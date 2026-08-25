@@ -3,11 +3,12 @@ import { promisify } from "node:util";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { rpcContract } from "./contracts.js";
-import { sanitizeThreadOrder } from "./work-model.js";
+import { sanitizeThreadOrder, type SidebarStack } from "./work-model.js";
 
 const execFileAsync = promisify(execFile);
 const TASKS_PLUGIN_ID = "tasks";
 const SIDEBAR_ORDER_KEY = "sidebar-thread-order:v1";
+const LATER_THREADS_KEY = "sidebar-later-threads:v1";
 const WORK_BINDINGS_KEY = "work-bindings:v2";
 export const SIDEBAR_ORDER_CHANNEL = "sidebar-order:changed";
 export const GITHUB_STACK_API_VERSION = "2026-03-10";
@@ -148,6 +149,25 @@ interface GitHubStackResponse {
   pull_requests: StackPullRequest[];
 }
 
+interface GitHubSearchPullRequest {
+  number: number;
+  title: string;
+  url: string;
+  repository: { nameWithOwner?: string };
+  state: "open";
+  isDraft?: boolean;
+}
+
+interface GitHubPullRequestDetails {
+  number?: number;
+  title?: string;
+  html_url?: string;
+  state?: string;
+  draft?: boolean;
+  head?: { ref?: string };
+  base?: { ref?: string };
+}
+
 export type GitHubApiRunner = (args: readonly string[], maxBuffer: number) => Promise<string>;
 
 const runGitHubApi: GitHubApiRunner = async (args, maxBuffer) => {
@@ -250,6 +270,95 @@ export async function fetchGitHubStack(
   return { number: raw.number, base: raw.base, currentPullRequest: pullRequest, pullRequests };
 }
 
+function parseAuthoredPullRequestSearch(value: unknown): GitHubSearchPullRequest[] {
+  if (!Array.isArray(value)) throw new Error("GitHub returned an invalid authored pull request list");
+  return value.flatMap((entry): GitHubSearchPullRequest[] => {
+    if (!isRecord(entry) || typeof entry.number !== "number" || typeof entry.title !== "string" || typeof entry.url !== "string" || !isRecord(entry.repository) || typeof entry.repository.nameWithOwner !== "string" || String(entry.state).toUpperCase() !== "OPEN") return [];
+    return [{ number: entry.number, title: entry.title, url: entry.url, repository: { nameWithOwner: entry.repository.nameWithOwner }, state: "open", isDraft: entry.isDraft === true }];
+  });
+}
+
+/** Resolve repository archival in batches rather than one REST call per PR. */
+async function archivedGitHubRepositories(repositories: readonly string[]): Promise<Set<string>> {
+  const unique = [...new Set(repositories)].filter((repository) => /^[^/]+\/[^/]+$/.test(repository));
+  const archived = new Set<string>();
+  // GitHub's search JSON includes a repository name but not its archived flag.
+  // Use GraphQL aliases in modest batches to keep this account-wide list fast.
+  for (let start = 0; start < unique.length; start += 50) {
+    const batch = unique.slice(start, start + 50);
+    const selections = batch.map((repository, index) => {
+      const slash = repository.indexOf("/");
+      const owner = repository.slice(0, slash);
+      const name = repository.slice(slash + 1);
+      return `r${index}: repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) { isArchived }`;
+    }).join(" ");
+    try {
+      const { stdout } = await execFileAsync("gh", ["api", "graphql", "-f", `query=query { ${selections} }`], { maxBuffer: 2_000_000 });
+      const parsed: unknown = JSON.parse(stdout);
+      const data = isRecord(parsed) && isRecord(parsed.data) ? parsed.data : {};
+      batch.forEach((repository, index) => {
+        const result = data[`r${index}`];
+        if (isRecord(result) && result.isArchived === true) archived.add(repository);
+      });
+    } catch {
+      // Search visibility remains useful during a transient metadata failure;
+      // the short PR cache retries archival filtering on its next refresh.
+    }
+  }
+  return archived;
+}
+
+type AuthoredPullRequestSignal = {
+  checks: "failed" | "passing" | "pending" | "none";
+  review: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
+};
+const UNKNOWN_AUTHORED_PULL_REQUEST_SIGNAL: AuthoredPullRequestSignal = { checks: "none", review: "none" };
+
+/** Fetch the concise CI and review summaries shown beside account-wide PRs. */
+async function authoredPullRequestSignals(items: readonly GitHubSearchPullRequest[]): Promise<Map<string, AuthoredPullRequestSignal>> {
+  const signals = new Map<string, AuthoredPullRequestSignal>();
+  for (let start = 0; start < items.length; start += 50) {
+    const batch = items.slice(start, start + 50);
+    const selections = batch.flatMap((item, index) => {
+      const repository = item.repository.nameWithOwner;
+      if (!repository) return [];
+      const slash = repository.indexOf("/");
+      const owner = repository.slice(0, slash);
+      const name = repository.slice(slash + 1);
+      return [`p${index}: repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) { pullRequest(number: ${item.number}) { reviewDecision reviewRequests(first: 1) { totalCount } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } }`];
+    }).join(" ");
+    if (!selections) continue;
+    try {
+      const { stdout } = await execFileAsync("gh", ["api", "graphql", "-f", `query=query { ${selections} }`], { maxBuffer: 4_000_000 });
+      const parsed: unknown = JSON.parse(stdout);
+      const data = isRecord(parsed) && isRecord(parsed.data) ? parsed.data : {};
+      batch.forEach((item, index) => {
+        const repository = item.repository.nameWithOwner;
+        const repositoryResult = data[`p${index}`];
+        const pullRequest = isRecord(repositoryResult) && isRecord(repositoryResult.pullRequest) ? repositoryResult.pullRequest : null;
+        if (!repository || !pullRequest) return;
+        const reviewDecision = String(pullRequest.reviewDecision ?? "");
+        const reviewRequests = isRecord(pullRequest.reviewRequests) && typeof pullRequest.reviewRequests.totalCount === "number" ? pullRequest.reviewRequests.totalCount : 0;
+        const review: AuthoredPullRequestSignal["review"] = reviewDecision === "APPROVED" ? "approved"
+          : reviewDecision === "CHANGES_REQUESTED" ? "changes_requested"
+          : reviewDecision === "REVIEW_REQUIRED" ? "review_required"
+          : reviewRequests > 0 ? "review_requested" : "none";
+        const commits = isRecord(pullRequest.commits) && Array.isArray(pullRequest.commits.nodes) ? pullRequest.commits.nodes : [];
+        const commit = commits[commits.length - 1];
+        const rollup = isRecord(commit) && isRecord(commit.commit) && isRecord(commit.commit.statusCheckRollup) ? commit.commit.statusCheckRollup : null;
+        const state = String(rollup?.state ?? "");
+        const checks: AuthoredPullRequestSignal["checks"] = state === "SUCCESS" ? "passing"
+          : state === "FAILURE" || state === "ERROR" ? "failed"
+          : state ? "pending" : "none";
+        signals.set(`${repository}#${item.number}`, { checks, review });
+      });
+    } catch {
+      // The main PR search remains useful if one metadata batch fails.
+    }
+  }
+  return signals;
+}
+
 export function projectCurrentPullRequest(pullRequest: CurrentPullRequest): CurrentPullRequest {
   return {
     number: pullRequest.number,
@@ -269,6 +378,7 @@ export function projectSidebarTask(task: Task, projectName: string, linkedThread
   return {
     id: task.id, projectId: task.projectId, projectName, key: task.key, title: task.title,
     status: task.status, priority: task.priority, dueDate: task.dueDate, parentTaskId: task.parentTaskId,
+    position: task.position,
     linkedThreadIds: [...linkedThreadIds],
   };
 }
@@ -345,7 +455,7 @@ export default async function plugin(bb: BbPluginApi) {
     do {
       const page = await tasksCall(
         "listTasks",
-        { ...input, limit: 500, ...(cursor ? { cursor } : {}) },
+        { activeOnly: input.activeOnly, sort: input.sort, limit: 500, ...(input.parentTaskId ? { parentTaskId: input.parentTaskId } : {}), ...(cursor ? { cursor } : {}) },
         taskPageSchema,
       );
       tasks.push(...page.tasks);
@@ -613,14 +723,99 @@ export default async function plugin(bb: BbPluginApi) {
       const stack = await fetchGitHubStack(owner, repo, currentPullRequest.number);
       return stack
         ? { currentPullRequest, reason: null, stack }
-        : { currentPullRequest, stack: null, reason: "This pull request is not part of a GitHub Stack." };
+        : { currentPullRequest, stack: null, reason: "This pull request is not part of a Stack." };
     } catch (error) {
       return {
         currentPullRequest,
         stack: null,
-        reason: error instanceof Error ? `GitHub Stacks unavailable: ${error.message}` : "GitHub Stacks unavailable.",
+        reason: error instanceof Error ? `Stack information is unavailable: ${error.message}` : "Stack information is unavailable.",
       };
     }
+  }
+
+  async function sidebarStackForThread(threadId: string): Promise<{ stack: SidebarStack | null; mergeTarget: string | null }> {
+    const result = await githubStack(threadId);
+    if (!result.stack) return { stack: null, mergeTarget: result.currentPullRequest?.base ?? null };
+    const repository = result.stack.pullRequests[0]?.url.match(/^https?:\/\/[^/]+\/([^/]+\/[^/]+)\//i)?.[1] ?? threadId;
+    return {
+      stack: {
+        id: `github-stack:${repository}:${result.stack.number}`,
+        number: result.stack.number,
+        base: result.stack.base,
+        currentPullRequest: result.stack.currentPullRequest,
+        pullRequests: result.stack.pullRequests.map((layer) => ({ ...layer })),
+      },
+      mergeTarget: result.currentPullRequest?.base ?? result.stack.base,
+    };
+  }
+
+  async function repositorySummary(thread: Awaited<ReturnType<typeof bb.sdk.threads.get>>) {
+    if (!thread.environmentId) return { outcome: "absent" as const, message: "This thread has no workspace.", branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFiles: [] };
+    try {
+      const result = await bb.sdk.environments.status({ environmentId: thread.environmentId });
+      if (result.outcome !== "available") return { outcome: result.outcome, message: "message" in result ? result.message : null, branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFiles: [] };
+      const { workspace } = result;
+      const mergeBase = workspace.mergeBase;
+      return {
+        outcome: "available" as const, message: null,
+        branch: workspace.branch.currentBranch ?? (workspace.checkout.kind === "branch" ? workspace.checkout.branchName : null),
+        base: mergeBase?.mergeBaseBranch ?? workspace.branch.defaultBranch,
+        ahead: mergeBase?.aheadCount ?? 0, behind: mergeBase?.behindCount ?? 0,
+        worktreeState: workspace.workingTree.state,
+        hasUncommittedChanges: workspace.workingTree.hasUncommittedChanges,
+        changedFiles: workspace.workingTree.files.slice(0, 8).map((file) => ({ path: file.path, status: file.status, insertions: file.insertions, deletions: file.deletions })),
+      };
+    } catch (error) {
+      return { outcome: "unavailable" as const, message: error instanceof Error ? error.message : "Repository status is unavailable.", branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFiles: [] };
+    }
+  }
+
+  type AuthoredPullRequestEntry = { number: number; title: string; url: string; repository: string; state: "open" | "draft"; draft: boolean; head: string; base: string; checks: AuthoredPullRequestSignal["checks"]; review: AuthoredPullRequestSignal["review"]; stack: SidebarStack | null };
+  let authoredPullRequestCache: { expiresAt: number; value: AuthoredPullRequestEntry[] } | null = null;
+  let authoredPullRequestStacksCache: { expiresAt: number; value: AuthoredPullRequestEntry[] } | null = null;
+  async function authoredPullRequests() {
+    if (authoredPullRequestCache && authoredPullRequestCache.expiresAt > Date.now()) return authoredPullRequestCache.value;
+    // `gh search prs` is GitHub's account-wide authored-PR search, unlike
+    // `gh pr list`, which is restricted to one checkout's repository.
+    // GitHub search exposes at most 1,000 matches. Request that full window so
+    // this is genuinely the user's account-wide open-PR list, not a 100-row
+    // subset that happens to include the current checkout.
+    const { stdout } = await execFileAsync("gh", ["search", "prs", "--author", "@me", "--state", "open", "--limit", "1000", "--json", "number,title,url,repository,state,isDraft"], { maxBuffer: 12_000_000 });
+    const search = parseAuthoredPullRequestSearch(JSON.parse(stdout));
+    const archivedRepositories = await archivedGitHubRepositories(search.flatMap((item) => item.repository.nameWithOwner ? [item.repository.nameWithOwner] : []));
+    const activeSearch = search.filter((item) => Boolean(item.repository.nameWithOwner) && !archivedRepositories.has(item.repository.nameWithOwner!));
+    const signals = await authoredPullRequestSignals(activeSearch);
+    const result: AuthoredPullRequestEntry[] = activeSearch.map((item) => {
+      const repository = item.repository.nameWithOwner!;
+      const signal = signals.get(`${repository}#${item.number}`) ?? UNKNOWN_AUTHORED_PULL_REQUEST_SIGNAL;
+      return { number: item.number, title: item.title, url: item.url, repository, state: item.isDraft ? "draft" as const : "open" as const, draft: item.isDraft === true, head: "", base: "", checks: signal.checks, review: signal.review, stack: null };
+    });
+    // Render account-wide open PRs as soon as search, archive filtering, and
+    // status signals arrive. Stack discovery is deliberately a second request.
+    authoredPullRequestCache = { expiresAt: Date.now() + 5 * 60_000, value: result };
+    return result;
+  }
+  async function authoredPullRequestStacks() {
+    if (authoredPullRequestStacksCache && authoredPullRequestStacksCache.expiresAt > Date.now()) return authoredPullRequestStacksCache.value;
+    const base = await authoredPullRequests();
+    const byPullRequest = new Map(base.map((item) => [`${item.repository}#${item.number}`, item]));
+    const describe = async (item: AuthoredPullRequestEntry): Promise<AuthoredPullRequestEntry> => {
+      try {
+        const { stdout } = await execFileAsync("gh", ["api", "--method", "GET", `repos/${item.repository}/stacks`, "-f", `pull_request=${item.number}`, "-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`], { maxBuffer: 2_000_000 });
+        const raw = parseGitHubStackResponse(JSON.parse(stdout));
+        if (!raw) return item;
+        const pullRequests = raw.pull_requests.flatMap((layer) => {
+          const known = byPullRequest.get(`${item.repository}#${layer.number}`);
+          return known ? [{ ...known, head: layer.head, base: layer.base || raw.base }] : [];
+        });
+        return pullRequests.length ? { ...item, stack: { id: `github-stack:${item.repository}:${raw.number}`, number: raw.number, base: raw.base, currentPullRequest: item.number, pullRequests } } : item;
+      } catch { return item; }
+    };
+    const result: AuthoredPullRequestEntry[] = [];
+    for (let start = 0; start < base.length; start += 12) result.push(...await Promise.all(base.slice(start, start + 12).map(describe)));
+    bb.log.info(`resolved ${result.length} authored PRs; ${result.filter((pullRequest) => pullRequest.stack).length} Stack memberships`);
+    authoredPullRequestStacksCache = { expiresAt: Date.now() + 5 * 60_000, value: result };
+    return result;
   }
 
   bb.rpc.register(rpcContract, {
@@ -630,6 +825,15 @@ export default async function plugin(bb: BbPluginApi) {
     async saveSiblingOrder({ threadIds }) {
       const sanitized = sanitizeThreadOrder(threadIds);
       await bb.storage.kv.set(SIDEBAR_ORDER_KEY, sanitized);
+      bb.realtime.publish(SIDEBAR_ORDER_CHANNEL, { threadIds: sanitized });
+      return { threadIds: sanitized };
+    },
+    async getLaterThreads() {
+      return { threadIds: sanitizeThreadOrder(await bb.storage.kv.get<unknown>(LATER_THREADS_KEY)) };
+    },
+    async saveLaterThreads({ threadIds }) {
+      const sanitized = sanitizeThreadOrder(threadIds);
+      await bb.storage.kv.set(LATER_THREADS_KEY, sanitized);
       bb.realtime.publish(SIDEBAR_ORDER_CHANNEL, { threadIds: sanitized });
       return { threadIds: sanitized };
     },
@@ -649,6 +853,42 @@ export default async function plugin(bb: BbPluginApi) {
         return { available: false, links: {}, error: error instanceof Error ? error.message : String(error) };
       }
     },
+    async sidebarPullRequestStacks({ threadIds }) {
+      try {
+        const entries = await Promise.all([...new Set(threadIds)].map(async (threadId) => [threadId, await sidebarStackForThread(threadId)] as const));
+        return {
+          available: true,
+          stacks: Object.fromEntries(entries.flatMap(([threadId, result]) => result.stack ? [[threadId, result.stack] as const] : [])),
+          mergeTargets: Object.fromEntries(entries.flatMap(([threadId, result]) => result.mergeTarget ? [[threadId, result.mergeTarget] as const] : [])),
+          error: null,
+        };
+      } catch (error) {
+        return { available: false, stacks: {}, mergeTargets: {}, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+    async sidebarAuthoredPullRequests({ force }) {
+      try {
+        if (force) { authoredPullRequestCache = null; authoredPullRequestStacksCache = null; }
+        return { available: true, pullRequests: await authoredPullRequests(), error: null };
+      } catch (error) {
+        return { available: false, pullRequests: [], error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+    async sidebarAuthoredPullRequestStacks() {
+      try {
+        return { available: true, pullRequests: await authoredPullRequestStacks(), error: null };
+      } catch (error) {
+        return { available: false, pullRequests: [], error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+    async setAuthoredPullRequestDraft({ url, draft }) {
+      await execFileAsync("gh", ["pr", "ready", url, ...(draft ? ["--undo"] : [])], { maxBuffer: 1_000_000 });
+      // The next PR-tab refresh should read GitHub's newly changed state,
+      // rather than retain this process-local discovery cache.
+      authoredPullRequestCache = null;
+      authoredPullRequestStacksCache = null;
+      return { draft };
+    },
     async getWorkContext({ threadId }) {
       const thread = await bb.sdk.threads.get({ threadId });
       const available = await tasksAvailable();
@@ -667,7 +907,7 @@ export default async function plugin(bb: BbPluginApi) {
         return task ? [summarizeTask(task, projectNames.get(task.projectId) ?? "Work")] : [];
       });
       const legacy = available && !outcomeBinding ? await legacyContext(root.id, root.projectId) : { state: "none" as const, taskIds: [], message: null };
-      const stackResult = await githubStack(threadId);
+      const [stackResult, repository] = await Promise.all([githubStack(threadId), repositorySummary(thread)]);
       return {
         tasksAvailable: available,
         currentThread: {
@@ -703,6 +943,7 @@ export default async function plugin(bb: BbPluginApi) {
         currentPullRequest: stackResult.currentPullRequest,
         stack: stackResult.stack,
         stackUnavailableReason: stackResult.reason,
+        repository,
       };
     },
     async createWorkTask(input) {
@@ -759,6 +1000,21 @@ export default async function plugin(bb: BbPluginApi) {
           z.object({ ok: z.literal(false), error: z.object({ code: z.string(), message: z.string() }) }),
         ]),
       );
+      if (!result.ok) throw new Error(result.error.message);
+      return { task: summarizeTask(result.task) };
+    },
+    async reorderTask({ taskId, beforeTaskId, afterTaskId }) {
+      const current = (await tasksCall("getTask", { taskId }, z.object({ task: taskSchema.nullable() }))).task;
+      if (!current) throw new Error(`Task not found: ${taskId}`);
+      for (const neighborId of [beforeTaskId, afterTaskId]) {
+        if (!neighborId) continue;
+        const neighbor = (await tasksCall("getTask", { taskId: neighborId }, z.object({ task: taskSchema.nullable() }))).task;
+        if (!neighbor || neighbor.projectId !== current.projectId || neighbor.status !== current.status || neighbor.parentTaskId !== current.parentTaskId) throw new Error("Tasks can only be reordered among same-project, same-status siblings");
+      }
+      const result = await tasksCall("boardMove", { taskId, status: current.status, beforeTaskId, afterTaskId, authorName: "Work Sidebar" }, z.union([
+        z.object({ ok: z.literal(true), task: taskSchema }),
+        z.object({ ok: z.literal(false), error: z.object({ code: z.string(), message: z.string() }) }),
+      ]));
       if (!result.ok) throw new Error(result.error.message);
       return { task: summarizeTask(result.task) };
     },

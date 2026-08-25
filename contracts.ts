@@ -15,6 +15,7 @@ const taskSummary = z.object({
   parentTaskId: z.string().nullable(),
 });
 const sidebarTask = taskSummary.extend({
+  position: z.number().optional(),
   linkedThreadIds: z.array(z.string()),
 });
 const taskLink = z.object({
@@ -67,6 +68,29 @@ const pullRequest = z.object({
     state: z.enum(["blocked", "conflicts", "draft", "mergeable", "unknown"]),
   }),
 });
+const sidebarStackLayer = z.object({
+  number: z.number().int().positive(), title: z.string(), state: z.string(), draft: z.boolean(),
+  url: z.string(), head: z.string(), base: z.string(), attention: z.string().nullable().optional(),
+  checks: z.enum(["failed", "passing", "pending", "none"]).optional(),
+  review: z.enum(["approved", "changes_requested", "review_requested", "review_required", "none"]).optional(),
+});
+const sidebarStack = z.object({
+  id: z.string(), number: z.number().int().positive().nullable(), base: z.string(),
+  currentPullRequest: z.number().int().positive().nullable(), pullRequests: z.array(sidebarStackLayer),
+});
+const authoredPullRequest = z.object({
+  number: z.number().int().positive(),
+  title: z.string(),
+  url: z.string().url(),
+  repository: z.string(),
+  state: z.enum(["open", "draft"]),
+  draft: z.boolean(),
+  head: z.string(),
+  base: z.string(),
+  checks: z.enum(["failed", "passing", "pending", "none"]),
+  review: z.enum(["approved", "changes_requested", "review_requested", "review_required", "none"]),
+  stack: sidebarStack.nullable(),
+});
 
 export const rpcContract = defineRpcContract({
   getSidebarOrder: {
@@ -76,6 +100,14 @@ export const rpcContract = defineRpcContract({
   saveSiblingOrder: {
     input: z.object({ threadIds: z.array(z.string()) }).strict(),
     output: z.object({ threadIds: z.array(z.string()) }).strict(),
+  },
+  getLaterThreads: {
+    input: z.null(),
+    output: z.object({ threadIds: z.array(z.string().startsWith("thr_")) }).strict(),
+  },
+  saveLaterThreads: {
+    input: z.object({ threadIds: z.array(z.string().startsWith("thr_")).max(2_000) }).strict(),
+    output: z.object({ threadIds: z.array(z.string().startsWith("thr_")) }).strict(),
   },
   sidebarTasks: {
     input: z.null(),
@@ -92,6 +124,33 @@ export const rpcContract = defineRpcContract({
       links: z.record(z.string(), z.array(taskLink)),
       error: z.string().nullable(),
     }),
+  },
+  sidebarPullRequestStacks: {
+    input: z.object({ threadIds: z.array(z.string().startsWith("thr_")).max(200) }).strict(),
+    output: z.object({
+      available: z.boolean(), stacks: z.record(z.string(), sidebarStack),
+      mergeTargets: z.record(z.string(), z.string()), error: z.string().nullable(),
+    }).strict(),
+  },
+  sidebarAuthoredPullRequests: {
+    input: z.object({ force: z.boolean().optional() }).strict(),
+    output: z.object({
+      available: z.boolean(),
+      pullRequests: z.array(authoredPullRequest),
+      error: z.string().nullable(),
+    }).strict(),
+  },
+  sidebarAuthoredPullRequestStacks: {
+    input: z.null(),
+    output: z.object({
+      available: z.boolean(),
+      pullRequests: z.array(authoredPullRequest),
+      error: z.string().nullable(),
+    }).strict(),
+  },
+  setAuthoredPullRequestDraft: {
+    input: z.object({ url: z.string().url(), draft: z.boolean() }).strict(),
+    output: z.object({ draft: z.boolean() }).strict(),
   },
   getWorkContext: {
     input: z.object({ threadId: z.string() }).strict(),
@@ -150,6 +209,17 @@ export const rpcContract = defineRpcContract({
         })),
       }).nullable(),
       stackUnavailableReason: z.string().nullable(),
+      repository: z.object({
+        outcome: z.enum(["available", "not_applicable", "unavailable", "absent"]),
+        message: z.string().nullable(),
+        branch: z.string().nullable(),
+        base: z.string().nullable(),
+        ahead: z.number(),
+        behind: z.number(),
+        worktreeState: z.string().nullable(),
+        hasUncommittedChanges: z.boolean(),
+        changedFiles: z.array(z.object({ path: z.string(), status: z.string(), insertions: z.number().nullable(), deletions: z.number().nullable() })),
+      }),
     }),
   },
   createWorkTask: {
@@ -193,7 +263,11 @@ export const rpcContract = defineRpcContract({
     output: z.object({ task: taskSummary }),
   },
   updateTaskStatus: {
-    input: z.object({ taskId: z.string(), status: z.literal("in_review") }).strict(),
+    input: z.object({ taskId: z.string(), status: taskStatus }).strict(),
+    output: z.object({ task: taskSummary }),
+  },
+  reorderTask: {
+    input: z.object({ taskId: z.string(), beforeTaskId: z.string().nullable(), afterTaskId: z.string().nullable() }).strict(),
     output: z.object({ task: taskSummary }),
   },
 });

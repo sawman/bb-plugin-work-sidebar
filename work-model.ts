@@ -25,10 +25,12 @@ export interface TaskSummary {
   title: string;
   status: "backlog" | "todo" | "in_progress" | "in_review" | "done" | "canceled";
   priority: "urgent" | "high" | "medium" | "low" | "none";
+  dueDate: string | null;
   parentTaskId: string | null;
 }
 
 export interface SidebarTask extends TaskSummary {
+  position?: number;
   linkedThreadIds: string[];
 }
 
@@ -207,6 +209,41 @@ export function orderTasks(tasks: readonly SidebarTask[]): SidebarTask[] {
   );
 }
 
+function orderTaskSiblings(tasks: readonly SidebarTask[]): SidebarTask[] {
+  const manual = tasks.some((task) => Number.isFinite(task.position));
+  if (!manual) return orderTasks(tasks);
+  return [...tasks].sort((left, right) =>
+    (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER) ||
+    left.key.localeCompare(right.key) || left.id.localeCompare(right.id),
+  );
+}
+
+export type TaskOrderPlacement = "before" | "after";
+
+export function reorderTaskSiblings(tasks: readonly SidebarTask[], sourceId: string, targetId: string, placement: TaskOrderPlacement = "before"): SidebarTask[] {
+  const source = tasks.find((task) => task.id === sourceId);
+  const target = tasks.find((task) => task.id === targetId);
+  if (!source || !target || sourceId === targetId || source.projectId !== target.projectId || source.status !== target.status || source.parentTaskId !== target.parentTaskId) return [...tasks];
+  const siblings = orderTaskSiblings(tasks.filter((task) => task.projectId === source.projectId && task.status === source.status && task.parentTaskId === source.parentTaskId));
+  const next = siblings.filter((task) => task.id !== sourceId);
+  const targetIndex = next.findIndex((task) => task.id === targetId);
+  if (targetIndex < 0) return [...tasks];
+  next.splice(targetIndex + (placement === "after" ? 1 : 0), 0, source);
+  const positions = new Map(next.map((task, index) => [task.id, (index + 1) * 1024]));
+  return tasks.map((task) => positions.has(task.id) ? { ...task, position: positions.get(task.id) } : task);
+}
+
+export function taskReorderNeighbors(tasks: readonly SidebarTask[], sourceId: string, targetId: string, placement: TaskOrderPlacement = "before"): { beforeTaskId: string | null; afterTaskId: string | null } | null {
+  const source = tasks.find((task) => task.id === sourceId);
+  const target = tasks.find((task) => task.id === targetId);
+  if (!source || !target || sourceId === targetId || source.projectId !== target.projectId || source.status !== target.status || source.parentTaskId !== target.parentTaskId) return null;
+  const siblings = orderTaskSiblings(tasks.filter((task) => task.projectId === source.projectId && task.status === source.status && task.parentTaskId === source.parentTaskId && task.id !== sourceId));
+  const targetIndex = siblings.findIndex((task) => task.id === targetId);
+  if (targetIndex < 0) return null;
+  const insertion = targetIndex + (placement === "after" ? 1 : 0);
+  return { beforeTaskId: siblings[insertion - 1]?.id ?? null, afterTaskId: siblings[insertion]?.id ?? null };
+}
+
 export function projectTaskQueue(tasks: readonly SidebarTask[]): TaskQueueNode[] {
   const tasksById = new Map(tasks.map((task) => [task.id, task]));
   const childrenByParent = new Map<string, SidebarTask[]>();
@@ -218,14 +255,14 @@ export function projectTaskQueue(tasks: readonly SidebarTask[]): TaskQueueNode[]
     childrenByParent.set(task.parentTaskId, siblings);
   }
 
-  const roots = orderTasks(tasks.filter((task) => !task.parentTaskId));
-  const orphanExecutions = orderTasks(tasks.filter((task) => task.parentTaskId && !tasksById.has(task.parentTaskId)));
+  const roots = orderTaskSiblings(tasks.filter((task) => !task.parentTaskId));
+  const orphanExecutions = orderTaskSiblings(tasks.filter((task) => task.parentTaskId && !tasksById.has(task.parentTaskId)));
 
   return [
     ...roots.map((task) => ({
       task,
       role: "outcome" as const,
-      children: orderTasks(childrenByParent.get(task.id) ?? []),
+      children: orderTaskSiblings(childrenByParent.get(task.id) ?? []),
       hasVisibleOutcomeParent: true,
     })),
     ...orphanExecutions.map((task) => ({
@@ -329,7 +366,52 @@ export interface StackLayer {
   url: string;
   head: string;
   base: string;
+  attention?: string | null;
+  checks?: "failed" | "passing" | "pending" | "none";
+  review?: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
 }
+
+/** The compact, host-neutral stack payload used by the PR-sidebar adapter. */
+export interface SidebarStack {
+  id: string;
+  number: number | null;
+  base: string;
+  currentPullRequest: number | null;
+  pullRequests: StackLayer[];
+}
+
+export interface PullRequestProjectionRecord {
+  thread: PluginSidebarThread;
+  pullRequest: PluginSidebarPullRequest;
+  stack: SidebarStack | null;
+}
+
+export interface PullRequestLayerProjection {
+  key: string;
+  pullRequest: PluginSidebarPullRequest;
+  thread: PluginSidebarThread | null;
+  handlingThreadIds: string[];
+  layer: StackLayer;
+}
+
+export interface PullRequestRowProjection {
+  kind: "pull-request";
+  key: string;
+  pullRequest: PluginSidebarPullRequest;
+  thread: PluginSidebarThread;
+  handlingThreadIds: string[];
+}
+
+export interface PullRequestStackProjection {
+  kind: "stack";
+  id: string;
+  number: number | null;
+  base: string;
+  currentPullRequest: number | null;
+  layers: PullRequestLayerProjection[];
+}
+
+export type PullRequestGroupProjection = PullRequestRowProjection | PullRequestStackProjection;
 
 export interface CurrentPullRequestView {
   number: number;
@@ -389,4 +471,62 @@ export function orderStackLayers(
   return ordered.concat(remaining);
 }
 
+function stackLayerKey(layer: StackLayer): string {
+  return layer.url.trim().toLocaleLowerCase() || `#${layer.number}`;
+}
 
+function stackProjectionKey(stack: SidebarStack): string {
+  return stack.id.trim() || [stack.base, ...stack.pullRequests.map(stackLayerKey)].join("|");
+}
+
+function pullRequestFromStackLayer(layer: StackLayer): PluginSidebarPullRequest {
+  const state = layer.draft ? "draft" : ["open", "draft", "merged", "closed"].includes(layer.state.toLocaleLowerCase())
+    ? layer.state.toLocaleLowerCase()
+    : "open";
+  return { number: layer.number, title: layer.title, url: layer.url, state: state as PluginSidebarPullRequest["state"], attention: (layer.attention ?? "none") as PluginSidebarPullRequest["attention"] };
+}
+
+/** Project per-thread PRs into one ordinary row per PR and one row per Stack. */
+export function projectPullRequestGroups(records: readonly PullRequestProjectionRecord[]): PullRequestGroupProjection[] {
+  const unique = new Map<string, PullRequestProjectionRecord>();
+  const handlers = new Map<string, string[]>();
+  const firstIndex = new Map<string, number>();
+  records.forEach((record, index) => {
+    const key = pullRequestKey(record.pullRequest);
+    if (!unique.has(key)) { unique.set(key, record); firstIndex.set(key, index); }
+    const ids = handlers.get(key) ?? [];
+    if (!ids.includes(record.thread.id)) ids.push(record.thread.id);
+    handlers.set(key, ids);
+  });
+  const stacks = new Map<string, PullRequestStackProjection>();
+  const stackOrder: string[] = [];
+  for (const record of records) {
+    if (!record.stack?.pullRequests.length) continue;
+    const id = stackProjectionKey(record.stack);
+    let group = stacks.get(id);
+    if (!group) {
+      group = { kind: "stack", id, number: record.stack.number, base: record.stack.base, currentPullRequest: record.stack.currentPullRequest, layers: [] };
+      stacks.set(id, group); stackOrder.push(id);
+    }
+    const existing = new Set(group.layers.map((layer) => layer.key));
+    for (const layer of orderStackLayers(record.stack.pullRequests, record.stack.base)) {
+      const key = stackLayerKey(layer);
+      if (existing.has(key)) continue;
+      existing.add(key);
+      const owner = unique.get(key);
+      group.layers.push({ key, pullRequest: owner?.pullRequest ?? pullRequestFromStackLayer(layer), thread: owner?.thread ?? null, handlingThreadIds: handlers.get(key) ?? [], layer });
+    }
+  }
+  const claimed = new Set<string>();
+  const result: PullRequestGroupProjection[] = [];
+  for (const id of stackOrder) {
+    const group = stacks.get(id)!;
+    group.layers = group.layers.filter((layer) => !claimed.has(layer.key) && Boolean(claimed.add(layer.key)));
+    if (group.layers.length) result.push(group);
+  }
+  for (const [key, record] of unique) if (!claimed.has(key)) result.push({ kind: "pull-request", key, pullRequest: record.pullRequest, thread: record.thread, handlingThreadIds: handlers.get(key) ?? [record.thread.id] });
+  return result.sort((left, right) => {
+    const index = (group: PullRequestGroupProjection) => group.kind === "stack" ? Math.min(...group.layers.map((layer) => firstIndex.get(layer.key) ?? Number.MAX_SAFE_INTEGER)) : firstIndex.get(group.key) ?? Number.MAX_SAFE_INTEGER;
+    return index(left) - index(right);
+  });
+}
