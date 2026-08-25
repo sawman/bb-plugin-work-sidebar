@@ -17,6 +17,7 @@ const paths: Record<string, React.ReactNode> = {
   ListTodo: <><path d="m4 6 1.5 1.5L8 4.5M11 6h9M4 12l1.5 1.5L8 10.5M11 12h9M4 18l1.5 1.5L8 16.5M11 18h9" /></>,
   LoaderCircle: <path d="M12 3a9 9 0 1 0 9 9" />,
   Plus: <path d="M12 5v14M5 12h14" />,
+  RefreshCw: <><path d="M20 11a8 8 0 0 0-14.8-4.2L3 9" /><path d="M3 4v5h5" /><path d="M4 13a8 8 0 0 0 14.8 4.2L21 15" /><path d="M21 20v-5h-5" /></>,
   Pin: <><path d="m14 4 6 6-3 2-3 5-2-2-5 3-2-2 3-5-2-3z" /><path d="m7 17-3 3" /></>,
   User: <><circle cx="12" cy="8" r="3" /><path d="M5 20a7 7 0 0 1 14 0" /></>,
   Wrench: <><path d="M14.5 6.5a4 4 0 0 0-5.2 5.2L4 17a2 2 0 1 0 2.8 2.8l5.3-5.3a4 4 0 0 0 5.2-5.2l-2.7 2.1-2.2-2.2z" /></>,
