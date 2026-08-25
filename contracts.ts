@@ -91,6 +91,11 @@ const authoredPullRequest = z.object({
   review: z.enum(["approved", "changes_requested", "review_requested", "review_required", "none"]),
   stack: sidebarStack.nullable(),
 });
+const archivedThread = z.object({
+  id: z.string().startsWith("thr_"), projectId: z.string(), title: z.string().nullable(), titleFallback: z.string().nullable(),
+  parentThreadId: z.string().nullable(), environmentBranchName: z.string().nullable(), isPinned: z.boolean(), isUnread: z.boolean(),
+  createdAt: z.number(), updatedAt: z.number(), archivedAt: z.number(),
+});
 
 export const rpcContract = defineRpcContract({
   getSidebarOrder: {
@@ -151,6 +156,14 @@ export const rpcContract = defineRpcContract({
   setAuthoredPullRequestDraft: {
     input: z.object({ url: z.string().url(), draft: z.boolean() }).strict(),
     output: z.object({ draft: z.boolean() }).strict(),
+  },
+  sidebarArchivedThreads: {
+    input: z.object({ force: z.boolean().optional() }).strict(),
+    output: z.object({ available: z.boolean(), threads: z.array(archivedThread), error: z.string().nullable() }).strict(),
+  },
+  unarchiveSidebarThread: {
+    input: z.object({ threadId: z.string().startsWith("thr_") }).strict(),
+    output: z.object({ threadId: z.string().startsWith("thr_") }).strict(),
   },
   getWorkContext: {
     input: z.object({ threadId: z.string() }).strict(),

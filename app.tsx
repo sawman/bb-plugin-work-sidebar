@@ -66,12 +66,18 @@ function indicatorGlyph(value: string): string {
   switch (normalizeIndicator(value)) {
     case "runtime": case "workflow": case "background-agent": case "background-command": return "●";
     case "unread-error": return "!";
-    case "unread-success": return "✓";
+    case "unread-success": return "•";
     case "waiting-for-input": return "?";
-    case "goal": return "◆";
-    case "plan-mode": return "◫";
+    case "goal": case "plan-mode": return "";
     default: return "";
   }
+}
+
+function threadPullRequestTone(pullRequest: { state: string; attention: string }): "open" | "draft" | "problem" | "merged" | "closed" {
+  if (pullRequest.state === "closed") return "closed";
+  if (pullRequest.state === "merged") return "merged";
+  if (pullRequest.state === "draft") return "draft";
+  return pullRequest.attention === "changes_requested" || pullRequest.attention === "checks_failed" || pullRequest.attention === "conflicts" ? "problem" : "open";
 }
 
 function visibleThreadTreeIds(roots: readonly PluginSidebarThread[], childrenByThread: ReadonlyMap<string, readonly PluginSidebarThread[]>): string[] {
@@ -139,6 +145,9 @@ function ThreadRow({
   const [draftTitle, setDraftTitle] = useState(threadTitle(thread));
   const projectLabel = project?.isPersonal ? "Personal" : project?.name ?? "Project";
   const title = threadTitle(thread);
+  const indicator = normalizeIndicator(String(thread.indicator));
+  const working = indicator === "runtime" || indicator === "workflow" || indicator === "background-agent" || indicator === "background-command" || indicator === "goal" || indicator === "plan-mode" || indicator === "working-draft";
+  const pullRequestTone = pullRequest ? threadPullRequestTone(pullRequest) : null;
 
   const open = (split = false) => {
     actions.open(thread.id, { split });
@@ -237,19 +246,19 @@ function ThreadRow({
               <span className="ws-thread-main">
                 <span className={`ws-thread-title ${thread.isUnread ? "ws-unread" : ""}`}>{title}</span>
                 <span className="ws-thread-meta">
-                  {orderTaskLinksByRelevance(taskLinks ?? []).map((taskLink) => <span className="ws-task-link" key={`${taskLink.task.id}:${taskLink.role}`} title={`${taskLink.task.title} · ${taskLink.task.key}`}><span>{taskLink.task.title}</span><small className="ws-task-key">{taskLink.task.key}</small></span>)}
-                  <span>{thread.environment?.branchName || (project?.isPersonal ? "Personal" : projectLabel)}</span>
-                  {pullRequest && <span className={`ws-pr-meta ws-pr-${pullRequest.attention}`}>PR #{pullRequest.number} · {pullRequest.state}</span>}
+                  {pullRequest && <span className={`ws-pr-meta ws-thread-token ws-thread-pr-token ws-thread-pr-${pullRequestTone}`} title={`PR #${pullRequest.number} · ${pullRequest.attention === "ready_to_merge" ? "Ready to merge" : pullRequest.state}`}><Icon name={pullRequestTone === "closed" ? "X" : pullRequest.attention === "ready_to_merge" ? "Check" : "GitPullRequest"} aria-hidden /><span>#{pullRequest.number}</span></span>}
+                  {children > 0 && <span className="ws-thread-agent-count ws-thread-token" title={`${children} agent${children === 1 ? "" : "s"}`}><Icon name="Bot" aria-hidden /><span>{children}</span></span>}
+                  <span className="ws-thread-worktree" title={thread.environment?.branchName || (project?.isPersonal ? "Personal" : projectLabel)}><Icon name="GitBranch" aria-hidden /><span>{thread.environment?.branchName || (project?.isPersonal ? "Personal" : projectLabel)}</span></span>
+                  {orderTaskLinksByRelevance(taskLinks ?? []).map((taskLink) => <span className="ws-task-link" key={`${taskLink.task.id}:${taskLink.role}`} title={`${taskLink.task.title} · ${taskLink.task.key}`}><Icon name="ListTodo" aria-hidden /><small className="ws-task-key">{taskLink.task.key}</small></span>)}
                   {pullRequestLoading && <span className="ws-pr-meta" aria-label="Pull request loading">PR loading…</span>}
-                  {children > 0 && <span>{children} agent{children === 1 ? "" : "s"}</span>}
                 </span>
               </span>
               <span className="ws-thread-trailing">
-                <span className={`ws-status ws-status-${normalizeIndicator(String(thread.indicator))}`} aria-label={thread.indicatorLabel ?? undefined}>
-                  {indicatorGlyph(String(thread.indicator))}
+                <span className={`ws-status ws-status-${indicator} ${working ? "ws-status-working" : ""}`} aria-label={thread.indicatorLabel ?? undefined}>
+                  {working ? <span className="ws-status-dots" aria-hidden><i /><i /><i /></span> : indicatorGlyph(String(thread.indicator))}
                 </span>
-                {thread.isPinned && <span className="ws-state" title="Pinned">◆</span>}
-                {thread.isUnread && <span className="ws-unread-dot" title="Unread" />}
+                {thread.isPinned && <Icon name="Pin" className="ws-thread-pin" aria-label="Pinned" />}
+                {thread.isUnread && !working && indicator !== "unread-success" && <span className="ws-unread-dot" title="Unread" />}
               </span>
             </a>
           </ContextMenuTrigger>
@@ -399,6 +408,11 @@ type AuthoredPullRequest = {
   checks?: "failed" | "passing" | "pending" | "none";
   review?: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
   stack: SidebarStack | null;
+};
+
+type ArchivedThread = {
+  id: string; projectId: string; title: string | null; titleFallback: string | null; parentThreadId: string | null;
+  environmentBranchName: string | null; isPinned: boolean; isUnread: boolean; createdAt: number; updatedAt: number; archivedAt: number;
 };
 
 function authoredCheckStatus(checks: AuthoredPullRequest["checks"]): { icon: string; label: string } {
@@ -569,6 +583,23 @@ function TaskRow({ node, siblings, showProject, reorderDisabled, dragTaskId, dro
 
 type SidebarView = "work" | "queue" | "prs";
 
+function ArchivedThreadRow({ thread, project, onUnarchive, onNavigate }: { thread: ArchivedThread; project?: { name: string; isPersonal: boolean }; onUnarchive(threadId: string): void; onNavigate(): void }) {
+  const actions = experimental_useSidebarThreadActions();
+  const title = thread.title || thread.titleFallback || "Untitled thread";
+  const projectLabel = project?.isPersonal ? "Personal" : project?.name ?? "Project";
+  return <article className="ws-thread ws-archived-thread">
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <a href="#" className="ws-thread-anchor" onClick={(event) => { event.preventDefault(); actions.open(thread.id); onNavigate(); }}>
+          <Icon name={project?.isPersonal ? "Laptop" : "FolderGit"} className="ws-project-icon" aria-label={projectLabel} />
+          <span className="ws-thread-main"><span className="ws-thread-title">{title}</span><span className="ws-thread-meta"><span>{thread.environmentBranchName || projectLabel}</span><span>Archived</span></span></span>
+        </a>
+      </ContextMenuTrigger>
+      <ContextMenuContent aria-label={`Actions for ${title}`}><ContextMenuLabel>{title}</ContextMenuLabel><ContextMenuItem onSelect={() => { actions.open(thread.id); onNavigate(); }}>Open</ContextMenuItem><ContextMenuSeparator /><ContextMenuItem onSelect={() => onUnarchive(thread.id)}>Unarchive</ContextMenuItem><ContextMenuSeparator /><ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => actions.requestDelete(thread.id)}>Delete</ContextMenuItem></ContextMenuContent>
+    </ContextMenu>
+  </article>;
+}
+
 function sidebarViewLabel(id: SidebarView): string {
   switch (id) {
     case "queue": return "Tasks";
@@ -584,6 +615,11 @@ function WorkThreadList(props: PluginThreadListProps) {
   const rpc = useRpc<typeof rpcContract>();
   const [taskLinks, setTaskLinks] = useState<Record<string, ThreadTaskLink[]>>({});
   const [view, setView] = useState<SidebarView>("work");
+  const [activeThreadsOpen, setActiveThreadsOpen] = useState(true);
+  const [archivedOpen, setArchivedOpen] = useState(false);
+  const [archivedThreads, setArchivedThreads] = useState<ArchivedThread[]>([]);
+  const [archivedThreadState, setArchivedThreadState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [archivedThreadError, setArchivedThreadError] = useState<string | null>(null);
   const [tasks, setTasks] = useState<SidebarTask[]>([]);
   const [taskState, setTaskState] = useState<"loading" | "ready" | "error">("loading");
   const [taskError, setTaskError] = useState<string | null>(null);
@@ -654,6 +690,28 @@ function WorkThreadList(props: PluginThreadListProps) {
   useEffect(() => {
     void refreshLaterThreads();
   }, [refreshLaterThreads]);
+  const refreshArchivedThreads = useCallback(async (force = false) => {
+    setArchivedThreadState("loading"); setArchivedThreadError(null);
+    try {
+      const result = await rpc.call("sidebarArchivedThreads", { force });
+      if (!result.available) throw new Error(result.error ?? "Archived threads are unavailable.");
+      setArchivedThreads(result.threads); setArchivedThreadState("ready");
+    } catch (error) {
+      setArchivedThreads([]); setArchivedThreadError(error instanceof Error ? error.message : String(error)); setArchivedThreadState("error");
+    }
+  }, [rpc]);
+  useEffect(() => {
+    // Warm this slow native query after the visible sidebar is responsive, so
+    // expanding Archived normally renders from the plugin/server cache.
+    const timer = window.setTimeout(() => void refreshArchivedThreads(), 350);
+    return () => window.clearTimeout(timer);
+  }, [refreshArchivedThreads]);
+  const unarchiveThread = useCallback((threadId: string) => {
+    void rpc.call("unarchiveSidebarThread", { threadId }).then(() => {
+      setArchivedThreads((current) => current.filter((thread) => thread.id !== threadId));
+      toast.success("Thread unarchived");
+    }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not unarchive thread"));
+  }, [rpc]);
   useRealtime(SIDEBAR_ORDER_CHANNEL, () => {
     void refreshSidebarOrder();
     void refreshLaterThreads();
@@ -1000,6 +1058,8 @@ function WorkThreadList(props: PluginThreadListProps) {
           </Button>}
         </span>
       </div>
+      <details className="ws-later ws-active-threads" open={activeThreadsOpen} onToggle={(event) => setActiveThreadsOpen(event.currentTarget.open)}>
+      <summary>Active <span>{orderedRoots.length}</span></summary>
       <section className="ws-hierarchy" aria-label="Work threads">
         {orderedRoots.map((thread) => (
           <WorkThreadTree
@@ -1025,7 +1085,9 @@ function WorkThreadList(props: PluginThreadListProps) {
           />
         ))}
       </section>
+      </details>
       <details className="ws-later" data-drop-target={threadDropTarget?.threadId === "later" || undefined} open onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || allLaterIds.has(sourceId)) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: "later", placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || allLaterIds.has(sourceId)) return; event.preventDefault(); toggleLater(sourceId); setDragThreadId(null); setThreadDropTarget(null); }}><summary>Later <span>{laterRoots.length}</span></summary>{laterRoots.length > 0 ? <section className="ws-hierarchy" aria-label="Threads for later">{laterRoots.map((thread) => <WorkThreadTree key={thread.id} thread={thread} childrenByThread={laterChildrenByThread} taskLinks={taskLinks} activeThreadId={props.activeThreadId} selectedThreadIds={selectedThreadIds} laterThreadIds={allLaterIds} projectsById={projectsById} onNavigate={props.onNavigate} onSelect={selectThread} onToggleLater={toggleLater} orderedSiblings={laterRoots} reorderDisabled={reorderDisabled} dragThreadId={dragThreadId} onDragThreadChange={setDragThreadId} dropTarget={threadDropTarget} onDropTargetChange={setThreadDropTarget} onDropThread={reorder} onMoveThread={move} />)}</section> : <div className="ws-later-empty">Right-click a thread to move it here.</div>}</details>
+      <details className="ws-later ws-archived" open={archivedOpen} onToggle={(event) => setArchivedOpen(event.currentTarget.open)}><summary>Archived <span>{archivedThreadState === "ready" ? archivedThreads.length : ""}</span></summary>{archivedThreadState === "idle" || archivedThreadState === "loading" ? <div className="ws-later-empty">Loading archived threads…</div> : archivedThreadState === "error" ? <div className="ws-callout">{archivedThreadError ?? "Could not load archived threads."}<button onClick={() => void refreshArchivedThreads(true)}>Try again</button></div> : <><div className="ws-archived-toolbar"><span>{archivedThreads.length} archived thread{archivedThreads.length === 1 ? "" : "s"}</span><button onClick={() => void refreshArchivedThreads(true)}>Refresh</button></div>{archivedThreads.length > 0 ? <section className="ws-hierarchy" aria-label="Archived threads">{archivedThreads.map((thread) => <ArchivedThreadRow key={thread.id} thread={thread} project={projectsById.get(thread.projectId)} onUnarchive={unarchiveThread} onNavigate={props.onNavigate} />)}</section> : <div className="ws-later-empty">No archived threads.</div>}</>}</details>
       {filtered.length === 0 && <div className="ws-empty">{props.searchQuery ? `No threads match “${props.searchQuery}”.` : "No active threads."}</div>}
       <details className="ws-native-fallback"><summary>Use BB’s native list</summary><Original /></details>
       </>}

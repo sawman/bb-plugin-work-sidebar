@@ -10,6 +10,11 @@ const TASKS_PLUGIN_ID = "tasks";
 const SIDEBAR_ORDER_KEY = "sidebar-thread-order:v1";
 const LATER_THREADS_KEY = "sidebar-later-threads:v1";
 const WORK_BINDINGS_KEY = "work-bindings:v2";
+// Plugin hosts do not inherit the interactive shell PATH. BB_CLI is injected
+// by BB specifically so plugins can invoke the same daemon-compatible binary.
+const BB_CLI = process.env.BB_CLI || "bb";
+let archivedThreadsCache: { expiresAt: number; value: Awaited<ReturnType<typeof loadSidebarArchivedThreads>> } | null = null;
+let archivedThreadsPending: Promise<Awaited<ReturnType<typeof loadSidebarArchivedThreads>>> | null = null;
 export const SIDEBAR_ORDER_CHANNEL = "sidebar-order:changed";
 export const GITHUB_STACK_API_VERSION = "2026-03-10";
 export const GITHUB_ACCEPT_HEADER = "application/vnd.github+json";
@@ -434,6 +439,39 @@ function assertOutcomeTaskBinding(binding: OutcomeBinding, task: Task) {
 function assertExecutionTaskBinding(binding: ExecutionBinding, task: Task) {
   if (task.parentTaskId !== binding.outcomeTaskId) throw new Error("Execution binding is no longer a direct child of the durable outcome");
   if (task.projectId !== binding.taskProjectId) throw new Error(`Execution binding project mismatch: task ${task.id} is in ${task.projectId}, binding expects ${binding.taskProjectId}`);
+}
+
+async function loadSidebarArchivedThreads() {
+  const { stdout } = await execFileAsync(BB_CLI, ["thread", "list", "--archived", "--json"], { maxBuffer: 8_000_000 });
+  const rows: unknown = JSON.parse(stdout);
+  if (!Array.isArray(rows)) throw new Error("BB returned an invalid archived-thread list.");
+  return rows.flatMap((row) => {
+    if (!isRecord(row) || typeof row.id !== "string" || !row.id.startsWith("thr_") || typeof row.projectId !== "string") return [];
+    const archivedAt = typeof row.archivedAt === "number" ? row.archivedAt : null;
+    if (archivedAt === null || typeof row.deletedAt === "number") return [];
+    return [{
+      id: row.id,
+      projectId: row.projectId,
+      title: typeof row.title === "string" ? row.title : null,
+      titleFallback: typeof row.titleFallback === "string" ? row.titleFallback : null,
+      parentThreadId: typeof row.parentThreadId === "string" ? row.parentThreadId : null,
+      environmentBranchName: typeof row.environmentBranchName === "string" ? row.environmentBranchName : null,
+      isPinned: row.pinnedAt !== null,
+      isUnread: false,
+      createdAt: typeof row.createdAt === "number" ? row.createdAt : 0,
+      updatedAt: typeof row.updatedAt === "number" ? row.updatedAt : archivedAt,
+      archivedAt,
+    }];
+  });
+}
+
+async function sidebarArchivedThreads() {
+  if (archivedThreadsCache && archivedThreadsCache.expiresAt > Date.now()) return archivedThreadsCache.value;
+  if (!archivedThreadsPending) archivedThreadsPending = loadSidebarArchivedThreads().then((value) => {
+    archivedThreadsCache = { value, expiresAt: Date.now() + 5 * 60_000 };
+    return value;
+  }).finally(() => { archivedThreadsPending = null; });
+  return archivedThreadsPending;
 }
 
 export default async function plugin(bb: BbPluginApi) {
@@ -888,6 +926,19 @@ export default async function plugin(bb: BbPluginApi) {
       authoredPullRequestCache = null;
       authoredPullRequestStacksCache = null;
       return { draft };
+    },
+    async sidebarArchivedThreads({ force }) {
+      try {
+        if (force) archivedThreadsCache = null;
+        return { available: true, threads: await sidebarArchivedThreads(), error: null };
+      } catch (error) {
+        return { available: false, threads: [], error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+    async unarchiveSidebarThread({ threadId }) {
+      await execFileAsync(BB_CLI, ["thread", "unarchive", threadId], { maxBuffer: 1_000_000 });
+      archivedThreadsCache = null;
+      return { threadId };
     },
     async getWorkContext({ threadId }) {
       const thread = await bb.sdk.threads.get({ threadId });
