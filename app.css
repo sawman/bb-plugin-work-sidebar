@@ -1,0 +1,4 @@
+.ws-list,.ws-panel{padding:.75rem;font:13px/1.4 system-ui,sans-serif;color:var(--foreground)}
+.ws-toolbar,.ws-row,.ws-actions{display:flex;align-items:center;gap:.5rem}.ws-toolbar{justify-content:space-between}.ws-hint,.ws-empty,.ws-row small{color:var(--muted-foreground)}
+.ws-row{margin:.2rem 0}.ws-thread{display:grid;flex:1;min-width:0;text-align:left;border:0;border-radius:6px;padding:.5rem;background:transparent;color:inherit;cursor:pointer}.ws-thread:hover,.ws-selected .ws-thread{background:var(--accent)}
+.ws-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ws-delete,.ws-toolbar button,.ws-actions button{border:1px solid var(--border);border-radius:5px;padding:.3rem .45rem;background:var(--background);color:inherit;cursor:pointer}.ws-danger,.ws-delete{color:var(--destructive)}

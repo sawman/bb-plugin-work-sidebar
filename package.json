@@ -1,0 +1,32 @@
+{
+  "name": "bb-plugin-work-sidebar",
+  "version": "0.1.0-recovery.0",
+  "private": true,
+  "type": "module",
+  "description": "Recovered source checkout for the BB Work Sidebar plugin.",
+  "engines": {
+    "bb": ">=0.38",
+    "bbPluginSdk": ">=0.4.8"
+  },
+  "bb": {
+    "name": "Work Sidebar",
+    "description": "A task, agent, review, and Stack-aware operational sidebar.",
+    "branding": { "icon": "ListTodo" },
+    "server": "./server.ts",
+    "app": "./app.tsx"
+  },
+  "scripts": {
+    "build": "env -u BB_CLI bb plugin build .",
+    "dev": "bb plugin dev .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@get-bb/plugin-sdk": "^0.4.8",
+    "react": "^19.0.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript": "^5.7.0"
+  }
+}
