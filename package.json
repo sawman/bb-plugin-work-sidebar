@@ -11,7 +11,9 @@
   "bb": {
     "name": "Work Sidebar",
     "description": "A task, agent, review, and Stack-aware operational sidebar.",
-    "branding": { "icon": "ListTodo" },
+    "branding": {
+      "icon": "ListTodo"
+    },
     "server": "./server.ts",
     "app": "./app.tsx"
   },
@@ -23,9 +25,11 @@
   "dependencies": {
     "@get-bb/plugin-sdk": "^0.4.8",
     "react": "^19.0.0",
+    "sonner": "^2.0.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/node": "^26.3.0",
     "@types/react": "^19.0.0",
     "typescript": "^5.7.0"
   }
