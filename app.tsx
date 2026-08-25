@@ -313,6 +313,7 @@ function WorkThreadTree({
   onDropTargetChange,
   onDropThread,
   onMoveThread,
+  subtextRefreshKey,
   depth = 0,
 }: {
   thread: PluginSidebarThread;
@@ -333,6 +334,7 @@ function WorkThreadTree({
   onDropTargetChange(target: { threadId: string; placement: "before" | "after" } | null): void;
   onDropThread(sourceId: string, targetId: string, placement: "before" | "after"): void;
   onMoveThread(threadId: string, direction: -1 | 1): void;
+  subtextRefreshKey: number;
   depth?: number;
 }) {
   const children = childrenByThread.get(thread.id) ?? [];
@@ -342,7 +344,7 @@ function WorkThreadTree({
   const siblingIndex = orderedSiblings.findIndex((sibling) => sibling.id === thread.id);
   return (
     <>
-      <ThreadRow
+      <ThreadRow key={`${thread.id}:${subtextRefreshKey}`}
         thread={thread}
         active={thread.id === activeThreadId}
         taskLinks={taskLinks[thread.id]}
@@ -387,6 +389,7 @@ function WorkThreadTree({
             onDropTargetChange={onDropTargetChange}
             onDropThread={onDropThread}
             onMoveThread={onMoveThread}
+            subtextRefreshKey={subtextRefreshKey}
             depth={depth + 1}
           />
         </div>
@@ -650,6 +653,7 @@ function WorkThreadList(props: PluginThreadListProps) {
   const [authoredPullRequestError, setAuthoredPullRequestError] = useState<string | null>(null);
   const [changingDraftUrl, setChangingDraftUrl] = useState<string | null>(null);
   const [authoredPullRequestRefreshKey, setAuthoredPullRequestRefreshKey] = useState(0);
+  const [subtextRefreshKey, setSubtextRefreshKey] = useState(0);
   const stacksRequest = useRef(0);
   const authoredPullRequestRequest = useRef(0);
 
@@ -744,6 +748,20 @@ function WorkThreadList(props: PluginThreadListProps) {
       if (request === taskLinksRequest.current) setTaskLinks({});
     }
   }, [rpc]);
+  const refreshThreadDetails = useCallback(async () => {
+    void refreshSidebarOrder();
+    void refreshLaterThreads();
+    void refreshTaskLinks();
+    void refreshArchivedThreads(true);
+    setSubtextRefreshKey((current) => current + 1);
+    try {
+      const result = await rpc.call("sidebarThreadPullRequests", { threadIds: threads.map((thread) => thread.id) });
+      if (!result.available) throw new Error(result.error ?? "Could not refresh pull requests.");
+      setPullRequestStates((current) => ({ ...current, ...Object.fromEntries(Object.entries(result.pullRequests).map(([threadId, pullRequest]) => [threadId, { isLoading: false, pullRequest }])) }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not refresh pull requests");
+    }
+  }, [refreshArchivedThreads, refreshLaterThreads, refreshSidebarOrder, refreshTaskLinks, rpc, threads]);
   useEffect(() => {
     void refreshTaskLinks();
     const timer = window.setInterval(() => void refreshTaskLinks(), 30_000);
@@ -1053,6 +1071,7 @@ function WorkThreadList(props: PluginThreadListProps) {
         <span className="ws-work-toolbar-actions">
           {selectedThreadIds.size > 1 && <><span className="ws-selection-count" role="status">{selectedThreadIds.size} selected</span><button className="ws-selection-archive" onClick={() => void archiveSelected()}>Archive selected</button></>}
           {reorderDisabled && <span className="ws-reorder-disabled" role="status">Clear search to reorder</span>}
+          <button onClick={() => void refreshThreadDetails()}>Refresh</button>
           {props.activeProjectId && <Button className="ws-new-thread" variant="ghost" size="icon" title="New thread in project" aria-label="New thread in project" onClick={() => actions.openNewThread({ projectId: props.activeProjectId!, focusPrompt: true })}>
             <Icon name="Plus" aria-hidden />
           </Button>}
@@ -1082,12 +1101,13 @@ function WorkThreadList(props: PluginThreadListProps) {
             onDropTargetChange={setThreadDropTarget}
             onDropThread={reorder}
             onMoveThread={move}
+            subtextRefreshKey={subtextRefreshKey}
           />
         ))}
       </section>
       </details>
-      <details className="ws-later" data-drop-target={threadDropTarget?.threadId === "later" || undefined} open onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || allLaterIds.has(sourceId)) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: "later", placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || allLaterIds.has(sourceId)) return; event.preventDefault(); toggleLater(sourceId); setDragThreadId(null); setThreadDropTarget(null); }}><summary>Later <span>{laterRoots.length}</span></summary>{laterRoots.length > 0 ? <section className="ws-hierarchy" aria-label="Threads for later">{laterRoots.map((thread) => <WorkThreadTree key={thread.id} thread={thread} childrenByThread={laterChildrenByThread} taskLinks={taskLinks} activeThreadId={props.activeThreadId} selectedThreadIds={selectedThreadIds} laterThreadIds={allLaterIds} projectsById={projectsById} onNavigate={props.onNavigate} onSelect={selectThread} onToggleLater={toggleLater} orderedSiblings={laterRoots} reorderDisabled={reorderDisabled} dragThreadId={dragThreadId} onDragThreadChange={setDragThreadId} dropTarget={threadDropTarget} onDropTargetChange={setThreadDropTarget} onDropThread={reorder} onMoveThread={move} />)}</section> : <div className="ws-later-empty">Right-click a thread to move it here.</div>}</details>
-      <details className="ws-later ws-archived" open={archivedOpen} onToggle={(event) => setArchivedOpen(event.currentTarget.open)}><summary>Archived <span>{archivedThreadState === "ready" ? archivedThreads.length : ""}</span></summary>{archivedThreadState === "idle" || archivedThreadState === "loading" ? <div className="ws-later-empty">Loading archived threads…</div> : archivedThreadState === "error" ? <div className="ws-callout">{archivedThreadError ?? "Could not load archived threads."}<button onClick={() => void refreshArchivedThreads(true)}>Try again</button></div> : <><div className="ws-archived-toolbar"><span>{archivedThreads.length} archived thread{archivedThreads.length === 1 ? "" : "s"}</span><button onClick={() => void refreshArchivedThreads(true)}>Refresh</button></div>{archivedThreads.length > 0 ? <section className="ws-hierarchy" aria-label="Archived threads">{archivedThreads.map((thread) => <ArchivedThreadRow key={thread.id} thread={thread} project={projectsById.get(thread.projectId)} onUnarchive={unarchiveThread} onNavigate={props.onNavigate} />)}</section> : <div className="ws-later-empty">No archived threads.</div>}</>}</details>
+      <details className="ws-later" data-drop-target={threadDropTarget?.threadId === "later" || undefined} open onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || allLaterIds.has(sourceId)) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: "later", placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || allLaterIds.has(sourceId)) return; event.preventDefault(); toggleLater(sourceId); setDragThreadId(null); setThreadDropTarget(null); }}><summary>Later <span>{laterRoots.length}</span></summary>{laterRoots.length > 0 ? <section className="ws-hierarchy" aria-label="Threads for later">{laterRoots.map((thread) => <WorkThreadTree key={thread.id} thread={thread} childrenByThread={laterChildrenByThread} taskLinks={taskLinks} activeThreadId={props.activeThreadId} selectedThreadIds={selectedThreadIds} laterThreadIds={allLaterIds} projectsById={projectsById} onNavigate={props.onNavigate} onSelect={selectThread} onToggleLater={toggleLater} orderedSiblings={laterRoots} reorderDisabled={reorderDisabled} dragThreadId={dragThreadId} onDragThreadChange={setDragThreadId} dropTarget={threadDropTarget} onDropTargetChange={setThreadDropTarget} onDropThread={reorder} onMoveThread={move} subtextRefreshKey={subtextRefreshKey} />)}</section> : <div className="ws-later-empty">Right-click a thread to move it here.</div>}</details>
+      <details className="ws-later ws-archived" open={archivedOpen} onToggle={(event) => setArchivedOpen(event.currentTarget.open)}><summary>Archived <span>{archivedThreadState === "ready" ? archivedThreads.length : ""}</span></summary>{archivedThreadState === "idle" || archivedThreadState === "loading" ? <div className="ws-later-empty">Loading archived threads…</div> : archivedThreadState === "error" ? <div className="ws-callout">{archivedThreadError ?? "Could not load archived threads."}<button onClick={() => void refreshArchivedThreads(true)}>Try again</button></div> : archivedThreads.length > 0 ? <section className="ws-hierarchy" aria-label="Archived threads">{archivedThreads.map((thread) => <ArchivedThreadRow key={thread.id} thread={thread} project={projectsById.get(thread.projectId)} onUnarchive={unarchiveThread} onNavigate={props.onNavigate} />)}</section> : <div className="ws-later-empty">No archived threads.</div>}</details>
       {filtered.length === 0 && <div className="ws-empty">{props.searchQuery ? `No threads match “${props.searchQuery}”.` : "No active threads."}</div>}
       <details className="ws-native-fallback"><summary>Use BB’s native list</summary><Original /></details>
       </>}

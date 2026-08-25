@@ -771,6 +771,20 @@ export default async function plugin(bb: BbPluginApi) {
     }
   }
 
+  async function sidebarThreadPullRequest(threadId: string) {
+    const thread = await bb.sdk.threads.get({ threadId });
+    if (!thread.environmentId) return null;
+    const result = await bb.sdk.environments.pullRequest({ environmentId: thread.environmentId });
+    if (result.outcome !== "available") return null;
+    return {
+      number: result.pullRequest.number,
+      title: result.pullRequest.title,
+      url: result.pullRequest.url,
+      state: result.pullRequest.state,
+      attention: result.pullRequest.attention,
+    };
+  }
+
   async function sidebarStackForThread(threadId: string): Promise<{ stack: SidebarStack | null; mergeTarget: string | null }> {
     const result = await githubStack(threadId);
     if (!result.stack) return { stack: null, mergeTarget: result.currentPullRequest?.base ?? null };
@@ -902,6 +916,25 @@ export default async function plugin(bb: BbPluginApi) {
         };
       } catch (error) {
         return { available: false, stacks: {}, mergeTargets: {}, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+    async sidebarThreadPullRequests({ threadIds }) {
+      try {
+        const pullRequests: Record<string, Awaited<ReturnType<typeof sidebarThreadPullRequest>>> = {};
+        const unique = [...new Set(threadIds)];
+        for (let offset = 0; offset < unique.length; offset += 12) {
+          const batch = unique.slice(offset, offset + 12);
+          const entries = await Promise.all(batch.map(async (threadId) => {
+            try { return [threadId, await sidebarThreadPullRequest(threadId)] as const; }
+            // A retired or otherwise unavailable environment has no PR to
+            // refresh. Keep healthy rows refreshing instead of failing all.
+            catch { return [threadId, null] as const; }
+          }));
+          for (const [threadId, pullRequest] of entries) pullRequests[threadId] = pullRequest;
+        }
+        return { available: true, pullRequests, error: null };
+      } catch (error) {
+        return { available: false, pullRequests: {}, error: error instanceof Error ? error.message : String(error) };
       }
     },
     async sidebarAuthoredPullRequests({ force }) {

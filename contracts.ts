@@ -91,6 +91,11 @@ const authoredPullRequest = z.object({
   review: z.enum(["approved", "changes_requested", "review_requested", "review_required", "none"]),
   stack: sidebarStack.nullable(),
 });
+const sidebarThreadPullRequest = z.object({
+  number: z.number(), title: z.string(), url: z.string().url(),
+  state: z.enum(["closed", "draft", "merged", "open"]),
+  attention: z.enum(["blocked", "changes_requested", "checks_failed", "checks_pending", "closed", "conflicts", "draft", "merged", "none", "ready_to_merge", "review_requested"]),
+});
 const archivedThread = z.object({
   id: z.string().startsWith("thr_"), projectId: z.string(), title: z.string().nullable(), titleFallback: z.string().nullable(),
   parentThreadId: z.string().nullable(), environmentBranchName: z.string().nullable(), isPinned: z.boolean(), isUnread: z.boolean(),
@@ -136,6 +141,10 @@ export const rpcContract = defineRpcContract({
       available: z.boolean(), stacks: z.record(z.string(), sidebarStack),
       mergeTargets: z.record(z.string(), z.string()), error: z.string().nullable(),
     }).strict(),
+  },
+  sidebarThreadPullRequests: {
+    input: z.object({ threadIds: z.array(z.string().startsWith("thr_")).max(200) }).strict(),
+    output: z.object({ available: z.boolean(), pullRequests: z.record(z.string(), sidebarThreadPullRequest.nullable()), error: z.string().nullable() }).strict(),
   },
   sidebarAuthoredPullRequests: {
     input: z.object({ force: z.boolean().optional() }).strict(),
