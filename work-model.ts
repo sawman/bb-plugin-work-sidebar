@@ -367,8 +367,8 @@ export interface StackLayer {
   head: string;
   base: string;
   attention?: string | null;
-  checks?: "failed" | "passing" | "pending" | "none";
-  review?: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
+  checks?: "failed" | "passing" | "pending" | "none" | "unknown";
+  review?: "approved" | "changes_requested" | "changes_requested_review_requested" | "review_requested" | "review_required" | "none";
 }
 
 /** The compact, host-neutral stack payload used by the PR-sidebar adapter. */

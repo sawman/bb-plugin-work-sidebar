@@ -198,6 +198,7 @@ interface GitHubPullRequestDetails {
   title?: string;
   html_url?: string;
   state?: string;
+  merged?: boolean;
   draft?: boolean;
   head?: { ref?: string };
   base?: { ref?: string };
@@ -255,6 +256,7 @@ type ParsedGitHubPullRequestDetails = {
   title?: string;
   htmlUrl?: string;
   state?: string;
+  merged?: boolean;
   draft?: boolean;
   reviewCommentCount?: number;
   head?: string;
@@ -267,6 +269,7 @@ function parseGitHubPullRequestDetails(value: unknown): ParsedGitHubPullRequestD
     title: typeof value.title === "string" ? value.title : undefined,
     htmlUrl: typeof value.html_url === "string" ? value.html_url : undefined,
     state: typeof value.state === "string" ? value.state : undefined,
+    merged: typeof value.merged === "boolean" ? value.merged : undefined,
     draft: typeof value.draft === "boolean" ? value.draft : undefined,
     reviewCommentCount: typeof value.review_comments === "number" && Number.isFinite(value.review_comments) ? value.review_comments : undefined,
     head: isRecord(value.head) && typeof value.head.ref === "string" ? value.head.ref : undefined,
@@ -312,7 +315,7 @@ export async function fetchGitHubStack(
   run: GitHubApiRunner = runGitHubApi,
 ) : Promise<{ number: number; base: string; currentPullRequest: number; pullRequests: Array<{
   number: number; title: string; state: string; draft: boolean; url: string; head: string; base: string; reviewCommentCount: number;
-  checks: "failed" | "passing" | "pending" | "none"; review: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
+  checks: "failed" | "passing" | "pending" | "none" | "unknown"; review: "approved" | "changes_requested" | "changes_requested_review_requested" | "review_requested" | "review_required" | "none";
 }> } | null> {
   const raw = parseGitHubStackResponse(JSON.parse(await run(githubStackApiArgs(owner, repo, pullRequest), 4_000_000)));
   if (!raw) return null;
@@ -326,7 +329,9 @@ export async function fetchGitHubStack(
       return {
         number: pr.number,
         title: details.title ?? `Pull request #${pr.number}`,
-        state: details.state ?? pr.state,
+        // GitHub's REST endpoint reports merged PRs as state=closed with a
+        // separate boolean. Normalize that pair before it reaches the UI.
+        state: details.merged ? "merged" : details.state ?? pr.state,
         draft: details.draft ?? pr.draft,
         url: details.htmlUrl ?? `https://github.com/${owner}/${repo}/pull/${pr.number}`,
         head: details.head ?? pr.head,
@@ -392,10 +397,13 @@ async function archivedGitHubRepositories(repositories: readonly string[]): Prom
 }
 
 type AuthoredPullRequestSignal = {
-  checks: "failed" | "passing" | "pending" | "none";
-  review: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
+  checks: "failed" | "passing" | "pending" | "none" | "unknown";
+  review: "approved" | "changes_requested" | "changes_requested_review_requested" | "review_requested" | "review_required" | "none";
 };
-const UNKNOWN_AUTHORED_PULL_REQUEST_SIGNAL: AuthoredPullRequestSignal = { checks: "none", review: "none" };
+// A failed metadata lookup is not evidence that a PR has no CI. Keeping it
+// distinct prevents private or temporarily unavailable repositories reading as
+// an empty check set in the UI.
+const UNKNOWN_AUTHORED_PULL_REQUEST_SIGNAL: AuthoredPullRequestSignal = { checks: "unknown", review: "none" };
 
 /** Fetch the compact status badges for every PR in one repository stack. */
 async function repositoryPullRequestSignals(owner: string, repo: string, numbers: readonly number[]): Promise<Map<number, AuthoredPullRequestSignal>> {
@@ -412,7 +420,7 @@ async function repositoryPullRequestSignals(owner: string, repo: string, numbers
       if (!isRecord(pullRequest)) return;
       const reviewDecision = String(pullRequest.reviewDecision ?? "");
       const reviewRequests = isRecord(pullRequest.reviewRequests) && typeof pullRequest.reviewRequests.totalCount === "number" ? pullRequest.reviewRequests.totalCount : 0;
-      const review: AuthoredPullRequestSignal["review"] = reviewDecision === "APPROVED" ? "approved" : reviewDecision === "CHANGES_REQUESTED" ? "changes_requested" : reviewDecision === "REVIEW_REQUIRED" ? "review_required" : reviewRequests > 0 ? "review_requested" : "none";
+      const review: AuthoredPullRequestSignal["review"] = reviewDecision === "APPROVED" ? "approved" : reviewDecision === "CHANGES_REQUESTED" ? reviewRequests > 0 ? "changes_requested_review_requested" : "changes_requested" : reviewDecision === "REVIEW_REQUIRED" ? "review_required" : reviewRequests > 0 ? "review_requested" : "none";
       const commits = isRecord(pullRequest.commits) && Array.isArray(pullRequest.commits.nodes) ? pullRequest.commits.nodes : [];
       const commit = commits[commits.length - 1];
       const rollup = isRecord(commit) && isRecord(commit.commit) && isRecord(commit.commit.statusCheckRollup) ? commit.commit.statusCheckRollup : null;
@@ -452,7 +460,7 @@ async function authoredPullRequestSignals(items: readonly GitHubSearchPullReques
         const reviewDecision = String(pullRequest.reviewDecision ?? "");
         const reviewRequests = isRecord(pullRequest.reviewRequests) && typeof pullRequest.reviewRequests.totalCount === "number" ? pullRequest.reviewRequests.totalCount : 0;
         const review: AuthoredPullRequestSignal["review"] = reviewDecision === "APPROVED" ? "approved"
-          : reviewDecision === "CHANGES_REQUESTED" ? "changes_requested"
+          : reviewDecision === "CHANGES_REQUESTED" ? reviewRequests > 0 ? "changes_requested_review_requested" : "changes_requested"
           : reviewDecision === "REVIEW_REQUIRED" ? "review_required"
           : reviewRequests > 0 ? "review_requested" : "none";
         const commits = isRecord(pullRequest.commits) && Array.isArray(pullRequest.commits.nodes) ? pullRequest.commits.nodes : [];
@@ -599,12 +607,87 @@ export default async function plugin(bb: BbPluginApi) {
     return callPluginRpc(GITHUB_STACK_PLUGIN_ID, method, input, outputSchema);
   }
 
-  async function enhancedGithubStack(threadId: string) {
+  function includeRemoteStackLayers(stack: z.infer<typeof ghStackPayloadSchema>["stack"], remoteStack: Awaited<ReturnType<typeof githubStack>>["stack"]) {
+    if (!remoteStack) return stack;
+    const remoteByNumber = new Map(remoteStack.pullRequests.map((pullRequest) => [pullRequest.number, pullRequest]));
+    const existing = new Set(stack?.branches.flatMap((branch) => branch.pr ? [branch.pr.number] : []) ?? []);
+    const remoteOnly = remoteStack.pullRequests.filter((pullRequest) => !existing.has(pullRequest.number));
+    if (!stack) return {
+      trunk: remoteStack.base,
+      currentBranch: null,
+      branches: remoteOnly.map((pullRequest) => ({
+        name: pullRequest.head,
+        isCurrent: false,
+        isMerged: pullRequest.state.toLowerCase() === "merged",
+        isQueued: false,
+        needsRebase: false,
+        hasStash: false,
+        stashCount: null,
+        pr: { number: pullRequest.number, url: pullRequest.url, state: pullRequest.state, title: pullRequest.title, isDraft: pullRequest.draft, metadataStale: false },
+        diff: null,
+        aheadOfRemote: null,
+        behindRemote: null,
+        checks: pullRequest.checks,
+        review: pullRequest.review,
+      })),
+      trunkBehind: null,
+      prunableBranchCount: null,
+    };
+    const branches = stack.branches.map((branch) => {
+      const remote = branch.pr ? remoteByNumber.get(branch.pr.number) : undefined;
+      if (!remote) return branch;
+      const merged = remote.state.toLowerCase() === "merged";
+      return {
+        ...branch,
+        isMerged: branch.isMerged || merged,
+        pr: { ...branch.pr!, state: merged ? "merged" : branch.pr!.state, isDraft: remote.draft },
+        checks: remote.checks,
+        review: remote.review,
+      };
+    });
+    if (remoteOnly.length === 0) return { ...stack, branches };
+    return {
+      ...stack,
+      // The REST stack is ordered base-to-head. Missing entries are normally
+      // merged layers at its base, so prepend them to the active local stack.
+      branches: [...remoteOnly.map((pullRequest) => ({
+        name: pullRequest.head,
+        isCurrent: false,
+        isMerged: pullRequest.state.toLowerCase() === "merged",
+        isQueued: false,
+        needsRebase: false,
+        hasStash: false,
+        stashCount: null,
+        pr: { number: pullRequest.number, url: pullRequest.url, state: pullRequest.state, title: pullRequest.title, isDraft: pullRequest.draft, metadataStale: false },
+        diff: null,
+        aheadOfRemote: null,
+        behindRemote: null,
+        checks: pullRequest.checks,
+        review: pullRequest.review,
+      })), ...branches],
+    };
+  }
+
+  async function enhancedGithubStack(threadId: string, remoteStack: Awaited<ReturnType<typeof githubStack>>["stack"]) {
     try {
       const payload = await githubStackCall("getStack", { threadId }, ghStackPayloadSchema);
-      return { stack: payload.stack, pending: payload.pending, error: payload.error?.message ?? null };
+      const stack = includeRemoteStackLayers(payload.stack, remoteStack);
+      const firstPullRequest = stack?.branches.find((branch) => branch.pr)?.pr ?? null;
+      const match = firstPullRequest?.url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+/);
+      if (!stack || !match) return { stack, pending: payload.pending, error: payload.error?.message ?? null };
+      const [, owner, repo] = match;
+      const signals = await repositoryPullRequestSignals(owner, repo, stack.branches.flatMap((branch) => branch.pr ? [branch.pr.number] : []));
+      return { stack: { ...stack, branches: stack.branches.map((branch) => ({
+        ...branch,
+        ...(branch.pr ? signals.get(branch.pr.number) ?? UNKNOWN_AUTHORED_PULL_REQUEST_SIGNAL : {}),
+      })) }, pending: payload.pending, error: payload.error?.message ?? null };
     } catch (error) {
-      return { stack: null, pending: null, error: error instanceof Error ? error.message : "GitHub Stack is unavailable." };
+      // The optional gh-stack plugin should enrich the projection, never gate
+      // it. The GitHub stack endpoint already gives us every layer (including
+      // merged ancestors), so preserve that useful fallback when the local
+      // stack integration is unavailable for this environment.
+      const stack = includeRemoteStackLayers(null, remoteStack);
+      return { stack, pending: null, error: stack ? null : error instanceof Error ? error.message : "GitHub Stack is unavailable." };
     }
   }
 
@@ -1218,7 +1301,8 @@ export default async function plugin(bb: BbPluginApi) {
         return task ? [summarizeTask(task, projectNames.get(task.projectId) ?? "Work")] : [];
       });
       const legacy = available && !outcomeBinding ? await legacyContext(root.id, root.projectId) : { state: "none" as const, taskIds: [], message: null };
-      const [stackResult, enhancedStack, repository, tracker, latestOutput] = await Promise.all([githubStack(threadId), enhancedGithubStack(threadId), repositorySummary(thread), trackerContext(root.id, root.projectId, thread.title ?? thread.titleFallback ?? ""), bb.sdk.threads.output({ threadId })]);
+      const [stackResult, repository, tracker, latestOutput] = await Promise.all([githubStack(threadId), repositorySummary(thread), trackerContext(root.id, root.projectId, thread.title ?? thread.titleFallback ?? ""), bb.sdk.threads.output({ threadId })]);
+      const enhancedStack = await enhancedGithubStack(threadId, stackResult.stack);
       return {
         tasksAvailable: available,
         currentThread: {

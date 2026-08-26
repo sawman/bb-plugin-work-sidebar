@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   definePluginApp,
   useBbNavigate,
@@ -19,7 +19,7 @@ import type {
 } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import "react-diff-view/style/index.css";
-import { CurrentPullRequestCard as ChangesPullRequestCard, StackBranchRow as ChangesStackBranchRow, WorkingTreeDiff as ChangesWorkingTreeDiff } from "@/components/work/changes";
+import { CurrentPullRequestCard as ChangesPullRequestCard, StackBranchRow as ChangesStackBranchRow, WorkingTreeDiff as ChangesWorkingTreeDiff, type StackBranchSignals } from "@/components/work/changes";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
@@ -153,6 +153,7 @@ function ThreadRow({
   const actions = experimental_useSidebarThreadActions();
   const { splitProps, isAvailable } = experimental_useSidebarThreadSplit(thread.id);
   const { pullRequest, isLoading: pullRequestLoading } = experimental_useSidebarThreadPullRequest(thread.id);
+  const composerView = useComposerView();
   const controlClick = useRef(false);
   const [renaming, setRenaming] = useState(false);
   const [draftTitle, setDraftTitle] = useState(threadTitle(thread));
@@ -160,6 +161,10 @@ function ThreadRow({
   const title = threadTitle(thread);
   const indicator = normalizeIndicator(String(thread.indicator));
   const working = threadIsWorking(thread);
+  // The plugin SDK exposes the active composer scope and its structured draft.
+  // Match the native row's precedence: running work wins; otherwise an
+  // unsent draft owns the one trailing status slot.
+  const hasComposerDraft = composerView.scope.kind === "thread" && composerView.scope.threadId === thread.id && !composerView.draft.isEmpty;
   const pullRequestTone = pullRequest ? threadPullRequestTone(pullRequest) : null;
 
   const open = (split = false) => {
@@ -176,43 +181,70 @@ function ThreadRow({
   // recursive confirmation. Never fan out child actions here.
   const archiveTree = () => { if (groupId) onMoveToGroup(thread.id, null); actions.archive(thread.id); };
   const requestDeleteTree = () => actions.requestDelete(thread.id);
-  // Native drag is reliable from this dedicated grip. The thread itself stays
-  // a normal link, so BB's split gesture and text selection cannot take over.
-  const startNativeDrag = (event: DragEvent<HTMLElement>) => {
-    if (reorderDisabled) { event.preventDefault(); return; }
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", thread.id);
-    onDragThreadChange(thread.id);
-  };
-  const finishNativeDrag = () => {
-    onDragThreadChange(null);
-    onDropTargetChange(null);
+  const unifiedDragCleanup = useRef<(() => void) | null>(null);
+  useEffect(() => () => unifiedDragCleanup.current?.(), []);
+  // One row-wide pointer gesture: while it remains in the sidebar it reorders;
+  // once it leaves, BB's native handler (called first) owns open/split.
+  const startUnifiedDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    splitProps.onPointerDown?.(event);
+    if (reorderDisabled || event.button !== 0 || (event.target as HTMLElement).closest("button,input,textarea")) return;
+    const pointerId = event.pointerId;
+    let active = false;
+    const clear = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", finish); window.removeEventListener("pointercancel", finish); unifiedDragCleanup.current = null; onDragThreadChange(null); onDropTargetChange(null); };
+    const targetAt = (x: number, y: number) => document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-ws-thread-id]")?.dataset.wsThreadId ?? null;
+    const zoneAt = (x: number, y: number) => document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-ws-thread-drop-zone]")?.dataset.wsThreadDropZone ?? null;
+    const move = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
+      if (!active && Math.hypot(moveEvent.clientX - event.clientX, moveEvent.clientY - event.clientY) < 5) return;
+      const sourceId = thread.id;
+      const targetId = targetAt(moveEvent.clientX, moveEvent.clientY);
+      const zone = zoneAt(moveEvent.clientX, moveEvent.clientY);
+      if (!targetId && zone && zone !== groupId) {
+        active = true;
+        onDragThreadChange(sourceId);
+        onDropTargetChange({ threadId: zone, placement: "after" });
+        moveEvent.preventDefault();
+        return;
+      }
+      if (!targetId || targetId === sourceId || !canDropThread(sourceId)) { if (active) { onDragThreadChange(null); onDropTargetChange(null); } return; }
+      const target = document.querySelector<HTMLElement>(`[data-ws-thread-id="${CSS.escape(targetId)}"]`);
+      if (!target) return;
+      active = true;
+      const bounds = target.getBoundingClientRect();
+      onDragThreadChange(sourceId);
+      onDropTargetChange({ threadId: targetId, placement: moveEvent.clientY > bounds.top + bounds.height / 2 ? "after" : "before" });
+      moveEvent.preventDefault();
+    };
+    const finish = (finishEvent: PointerEvent) => {
+      if (finishEvent.pointerId === pointerId && active) {
+        const zone = zoneAt(finishEvent.clientX, finishEvent.clientY);
+        const targetId = targetAt(finishEvent.clientX, finishEvent.clientY);
+        if (!targetId && zone === "archive") archiveTree();
+        else if (!targetId && zone && zone !== groupId) onMoveToGroup(thread.id, zone === "active" ? null : zone);
+        else {
+        const target = targetId ? document.querySelector<HTMLElement>(`[data-ws-thread-id="${CSS.escape(targetId)}"]`) : null;
+        if (targetId && target && targetId !== thread.id && canDropThread(thread.id)) {
+          const bounds = target.getBoundingClientRect();
+          onDropThread(thread.id, targetId, finishEvent.clientY > bounds.top + bounds.height / 2 ? "after" : "before");
+        }
+        }
+      }
+      clear();
+    };
+    unifiedDragCleanup.current?.();
+    unifiedDragCleanup.current = clear;
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
   };
 
   return (
     <div
       className={`ws-thread ${active ? "ws-thread-active" : ""} ${selected ? "ws-thread-selected" : ""} ${dragThreadId === thread.id ? "ws-thread-dragging" : ""}`}
+      data-ws-thread-id={thread.id}
       data-depth={thread.parentThreadId ? "child" : "root"}
       data-drop-placement={dropTarget?.threadId === thread.id ? dropTarget.placement : undefined}
-      onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) onDropTargetChange(null); }}
-      onDragOver={(event) => {
-        const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain");
-        if (reorderDisabled || !sourceId || sourceId === thread.id || !canDropThread(sourceId)) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
-        const bounds = event.currentTarget.getBoundingClientRect();
-        onDropTargetChange({ threadId: thread.id, placement: event.clientY > bounds.top + bounds.height / 2 ? "after" : "before" });
-      }}
-      onDrop={(event) => {
-        const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain");
-        if (reorderDisabled || !sourceId || sourceId === thread.id || !canDropThread(sourceId)) return;
-        event.preventDefault();
-        const bounds = event.currentTarget.getBoundingClientRect();
-        const placement = event.clientY > bounds.top + bounds.height / 2 ? "after" : "before";
-        onDropThread(sourceId, thread.id, placement);
-        onDragThreadChange(null);
-        onDropTargetChange(null);
-      }}
+      onPointerDown={startUnifiedDrag}
     >
       {renaming ? (
         <div className="ws-rename">
@@ -234,11 +266,11 @@ function ThreadRow({
             <a
 
               href="#"
-              {...splitProps}
               data-sidebar-thread-shortcut-target=""
               data-sidebar-thread-id={thread.id}
               data-sidebar-thread-parent-id={thread.parentThreadId ?? ""}
               className={`ws-thread-anchor ${children > 0 ? "ws-thread-has-children" : ""}`}
+              title={isAvailable ? "Drag into the main area to open; drop at an edge to split" : undefined}
               aria-selected={selected}
               onMouseDown={(event) => { controlClick.current = event.ctrlKey && event.button === 0; }}
               onClick={(event) => {
@@ -271,7 +303,7 @@ function ThreadRow({
                 </span>
               </span>
               <span className="ws-thread-trailing">
-                {!reorderDisabled && <span className="ws-thread-drag-handle" role="button" tabIndex={0} draggable aria-label={`Reorder ${title}`} title="Drag to reorder" onDragStart={(event) => { event.stopPropagation(); startNativeDrag(event); }} onDragEnd={(event) => { event.stopPropagation(); finishNativeDrag(); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}><Icon name="GripVertical" aria-hidden /></span>}
+                {hasComposerDraft && <Icon name="Pencil" className="ws-composer-draft" aria-label="Unsent draft" />}
                 <span className={`ws-status ws-status-${indicator} ${working ? "ws-status-working" : ""}`} aria-label={thread.indicatorLabel ?? undefined}>
                   {working ? <span className="ws-status-dots" aria-hidden><i /><i /><i /></span> : indicatorGlyph(String(thread.indicator))}
                 </span>
@@ -893,7 +925,7 @@ function WorkThreadList(props: PluginThreadListProps) {
       </div>}
       {view === "work" && <>
       {threadListMode === "native" ? <section className="ws-native-thread-list" aria-label="BB native threads"><Original /></section> : <><section className="ws-thread-statuses" aria-label="Thread status groups">
-      <details className="ws-later ws-active-threads" data-drop-target={threadDropTarget?.threadId === "active" || undefined} open={activeThreadsOpen} onToggle={(event) => setActiveThreadsOpen(event.currentTarget.open)} onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || (!threadGroupIds.has(sourceId) && !archivedThreadIds.has(sourceId))) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: "active", placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || (!threadGroupIds.has(sourceId) && !archivedThreadIds.has(sourceId))) return; event.preventDefault(); if (archivedThreadIds.has(sourceId)) unarchiveThread(sourceId, null); else moveThreadToGroup(sourceId, null); setDragThreadId(null); setThreadDropTarget(null); }}>
+      <details className="ws-later ws-active-threads" data-ws-thread-drop-zone="active" data-drop-target={threadDropTarget?.threadId === "active" || undefined} open={activeThreadsOpen} onToggle={(event) => setActiveThreadsOpen(event.currentTarget.open)} onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || (!threadGroupIds.has(sourceId) && !archivedThreadIds.has(sourceId))) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: "active", placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || (!threadGroupIds.has(sourceId) && !archivedThreadIds.has(sourceId))) return; event.preventDefault(); if (archivedThreadIds.has(sourceId)) unarchiveThread(sourceId, null); else moveThreadToGroup(sourceId, null); setDragThreadId(null); setThreadDropTarget(null); }}>
       <summary>Active <span>{orderedRoots.length}</span></summary>
       <section className="ws-hierarchy" aria-label="Work threads">
         {orderedRoots.map((thread) => (
@@ -923,8 +955,8 @@ function WorkThreadList(props: PluginThreadListProps) {
         ))}
       </section>
       </details>
-      {threadGroups.map((group) => { const tree = groupedThreadTrees.get(group.id); const roots = tree?.roots ?? []; return <details key={group.id} className="ws-later" data-drop-target={threadDropTarget?.threadId === group.id || undefined} open onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || threadGroupIds.get(sourceId) === group.id) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: group.id, placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || threadGroupIds.get(sourceId) === group.id) return; event.preventDefault(); if (archivedThreadIds.has(sourceId)) unarchiveThread(sourceId, group.id); else moveThreadToGroup(sourceId, group.id); setDragThreadId(null); setThreadDropTarget(null); }}><summary>{group.name} <span>{roots.length}</span></summary>{roots.length > 0 ? <section className="ws-hierarchy" aria-label={`${group.name} threads`}>{roots.map((thread) => <WorkThreadTree key={thread.id} thread={thread} childrenByThread={tree?.children ?? new Map()} taskLinks={taskLinks} activeThreadId={props.activeThreadId} selectedThreadIds={selectedThreadIds} groupIds={threadGroupIds} groups={threadGroups} projectsById={projectsById} onNavigate={props.onNavigate} onSelect={selectThread} onMoveToGroup={moveThreadToGroup} orderedSiblings={roots} reorderDisabled={reorderDisabled} dragThreadId={dragThreadId} onDragThreadChange={setDragThreadId} dropTarget={threadDropTarget} onDropTargetChange={setThreadDropTarget} onDropThread={reorder} onMoveThread={move} subtextRefreshKey={subtextRefreshKey} />)}</section> : <div className="ws-later-empty">Right-click a thread to move it here.</div>}</details>; })}
-      <details className="ws-later ws-archived" data-drop-target={threadDropTarget?.threadId === "archive" || undefined} open={archivedOpen} onToggle={(event) => setArchivedOpen(event.currentTarget.open)} onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || archivedThreadIds.has(sourceId)) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: "archive", placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || archivedThreadIds.has(sourceId)) return; event.preventDefault(); if (threadGroupIds.has(sourceId)) moveThreadToGroup(sourceId, null); actions.archive(sourceId); window.setTimeout(() => void refreshArchivedThreads(true), 250); setDragThreadId(null); setThreadDropTarget(null); }}><summary>Archive <span>{archivedThreadState === "ready" ? archivedThreads.length : ""}</span></summary>{archivedThreadState === "idle" || archivedThreadState === "loading" ? <div className="ws-later-empty">Loading archive threads…</div> : archivedThreadState === "error" ? <div className="ws-callout">{archivedThreadError ?? "Could not load archive threads."}<button onClick={() => void refreshArchivedThreads(true)}>Try again</button></div> : archivedThreads.length > 0 ? <section className="ws-hierarchy" aria-label="Archive threads">{archivedThreads.map((thread) => <ArchivedThreadRow key={thread.id} thread={thread} project={projectsById.get(thread.projectId)} groups={threadGroups} onUnarchive={unarchiveThread} onNavigate={props.onNavigate} onDragThreadChange={setDragThreadId} onDropTargetChange={() => setThreadDropTarget(null)} />)}</section> : <div className="ws-later-empty">No archive threads.</div>}</details>
+      {threadGroups.map((group) => { const tree = groupedThreadTrees.get(group.id); const roots = tree?.roots ?? []; return <details key={group.id} className="ws-later" data-ws-thread-drop-zone={group.id} data-drop-target={threadDropTarget?.threadId === group.id || undefined} open onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || threadGroupIds.get(sourceId) === group.id) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: group.id, placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || threadGroupIds.get(sourceId) === group.id) return; event.preventDefault(); if (archivedThreadIds.has(sourceId)) unarchiveThread(sourceId, group.id); else moveThreadToGroup(sourceId, group.id); setDragThreadId(null); setThreadDropTarget(null); }}><summary>{group.name} <span>{roots.length}</span></summary>{roots.length > 0 ? <section className="ws-hierarchy" aria-label={`${group.name} threads`}>{roots.map((thread) => <WorkThreadTree key={thread.id} thread={thread} childrenByThread={tree?.children ?? new Map()} taskLinks={taskLinks} activeThreadId={props.activeThreadId} selectedThreadIds={selectedThreadIds} groupIds={threadGroupIds} groups={threadGroups} projectsById={projectsById} onNavigate={props.onNavigate} onSelect={selectThread} onMoveToGroup={moveThreadToGroup} orderedSiblings={roots} reorderDisabled={reorderDisabled} dragThreadId={dragThreadId} onDragThreadChange={setDragThreadId} dropTarget={threadDropTarget} onDropTargetChange={setThreadDropTarget} onDropThread={reorder} onMoveThread={move} subtextRefreshKey={subtextRefreshKey} />)}</section> : <div className="ws-later-empty">Right-click a thread to move it here.</div>}</details>; })}
+      <details className="ws-later ws-archived" data-ws-thread-drop-zone="archive" data-drop-target={threadDropTarget?.threadId === "archive" || undefined} open={archivedOpen} onToggle={(event) => setArchivedOpen(event.currentTarget.open)} onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || archivedThreadIds.has(sourceId)) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: "archive", placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || archivedThreadIds.has(sourceId)) return; event.preventDefault(); if (threadGroupIds.has(sourceId)) moveThreadToGroup(sourceId, null); actions.archive(sourceId); window.setTimeout(() => void refreshArchivedThreads(true), 250); setDragThreadId(null); setThreadDropTarget(null); }}><summary>Archive <span>{archivedThreadState === "ready" ? archivedThreads.length : ""}</span></summary>{archivedThreadState === "idle" || archivedThreadState === "loading" ? <div className="ws-later-empty">Loading archive threads…</div> : archivedThreadState === "error" ? <div className="ws-callout">{archivedThreadError ?? "Could not load archive threads."}<button onClick={() => void refreshArchivedThreads(true)}>Try again</button></div> : archivedThreads.length > 0 ? <section className="ws-hierarchy" aria-label="Archive threads">{archivedThreads.map((thread) => <ArchivedThreadRow key={thread.id} thread={thread} project={projectsById.get(thread.projectId)} groups={threadGroups} onUnarchive={unarchiveThread} onNavigate={props.onNavigate} onDragThreadChange={setDragThreadId} onDropTargetChange={() => setThreadDropTarget(null)} />)}</section> : <div className="ws-later-empty">No archive threads.</div>}</details>
       </section>
       {filtered.length === 0 && <div className="ws-empty">{props.searchQuery ? `No threads match “${props.searchQuery}”.` : "No active threads."}</div>}
       </>}
@@ -940,6 +972,35 @@ const WORK_TABS: readonly { id: WorkTab; label: string; description: string }[] 
   { id: "changes", label: "Changes", description: "Pull request, stack, branch, and working-tree state" },
   { id: "agents", label: "Agents", description: "Delegated child threads" },
 ];
+
+type WorkPanelChild = {
+  id: string;
+  title: string;
+  depth: number;
+  status: string;
+  runtimeStatus: string;
+  task: { key: string; status: string; liveStatus: string | null } | null;
+};
+
+type WorkPanelBinding = { ownerThreadId: string | null; dispatchState: string; recoveryMessage: string | null };
+
+/** An agent row keeps ordinary open and deliberate split navigation separate. */
+function WorkAgentRow({ child, bindings }: { child: WorkPanelChild; bindings: readonly WorkPanelBinding[] }) {
+  const actions = experimental_useSidebarThreadActions();
+  const { isAvailable: splitAvailable } = experimental_useSidebarThreadSplit(child.id);
+  const state = agentProjectionState(child.status, child.task?.status ?? null);
+  const runtime = runtimeStatusPresentation(child);
+  const owned = bindings.find((binding) => binding.ownerThreadId === child.id);
+  return <article className={`ws-agent-card ws-agent-${state}`} style={{ marginLeft: `${Math.min(child.depth - 1, 4) * 0.65}rem` }}>
+    <Icon name="Bot" className={`ws-agent-state ws-agent-state-${runtime.tone}`} aria-label={runtime.label} />
+    <button type="button" className="ws-agent-target" onClick={() => actions.open(child.id)} aria-label={`Open ${child.title}`}>
+      <strong>{child.title}</strong>
+      <small>{runtime.label}{child.task ? ` · ${child.task.key}` : ""}{owned ? ` · ${readableStatus(owned.dispatchState)}` : ""}</small>
+      {owned?.recoveryMessage && <small>{owned.recoveryMessage}</small>}
+    </button>
+    {splitAvailable && <button type="button" className="ws-agent-split" onClick={() => actions.open(child.id, { split: true })} aria-label={`Open ${child.title} in split`} title="Open in split"><Icon name="Columns2" aria-hidden /></button>}
+  </article>;
+}
 
 function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const rpc = useRpc<typeof rpcContract>();
@@ -1139,15 +1200,15 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
             <article className="ws-card ws-repository-card"><div className="ws-card-heading"><strong>{context.repository.branch ?? "Repository"}</strong><span className={`ws-pill ${context.repository.hasUncommittedChanges ? "ws-pr-changes_requested" : ""}`}>{context.repository.hasUncommittedChanges ? "Changed" : context.repository.outcome === "available" ? "Clean" : "Unavailable"}</span></div>{context.repository.outcome === "available" ? <><div className="ws-card-meta"><span>{context.repository.ahead}↑ {context.repository.behind}↓</span><span>{context.repository.base ?? "—"}</span>{context.repository.changedFileCount > 0 && <button type="button" className="ws-repository-changes-toggle" aria-expanded={pendingChangesExpanded} onClick={() => setPendingChangesExpanded((expanded) => !expanded)} aria-label={`${pendingChangesExpanded ? "Hide" : "Show"} ${context.repository.changedFileCount} working-tree file${context.repository.changedFileCount === 1 ? "" : "s"}`}><b>{context.repository.changedFileCount}</b> file{context.repository.changedFileCount === 1 ? "" : "s"} <i>+{context.repository.changedInsertions}</i> <em>−{context.repository.changedDeletions}</em> {pendingChangesExpanded ? "⌄" : "›"}</button>}</div>{pendingChangesExpanded && context.repository.changedFileCount > 0 && <div className="ws-current-pr-details ws-working-tree-files">{context.repository.changedFiles.map((file) => <button type="button" className="ws-working-tree-file" key={file.path} onClick={() => void openWorkingTreeDiff(file.path)} aria-label={`Open uncommitted diff for ${file.path}`}><b className={`ws-file-${file.status}`}>{file.status[0]?.toUpperCase()}</b><em>{file.path}</em><small>{file.insertions !== null ? `+${file.insertions}` : ""} {file.deletions !== null ? `−${file.deletions}` : ""}</small></button>)}{context.repository.changedFileCount > context.repository.changedFiles.length && <small>Only the first {context.repository.changedFiles.length} files are shown.</small>}</div>}</> : <p className="ws-card-note">{context.repository.message ?? "Repository status is unavailable."}</p>}</article>
             {workingTreeDiff && <article className="ws-card ws-working-tree-diff"><div className="ws-card-heading"><strong>{workingTreeDiff.path}</strong><button type="button" className="ws-text-button" onClick={() => setWorkingTreeDiff(null)}>Close</button></div>{workingTreeDiff.loading ? <p className="ws-card-note">Loading diff…</p> : workingTreeDiff.patch ? <ChangesWorkingTreeDiff patch={workingTreeDiff.patch} /> : <p className="ws-card-note">{workingTreeDiff.message ?? "No diff is available for this file."}</p>}</article>}
             {context.githubStack?.stack ? <ol className="ws-stack-rail" aria-label={`GitHub Stack based on ${context.githubStack.stack.trunk}`}>
-              {context.githubStack.stack.branches.map((branch) => { const stackPullRequest = context.stack?.pullRequests.find((pullRequest) => pullRequest.number === branch.pr?.number || pullRequest.head === branch.name); const current = branch.pr?.number === context.currentPullRequest?.number ? context.currentPullRequest : null; const checks: "failed" | "passing" | "pending" | "none" = current?.checks.state === "failing" ? "failed" : current?.checks.state === "passing" ? "passing" : current?.checks.state === "pending" ? "pending" : "none"; const signals = current ? { ...stackPullRequest, state: current.state, draft: current.state === "draft", checks, review: current.review.state } : stackPullRequest; return <ChangesStackBranchRow key={branch.name} branch={branch} signals={signals} expanded={expandedStackBranches.has(branch.name)} checkingOut={checkingOutBranch === branch.name} onToggle={() => toggleStackBranch(branch.name)} onCheckout={() => void checkoutStackBranch(branch.name)} />; })}
+              {context.githubStack.stack.branches.map((branch) => { const stackPullRequest = context.stack?.pullRequests.find((pullRequest) => pullRequest.number === branch.pr?.number || pullRequest.head === branch.name); const legacySignals = stackPullRequest as Partial<StackBranchSignals> | undefined; const current = branch.pr?.number === context.currentPullRequest?.number ? context.currentPullRequest : null; const checks: "failed" | "passing" | "pending" | "none" = current?.checks.state === "failing" ? "failed" : current?.checks.state === "passing" ? "passing" : current?.checks.state === "pending" ? "pending" : "none"; const signals = current ? { ...stackPullRequest, state: current.state, draft: current.state === "draft", checks, review: current.review.state } : branch.pr ? { ...stackPullRequest, state: stackPullRequest?.state ?? branch.pr.state, draft: stackPullRequest?.draft ?? branch.pr.isDraft, checks: branch.checks ?? legacySignals?.checks ?? "unknown", review: branch.review ?? legacySignals?.review ?? "none" } : stackPullRequest; return <ChangesStackBranchRow key={branch.name} branch={branch} signals={signals} expanded={expandedStackBranches.has(branch.name)} checkingOut={checkingOutBranch === branch.name} onToggle={() => toggleStackBranch(branch.name)} onCheckout={() => void checkoutStackBranch(branch.name)} />; })}
             </ol> : context.currentPullRequest ? <ChangesPullRequestCard pullRequest={context.currentPullRequest} expanded={currentPrExpanded} onToggle={() => setCurrentPrExpanded((expanded) => !expanded)} /> : <div className="ws-empty">No pull request is linked to this thread.</div>}
           </div>
         )}
         {!loading && context && tab === "agents" && (
           <div className="ws-section-stack">
-            <header><div><h2>Agents</h2></div><span className="ws-section-count">{context.children.length}</span></header>
-            {context.children.map((child) => { const childTasks = ((child as typeof child & { tasks?: readonly NonNullable<typeof child.task>[] }).tasks ?? (child.task ? [child.task] : [])); const state = agentProjectionState(child.status, childTasks[0]?.status ?? null); const runtime = runtimeStatusPresentation(child); const owned = bindings.filter((binding) => binding.ownerThreadId === child.id); return <button key={child.id} className={`ws-agent-card ws-agent-${state}`} style={{ marginLeft: `${Math.min(child.depth - 1, 4) * 0.65}rem` }} onClick={() => actions.open(child.id, { split: true })} aria-label={`Open ${child.title} in split`}><Icon name="Bot" className={`ws-agent-state ws-agent-state-${runtime.tone}`} aria-hidden /><span><strong>{child.title}</strong><small>{runtime.label}{childTasks[0] ? ` · ${childTasks[0].key}` : ""}{owned[0] ? ` · ${readableStatus(owned[0].dispatchState)}` : ""}</small>{owned[0]?.recoveryMessage && <small>{owned[0].recoveryMessage}</small>}</span><Icon name="ArrowRight" className="ws-agent-open" aria-hidden /></button>; })}
-            {context.children.length === 0 && <div className="ws-empty">No delegated child threads are attached to this thread.</div>}
+            <header><div><h2>Agents</h2></div><span className="ws-section-count">{context.children.filter((child) => !child.isArchived).length}</span></header>
+            {context.children.filter((child) => !child.isArchived).map((child) => <WorkAgentRow key={child.id} child={child} bindings={bindings} />)}
+            {context.children.filter((child) => !child.isArchived).length === 0 && <div className="ws-empty">No active delegated child threads are attached to this thread.</div>}
           </div>
         )}
       </div>

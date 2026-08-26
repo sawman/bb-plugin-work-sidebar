@@ -71,8 +71,8 @@ const pullRequest = z.object({
 const sidebarStackLayer = z.object({
   number: z.number().int().positive(), title: z.string(), state: z.string(), draft: z.boolean(),
   url: z.string(), head: z.string(), base: z.string(), attention: z.string().nullable().optional(),
-  checks: z.enum(["failed", "passing", "pending", "none"]).optional(),
-  review: z.enum(["approved", "changes_requested", "review_requested", "review_required", "none"]).optional(),
+  checks: z.enum(["failed", "passing", "pending", "none", "unknown"]).optional(),
+  review: z.enum(["approved", "changes_requested", "changes_requested_review_requested", "review_requested", "review_required", "none"]).optional(),
   reviewCommentCount: z.number().int().nonnegative().optional(),
 });
 const sidebarStack = z.object({
@@ -88,8 +88,8 @@ const authoredPullRequest = z.object({
   draft: z.boolean(),
   head: z.string(),
   base: z.string(),
-  checks: z.enum(["failed", "passing", "pending", "none"]),
-  review: z.enum(["approved", "changes_requested", "review_requested", "review_required", "none"]),
+  checks: z.enum(["failed", "passing", "pending", "none", "unknown"]),
+  review: z.enum(["approved", "changes_requested", "changes_requested_review_requested", "review_requested", "review_required", "none"]),
   stack: sidebarStack.nullable(),
 });
 const sidebarThreadPullRequest = z.object({
@@ -112,6 +112,8 @@ const githubStackBranch = z.object({
   name: z.string(), isCurrent: z.boolean(), isMerged: z.boolean(), isQueued: z.boolean(), needsRebase: z.boolean(), hasStash: z.boolean(), stashCount: z.number().int().nonnegative().nullable(),
   pr: z.object({ number: z.number(), url: z.string().url(), state: z.string(), title: z.string().nullable(), isDraft: z.boolean(), metadataStale: z.boolean() }).nullable(),
   diff: stackChange.nullable(), aheadOfRemote: z.number().nullable(), behindRemote: z.number().nullable(),
+  checks: z.enum(["failed", "passing", "pending", "none", "unknown"]).optional(),
+  review: z.enum(["approved", "changes_requested", "changes_requested_review_requested", "review_requested", "review_required", "none"]).optional(),
 });
 const githubStack = z.object({ trunk: z.string(), currentBranch: z.string().nullable(), branches: z.array(githubStackBranch), trunkBehind: z.number().nullable(), prunableBranchCount: z.number().int().nonnegative().nullable() });
 
