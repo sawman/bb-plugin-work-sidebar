@@ -102,6 +102,11 @@ const archivedThread = z.object({
   parentThreadId: z.string().nullable(), environmentBranchName: z.string().nullable(), isPinned: z.boolean(), isUnread: z.boolean(),
   createdAt: z.number(), updatedAt: z.number(), archivedAt: z.number(),
 });
+const sidebarThreadGroup = z.object({
+  id: z.string().regex(/^group_[a-z0-9_-]{1,48}$/),
+  name: z.string().trim().min(1).max(40),
+  threadIds: z.array(z.string().startsWith("thr_")).max(2_000),
+});
 const stackChange = z.object({ additions: z.number(), deletions: z.number(), files: z.array(z.object({ path: z.string(), previousPath: z.string().nullable(), status: z.enum(["added", "deleted", "modified", "renamed", "untracked"]), additions: z.number().nullable(), deletions: z.number().nullable() })), truncated: z.boolean() });
 const githubStackBranch = z.object({
   name: z.string(), isCurrent: z.boolean(), isMerged: z.boolean(), isQueued: z.boolean(), needsRebase: z.boolean(), hasStash: z.boolean(), stashCount: z.number().int().nonnegative().nullable(),
@@ -137,6 +142,14 @@ export const rpcContract = defineRpcContract({
   saveLaterThreads: {
     input: z.object({ threadIds: z.array(z.string().startsWith("thr_")).max(2_000) }).strict(),
     output: z.object({ threadIds: z.array(z.string().startsWith("thr_")) }).strict(),
+  },
+  getThreadGroups: {
+    input: z.null(),
+    output: z.object({ groups: z.array(sidebarThreadGroup).max(12) }).strict(),
+  },
+  saveThreadGroups: {
+    input: z.object({ groups: z.array(sidebarThreadGroup).max(12) }).strict(),
+    output: z.object({ groups: z.array(sidebarThreadGroup).max(12) }).strict(),
   },
   sidebarTasks: {
     input: z.null(),

@@ -9,6 +9,7 @@ import {
   runtimeStatusPresentation,
   type SidebarTask,
 } from "./work-model";
+import { normalizeThreadGroups } from "./server";
 
 function task(overrides: Partial<SidebarTask> = {}): SidebarTask {
   return {
@@ -31,6 +32,20 @@ describe("thread order persistence", () => {
     expect(sanitizeThreadOrder(["thr_one", "bad", "thr_one", " thr_two "])).toEqual(["thr_one", "thr_two"]);
   });
 
+});
+
+describe("custom thread groups", () => {
+  it("migrates Later and keeps every thread in only one group", () => {
+    expect(normalizeThreadGroups(undefined, ["thr_later", "thr_later"]))
+      .toEqual([{ id: "group_later", name: "Later", threadIds: ["thr_later"] }]);
+    expect(normalizeThreadGroups({ groups: [
+      { id: "group_later", name: "Later", threadIds: ["thr_one", "thr_two"] },
+      { id: "group_next", name: "Next", threadIds: ["thr_two", "thr_three"] },
+    ] })).toEqual([
+      { id: "group_later", name: "Later", threadIds: ["thr_one", "thr_two"] },
+      { id: "group_next", name: "Next", threadIds: ["thr_three"] },
+    ]);
+  });
 });
 
 describe("task ordering", () => {

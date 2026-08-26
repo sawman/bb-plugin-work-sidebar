@@ -10,6 +10,7 @@ const TASKS_PLUGIN_ID = "tasks";
 const SIDEBAR_ORDER_KEY = "sidebar-thread-order:v1";
 const THREAD_LIST_MODE_KEY = "sidebar-thread-list-mode:v1";
 const LATER_THREADS_KEY = "sidebar-later-threads:v1";
+const THREAD_GROUPS_KEY = "sidebar-thread-groups:v1";
 const WORK_BINDINGS_KEY = "work-bindings:v2";
 const LINEAR_LINKS_KEY = "work-linear-links:v1";
 const TASKBOARD_PLUGIN_ID = "taskboard";
@@ -220,6 +221,24 @@ export function githubStackApiArgs(owner: string, repo: string, pullRequest: num
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+type SidebarThreadGroup = { id: string; name: string; threadIds: string[] };
+
+export function normalizeThreadGroups(value: unknown, legacyLater: unknown = []): SidebarThreadGroup[] {
+  const rawGroups = isRecord(value) && Array.isArray(value.groups) ? value.groups : null;
+  const candidates = rawGroups ?? [{ id: "group_later", name: "Later", threadIds: sanitizeThreadOrder(legacyLater) }];
+  const usedIds = new Set<string>();
+  const assignedThreads = new Set<string>();
+  return candidates.flatMap((candidate): SidebarThreadGroup[] => {
+    if (!isRecord(candidate) || typeof candidate.id !== "string" || !/^group_[a-z0-9_-]{1,48}$/.test(candidate.id) || usedIds.has(candidate.id)) return [];
+    const name = typeof candidate.name === "string" ? candidate.name.trim().slice(0, 40) : "";
+    if (!name) return [];
+    usedIds.add(candidate.id);
+    const threadIds = sanitizeThreadOrder(candidate.threadIds).filter((threadId) => !assignedThreads.has(threadId));
+    threadIds.forEach((threadId) => assignedThreads.add(threadId));
+    return [{ id: candidate.id, name, threadIds }];
+  });
 }
 
 function requiredString(value: unknown, field: string): string {
@@ -1049,6 +1068,19 @@ export default async function plugin(bb: BbPluginApi) {
       await bb.storage.kv.set(LATER_THREADS_KEY, sanitized);
       bb.realtime.publish(SIDEBAR_ORDER_CHANNEL, { threadIds: sanitized });
       return { threadIds: sanitized };
+    },
+    async getThreadGroups() {
+      const [savedGroups, legacyLater] = await Promise.all([
+        bb.storage.kv.get<unknown>(THREAD_GROUPS_KEY),
+        bb.storage.kv.get<unknown>(LATER_THREADS_KEY),
+      ]);
+      return { groups: normalizeThreadGroups(savedGroups, legacyLater) };
+    },
+    async saveThreadGroups({ groups }) {
+      const normalized = normalizeThreadGroups({ groups });
+      await bb.storage.kv.set(THREAD_GROUPS_KEY, { groups: normalized });
+      bb.realtime.publish(SIDEBAR_ORDER_CHANNEL, { groups: normalized });
+      return { groups: normalized };
     },
     async sidebarTasks() {
       try {

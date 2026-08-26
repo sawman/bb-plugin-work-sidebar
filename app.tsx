@@ -64,6 +64,7 @@ import "./scrollbar.css";
 import "./views.css";
 
 const SIDEBAR_ORDER_CHANNEL = "sidebar-order:changed";
+type SidebarThreadGroup = { id: string; name: string; threadIds: string[] };
 
 function indicatorGlyph(value: string): string {
   switch (normalizeIndicator(value)) {
@@ -106,10 +107,11 @@ function ThreadRow({
   activeChildren,
   childrenExpanded,
   selected,
-  later,
+  groupId,
+  groups,
   onToggleChildren,
   onSelect,
-  onToggleLater,
+  onMoveToGroup,
   project,
   onNavigate,
   reorderDisabled,
@@ -130,10 +132,11 @@ function ThreadRow({
   activeChildren: number;
   childrenExpanded: boolean;
   selected: boolean;
-  later: boolean;
+  groupId: string | null;
+  groups: readonly SidebarThreadGroup[];
   onToggleChildren(): void;
   onSelect(thread: PluginSidebarThread, event: ReactMouseEvent<HTMLAnchorElement>): boolean;
-  onToggleLater(threadId: string): void;
+  onMoveToGroup(threadId: string, groupId: string | null): void;
   project?: { name: string; isPersonal: boolean };
   onNavigate(): void;
   reorderDisabled: boolean;
@@ -171,7 +174,7 @@ function ThreadRow({
   // These sidebar action APIs own the recursive tree mutation: archive closes
   // the parent and every descendant, and delete opens BB's child-counting
   // recursive confirmation. Never fan out child actions here.
-  const archiveTree = () => actions.archive(thread.id);
+  const archiveTree = () => { if (groupId) onMoveToGroup(thread.id, null); actions.archive(thread.id); };
   const requestDeleteTree = () => actions.requestDelete(thread.id);
   // Native drag is reliable from this dedicated grip. The thread itself stays
   // a normal link, so BB's split gesture and text selection cannot take over.
@@ -296,7 +299,8 @@ function ThreadRow({
               {thread.isUnread ? "Mark read" : "Mark unread"}
             </ContextMenuItem>
             <ContextMenuItem onSelect={() => setRenaming(true)}>Rename</ContextMenuItem>
-            <ContextMenuItem onSelect={() => onToggleLater(thread.id)}>{later ? "Active" : "Later"}</ContextMenuItem>
+            <ContextMenuItem disabled={groupId === null} onSelect={() => onMoveToGroup(thread.id, null)}>Active</ContextMenuItem>
+            {groups.map((group) => <ContextMenuItem key={group.id} disabled={group.id === groupId} onSelect={() => onMoveToGroup(thread.id, group.id)}>{group.name}</ContextMenuItem>)}
             <ContextMenuItem onSelect={archiveTree}>Archive</ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={requestDeleteTree}>
@@ -315,11 +319,12 @@ function WorkThreadTree({
   taskLinks,
   activeThreadId,
   selectedThreadIds,
-  laterThreadIds,
+  groupIds,
+  groups,
   projectsById,
   onNavigate,
   onSelect,
-  onToggleLater,
+  onMoveToGroup,
   orderedSiblings,
   reorderDisabled,
   dragThreadId,
@@ -336,11 +341,12 @@ function WorkThreadTree({
   taskLinks: Readonly<Record<string, readonly ThreadTaskLink[]>>;
   activeThreadId: string | null;
   selectedThreadIds: ReadonlySet<string>;
-  laterThreadIds: ReadonlySet<string>;
+  groupIds: ReadonlyMap<string, string>;
+  groups: readonly SidebarThreadGroup[];
   projectsById: ReadonlyMap<string, { name: string; isPersonal: boolean }>;
   onNavigate(): void;
   onSelect(thread: PluginSidebarThread, event: ReactMouseEvent<HTMLAnchorElement>): boolean;
-  onToggleLater(threadId: string): void;
+  onMoveToGroup(threadId: string, groupId: string | null): void;
   orderedSiblings: readonly PluginSidebarThread[];
   reorderDisabled: boolean;
   dragThreadId: string | null;
@@ -368,10 +374,11 @@ function WorkThreadTree({
         activeChildren={activeChildren}
         childrenExpanded={childrenExpanded}
         selected={selectedThreadIds.has(thread.id)}
-        later={laterThreadIds.has(thread.id)}
+        groupId={groupIds.get(thread.id) ?? null}
+        groups={groups}
         onToggleChildren={() => setChildrenExpanded((expanded) => !expanded)}
         onSelect={onSelect}
-        onToggleLater={onToggleLater}
+        onMoveToGroup={onMoveToGroup}
         project={projectsById.get(thread.projectId)}
         onNavigate={onNavigate}
         reorderDisabled={reorderDisabled}
@@ -393,11 +400,12 @@ function WorkThreadTree({
             taskLinks={taskLinks}
             activeThreadId={activeThreadId}
             selectedThreadIds={selectedThreadIds}
-            laterThreadIds={laterThreadIds}
+            groupIds={groupIds}
+            groups={groups}
             projectsById={projectsById}
             onNavigate={onNavigate}
             onSelect={onSelect}
-            onToggleLater={onToggleLater}
+            onMoveToGroup={onMoveToGroup}
             orderedSiblings={children}
             reorderDisabled={reorderDisabled}
             dragThreadId={dragThreadId}
@@ -453,7 +461,7 @@ function WorkThreadList(props: PluginThreadListProps) {
   const orderMutation = useRef(0);
   const orderRef = useRef<string[]>([]);
   const [threadOrder, setThreadOrder] = useState<string[]>([]);
-  const [laterThreadIds, setLaterThreadIds] = useState<Set<string>>(() => new Set());
+  const [threadGroups, setThreadGroups] = useState<SidebarThreadGroup[]>([]);
   const [dragThreadId, setDragThreadId] = useState<string | null>(null);
   const [threadDropTarget, setThreadDropTarget] = useState<{ threadId: string; placement: "before" | "after" } | null>(null);
   const [selectedThreadIds, setSelectedThreadIds] = useState<Set<string>>(() => new Set());
@@ -499,17 +507,17 @@ function WorkThreadList(props: PluginThreadListProps) {
     void refreshSidebarOrder();
     return () => { orderRequest.current += 1; orderMutation.current += 1; };
   }, [refreshSidebarOrder]);
-  const refreshLaterThreads = useCallback(async () => {
+  const refreshThreadGroups = useCallback(async () => {
     try {
-      const result = await rpc.call("getLaterThreads", null);
-      setLaterThreadIds(new Set(result.threadIds));
+      const result = await rpc.call("getThreadGroups", null);
+      setThreadGroups(result.groups);
     } catch {
-      // Keep the last known Later section if the plugin backend is reloading.
+      // Keep the last known custom groups while the plugin backend reloads.
     }
   }, [rpc]);
   useEffect(() => {
-    void refreshLaterThreads();
-  }, [refreshLaterThreads]);
+    void refreshThreadGroups();
+  }, [refreshThreadGroups]);
   const refreshArchivedThreads = useCallback(async (force = false) => {
     setArchivedThreadState("loading"); setArchivedThreadError(null);
     try {
@@ -526,20 +534,25 @@ function WorkThreadList(props: PluginThreadListProps) {
     const timer = window.setTimeout(() => void refreshArchivedThreads(), 350);
     return () => window.clearTimeout(timer);
   }, [refreshArchivedThreads]);
-  const unarchiveThread = useCallback((threadId: string, destination: "active" | "later") => {
+  const saveThreadGroups = useCallback((next: SidebarThreadGroup[], previous = threadGroups) => {
+    setThreadGroups(next);
+    void rpc.call("saveThreadGroups", { groups: next }).then((result) => {
+      setThreadGroups(result.groups);
+    }).catch((error: unknown) => {
+      setThreadGroups(previous);
+      toast.error(error instanceof Error ? error.message : "Could not save thread groups");
+    });
+  }, [rpc, threadGroups]);
+  const unarchiveThread = useCallback((threadId: string, destination: string | null) => {
     void rpc.call("unarchiveSidebarThread", { threadId }).then(async () => {
-      if (destination === "later") {
-        const current = await rpc.call("getLaterThreads", null);
-        const result = await rpc.call("saveLaterThreads", { threadIds: [...new Set([...current.threadIds, threadId])] });
-        setLaterThreadIds(new Set(result.threadIds));
-      }
+      if (destination) saveThreadGroups(threadGroups.map((group) => group.id === destination ? { ...group, threadIds: [...new Set([...group.threadIds, threadId])] } : group));
       setArchivedThreads((current) => current.filter((thread) => thread.id !== threadId));
-      toast.success(`Moved to ${destination}`);
+      toast.success(`Moved to ${destination ? threadGroups.find((group) => group.id === destination)?.name ?? "group" : "Active"}`);
     }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not unarchive thread"));
-  }, [rpc]);
+  }, [rpc, saveThreadGroups, threadGroups]);
   useRealtime(SIDEBAR_ORDER_CHANNEL, () => {
     void refreshSidebarOrder();
-    void refreshLaterThreads();
+    void refreshThreadGroups();
   });
 
   const persistSidebarOrder = useCallback(async (next: string[]) => {
@@ -571,11 +584,11 @@ function WorkThreadList(props: PluginThreadListProps) {
   }, [rpc]);
   const refreshThreadDetails = useCallback(async () => {
     void refreshSidebarOrder();
-    void refreshLaterThreads();
+    void refreshThreadGroups();
     void refreshTaskLinks();
     void refreshArchivedThreads(true);
     setSubtextRefreshKey((current) => current + 1);
-  }, [refreshArchivedThreads, refreshLaterThreads, refreshSidebarOrder, refreshTaskLinks]);
+  }, [refreshArchivedThreads, refreshThreadGroups, refreshSidebarOrder, refreshTaskLinks]);
   useEffect(() => {
     void refreshTaskLinks();
     const timer = window.setInterval(() => void refreshTaskLinks(), 30_000);
@@ -661,49 +674,69 @@ function WorkThreadList(props: PluginThreadListProps) {
   const projectNames = useMemo(() => Object.fromEntries(projects.map((project) => [project.id, project.name])), [projects]);
   const effectiveOrder = useMemo(() => reconcileThreadOrder(threadOrder, threads), [threadOrder, threads]);
   const allChildrenByThread = useMemo(() => childrenByParent(threads, effectiveOrder), [effectiveOrder, threads]);
-  // A parent brought forward/back carries its subtree too; this prevents a
-  // child thread from being orphaned in the opposite section.
-  const allLaterIds = useMemo(() => {
-    const result = new Set(laterThreadIds);
-    const includeDescendants = (threadId: string) => {
-      for (const child of allChildrenByThread.get(threadId) ?? []) {
-        if (result.has(child.id)) continue;
-        result.add(child.id);
-        includeDescendants(child.id);
-      }
+  // A group follows the whole thread subtree, just as archive does. This
+  // keeps child agents from being stranded in a different status section.
+  const threadGroupIds = useMemo(() => {
+    const result = new Map<string, string>();
+    const includeDescendants = (threadId: string, groupId: string) => {
+      if (result.has(threadId)) return;
+      result.set(threadId, groupId);
+      for (const child of allChildrenByThread.get(threadId) ?? []) includeDescendants(child.id, groupId);
     };
-    for (const threadId of laterThreadIds) includeDescendants(threadId);
+    for (const group of threadGroups) for (const threadId of group.threadIds) includeDescendants(threadId, group.id);
     return result;
-  }, [allChildrenByThread, laterThreadIds]);
+  }, [allChildrenByThread, threadGroups]);
+  const allGroupedIds = useMemo(() => new Set(threadGroupIds.keys()), [threadGroupIds]);
   const archivedThreadIds = useMemo(() => new Set(archivedThreads.map((thread) => thread.id)), [archivedThreads]);
-  const filtered = useMemo(() => filterThreadsWithAncestors(threads.filter((thread) => !allLaterIds.has(thread.id)), projectNames, props.searchQuery), [allLaterIds, threads, projectNames, props.searchQuery]);
+  const filtered = useMemo(() => filterThreadsWithAncestors(threads.filter((thread) => !allGroupedIds.has(thread.id)), projectNames, props.searchQuery), [allGroupedIds, threads, projectNames, props.searchQuery]);
   const orderedRoots = useMemo(() => rootThreads(filtered, effectiveOrder), [effectiveOrder, filtered]);
   const childrenByThread = useMemo(() => childrenByParent(filtered, effectiveOrder), [effectiveOrder, filtered]);
-  const laterThreads = useMemo(() => threads.filter((thread) => allLaterIds.has(thread.id)), [allLaterIds, threads]);
-  const laterRoots = useMemo(() => rootThreads(laterThreads, effectiveOrder), [effectiveOrder, laterThreads]);
-  const laterChildrenByThread = useMemo(() => childrenByParent(laterThreads, effectiveOrder), [effectiveOrder, laterThreads]);
+  const groupedThreadTrees = useMemo(() => new Map(threadGroups.map((group) => {
+    const groupThreads = threads.filter((thread) => threadGroupIds.get(thread.id) === group.id);
+    return [group.id, { roots: rootThreads(groupThreads, effectiveOrder), children: childrenByParent(groupThreads, effectiveOrder) }] as const;
+  })), [effectiveOrder, threadGroupIds, threadGroups, threads]);
   const projectsById = useMemo(() => new Map(projects.map((project) => [project.id, project])), [projects]);
   const reorderDisabled = props.searchQuery.trim().length > 0;
   const visibleThreadIds = useMemo(() => visibleThreadTreeIds(orderedRoots, childrenByThread), [childrenByThread, orderedRoots]);
 
-  const toggleLater = useCallback((threadId: string) => {
+  const moveThreadToGroup = useCallback((threadId: string, destination: string | null) => {
     const thread = threads.find((candidate) => candidate.id === threadId);
     if (!thread) return;
     const subtree = new Set(visibleThreadTreeIds([thread], allChildrenByThread));
-    setLaterThreadIds((current) => {
-      const previous = new Set(current);
-      const next = new Set(current);
-      if (current.has(threadId)) subtree.forEach((id) => next.delete(id));
-      else subtree.forEach((id) => next.add(id));
-      void rpc.call("saveLaterThreads", { threadIds: [...next] }).then((result) => {
-        setLaterThreadIds(new Set(result.threadIds));
-      }).catch((error: unknown) => {
-        setLaterThreadIds(previous);
-        toast.error(error instanceof Error ? error.message : "Could not update Later threads");
-      });
-      return next;
-    });
-  }, [allChildrenByThread, rpc, threads]);
+    const next = threadGroups.map((group) => ({ ...group, threadIds: group.threadIds.filter((id) => !subtree.has(id)) }));
+    if (destination) {
+      const index = next.findIndex((group) => group.id === destination);
+      if (index < 0) return;
+      next[index] = { ...next[index], threadIds: [...new Set([...next[index].threadIds, threadId])] };
+    }
+    saveThreadGroups(next);
+  }, [allChildrenByThread, saveThreadGroups, threadGroups, threads]);
+  const addThreadGroup = useCallback(() => {
+    if (threadGroups.length >= 12) { toast.error("You can have up to 12 custom groups."); return; }
+    const name = window.prompt("Name this thread group");
+    if (!name?.trim()) return;
+    const trimmed = name.trim().slice(0, 40);
+    if (threadGroups.some((group) => group.name.localeCompare(trimmed, undefined, { sensitivity: "accent" }) === 0)) {
+      toast.error("A group with that name already exists.");
+      return;
+    }
+    const id = `group_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    saveThreadGroups([...threadGroups, { id, name: trimmed, threadIds: [] }]);
+  }, [saveThreadGroups, threadGroups]);
+  const renameThreadGroup = useCallback((group: SidebarThreadGroup) => {
+    const name = window.prompt("Rename thread group", group.name);
+    if (!name?.trim()) return;
+    const trimmed = name.trim().slice(0, 40);
+    if (threadGroups.some((candidate) => candidate.id !== group.id && candidate.name.localeCompare(trimmed, undefined, { sensitivity: "accent" }) === 0)) {
+      toast.error("A group with that name already exists.");
+      return;
+    }
+    saveThreadGroups(threadGroups.map((candidate) => candidate.id === group.id ? { ...candidate, name: trimmed } : candidate));
+  }, [saveThreadGroups, threadGroups]);
+  const removeThreadGroup = useCallback((group: SidebarThreadGroup) => {
+    if ([...threadGroupIds.values()].includes(group.id)) return;
+    saveThreadGroups(threadGroups.filter((candidate) => candidate.id !== group.id));
+  }, [saveThreadGroups, threadGroupIds, threadGroups]);
 
   // Plain click retains BB's normal open behavior. Ctrl/Cmd toggles an item,
   // while Shift extends a range through the currently visible work list.
@@ -839,7 +872,7 @@ function WorkThreadList(props: PluginThreadListProps) {
     return false;
   };
 
-  const viewToolbar = view === "queue" ? <><span>{filteredTasks.length} active task{filteredTasks.length === 1 ? "" : "s"}</span><span className="ws-work-toolbar-actions">{selectedTaskIds.size > 1 && <span className="ws-selection-count" role="status">{selectedTaskIds.size} selected</span>}<button className="ws-icon-button" title="Refresh tasks" aria-label="Refresh tasks" onClick={() => void refreshTasks()}><Icon name="RefreshCw" aria-hidden /></button></span></> : view === "prs" ? <><span>{visibleAuthoredPullRequests.length} open pull request{visibleAuthoredPullRequests.length === 1 ? "" : "s"}</span><span className="ws-work-toolbar-actions">{selectedPullRequestIds.size > 1 && <span className="ws-selection-count" role="status">{selectedPullRequestIds.size} selected</span>}<button className="ws-icon-button" title="Refresh pull requests" aria-label="Refresh pull requests" disabled={authoredPullRequestState === "loading"} onClick={() => setAuthoredPullRequestRefreshKey((value) => value + 1)}><Icon name="RefreshCw" aria-hidden /></button></span></> : <><span>{threadListMode === "native" ? "Threads" : `${filtered.length} thread${filtered.length === 1 ? "" : "s"}`}</span><span className="ws-work-toolbar-actions">{threadListMode === "enhanced" && <>{selectedThreadIds.size > 1 && <><span className="ws-selection-count" role="status">{selectedThreadIds.size} selected</span><button className="ws-selection-archive" onClick={() => void archiveSelected()}>Archive selected</button></>}{reorderDisabled && <span className="ws-reorder-disabled" role="status">Clear search to reorder</span>}</>}<span className="ws-thread-settings"><button className="ws-icon-button" title="Thread list settings" aria-label="Thread list settings" aria-expanded={threadSettingsOpen} onClick={() => setThreadSettingsOpen((open) => !open)}><Icon name="Wrench" aria-hidden /></button>{threadSettingsOpen && <span className="ws-thread-settings-menu" role="menu"><button role="menuitemradio" aria-checked={threadListMode === "enhanced"} onClick={() => setSavedThreadListMode("enhanced")}>Enhanced list</button><button role="menuitemradio" aria-checked={threadListMode === "native"} onClick={() => setSavedThreadListMode("native")}>BB native list</button></span>}</span><button className="ws-icon-button" title="Refresh threads" aria-label="Refresh threads" onClick={() => void refreshThreadDetails()}><Icon name="RefreshCw" aria-hidden /></button>{props.activeProjectId && <Button className="ws-new-thread" variant="ghost" size="icon" title="New thread in project" aria-label="New thread in project" onClick={() => actions.openNewThread({ projectId: props.activeProjectId!, focusPrompt: true })}><Icon name="Plus" aria-hidden /></Button>}</span></>;
+  const viewToolbar = view === "queue" ? <><span>{filteredTasks.length} active task{filteredTasks.length === 1 ? "" : "s"}</span><span className="ws-work-toolbar-actions">{selectedTaskIds.size > 1 && <span className="ws-selection-count" role="status">{selectedTaskIds.size} selected</span>}<button className="ws-icon-button" title="Refresh tasks" aria-label="Refresh tasks" onClick={() => void refreshTasks()}><Icon name="RefreshCw" aria-hidden /></button></span></> : view === "prs" ? <><span>{visibleAuthoredPullRequests.length} open pull request{visibleAuthoredPullRequests.length === 1 ? "" : "s"}</span><span className="ws-work-toolbar-actions">{selectedPullRequestIds.size > 1 && <span className="ws-selection-count" role="status">{selectedPullRequestIds.size} selected</span>}<button className="ws-icon-button" title="Refresh pull requests" aria-label="Refresh pull requests" disabled={authoredPullRequestState === "loading"} onClick={() => setAuthoredPullRequestRefreshKey((value) => value + 1)}><Icon name="RefreshCw" aria-hidden /></button></span></> : <><span>{threadListMode === "native" ? "Threads" : `${filtered.length} thread${filtered.length === 1 ? "" : "s"}`}</span><span className="ws-work-toolbar-actions">{threadListMode === "enhanced" && <>{selectedThreadIds.size > 1 && <><span className="ws-selection-count" role="status">{selectedThreadIds.size} selected</span><button className="ws-selection-archive" onClick={() => void archiveSelected()}>Archive selected</button></>}{reorderDisabled && <span className="ws-reorder-disabled" role="status">Clear search to reorder</span>}</>}<span className="ws-thread-settings"><button className="ws-icon-button" title="Thread list settings" aria-label="Thread list settings" aria-expanded={threadSettingsOpen} onClick={() => setThreadSettingsOpen((open) => !open)}><Icon name="Wrench" aria-hidden /></button>{threadSettingsOpen && <span className="ws-thread-settings-menu" role="menu"><button role="menuitemradio" aria-checked={threadListMode === "enhanced"} onClick={() => setSavedThreadListMode("enhanced")}>Enhanced list</button><button role="menuitemradio" aria-checked={threadListMode === "native"} onClick={() => setSavedThreadListMode("native")}>BB native list</button><span className="ws-thread-group-settings"><b>Custom groups</b>{threadGroups.map((group) => <span key={group.id}><button title={`Rename ${group.name}`} onClick={() => renameThreadGroup(group)}>{group.name}</button><button className="ws-thread-group-remove" title={[...threadGroupIds.values()].includes(group.id) ? "Move its threads before removing" : `Remove ${group.name}`} disabled={[...threadGroupIds.values()].includes(group.id)} onClick={() => removeThreadGroup(group)}><Icon name="X" aria-hidden /></button></span>)}<button className="ws-thread-group-add" onClick={addThreadGroup}>Add group</button></span></span>}</span><button className="ws-icon-button" title="Refresh threads" aria-label="Refresh threads" onClick={() => void refreshThreadDetails()}><Icon name="RefreshCw" aria-hidden /></button>{props.activeProjectId && <Button className="ws-new-thread" variant="ghost" size="icon" title="New thread in project" aria-label="New thread in project" onClick={() => actions.openNewThread({ projectId: props.activeProjectId!, focusPrompt: true })}><Icon name="Plus" aria-hidden /></Button>}</span></>;
 
   return (
     <div className="ws-list">
@@ -860,7 +893,7 @@ function WorkThreadList(props: PluginThreadListProps) {
       </div>}
       {view === "work" && <>
       {threadListMode === "native" ? <section className="ws-native-thread-list" aria-label="BB native threads"><Original /></section> : <><section className="ws-thread-statuses" aria-label="Thread status groups">
-      <details className="ws-later ws-active-threads" data-drop-target={threadDropTarget?.threadId === "active" || undefined} open={activeThreadsOpen} onToggle={(event) => setActiveThreadsOpen(event.currentTarget.open)} onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || (!allLaterIds.has(sourceId) && !archivedThreadIds.has(sourceId))) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: "active", placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || (!allLaterIds.has(sourceId) && !archivedThreadIds.has(sourceId))) return; event.preventDefault(); if (archivedThreadIds.has(sourceId)) unarchiveThread(sourceId, "active"); else toggleLater(sourceId); setDragThreadId(null); setThreadDropTarget(null); }}>
+      <details className="ws-later ws-active-threads" data-drop-target={threadDropTarget?.threadId === "active" || undefined} open={activeThreadsOpen} onToggle={(event) => setActiveThreadsOpen(event.currentTarget.open)} onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || (!threadGroupIds.has(sourceId) && !archivedThreadIds.has(sourceId))) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: "active", placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || (!threadGroupIds.has(sourceId) && !archivedThreadIds.has(sourceId))) return; event.preventDefault(); if (archivedThreadIds.has(sourceId)) unarchiveThread(sourceId, null); else moveThreadToGroup(sourceId, null); setDragThreadId(null); setThreadDropTarget(null); }}>
       <summary>Active <span>{orderedRoots.length}</span></summary>
       <section className="ws-hierarchy" aria-label="Work threads">
         {orderedRoots.map((thread) => (
@@ -871,11 +904,12 @@ function WorkThreadList(props: PluginThreadListProps) {
             taskLinks={taskLinks}
             activeThreadId={props.activeThreadId}
             selectedThreadIds={selectedThreadIds}
-            laterThreadIds={allLaterIds}
+            groupIds={threadGroupIds}
+            groups={threadGroups}
             projectsById={projectsById}
             onNavigate={props.onNavigate}
             onSelect={selectThread}
-            onToggleLater={toggleLater}
+            onMoveToGroup={moveThreadToGroup}
             orderedSiblings={orderedRoots}
             reorderDisabled={reorderDisabled}
             dragThreadId={dragThreadId}
@@ -889,8 +923,8 @@ function WorkThreadList(props: PluginThreadListProps) {
         ))}
       </section>
       </details>
-      <details className="ws-later" data-drop-target={threadDropTarget?.threadId === "later" || undefined} open onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || allLaterIds.has(sourceId)) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: "later", placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || allLaterIds.has(sourceId)) return; event.preventDefault(); if (archivedThreadIds.has(sourceId)) unarchiveThread(sourceId, "later"); else toggleLater(sourceId); setDragThreadId(null); setThreadDropTarget(null); }}><summary>Later <span>{laterRoots.length}</span></summary>{laterRoots.length > 0 ? <section className="ws-hierarchy" aria-label="Threads for later">{laterRoots.map((thread) => <WorkThreadTree key={thread.id} thread={thread} childrenByThread={laterChildrenByThread} taskLinks={taskLinks} activeThreadId={props.activeThreadId} selectedThreadIds={selectedThreadIds} laterThreadIds={allLaterIds} projectsById={projectsById} onNavigate={props.onNavigate} onSelect={selectThread} onToggleLater={toggleLater} orderedSiblings={laterRoots} reorderDisabled={reorderDisabled} dragThreadId={dragThreadId} onDragThreadChange={setDragThreadId} dropTarget={threadDropTarget} onDropTargetChange={setThreadDropTarget} onDropThread={reorder} onMoveThread={move} subtextRefreshKey={subtextRefreshKey} />)}</section> : <div className="ws-later-empty">Right-click a thread to move it here.</div>}</details>
-      <details className="ws-later ws-archived" data-drop-target={threadDropTarget?.threadId === "archive" || undefined} open={archivedOpen} onToggle={(event) => setArchivedOpen(event.currentTarget.open)} onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || archivedThreadIds.has(sourceId)) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: "archive", placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || archivedThreadIds.has(sourceId)) return; event.preventDefault(); actions.archive(sourceId); window.setTimeout(() => void refreshArchivedThreads(true), 250); setDragThreadId(null); setThreadDropTarget(null); }}><summary>Archive <span>{archivedThreadState === "ready" ? archivedThreads.length : ""}</span></summary>{archivedThreadState === "idle" || archivedThreadState === "loading" ? <div className="ws-later-empty">Loading archive threads…</div> : archivedThreadState === "error" ? <div className="ws-callout">{archivedThreadError ?? "Could not load archive threads."}<button onClick={() => void refreshArchivedThreads(true)}>Try again</button></div> : archivedThreads.length > 0 ? <section className="ws-hierarchy" aria-label="Archive threads">{archivedThreads.map((thread) => <ArchivedThreadRow key={thread.id} thread={thread} project={projectsById.get(thread.projectId)} onUnarchive={unarchiveThread} onNavigate={props.onNavigate} onDragThreadChange={setDragThreadId} onDropTargetChange={() => setThreadDropTarget(null)} />)}</section> : <div className="ws-later-empty">No archive threads.</div>}</details>
+      {threadGroups.map((group) => { const tree = groupedThreadTrees.get(group.id); const roots = tree?.roots ?? []; return <details key={group.id} className="ws-later" data-drop-target={threadDropTarget?.threadId === group.id || undefined} open onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || threadGroupIds.get(sourceId) === group.id) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: group.id, placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || threadGroupIds.get(sourceId) === group.id) return; event.preventDefault(); if (archivedThreadIds.has(sourceId)) unarchiveThread(sourceId, group.id); else moveThreadToGroup(sourceId, group.id); setDragThreadId(null); setThreadDropTarget(null); }}><summary>{group.name} <span>{roots.length}</span></summary>{roots.length > 0 ? <section className="ws-hierarchy" aria-label={`${group.name} threads`}>{roots.map((thread) => <WorkThreadTree key={thread.id} thread={thread} childrenByThread={tree?.children ?? new Map()} taskLinks={taskLinks} activeThreadId={props.activeThreadId} selectedThreadIds={selectedThreadIds} groupIds={threadGroupIds} groups={threadGroups} projectsById={projectsById} onNavigate={props.onNavigate} onSelect={selectThread} onMoveToGroup={moveThreadToGroup} orderedSiblings={roots} reorderDisabled={reorderDisabled} dragThreadId={dragThreadId} onDragThreadChange={setDragThreadId} dropTarget={threadDropTarget} onDropTargetChange={setThreadDropTarget} onDropThread={reorder} onMoveThread={move} subtextRefreshKey={subtextRefreshKey} />)}</section> : <div className="ws-later-empty">Right-click a thread to move it here.</div>}</details>; })}
+      <details className="ws-later ws-archived" data-drop-target={threadDropTarget?.threadId === "archive" || undefined} open={archivedOpen} onToggle={(event) => setArchivedOpen(event.currentTarget.open)} onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || archivedThreadIds.has(sourceId)) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: "archive", placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || archivedThreadIds.has(sourceId)) return; event.preventDefault(); if (threadGroupIds.has(sourceId)) moveThreadToGroup(sourceId, null); actions.archive(sourceId); window.setTimeout(() => void refreshArchivedThreads(true), 250); setDragThreadId(null); setThreadDropTarget(null); }}><summary>Archive <span>{archivedThreadState === "ready" ? archivedThreads.length : ""}</span></summary>{archivedThreadState === "idle" || archivedThreadState === "loading" ? <div className="ws-later-empty">Loading archive threads…</div> : archivedThreadState === "error" ? <div className="ws-callout">{archivedThreadError ?? "Could not load archive threads."}<button onClick={() => void refreshArchivedThreads(true)}>Try again</button></div> : archivedThreads.length > 0 ? <section className="ws-hierarchy" aria-label="Archive threads">{archivedThreads.map((thread) => <ArchivedThreadRow key={thread.id} thread={thread} project={projectsById.get(thread.projectId)} groups={threadGroups} onUnarchive={unarchiveThread} onNavigate={props.onNavigate} onDragThreadChange={setDragThreadId} onDropTargetChange={() => setThreadDropTarget(null)} />)}</section> : <div className="ws-later-empty">No archive threads.</div>}</details>
       </section>
       {filtered.length === 0 && <div className="ws-empty">{props.searchQuery ? `No threads match “${props.searchQuery}”.` : "No active threads."}</div>}
       </>}
