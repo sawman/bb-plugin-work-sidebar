@@ -878,12 +878,10 @@ function WorkThreadList(props: PluginThreadListProps) {
 
   return (
     <div className="ws-list">
-      <div className="ws-list-chrome">
       <nav className="ws-view-selector" aria-label="Sidebar views">
         {(["work", "queue", "prs"] as const).map((id) => <button key={id} className={view === id ? "ws-view-active" : ""} aria-pressed={view === id} onClick={() => setView(id)}>{sidebarViewLabel(id)}</button>)}
       </nav>
       <div className="ws-list-toolbar">{viewToolbar}</div>
-      </div>
       {view === "queue" && <div className="ws-view-content">
         {taskState === "loading" && <div className="ws-empty">Loading tasks…</div>}
         {taskState === "error" && <div className="ws-callout">{taskError ?? "Could not load tasks."}<button onClick={() => void refreshTasks()}>Try again</button></div>}
