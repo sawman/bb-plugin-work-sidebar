@@ -420,7 +420,7 @@ async function repositoryPullRequestSignals(owner: string, repo: string, numbers
       if (!isRecord(pullRequest)) return;
       const reviewDecision = String(pullRequest.reviewDecision ?? "");
       const reviewRequests = isRecord(pullRequest.reviewRequests) && typeof pullRequest.reviewRequests.totalCount === "number" ? pullRequest.reviewRequests.totalCount : 0;
-      const review: AuthoredPullRequestSignal["review"] = reviewDecision === "APPROVED" ? "approved" : reviewDecision === "CHANGES_REQUESTED" ? reviewRequests > 0 ? "changes_requested_review_requested" : "changes_requested" : reviewDecision === "REVIEW_REQUIRED" ? "review_required" : reviewRequests > 0 ? "review_requested" : "none";
+      const review: AuthoredPullRequestSignal["review"] = reviewDecision === "APPROVED" ? "approved" : reviewDecision === "CHANGES_REQUESTED" ? reviewRequests > 0 ? "changes_requested_review_requested" : "changes_requested" : reviewRequests > 0 ? "review_requested" : reviewDecision === "REVIEW_REQUIRED" ? "review_required" : "none";
       const commits = isRecord(pullRequest.commits) && Array.isArray(pullRequest.commits.nodes) ? pullRequest.commits.nodes : [];
       const commit = commits[commits.length - 1];
       const rollup = isRecord(commit) && isRecord(commit.commit) && isRecord(commit.commit.statusCheckRollup) ? commit.commit.statusCheckRollup : null;
@@ -461,8 +461,8 @@ async function authoredPullRequestSignals(items: readonly GitHubSearchPullReques
         const reviewRequests = isRecord(pullRequest.reviewRequests) && typeof pullRequest.reviewRequests.totalCount === "number" ? pullRequest.reviewRequests.totalCount : 0;
         const review: AuthoredPullRequestSignal["review"] = reviewDecision === "APPROVED" ? "approved"
           : reviewDecision === "CHANGES_REQUESTED" ? reviewRequests > 0 ? "changes_requested_review_requested" : "changes_requested"
-          : reviewDecision === "REVIEW_REQUIRED" ? "review_required"
-          : reviewRequests > 0 ? "review_requested" : "none";
+          : reviewRequests > 0 ? "review_requested"
+          : reviewDecision === "REVIEW_REQUIRED" ? "review_required" : "none";
         const commits = isRecord(pullRequest.commits) && Array.isArray(pullRequest.commits.nodes) ? pullRequest.commits.nodes : [];
         const commit = commits[commits.length - 1];
         const rollup = isRecord(commit) && isRecord(commit.commit) && isRecord(commit.commit.statusCheckRollup) ? commit.commit.statusCheckRollup : null;

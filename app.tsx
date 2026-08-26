@@ -191,18 +191,21 @@ function ThreadRow({
     const pointerId = event.pointerId;
     let active = false;
     const clear = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", finish); window.removeEventListener("pointercancel", finish); unifiedDragCleanup.current = null; onDragThreadChange(null); onDropTargetChange(null); };
-    const targetAt = (x: number, y: number) => document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-ws-thread-id]")?.dataset.wsThreadId ?? null;
+    const targetElementAt = (x: number, y: number) => document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-ws-thread-id]") ?? null;
+    const targetAt = (x: number, y: number) => targetElementAt(x, y)?.dataset.wsThreadId ?? null;
     const zoneAt = (x: number, y: number) => document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-ws-thread-drop-zone]")?.dataset.wsThreadDropZone ?? null;
     const move = (moveEvent: PointerEvent) => {
       if (moveEvent.pointerId !== pointerId) return;
       if (!active && Math.hypot(moveEvent.clientX - event.clientX, moveEvent.clientY - event.clientY) < 5) return;
       const sourceId = thread.id;
-      const targetId = targetAt(moveEvent.clientX, moveEvent.clientY);
+      const targetElement = targetElementAt(moveEvent.clientX, moveEvent.clientY);
+      const targetId = targetElement?.dataset.wsThreadId ?? null;
+      const targetGroup = targetElement?.dataset.wsThreadGroup ?? null;
       const zone = zoneAt(moveEvent.clientX, moveEvent.clientY);
-      if (!targetId && zone && zone !== groupId) {
+      if ((targetGroup && targetGroup !== (groupId ?? "active")) || (!targetId && zone && zone !== groupId)) {
         active = true;
         onDragThreadChange(sourceId);
-        onDropTargetChange({ threadId: zone, placement: "after" });
+        onDropTargetChange({ threadId: targetGroup ?? zone!, placement: "after" });
         moveEvent.preventDefault();
         return;
       }
@@ -218,9 +221,12 @@ function ThreadRow({
     const finish = (finishEvent: PointerEvent) => {
       if (finishEvent.pointerId === pointerId && active) {
         const zone = zoneAt(finishEvent.clientX, finishEvent.clientY);
-        const targetId = targetAt(finishEvent.clientX, finishEvent.clientY);
+        const targetElement = targetElementAt(finishEvent.clientX, finishEvent.clientY);
+        const targetId = targetElement?.dataset.wsThreadId ?? null;
+        const targetGroup = targetElement?.dataset.wsThreadGroup ?? null;
         if (!targetId && zone === "archive") archiveTree();
         else if (!targetId && zone && zone !== groupId) onMoveToGroup(thread.id, zone === "active" ? null : zone);
+        else if (targetGroup && targetGroup !== (groupId ?? "active")) onMoveToGroup(thread.id, targetGroup === "active" ? null : targetGroup);
         else {
         const target = targetId ? document.querySelector<HTMLElement>(`[data-ws-thread-id="${CSS.escape(targetId)}"]`) : null;
         if (targetId && target && targetId !== thread.id && canDropThread(thread.id)) {
@@ -242,6 +248,7 @@ function ThreadRow({
     <div
       className={`ws-thread ${active ? "ws-thread-active" : ""} ${selected ? "ws-thread-selected" : ""} ${dragThreadId === thread.id ? "ws-thread-dragging" : ""}`}
       data-ws-thread-id={thread.id}
+      data-ws-thread-group={groupId ?? "active"}
       data-depth={thread.parentThreadId ? "child" : "root"}
       data-drop-placement={dropTarget?.threadId === thread.id ? dropTarget.placement : undefined}
       onPointerDown={startUnifiedDrag}
