@@ -312,6 +312,7 @@ export async function fetchGitHubStack(
   run: GitHubApiRunner = runGitHubApi,
 ) : Promise<{ number: number; base: string; currentPullRequest: number; pullRequests: Array<{
   number: number; title: string; state: string; draft: boolean; url: string; head: string; base: string; reviewCommentCount: number;
+  checks: "failed" | "passing" | "pending" | "none"; review: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
 }> } | null> {
   const raw = parseGitHubStackResponse(JSON.parse(await run(githubStackApiArgs(owner, repo, pullRequest), 4_000_000)));
   if (!raw) return null;
@@ -345,7 +346,11 @@ export async function fetchGitHubStack(
       };
     }
   }));
-  return { number: raw.number, base: raw.base, currentPullRequest: pullRequest, pullRequests };
+  const signals = await repositoryPullRequestSignals(owner, repo, pullRequests.map((item) => item.number));
+  return { number: raw.number, base: raw.base, currentPullRequest: pullRequest, pullRequests: pullRequests.map((item) => ({
+    ...item,
+    ...(signals.get(item.number) ?? UNKNOWN_AUTHORED_PULL_REQUEST_SIGNAL),
+  })) };
 }
 
 function parseAuthoredPullRequestSearch(value: unknown): GitHubSearchPullRequest[] {
@@ -391,6 +396,35 @@ type AuthoredPullRequestSignal = {
   review: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
 };
 const UNKNOWN_AUTHORED_PULL_REQUEST_SIGNAL: AuthoredPullRequestSignal = { checks: "none", review: "none" };
+
+/** Fetch the compact status badges for every PR in one repository stack. */
+async function repositoryPullRequestSignals(owner: string, repo: string, numbers: readonly number[]): Promise<Map<number, AuthoredPullRequestSignal>> {
+  const unique = [...new Set(numbers)].filter((number) => Number.isInteger(number) && number > 0);
+  const signals = new Map<number, AuthoredPullRequestSignal>();
+  if (!unique.length) return signals;
+  const selections = unique.map((number, index) => `p${index}: pullRequest(number: ${number}) { reviewDecision reviewRequests(first: 1) { totalCount } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } }`).join(" ");
+  try {
+    const { stdout } = await execFileAsync("gh", ["api", "graphql", "-f", `query=query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${selections} } }`], { maxBuffer: 4_000_000 });
+    const parsed: unknown = JSON.parse(stdout);
+    const data = isRecord(parsed) && isRecord(parsed.data) && isRecord(parsed.data.repository) ? parsed.data.repository : {};
+    unique.forEach((number, index) => {
+      const pullRequest = data[`p${index}`];
+      if (!isRecord(pullRequest)) return;
+      const reviewDecision = String(pullRequest.reviewDecision ?? "");
+      const reviewRequests = isRecord(pullRequest.reviewRequests) && typeof pullRequest.reviewRequests.totalCount === "number" ? pullRequest.reviewRequests.totalCount : 0;
+      const review: AuthoredPullRequestSignal["review"] = reviewDecision === "APPROVED" ? "approved" : reviewDecision === "CHANGES_REQUESTED" ? "changes_requested" : reviewDecision === "REVIEW_REQUIRED" ? "review_required" : reviewRequests > 0 ? "review_requested" : "none";
+      const commits = isRecord(pullRequest.commits) && Array.isArray(pullRequest.commits.nodes) ? pullRequest.commits.nodes : [];
+      const commit = commits[commits.length - 1];
+      const rollup = isRecord(commit) && isRecord(commit.commit) && isRecord(commit.commit.statusCheckRollup) ? commit.commit.statusCheckRollup : null;
+      const state = String(rollup?.state ?? "");
+      const checks: AuthoredPullRequestSignal["checks"] = state === "SUCCESS" ? "passing" : state === "FAILURE" || state === "ERROR" ? "failed" : state ? "pending" : "none";
+      signals.set(number, { checks, review });
+    });
+  } catch {
+    // Stack structure remains useful if GitHub's richer badge query fails.
+  }
+  return signals;
+}
 
 /** Fetch the concise CI and review summaries shown beside account-wide PRs. */
 async function authoredPullRequestSignals(items: readonly GitHubSearchPullRequest[]): Promise<Map<string, AuthoredPullRequestSignal>> {
