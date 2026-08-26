@@ -1,9 +1,8 @@
 import type { SVGProps } from "react";
 
-type IconProps = SVGProps<SVGSVGElement> & { name: string };
-
 const paths: Record<string, React.ReactNode> = {
   AlertCircle: <><circle cx="12" cy="12" r="9" /><path d="M12 8v4m0 4h.01" /></>,
+  ArrowRight: <path d="M5 12h14m-5-5 5 5-5 5" />,
   Bot: <><rect x="4" y="7" width="16" height="12" rx="3" /><path d="M12 3v4M8 12h.01M16 12h.01M8 16h8" /></>,
   Check: <path d="m5 12 4 4L19 6" />,
   Circle: <circle cx="12" cy="12" r="8" />,
@@ -23,6 +22,9 @@ const paths: Record<string, React.ReactNode> = {
   Wrench: <><path d="M14.5 6.5a4 4 0 0 0-5.2 5.2L4 17a2 2 0 1 0 2.8 2.8l5.3-5.3a4 4 0 0 0 5.2-5.2l-2.7 2.1-2.2-2.2z" /></>,
   X: <path d="m6 6 12 12M18 6 6 18" />,
 };
+
+export type IconName = keyof typeof paths;
+type IconProps = SVGProps<SVGSVGElement> & { name: IconName };
 
 export function Icon({ name, "aria-hidden": ariaHidden, "aria-label": ariaLabel, ...props }: IconProps) {
   return (

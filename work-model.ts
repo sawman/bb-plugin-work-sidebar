@@ -449,6 +449,21 @@ export function goalProgressPercent(goal: GoalProgressInput): number | null {
   return Math.min(100, Math.max(0, Math.round((goal.tokensUsed / goal.tokenBudget) * 100)));
 }
 
+export type RuntimePresentation = { label: string; tone: "working" | "waiting" | "blocked" | "idle" | "complete" };
+
+export function readableStatus(status: string): string {
+  return status.replaceAll("-", " ").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+export function runtimeStatusPresentation(thread: { status: string; runtimeStatus: string }): RuntimePresentation {
+  const value = `${thread.status} ${thread.runtimeStatus}`.toLowerCase();
+  if (thread.status === "error" || /blocked|error|failed/.test(value)) return { label: "Blocked", tone: "blocked" };
+  if (/waiting|input|approval|paused/.test(value)) return { label: "Waiting", tone: "waiting" };
+  if (/working|running|starting|active/.test(value)) return { label: "Working", tone: "working" };
+  if (/complete|done|finished/.test(value)) return { label: "Complete", tone: "complete" };
+  return { label: "Idle", tone: "idle" };
+}
+
 export function orderStackLayers(
   layers: readonly StackLayer[],
   base: string,

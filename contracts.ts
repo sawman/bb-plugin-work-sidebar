@@ -73,6 +73,7 @@ const sidebarStackLayer = z.object({
   url: z.string(), head: z.string(), base: z.string(), attention: z.string().nullable().optional(),
   checks: z.enum(["failed", "passing", "pending", "none"]).optional(),
   review: z.enum(["approved", "changes_requested", "review_requested", "review_required", "none"]).optional(),
+  reviewCommentCount: z.number().int().nonnegative().optional(),
 });
 const sidebarStack = z.object({
   id: z.string(), number: z.number().int().positive().nullable(), base: z.string(),
@@ -101,6 +102,16 @@ const archivedThread = z.object({
   parentThreadId: z.string().nullable(), environmentBranchName: z.string().nullable(), isPinned: z.boolean(), isUnread: z.boolean(),
   createdAt: z.number(), updatedAt: z.number(), archivedAt: z.number(),
 });
+const stackChange = z.object({ additions: z.number(), deletions: z.number(), files: z.array(z.object({ path: z.string(), previousPath: z.string().nullable(), status: z.enum(["added", "deleted", "modified", "renamed", "untracked"]), additions: z.number().nullable(), deletions: z.number().nullable() })), truncated: z.boolean() });
+const githubStackBranch = z.object({
+  name: z.string(), isCurrent: z.boolean(), isMerged: z.boolean(), isQueued: z.boolean(), needsRebase: z.boolean(), hasStash: z.boolean(), stashCount: z.number().int().nonnegative().nullable(),
+  pr: z.object({ number: z.number(), url: z.string().url(), state: z.string(), title: z.string().nullable(), isDraft: z.boolean(), metadataStale: z.boolean() }).nullable(),
+  diff: stackChange.nullable(), aheadOfRemote: z.number().nullable(), behindRemote: z.number().nullable(),
+});
+const githubStack = z.object({ trunk: z.string(), currentBranch: z.string().nullable(), branches: z.array(githubStackBranch), trunkBehind: z.number().nullable(), prunableBranchCount: z.number().int().nonnegative().nullable() });
+
+export type GitHubStackBranch = z.infer<typeof githubStackBranch>;
+export type GitHubStackSignal = z.infer<typeof sidebarStackLayer>;
 
 export const rpcContract = defineRpcContract({
   getSidebarOrder: {
@@ -110,6 +121,14 @@ export const rpcContract = defineRpcContract({
   saveSiblingOrder: {
     input: z.object({ threadIds: z.array(z.string()) }).strict(),
     output: z.object({ threadIds: z.array(z.string()) }).strict(),
+  },
+  getThreadListMode: {
+    input: z.null(),
+    output: z.object({ mode: z.enum(["enhanced", "native"]) }).strict(),
+  },
+  saveThreadListMode: {
+    input: z.object({ mode: z.enum(["enhanced", "native"]) }).strict(),
+    output: z.object({ mode: z.enum(["enhanced", "native"]) }).strict(),
   },
   getLaterThreads: {
     input: z.null(),
@@ -202,6 +221,11 @@ export const rpcContract = defineRpcContract({
         text: z.string(),
         status: z.enum(["completed", "in_progress", "pending"]),
       })),
+      activity: z.object({
+        latest: z.object({ text: z.string(), kind: z.enum(["assistant", "user", "command", "activity"]) }).nullable(),
+        lastUser: z.object({ text: z.string(), kind: z.literal("user") }).nullable(),
+        current: z.object({ text: z.string(), kind: z.enum(["assistant", "user", "command", "activity"]) }).nullable(),
+      }),
       children: z.array(z.object({
         id: z.string(),
         title: z.string(),
@@ -209,6 +233,7 @@ export const rpcContract = defineRpcContract({
         status: z.string(),
         runtimeStatus: z.string(),
         providerId: z.string(),
+        isArchived: z.boolean(),
         task: z.object({
           key: z.string(),
           status: taskStatus,
@@ -231,6 +256,7 @@ export const rpcContract = defineRpcContract({
         })),
       }).nullable(),
       stackUnavailableReason: z.string().nullable(),
+      githubStack: z.object({ stack: githubStack.nullable(), pending: stackChange.nullable(), error: z.string().nullable() }).nullable(),
       repository: z.object({
         outcome: z.enum(["available", "not_applicable", "unavailable", "absent"]),
         message: z.string().nullable(),
@@ -240,9 +266,60 @@ export const rpcContract = defineRpcContract({
         behind: z.number(),
         worktreeState: z.string().nullable(),
         hasUncommittedChanges: z.boolean(),
+        changedFileCount: z.number().int().nonnegative(),
+        changedInsertions: z.number().int().nonnegative(),
+        changedDeletions: z.number().int().nonnegative(),
         changedFiles: z.array(z.object({ path: z.string(), status: z.string(), insertions: z.number().nullable(), deletions: z.number().nullable() })),
       }),
+      tracker: z.object({
+        visible: z.boolean(),
+        available: z.boolean(),
+        message: z.string().nullable(),
+        suggestions: z.array(z.object({ key: z.string(), title: z.string(), url: z.string().url() })),
+        item: z.object({
+          key: z.string(), title: z.string(), url: z.string().url(), status: z.string(),
+          stateCategory: z.enum(["backlog", "todo", "in_progress", "done", "canceled"]),
+          priority: z.string().nullable(), assignee: z.string().nullable(), project: z.string().nullable(),
+        }).nullable(),
+        statusOptions: z.array(z.object({ id: z.string(), name: z.string(), current: z.boolean() })),
+      }),
     }),
+  },
+  checkoutStackBranch: {
+    input: z.object({ threadId: z.string().startsWith("thr_"), branch: z.string().min(1).max(255) }).strict(),
+    output: z.object({ ok: z.boolean(), message: z.string(), tone: z.enum(["success", "warning", "error"]).optional(), detail: z.string().nullable() }),
+  },
+  linkLinearIssue: {
+    input: z.object({ threadId: z.string().startsWith("thr_"), key: z.string().trim().min(2).max(64) }).strict(),
+    output: z.object({ key: z.string(), title: z.string() }),
+  },
+  searchLinearIssues: {
+    input: z.object({ threadId: z.string().startsWith("thr_"), query: z.string().trim().max(160) }).strict(),
+    output: z.object({ items: z.array(z.object({ key: z.string(), title: z.string(), url: z.string().url() })) }),
+  },
+  getLatestActivity: {
+    input: z.object({ threadId: z.string().startsWith("thr_") }).strict(),
+    output: z.object({
+      currentThread: z.object({
+        status: z.enum(["active", "error", "idle", "starting", "stopping"]),
+        runtimeStatus: z.string(),
+      }),
+      latest: z.object({ text: z.string(), kind: z.enum(["assistant", "user", "command", "activity"]) }).nullable(),
+      lastUser: z.object({ text: z.string(), kind: z.literal("user") }).nullable(),
+      current: z.object({ text: z.string(), kind: z.enum(["assistant", "user", "command", "activity"]) }).nullable(),
+    }),
+  },
+  getWorkingTreeFileDiff: {
+    input: z.object({ threadId: z.string().startsWith("thr_"), path: z.string().min(1) }).strict(),
+    output: z.object({ available: z.boolean(), patch: z.string().nullable(), message: z.string().nullable() }).strict(),
+  },
+  unlinkLinearIssue: {
+    input: z.object({ threadId: z.string().startsWith("thr_") }).strict(),
+    output: z.object({ ok: z.literal(true) }).strict(),
+  },
+  updateLinearIssueStatus: {
+    input: z.object({ threadId: z.string().startsWith("thr_"), statusId: z.string().min(1) }).strict(),
+    output: z.object({ key: z.string(), status: z.string() }),
   },
   createWorkTask: {
     input: z.object({

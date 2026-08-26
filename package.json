@@ -20,17 +20,20 @@
   "scripts": {
     "build": "env -u BB_CLI bb plugin build .",
     "dev": "bb plugin dev .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@get-bb/plugin-sdk": "^0.4.8",
     "react": "^19.0.0",
+    "react-diff-view": "^3.3.3",
     "sonner": "^2.0.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/node": "^26.3.0",
     "@types/react": "^19.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.11"
   }
 }

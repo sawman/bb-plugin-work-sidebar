@@ -1,0 +1,26 @@
+import { useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { Icon, type IconName } from "../ui/icon";
+import { orderStackLayers, type SidebarStack } from "../../work-model";
+
+export type AuthoredPullRequest = { number: number; title: string; url: string; repository: string; state: "open" | "draft"; draft: boolean; head: string; base: string; checks?: "failed" | "passing" | "pending" | "none"; review?: "approved" | "changes_requested" | "review_requested" | "review_required" | "none"; stack: SidebarStack | null; };
+type AuthoredRow = Omit<AuthoredPullRequest, "stack">;
+type StatusPresentation = { icon: IconName; label: string };
+
+function checkStatus(checks: AuthoredPullRequest["checks"]): StatusPresentation { return checks === "failed" ? { icon: "X", label: "Checks failed" } : checks === "passing" ? { icon: "Check", label: "Checks passing" } : checks === "pending" ? { icon: "LoaderCircle", label: "Checks pending" } : { icon: "Circle", label: "No checks" }; }
+function reviewStatus(review: AuthoredPullRequest["review"]): StatusPresentation { return review === "approved" ? { icon: "Check", label: "Approved" } : review === "changes_requested" ? { icon: "Wrench", label: "Changes requested" } : review === "review_requested" ? { icon: "User", label: "Review requested" } : review === "review_required" ? { icon: "Eye", label: "Review required" } : { icon: "Circle", label: "No review" }; }
+
+export function AuthoredPullRequestRow({ pullRequest, stackControl, selected, changingDraft, onSelect, onToggleDraft }: { pullRequest: AuthoredRow; stackControl?: ReactNode; selected: boolean; changingDraft: boolean; onSelect(id: string, event: ReactMouseEvent<HTMLAnchorElement>): boolean; onToggleDraft(pullRequest: AuthoredRow): void }) {
+  const controlClick = useRef(false);
+  const checks = checkStatus(pullRequest.checks);
+  const review = reviewStatus(pullRequest.review);
+  return <article className={`ws-pr-row ws-pr-compact-row ${selected ? "ws-pr-row-selected" : ""}`} aria-selected={selected}><span className="ws-pr-stack-slot">{stackControl}</span><a className="ws-pr-target" href={pullRequest.url} target="_blank" rel="noreferrer" aria-label={`Open pull request #${pullRequest.number}: ${pullRequest.title}`} onMouseDown={(event) => { controlClick.current = event.ctrlKey && event.button === 0; }} onClick={(event) => { if (onSelect(pullRequest.url, event)) event.preventDefault(); }} onContextMenu={(event) => { if (!controlClick.current && !event.ctrlKey) return; controlClick.current = false; event.preventDefault(); onSelect(pullRequest.url, event); }}><strong className="ws-pr-title ws-pr-target-title">{pullRequest.title}</strong><span className="ws-pr-context ws-pr-target-context"><span className="ws-pr-number">#{pullRequest.number}</span><span className="ws-pr-branch">{pullRequest.head || "Authored by you"}</span></span></a><span className="ws-pr-status-icons"><span data-tooltip={changingDraft ? "Updating…" : `${pullRequest.draft ? "Mark open" : "Mark draft"}`}><button type="button" className="ws-pr-state-toggle" disabled={changingDraft} aria-label={changingDraft ? "Updating pull request state" : `${pullRequest.draft ? "Mark open" : "Mark draft"}`} onClick={() => onToggleDraft(pullRequest)}><Icon name={changingDraft ? "LoaderCircle" : "GitPullRequest"} aria-label={pullRequest.draft ? "Draft" : "Open"} className={`ws-pr-status-icon ws-pr-state-${pullRequest.draft ? "draft" : "open"} ${changingDraft ? "ws-pr-status-spinning" : ""}`} /></button></span><span data-tooltip={checks.label}><Icon name={checks.icon} aria-label={checks.label} className={`ws-pr-status-icon ws-pr-checks-${pullRequest.checks ?? "none"}`} /></span><span data-tooltip={review.label}><Icon name={review.icon} aria-label={review.label} className={`ws-pr-status-icon ws-pr-review-${pullRequest.review ?? "none"}`} /></span></span></article>;
+}
+
+export function AuthoredPullRequestStack({ stack, selectedIds, changingDraftUrl, onSelect, onToggleDraft }: { stack: SidebarStack; selectedIds: ReadonlySet<string>; changingDraftUrl: string | null; onSelect(id: string, event: ReactMouseEvent<HTMLAnchorElement>): boolean; onToggleDraft(pullRequest: AuthoredRow): void }) {
+  const [expanded, setExpanded] = useState(false);
+  const layers = orderStackLayers(stack.pullRequests, stack.base);
+  const base = layers[0];
+  if (!base) return null;
+  const row = (layer: SidebarStack["pullRequests"][number], stackControl?: ReactNode) => <AuthoredPullRequestRow key={layer.number} stackControl={stackControl} selected={selectedIds.has(layer.url)} changingDraft={changingDraftUrl === layer.url} onSelect={onSelect} onToggleDraft={onToggleDraft} pullRequest={{ ...layer, repository: "", state: layer.draft ? "draft" : "open" }} />;
+  return <section className={`ws-pr-stack ${expanded ? "ws-pr-stack-open" : "ws-pr-stack-closed"}`} aria-label={`Stack rooted at ${stack.base}`}>{row(base, layers.length > 1 ? <button type="button" className="ws-pr-stack-disclosure" data-state={expanded ? "open" : "closed"} aria-expanded={expanded} aria-label={`${expanded ? "Collapse" : "Expand"} stack layers`} onClick={() => setExpanded((value) => !value)}>›</button> : undefined)}{expanded && layers.slice(1).map((layer) => <div className="ws-pr-stack-layer-item" key={layer.number}>{row(layer)}</div>)}</section>;
+}

@@ -18,6 +18,8 @@ import type {
   PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
+import "react-diff-view/style/index.css";
+import { CurrentPullRequestCard as ChangesPullRequestCard, StackBranchRow as ChangesStackBranchRow, WorkingTreeDiff as ChangesWorkingTreeDiff } from "@/components/work/changes";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
@@ -28,17 +30,19 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Input } from "@/components/ui/input";
+import { ArchivedThreadRow, type ArchivedThread } from "@/components/threads/archived-thread-row";
+import { LinearCard } from "@/components/work/linear-card";
+import { AuthoredPullRequestRow as AuthoredPrRow, AuthoredPullRequestStack as AuthoredPrStack, type AuthoredPullRequest } from "@/components/threads/authored-pull-requests";
+import { TaskRow as SidebarTaskRow } from "@/components/threads/task-row";
 import type { rpcContract } from "./contracts";
 import {
   childrenByParent,
   filterThreadsWithAncestors,
   moveThreadSibling,
-  matchesPullRequestSearch,
   normalizeIndicator,
   reconcileThreadOrder,
   reorderThreadSibling,
   rootThreads,
-  uniquePullRequestThreadIds,
   threadTitle,
   type ThreadTaskLink,
   reorderTaskSiblings,
@@ -46,13 +50,12 @@ import {
   orderTaskLinksByRelevance,
   projectTaskQueue,
   taskMatchesSearch,
-  type TaskQueueNode,
   type SidebarTask,
   agentProjectionState,
   goalProgressPercent,
   orderStackLayers,
-  type CurrentPullRequestView,
-  projectPullRequestGroups,
+  readableStatus,
+  runtimeStatusPresentation,
   type SidebarStack,
 } from "./work-model";
 import { Icon } from "@/components/ui/icon";
@@ -240,13 +243,6 @@ function ThreadRow({
         onDropTargetChange(null);
       }}
     >
-      {children > 0 ? <button
-        type="button"
-        className="ws-thread-disclosure"
-        aria-label={`${childrenExpanded ? "Collapse" : "Expand"} ${children} child agent${children === 1 ? "" : "s"}`}
-        aria-expanded={childrenExpanded}
-        onClick={onToggleChildren}
-      >{childrenExpanded ? "⌄" : "›"}</button> : <span className="ws-thread-disclosure-placeholder" aria-hidden="true" />}
       {renaming ? (
         <div className="ws-rename">
           <Input
@@ -296,13 +292,14 @@ function ThreadRow({
                 }));
               }}
             >
-              <Icon name={project?.isPersonal ? "Laptop" : "FolderGit"} className="ws-project-icon" aria-label={`${projectLabel} ${project?.isPersonal ? "work" : "project"}`} />
+              <span className="ws-thread-leading">
+                {children > 0 ? <button type="button" className={`ws-thread-agent-badge ${childrenExpanded ? "ws-thread-agent-badge-expanded" : ""}`} aria-label={`${children} child agent${children === 1 ? "" : "s"}${childrenExpanded ? ", expanded" : ", collapsed"}`} aria-expanded={childrenExpanded} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); onToggleChildren(); }}><Icon name="Bot" className={activeChildren ? "ws-child-agent-working" : undefined} aria-hidden /><small>{children}</small></button> : <span className="ws-thread-agent-placeholder" aria-hidden />}
+              </span>
               <span className="ws-thread-main">
                 <span className={`ws-thread-title ${thread.isUnread ? "ws-unread" : ""}`}>{title}</span>
                 <span className="ws-thread-meta">
                   {pullRequest && <span className={`ws-pr-meta ws-thread-token ws-thread-pr-token ws-thread-pr-${pullRequestTone}`} title={`PR #${pullRequest.number} · ${pullRequest.attention === "ready_to_merge" ? "Ready to merge" : pullRequest.state}`}><Icon name={pullRequestTone === "closed" ? "X" : pullRequest.attention === "ready_to_merge" ? "Check" : "GitPullRequest"} aria-hidden /><span>#{pullRequest.number}</span></span>}
-                  {children > 0 && <span className="ws-thread-agent-count ws-thread-token" title={`${children} agent${children === 1 ? "" : "s"}${activeChildren ? ` · ${activeChildren} active` : ""}`}><Icon name="Bot" className={activeChildren ? "ws-child-agent-working" : undefined} aria-label={activeChildren ? `${activeChildren} child agent${activeChildren === 1 ? "" : "s"} active` : undefined} /><span>{children}</span></span>}
-                  <span className="ws-thread-worktree" title={thread.environment?.branchName || (project?.isPersonal ? "Personal" : projectLabel)}><Icon name="GitBranch" aria-hidden /><span>{thread.environment?.branchName || (project?.isPersonal ? "Personal" : projectLabel)}</span></span>
+                  <span className="ws-thread-worktree" title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${thread.environment?.branchName || (project?.isPersonal ? "Personal" : projectLabel)}`}><Icon name={project?.isPersonal ? "Laptop" : "FolderGit"} aria-hidden /><span>{thread.environment?.branchName || (project?.isPersonal ? "Personal" : projectLabel)}</span></span>
                   {orderTaskLinksByRelevance(taskLinks ?? []).map((taskLink) => <span className="ws-task-link" key={`${taskLink.task.id}:${taskLink.role}`} title={`${taskLink.task.title} · ${taskLink.task.key}`}><Icon name="ListTodo" aria-hidden /><small className="ws-task-key">{taskLink.task.key}</small></span>)}
                   {pullRequestLoading && <span className="ws-pr-meta" aria-label="Pull request loading">PR loading…</span>}
                 </span>
@@ -454,210 +451,7 @@ function WorkThreadTree({
   );
 }
 
-function pullRequestRepository(url: string): string | null {
-  try {
-    const parts = new URL(url).pathname.split("/").filter(Boolean);
-    return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : null;
-  } catch { return null; }
-}
-
-type AuthoredPullRequest = {
-  number: number; title: string; url: string; repository: string;
-  state: "open" | "draft"; draft: boolean; head: string; base: string;
-  checks?: "failed" | "passing" | "pending" | "none";
-  review?: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
-  stack: SidebarStack | null;
-};
-
-type ArchivedThread = {
-  id: string; projectId: string; title: string | null; titleFallback: string | null; parentThreadId: string | null;
-  environmentBranchName: string | null; isPinned: boolean; isUnread: boolean; createdAt: number; updatedAt: number; archivedAt: number;
-};
-
-function authoredCheckStatus(checks: AuthoredPullRequest["checks"]): { icon: string; label: string } {
-  return checks === "failed" ? { icon: "X", label: "Checks failed" } : checks === "passing" ? { icon: "Check", label: "Checks passing" } : checks === "pending" ? { icon: "LoaderCircle", label: "Checks pending" } : { icon: "Circle", label: "No checks" };
-}
-function authoredReviewStatus(review: AuthoredPullRequest["review"]): { icon: string; label: string } {
-  return review === "approved" ? { icon: "Check", label: "Approved" } : review === "changes_requested" ? { icon: "Wrench", label: "Changes requested" } : review === "review_requested" ? { icon: "User", label: "Review requested" } : review === "review_required" ? { icon: "Eye", label: "Review required" } : { icon: "Circle", label: "No review" };
-}
-
-function AuthoredPullRequestRow({ pullRequest, stackControl, selected, changingDraft, onSelect, onToggleDraft }: { pullRequest: Omit<AuthoredPullRequest, "stack">; stackControl?: React.ReactNode; selected: boolean; changingDraft: boolean; onSelect(id: string, event: ReactMouseEvent<HTMLAnchorElement>): boolean; onToggleDraft(pullRequest: Omit<AuthoredPullRequest, "stack">): void }) {
-  const controlClick = useRef(false);
-  const state = { icon: "GitPullRequest", label: pullRequest.draft ? "Draft" : "Open" };
-  const checks = authoredCheckStatus(pullRequest.checks);
-  const review = authoredReviewStatus(pullRequest.review);
-  return <article className={`ws-pr-row ws-pr-compact-row ${selected ? "ws-pr-row-selected" : ""}`} aria-selected={selected}>
-    <span className="ws-pr-stack-slot">{stackControl}</span>
-    <a className="ws-pr-target" href={pullRequest.url} target="_blank" rel="noreferrer" aria-label={`Open pull request #${pullRequest.number}: ${pullRequest.title}`} onMouseDown={(event) => { controlClick.current = event.ctrlKey && event.button === 0; }} onClick={(event) => { if (onSelect(pullRequest.url, event)) event.preventDefault(); }} onContextMenu={(event) => { if (!controlClick.current && !event.ctrlKey) return; controlClick.current = false; event.preventDefault(); onSelect(pullRequest.url, event); }}>
-      <strong className="ws-pr-title ws-pr-target-title">{pullRequest.title}</strong>
-      <span className="ws-pr-context ws-pr-target-context"><span className="ws-pr-number">#{pullRequest.number}</span><span className="ws-pr-branch">{pullRequest.head || "Authored by you"}</span></span>
-    </a>
-    <span className="ws-pr-status-icons"><span data-tooltip={changingDraft ? "Updating…" : `${pullRequest.draft ? "Mark open" : "Mark draft"}`}><button type="button" className="ws-pr-state-toggle" disabled={changingDraft} aria-label={changingDraft ? "Updating pull request state" : `${pullRequest.draft ? "Mark open" : "Mark draft"}`} onClick={() => onToggleDraft(pullRequest)}><Icon name={changingDraft ? "LoaderCircle" : state.icon} aria-label={state.label} className={`ws-pr-status-icon ws-pr-state-${pullRequest.draft ? "draft" : "open"} ${changingDraft ? "ws-pr-status-spinning" : ""}`} /></button></span><span data-tooltip={checks.label}><Icon name={checks.icon} aria-label={checks.label} className={`ws-pr-status-icon ws-pr-checks-${pullRequest.checks ?? "none"}`} /></span><span data-tooltip={review.label}><Icon name={review.icon} aria-label={review.label} className={`ws-pr-status-icon ws-pr-review-${pullRequest.review ?? "none"}`} /></span></span>
-  </article>;
-}
-
-function AuthoredPullRequestStack({ stack, selectedIds, changingDraftUrl, onSelect, onToggleDraft }: { stack: SidebarStack; selectedIds: ReadonlySet<string>; changingDraftUrl: string | null; onSelect(id: string, event: ReactMouseEvent<HTMLAnchorElement>): boolean; onToggleDraft(pullRequest: Omit<AuthoredPullRequest, "stack">): void }) {
-  const [expanded, setExpanded] = useState(false);
-  const layers = orderStackLayers(stack.pullRequests, stack.base);
-  const base = layers[0];
-  if (!base) return null;
-  const row = (layer: SidebarStack["pullRequests"][number], stackControl?: React.ReactNode) => <AuthoredPullRequestRow key={layer.number} stackControl={stackControl} selected={selectedIds.has(layer.url)} changingDraft={changingDraftUrl === layer.url} onSelect={onSelect} onToggleDraft={onToggleDraft} pullRequest={{ ...layer, repository: "", state: layer.draft ? "draft" : "open" }} />;
-  return <section className={`ws-pr-stack ${expanded ? "ws-pr-stack-open" : "ws-pr-stack-closed"}`} aria-label={`Stack rooted at ${stack.base}`}>
-    {row(base, layers.length > 1 ? <button type="button" className="ws-pr-stack-disclosure" data-state={expanded ? "open" : "closed"} aria-expanded={expanded} aria-label={`${expanded ? "Collapse" : "Expand"} stack layers`} onClick={() => setExpanded((value) => !value)} aria-hidden={false}>›</button> : undefined)}
-    {expanded && layers.slice(1).map((layer) => <div className="ws-pr-stack-layer-item" key={layer.number}>{row(layer)}</div>)}
-  </section>;
-}
-
-/** Keep PR discovery alive regardless of which sidebar tab is selected. */
-function PullRequestRow({
-  thread,
-  active,
-  projectName,
-  query,
-  visible,
-  stackName,
-  stackExpanded,
-  onToggleStack,
-  onNavigate,
-  onStateChange,
-}: {
-  thread: PluginSidebarThread;
-  active: boolean;
-  projectName: string;
-  query: string;
-  visible: boolean;
-  stackName?: string;
-  stackExpanded?: boolean;
-  onToggleStack?(): void;
-  onNavigate(): void;
-  onStateChange(threadId: string, state: { isLoading: boolean; pullRequest: ReturnType<typeof experimental_useSidebarThreadPullRequest>["pullRequest"] }): void;
-}) {
-  const { splitProps } = experimental_useSidebarThreadSplit(thread.id);
-  const { pullRequest, isLoading } = experimental_useSidebarThreadPullRequest(thread.id);
-  const signature = pullRequest ? `${pullRequest.number}:${pullRequest.title}:${pullRequest.url}:${pullRequest.state}:${pullRequest.attention}` : "none";
-  useEffect(() => { onStateChange(thread.id, { isLoading, pullRequest }); }, [isLoading, onStateChange, signature, thread.id]);
-  if (!visible || (!pullRequest && !isLoading)) return null;
-  if (pullRequest && !matchesPullRequestSearch(thread, projectName, pullRequest, query)) return null;
-  const repository = pullRequest ? pullRequestRepository(pullRequest.url) : null;
-  return (
-    <div className={`ws-pr-row ws-pr-compact-row ${active ? "ws-thread-active" : ""}`}>
-      <div className="ws-pr-row-main"><a
-          href={pullRequest?.url ?? "#"} target={pullRequest ? "_blank" : undefined} rel={pullRequest ? "noreferrer" : undefined}
-          {...splitProps} data-sidebar-thread-shortcut-target="" data-sidebar-thread-id={thread.id}
-          className="ws-pr-target"
-        >
-          <span className="ws-pr-meta ws-pr-target-meta">{repository && <span className="ws-pr-repository">{repository}</span>}{pullRequest && <span className="ws-pr-number">#{pullRequest.number}</span>}<span className="sr-only">{pullRequest?.state ?? "Loading"}</span></span>
-          <strong className="ws-pr-title ws-pr-target-title">{pullRequest ? pullRequest.title : "Loading pull request…"}</strong>
-          <span className="ws-pr-context ws-pr-target-context">{pullRequest && <span>{pullRequest.state}</span>}{thread.environment?.branchName && <span>{thread.environment.branchName}</span>}</span>
-          {pullRequest && <span className={`ws-pr-list-badge ws-pr-list-state ws-pr-list-state-${pullRequest.state}`} title={pullRequest.state} aria-label={pullRequest.state}>{pullRequest.state === "merged" ? "✓" : pullRequest.state === "closed" ? "×" : "●"}</span>}
-        </a></div>
-      {stackName && onToggleStack && <button type="button" className="ws-pr-stack-disclosure" data-state={stackExpanded ? "open" : "closed"} aria-expanded={stackExpanded} aria-label={`${stackExpanded ? "Collapse" : "Expand"} layers for ${stackName}`} onClick={onToggleStack}><Icon name="Layers" aria-hidden /></button>}
-    </div>
-  );
-}
-
-function PullRequestStackGroup({
-  stack,
-  activeThreadId,
-  projectNames,
-  query,
-  onNavigate,
-  onStateChange,
-}: {
-  stack: ReturnType<typeof projectPullRequestGroups>[number] & { kind: "stack" };
-  activeThreadId: string | null;
-  projectNames: Readonly<Record<string, string>>;
-  query: string;
-  onNavigate(): void;
-  onStateChange: Parameters<typeof PullRequestRow>[0]["onStateChange"];
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const base = stack.layers[0];
-  if (!base?.thread) return null;
-  const hasLayers = stack.layers.length > 1;
-  const stackName = stack.number === null ? "stack" : `stack #${stack.number}`;
-  return (
-    <section className={`ws-pr-stack ${expanded ? "ws-pr-stack-open" : "ws-pr-stack-closed"}`} data-state={expanded ? "open" : "closed"} aria-label={`Pull request ${stackName}, base ${stack.base}`}>
-      <div className="ws-pr-stack-base-item"><PullRequestRow thread={base.thread} active={base.thread.id === activeThreadId} projectName={projectNames[base.thread.projectId] ?? "Personal"} query={query} visible stackName={stackName} stackExpanded={expanded} onToggleStack={hasLayers ? () => setExpanded((value) => !value) : undefined} onNavigate={onNavigate} onStateChange={onStateChange} /></div>
-      {hasLayers && expanded && <div className="ws-pr-stack-rail">{stack.layers.slice(1).map((layer) => layer.thread ? <div key={layer.key} className="ws-pr-stack-layer-item"><PullRequestRow thread={layer.thread} active={layer.thread.id === activeThreadId} projectName={projectNames[layer.thread.projectId] ?? "Personal"} query={query} visible onNavigate={onNavigate} onStateChange={onStateChange} /></div> : null)}</div>}
-    </section>
-  );
-}
-
-function PullRequestReferenceRow({ thread, active, projectName, onNavigate }: { thread: PluginSidebarThread; active: boolean; projectName: string; onNavigate(): void }) {
-  const actions = experimental_useSidebarThreadActions();
-  const match = threadTitle(thread).match(/\bPR\s*#(\d+)\b\s*[·:-]?\s*(.*)$/i);
-  if (!match) return null;
-  return <button type="button" className={`ws-pr-row ws-pr-reference-row ${active ? "ws-thread-active" : ""}`} onClick={() => { actions.open(thread.id); onNavigate(); }} aria-label={`Open linked pull request reference #${match[1]}: ${match[2] || threadTitle(thread)}`}>
-    <span className="ws-pr-meta"><span className="ws-pr-repository">{projectName}</span><span className="ws-pr-number">#{match[1]}</span></span>
-    <strong className="ws-pr-title">{match[2] || threadTitle(thread)}</strong>
-    <span className="ws-pr-context">Linked work thread · PR details unavailable</span>
-  </button>;
-}
-
-const TASK_STATUSES: readonly SidebarTask["status"][] = ["backlog", "todo", "in_progress", "in_review", "done", "canceled"];
-
-function taskStatusMeta(status: SidebarTask["status"]): { label: string; icon: string } {
-  return {
-    backlog: { label: "Backlog", icon: "Inbox" }, todo: { label: "To do", icon: "Circle" },
-    in_progress: { label: "In progress", icon: "LoaderCircle" }, in_review: { label: "In review", icon: "Eye" },
-    done: { label: "Done", icon: "CheckCircle2" }, canceled: { label: "Canceled", icon: "CircleX" },
-  }[status];
-}
-
-function TaskRow({ node, siblings, showProject, reorderDisabled, dragTaskId, dropTarget, onDragTaskChange, onDragTargetChange, onDropTask, onMoveTask, onOpenThread, onUpdateStatus, updatingTaskId, selectedTaskIds, onSelect }: {
-  node: TaskQueueNode; siblings: readonly TaskQueueNode[]; showProject: boolean; reorderDisabled: boolean;
-  dragTaskId: string | null; dropTarget: { taskId: string; placement: "before" | "after" } | null;
-  onDragTaskChange(taskId: string | null): void; onDragTargetChange(taskId: string | null, placement?: "before" | "after"): void;
-  onDropTask(sourceId: string, targetId: string, placement: "before" | "after"): void; onMoveTask(taskId: string, direction: -1 | 1): void;
-  onOpenThread(threadId: string, split?: boolean): void; onUpdateStatus(taskId: string, status: SidebarTask["status"]): Promise<void>; updatingTaskId: string | null;
-  selectedTaskIds: ReadonlySet<string>; onSelect(taskId: string, event: ReactMouseEvent<HTMLButtonElement>): boolean;
-}) {
-  const { task } = node;
-  const controlClick = useRef(false);
-  const workers = task.linkedThreadIds;
-  const status = taskStatusMeta(task.status);
-  const peers = siblings.filter((candidate) => candidate.task.projectId === task.projectId && candidate.task.status === task.status && candidate.task.parentTaskId === task.parentTaskId);
-  const index = peers.findIndex((candidate) => candidate.task.id === task.id);
-  const interactive = (event: DragEvent<HTMLElement>) => Boolean((event.target as HTMLElement).closest("button,a,summary,[role=menu],[role=menuitem]"));
-  const open = () => workers[0] && onOpenThread(workers[0], workers.length === 1);
-  return <ContextMenu>
-    <ContextMenuTrigger asChild>
-      <article className={`ws-task-row ws-task-row-${node.role} ${selectedTaskIds.has(task.id) ? "ws-task-row-selected" : ""} ${dragTaskId === task.id ? "ws-task-dragging" : ""}`} aria-selected={selectedTaskIds.has(task.id)} data-task-role={node.role} data-task-id={task.id} data-drop-placement={dropTarget?.taskId === task.id ? dropTarget.placement : undefined} draggable={!reorderDisabled}
-        onDragStart={(event) => { if (reorderDisabled || interactive(event)) { event.preventDefault(); return; } event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", task.id); onDragTaskChange(task.id); }}
-        onDragOver={(event) => { if (reorderDisabled || !dragTaskId || dragTaskId === task.id) return; const source = peers.find((candidate) => candidate.task.id === dragTaskId); if (!source) return; event.preventDefault(); const bounds = event.currentTarget.getBoundingClientRect(); onDragTargetChange(task.id, event.clientY > bounds.top + bounds.height / 2 ? "after" : "before"); }}
-        onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) onDragTargetChange(null); }}
-        onDrop={(event) => { if (!dragTaskId || dragTaskId === task.id) return; event.preventDefault(); const bounds = event.currentTarget.getBoundingClientRect(); onDropTask(dragTaskId, task.id, event.clientY > bounds.top + bounds.height / 2 ? "after" : "before"); onDragTaskChange(null); onDragTargetChange(null); }} onDragEnd={() => { onDragTaskChange(null); onDragTargetChange(null); }}>
-        <div className="ws-task-row-main">
-          <button className="ws-task-open" type="button" onMouseDown={(event) => { controlClick.current = event.ctrlKey && event.button === 0; }} onClick={(event) => { if (!onSelect(task.id, event)) open(); }} onContextMenu={(event) => { if (!controlClick.current && !event.ctrlKey) return; controlClick.current = false; event.preventDefault(); onSelect(task.id, event); }} aria-disabled={!workers.length} aria-label={`Open ${task.key} in Tasks${workers.length === 1 ? " and its worker" : ""}`}><strong className="ws-task-title" title={task.title}>{task.title}</strong></button>
-          <div className="ws-task-meta"><span className="ws-task-key-badge">{task.key}</span><span className={`ws-task-badge ws-task-priority-${task.priority}`}>{task.priority}</span>{task.dueDate && <span className="ws-task-badge">Due {task.dueDate}</span>}{workers.length > 0 && <span className="ws-task-badge">{workers.length} worker{workers.length === 1 ? "" : "s"}</span>}{showProject && <span className="ws-task-badge">{task.projectName}</span>}</div>
-        </div>
-        <div className="ws-task-actions"><label className={`ws-task-status-picker ws-task-status-${task.status}`}><Icon name={status.icon as never} aria-hidden /><span className="sr-only">Change status for {task.key}</span><select value={task.status} disabled={updatingTaskId === task.id} aria-label={`Change status for ${task.key}: ${status.label}`} onChange={(event) => void onUpdateStatus(task.id, event.target.value as SidebarTask["status"])}>{TASK_STATUSES.map((next) => <option key={next} value={next}>{taskStatusMeta(next).label}</option>)}</select></label></div>
-        {node.children.length > 0 && <div className="ws-task-children" aria-label={`Execution tasks for ${task.title}`}>{node.children.map((child) => <TaskRow key={child.id} node={{ task: child, role: "execution", children: [], hasVisibleOutcomeParent: true }} siblings={node.children.map((task) => ({ task, role: "execution" as const, children: [], hasVisibleOutcomeParent: true }))} showProject={showProject} reorderDisabled={reorderDisabled} dragTaskId={dragTaskId} dropTarget={dropTarget} onDragTaskChange={onDragTaskChange} onDragTargetChange={onDragTargetChange} onDropTask={onDropTask} onMoveTask={onMoveTask} onOpenThread={onOpenThread} onUpdateStatus={onUpdateStatus} updatingTaskId={updatingTaskId} selectedTaskIds={selectedTaskIds} onSelect={onSelect} />)}</div>}
-      </article>
-    </ContextMenuTrigger>
-    <ContextMenuContent aria-label={`Actions for ${task.key}`}><ContextMenuLabel>{task.title}</ContextMenuLabel><ContextMenuItem disabled={!workers.length} onSelect={open}>Open</ContextMenuItem><ContextMenuSeparator /><ContextMenuItem disabled={reorderDisabled || index <= 0} onSelect={() => onMoveTask(task.id, -1)}>Move up</ContextMenuItem><ContextMenuItem disabled={reorderDisabled || index < 0 || index >= peers.length - 1} onSelect={() => onMoveTask(task.id, 1)}>Move down</ContextMenuItem></ContextMenuContent>
-  </ContextMenu>;
-}
-
 type SidebarView = "work" | "queue" | "prs";
-
-function ArchivedThreadRow({ thread, project, onUnarchive, onNavigate }: { thread: ArchivedThread; project?: { name: string; isPersonal: boolean }; onUnarchive(threadId: string, destination: "active" | "later"): void; onNavigate(): void }) {
-  const actions = experimental_useSidebarThreadActions();
-  const title = thread.title || thread.titleFallback || "Untitled thread";
-  const projectLabel = project?.isPersonal ? "Personal" : project?.name ?? "Project";
-  return <article className="ws-thread ws-archived-thread">
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <a href="#" className="ws-thread-anchor" onClick={(event) => { event.preventDefault(); actions.open(thread.id); onNavigate(); }}>
-          <Icon name={project?.isPersonal ? "Laptop" : "FolderGit"} className="ws-project-icon" aria-label={projectLabel} />
-          <span className="ws-thread-main"><span className="ws-thread-title">{title}</span><span className="ws-thread-meta"><span>{thread.environmentBranchName || projectLabel}</span><span>Archive</span></span></span>
-        </a>
-      </ContextMenuTrigger>
-      <ContextMenuContent aria-label={`Actions for ${title}`}><ContextMenuLabel>{title}</ContextMenuLabel><ContextMenuItem onSelect={() => { actions.open(thread.id); onNavigate(); }}>Open</ContextMenuItem><ContextMenuSeparator /><ContextMenuItem onSelect={() => onUnarchive(thread.id, "active")}>Active</ContextMenuItem><ContextMenuItem onSelect={() => onUnarchive(thread.id, "later")}>Later</ContextMenuItem><ContextMenuSeparator /><ContextMenuItem className="text-destructive focus:text-destructive" onSelect={() => actions.requestDelete(thread.id)}>Delete</ContextMenuItem></ContextMenuContent>
-    </ContextMenu>
-  </article>;
-}
 
 function sidebarViewLabel(id: SidebarView): string {
   switch (id) {
@@ -674,6 +468,8 @@ function WorkThreadList(props: PluginThreadListProps) {
   const rpc = useRpc<typeof rpcContract>();
   const [taskLinks, setTaskLinks] = useState<Record<string, ThreadTaskLink[]>>({});
   const [view, setView] = useState<SidebarView>("work");
+  const [threadListMode, setThreadListMode] = useState<"enhanced" | "native">("enhanced");
+  const [threadSettingsOpen, setThreadSettingsOpen] = useState(false);
   const [activeThreadsOpen, setActiveThreadsOpen] = useState(true);
   const [archivedOpen, setArchivedOpen] = useState(false);
   const [archivedThreads, setArchivedThreads] = useState<ArchivedThread[]>([]);
@@ -702,21 +498,21 @@ function WorkThreadList(props: PluginThreadListProps) {
   const [taskSelectionAnchorId, setTaskSelectionAnchorId] = useState<string | null>(null);
   const [selectedPullRequestIds, setSelectedPullRequestIds] = useState<Set<string>>(() => new Set());
   const [pullRequestSelectionAnchorId, setPullRequestSelectionAnchorId] = useState<string | null>(null);
-  const [pullRequestStates, setPullRequestStates] = useState<Record<string, { isLoading: boolean; pullRequest: ReturnType<typeof experimental_useSidebarThreadPullRequest>["pullRequest"] }>>({});
-  const [pullRequestStacks, setPullRequestStacks] = useState<Record<string, SidebarStack>>({});
   const [authoredPullRequests, setAuthoredPullRequests] = useState<AuthoredPullRequest[]>([]);
   const [authoredPullRequestState, setAuthoredPullRequestState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [authoredPullRequestError, setAuthoredPullRequestError] = useState<string | null>(null);
   const [changingDraftUrl, setChangingDraftUrl] = useState<string | null>(null);
   const [authoredPullRequestRefreshKey, setAuthoredPullRequestRefreshKey] = useState(0);
   const [subtextRefreshKey, setSubtextRefreshKey] = useState(0);
-  const stacksRequest = useRef(0);
   const authoredPullRequestRequest = useRef(0);
 
-  const onPullRequestStateChange = useCallback((threadId: string, state: { isLoading: boolean; pullRequest: ReturnType<typeof experimental_useSidebarThreadPullRequest>["pullRequest"] }) => {
-    const signature = (value: typeof state) => value.pullRequest ? `${value.isLoading}:${value.pullRequest.url}:${value.pullRequest.attention}` : `${value.isLoading}:none`;
-    setPullRequestStates((current) => current[threadId] && signature(current[threadId]) === signature(state) ? current : { ...current, [threadId]: state });
-  }, []);
+  useEffect(() => {
+    void rpc.call("getThreadListMode", null).then((result) => setThreadListMode(result.mode)).catch(() => undefined);
+  }, [rpc]);
+  const setSavedThreadListMode = (mode: "enhanced" | "native") => {
+    setThreadListMode(mode); setThreadSettingsOpen(false);
+    void rpc.call("saveThreadListMode", { mode }).catch(() => toast.error("Could not save thread-list preference."));
+  };
 
   const applyOrder = useCallback((next: string[]) => {
     orderRef.current = next;
@@ -815,28 +611,12 @@ function WorkThreadList(props: PluginThreadListProps) {
     void refreshTaskLinks();
     void refreshArchivedThreads(true);
     setSubtextRefreshKey((current) => current + 1);
-    try {
-      const result = await rpc.call("sidebarThreadPullRequests", { threadIds: threads.map((thread) => thread.id) });
-      if (!result.available) throw new Error(result.error ?? "Could not refresh pull requests.");
-      setPullRequestStates((current) => ({ ...current, ...Object.fromEntries(Object.entries(result.pullRequests).map(([threadId, pullRequest]) => [threadId, { isLoading: false, pullRequest }])) }));
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not refresh pull requests");
-    }
-  }, [refreshArchivedThreads, refreshLaterThreads, refreshSidebarOrder, refreshTaskLinks, rpc, threads]);
+  }, [refreshArchivedThreads, refreshLaterThreads, refreshSidebarOrder, refreshTaskLinks]);
   useEffect(() => {
     void refreshTaskLinks();
     const timer = window.setInterval(() => void refreshTaskLinks(), 30_000);
     return () => { taskLinksRequest.current += 1; window.clearInterval(timer); };
   }, [refreshTaskLinks]);
-  useEffect(() => {
-    const readyThreadIds = threads.filter((thread) => pullRequestStates[thread.id]?.pullRequest).map((thread) => thread.id);
-    if (!readyThreadIds.length) { setPullRequestStacks({}); return; }
-    const request = ++stacksRequest.current;
-    void rpc.call("sidebarPullRequestStacks", { threadIds: readyThreadIds }).then((result) => {
-      if (request === stacksRequest.current) setPullRequestStacks(result.stacks);
-    }).catch(() => { if (request === stacksRequest.current) setPullRequestStacks({}); });
-    return () => { stacksRequest.current += 1; };
-  }, [pullRequestStates, rpc, threads]);
   useEffect(() => {
     let cancelled = false;
     const loadAuthoredPullRequests = async (foreground: boolean, force = false) => {
@@ -1024,21 +804,7 @@ function WorkThreadList(props: PluginThreadListProps) {
     for (const task of filteredTasks) counts.set(task.key, (counts.get(task.key) ?? 0) + 1);
     return counts;
   }, [filteredTasks]);
-  const prThreads = threads;
   const navigateToThread = (threadId: string, split = false) => { actions.open(threadId, { split }); props.onNavigate(); };
-  const pullRequestByThread = Object.fromEntries(Object.entries(pullRequestStates).map(([id, state]) => [id, state.pullRequest]));
-  const uniquePullRequestIds = uniquePullRequestThreadIds(prThreads.map((thread) => thread.id), pullRequestByThread);
-  const visiblePullRequestIds = uniquePullRequestIds.filter((threadId) => {
-    const state = pullRequestStates[threadId];
-    const thread = prThreads.find((candidate) => candidate.id === threadId);
-    return Boolean(state?.pullRequest && thread && matchesPullRequestSearch(thread, projectNames[thread.projectId] ?? "", state.pullRequest, props.searchQuery));
-  });
-  const pullRequestsSettled = prThreads.length === 0 || prThreads.every((thread) => pullRequestStates[thread.id] && !pullRequestStates[thread.id]!.isLoading);
-  const pullRequestGroups = useMemo(() => projectPullRequestGroups(prThreads.flatMap((thread) => {
-    const pullRequest = pullRequestStates[thread.id]?.pullRequest;
-    return pullRequest ? [{ thread, pullRequest, stack: pullRequestStacks[thread.id] ?? null }] : [];
-  })), [prThreads, pullRequestStacks, pullRequestStates]);
-  const pullRequestReferences = useMemo(() => prThreads.filter((thread) => /\bPR\s*#\d+\b/i.test(threadTitle(thread))), [prThreads]);
   const visibleAuthoredPullRequests = useMemo(() => authoredPullRequests.filter((pullRequest) => {
     const needle = props.searchQuery.trim().toLocaleLowerCase();
     return !needle || [pullRequest.repository, `#${pullRequest.number}`, pullRequest.title, pullRequest.head, pullRequest.base, pullRequest.state].join(" ").toLocaleLowerCase().includes(needle);
@@ -1117,28 +883,28 @@ function WorkThreadList(props: PluginThreadListProps) {
         <div className="ws-list-toolbar"><span>{filteredTasks.length} active task{filteredTasks.length === 1 ? "" : "s"}</span><span className="ws-work-toolbar-actions">{selectedTaskIds.size > 1 && <span className="ws-selection-count" role="status">{selectedTaskIds.size} selected</span>}<button className="ws-icon-button" title="Refresh tasks" aria-label="Refresh tasks" onClick={() => void refreshTasks()}><Icon name="RefreshCw" aria-hidden /></button></span></div>
         {taskState === "loading" && <div className="ws-empty">Loading tasks…</div>}
         {taskState === "error" && <div className="ws-callout">{taskError ?? "Could not load tasks."}<button onClick={() => void refreshTasks()}>Try again</button></div>}
-        {taskState === "ready" && taskQueue.map((node) => <TaskRow key={node.task.id} node={node} siblings={taskQueue} showProject={(taskKeys.get(node.task.key) ?? 0) > 1} reorderDisabled={reorderDisabled} dragTaskId={dragTaskId} dropTarget={taskDropTarget} onDragTaskChange={setDragTaskId} onDragTargetChange={(taskId, placement) => setTaskDropTarget(taskId && placement ? { taskId, placement } : null)} onDropTask={(sourceId, targetId, placement) => void persistTaskReorder(sourceId, targetId, placement)} onMoveTask={moveTask} onOpenThread={navigateToThread} onUpdateStatus={updateTaskStatus} updatingTaskId={updatingTaskId} selectedTaskIds={selectedTaskIds} onSelect={selectTask} />)}
+        {taskState === "ready" && taskQueue.map((node) => <SidebarTaskRow key={node.task.id} node={node} siblings={taskQueue} showProject={(taskKeys.get(node.task.key) ?? 0) > 1} reorderDisabled={reorderDisabled} dragTaskId={dragTaskId} dropTarget={taskDropTarget} onDragTaskChange={setDragTaskId} onDragTargetChange={(taskId, placement) => setTaskDropTarget(taskId && placement ? { taskId, placement } : null)} onDropTask={(sourceId, targetId, placement) => void persistTaskReorder(sourceId, targetId, placement)} onMoveTask={moveTask} onOpenThread={navigateToThread} onUpdateStatus={updateTaskStatus} updatingTaskId={updatingTaskId} selectedTaskIds={selectedTaskIds} onSelect={selectTask} />)}
         {taskState === "ready" && filteredTasks.length === 0 && <div className="ws-empty">{props.searchQuery ? `No tasks match “${props.searchQuery}”.` : "No active tasks."}</div>}
       </div>}
       {view === "prs" && <div className="ws-view-content">
         <div className="ws-list-toolbar"><span>{visibleAuthoredPullRequests.length} open pull request{visibleAuthoredPullRequests.length === 1 ? "" : "s"}</span><span className="ws-work-toolbar-actions">{selectedPullRequestIds.size > 1 && <span className="ws-selection-count" role="status">{selectedPullRequestIds.size} selected</span>}<button className="ws-icon-button" title="Refresh pull requests" aria-label="Refresh pull requests" disabled={authoredPullRequestState === "loading"} onClick={() => setAuthoredPullRequestRefreshKey((value) => value + 1)}><Icon name="RefreshCw" aria-hidden /></button></span></div>
         {authoredPullRequestState === "loading" && <div className="ws-empty">Loading your open pull requests…</div>}
         {authoredPullRequestState === "error" && <div className="ws-callout"><strong>Could not load your open pull requests</strong><span>{authoredPullRequestError}</span></div>}
-        {authoredPullRequestState === "ready" && <>{authoredPullRequestGroups.map((group) => <section className="ws-pr-repository-group" key={group.repository}><h3>{group.repository}</h3>{group.stacks.map((stack) => <AuthoredPullRequestStack key={stack.id} stack={stack} selectedIds={selectedPullRequestIds} changingDraftUrl={changingDraftUrl} onSelect={selectPullRequest} onToggleDraft={toggleAuthoredPullRequestDraft} />)}{group.ordinary.map((pullRequest) => <section className="ws-pr-stack ws-pr-stack-singleton" key={pullRequest.url}><AuthoredPullRequestRow pullRequest={pullRequest} selected={selectedPullRequestIds.has(pullRequest.url)} changingDraft={changingDraftUrl === pullRequest.url} onSelect={selectPullRequest} onToggleDraft={toggleAuthoredPullRequestDraft} /></section>)}</section>)}{visibleAuthoredPullRequests.length === 0 && <div className="ws-empty"><strong>No open pull requests</strong><span>{props.searchQuery ? `No pull requests match “${props.searchQuery}”.` : "Open pull requests you author on GitHub appear here."}</span></div>}</>}
+        {authoredPullRequestState === "ready" && <>{authoredPullRequestGroups.map((group) => <section className="ws-pr-repository-group" key={group.repository}><h3>{group.repository}</h3>{group.stacks.map((stack) => <AuthoredPrStack key={stack.id} stack={stack} selectedIds={selectedPullRequestIds} changingDraftUrl={changingDraftUrl} onSelect={selectPullRequest} onToggleDraft={toggleAuthoredPullRequestDraft} />)}{group.ordinary.map((pullRequest) => <section className="ws-pr-stack ws-pr-stack-singleton" key={pullRequest.url}><AuthoredPrRow pullRequest={pullRequest} selected={selectedPullRequestIds.has(pullRequest.url)} changingDraft={changingDraftUrl === pullRequest.url} onSelect={selectPullRequest} onToggleDraft={toggleAuthoredPullRequestDraft} /></section>)}</section>)}{visibleAuthoredPullRequests.length === 0 && <div className="ws-empty"><strong>No open pull requests</strong><span>{props.searchQuery ? `No pull requests match “${props.searchQuery}”.` : "Open pull requests you author on GitHub appear here."}</span></div>}</>}
       </div>}
       {view === "work" && <>
       <div className="ws-list-toolbar">
-        <span>{filtered.length} thread{filtered.length === 1 ? "" : "s"}</span>
+        <span>{threadListMode === "native" ? "Threads" : `${filtered.length} thread${filtered.length === 1 ? "" : "s"}`}</span>
         <span className="ws-work-toolbar-actions">
-          {selectedThreadIds.size > 1 && <><span className="ws-selection-count" role="status">{selectedThreadIds.size} selected</span><button className="ws-selection-archive" onClick={() => void archiveSelected()}>Archive selected</button></>}
-          {reorderDisabled && <span className="ws-reorder-disabled" role="status">Clear search to reorder</span>}
+          {threadListMode === "enhanced" && <>{selectedThreadIds.size > 1 && <><span className="ws-selection-count" role="status">{selectedThreadIds.size} selected</span><button className="ws-selection-archive" onClick={() => void archiveSelected()}>Archive selected</button></>}{reorderDisabled && <span className="ws-reorder-disabled" role="status">Clear search to reorder</span>}</>}
+          <span className="ws-thread-settings"><button className="ws-icon-button" title="Thread list settings" aria-label="Thread list settings" aria-expanded={threadSettingsOpen} onClick={() => setThreadSettingsOpen((open) => !open)}><Icon name="Wrench" aria-hidden /></button>{threadSettingsOpen && <span className="ws-thread-settings-menu" role="menu"><button role="menuitemradio" aria-checked={threadListMode === "enhanced"} onClick={() => setSavedThreadListMode("enhanced")}>Enhanced list</button><button role="menuitemradio" aria-checked={threadListMode === "native"} onClick={() => setSavedThreadListMode("native")}>BB native list</button></span>}</span>
           <button className="ws-icon-button" title="Refresh threads" aria-label="Refresh threads" onClick={() => void refreshThreadDetails()}><Icon name="RefreshCw" aria-hidden /></button>
           {props.activeProjectId && <Button className="ws-new-thread" variant="ghost" size="icon" title="New thread in project" aria-label="New thread in project" onClick={() => actions.openNewThread({ projectId: props.activeProjectId!, focusPrompt: true })}>
             <Icon name="Plus" aria-hidden />
           </Button>}
         </span>
       </div>
-      <section className="ws-thread-statuses" aria-label="Thread status groups">
+      {threadListMode === "native" ? <section className="ws-native-thread-list" aria-label="BB native threads"><Original /></section> : <><section className="ws-thread-statuses" aria-label="Thread status groups">
       <details className="ws-later ws-active-threads" open={activeThreadsOpen} onToggle={(event) => setActiveThreadsOpen(event.currentTarget.open)}>
       <summary>Active <span>{orderedRoots.length}</span></summary>
       <section className="ws-hierarchy" aria-label="Work threads">
@@ -1172,7 +938,7 @@ function WorkThreadList(props: PluginThreadListProps) {
       <details className="ws-later ws-archived" open={archivedOpen} onToggle={(event) => setArchivedOpen(event.currentTarget.open)}><summary>Archive <span>{archivedThreadState === "ready" ? archivedThreads.length : ""}</span></summary>{archivedThreadState === "idle" || archivedThreadState === "loading" ? <div className="ws-later-empty">Loading archive threads…</div> : archivedThreadState === "error" ? <div className="ws-callout">{archivedThreadError ?? "Could not load archive threads."}<button onClick={() => void refreshArchivedThreads(true)}>Try again</button></div> : archivedThreads.length > 0 ? <section className="ws-hierarchy" aria-label="Archive threads">{archivedThreads.map((thread) => <ArchivedThreadRow key={thread.id} thread={thread} project={projectsById.get(thread.projectId)} onUnarchive={unarchiveThread} onNavigate={props.onNavigate} />)}</section> : <div className="ws-later-empty">No archive threads.</div>}</details>
       </section>
       {filtered.length === 0 && <div className="ws-empty">{props.searchQuery ? `No threads match “${props.searchQuery}”.` : "No active threads."}</div>}
-      <details className="ws-native-fallback"><summary>Use BB’s native list</summary><Original /></details>
+      </>}
       </>}
     </div>
   );
@@ -1182,28 +948,9 @@ type WorkTab = "work" | "changes" | "agents";
 
 const WORK_TABS: readonly { id: WorkTab; label: string; description: string }[] = [
   { id: "work", label: "Work", description: "Outcome, execution tasks, goal, and plan" },
-  { id: "changes", label: "PR & Changes", description: "Pull request, stack, branch, and working-tree state" },
+  { id: "changes", label: "Changes", description: "Pull request, stack, branch, and working-tree state" },
   { id: "agents", label: "Agents", description: "Delegated child threads" },
 ];
-
-function readableStatus(status: string): string {
-  return status.replaceAll("-", " ").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function CurrentPullRequestCard({ pullRequest }: { pullRequest: CurrentPullRequestView }) {
-  const checks = pullRequest.checks.totalCount === 0
-    ? "No checks reported"
-    : `${pullRequest.checks.passedCount}/${pullRequest.checks.totalCount} checks ${readableStatus(pullRequest.checks.state)}`;
-  return (
-    <article className="ws-card ws-current-pr-card">
-      <div className="ws-card-heading"><strong>Current pull request</strong><span className={`ws-pill ws-pr-${pullRequest.attention}`}>{readableStatus(pullRequest.attention)}</span></div>
-      <h3><a href={pullRequest.url} target="_blank" rel="noreferrer">#{pullRequest.number} {pullRequest.title}</a></h3>
-
-      <div className="ws-card-meta"><span>{pullRequest.head}</span><span>{readableStatus(pullRequest.state)}</span><span>{checks}</span><span>Review: {readableStatus(pullRequest.review.state)}</span></div>
-      <p className="ws-card-note">This PR directly merges into <strong>{pullRequest.base}</strong>. Mergeability: {readableStatus(pullRequest.mergeability.state)}.</p>
-    </article>
-  );
-}
 
 function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const rpc = useRpc<typeof rpcContract>();
@@ -1214,18 +961,27 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [updatingTask, setUpdatingTask] = useState<string | null>(null);
   const requestId = useRef(0);
+  const activityRefreshInFlight = useRef(false);
+  const [activity, setActivity] = useState<{ latest: { text: string; kind: "assistant" | "user" | "command" | "activity" } | null; lastUser: { text: string; kind: "user" } | null; current: { text: string; kind: "assistant" | "user" | "command" | "activity" } | null } | null>(null);
+  const [expandedActivity, setExpandedActivity] = useState<Set<string>>(() => new Set());
   const [taskTitle, setTaskTitle] = useState("");
   const [createTaskState, setCreateTaskState] = useState<"idle" | "working" | "error">("idle");
   const [createTaskError, setCreateTaskError] = useState<string | null>(null);
+  const [linearBusy, setLinearBusy] = useState(false);
+  const [pendingChangesExpanded, setPendingChangesExpanded] = useState(false);
+  const [currentPrExpanded, setCurrentPrExpanded] = useState(false);
+  const [expandedStackBranches, setExpandedStackBranches] = useState<Set<string>>(() => new Set());
+  const [checkingOutBranch, setCheckingOutBranch] = useState<string | null>(null);
+  const [workingTreeDiff, setWorkingTreeDiff] = useState<{ path: string; patch: string | null; loading: boolean; message: string | null } | null>(null);
 
   const refresh = useCallback(async () => {
     const request = ++requestId.current;
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
       const next = await rpc.call("getWorkContext", { threadId });
       if (request !== requestId.current) return;
       setContext(next);
+      setActivity(next.activity);
       setTaskTitle((current) => current || next.currentThread.title);
       setCreateTaskState("idle");
       setCreateTaskError(null);
@@ -1239,6 +995,31 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   }, [rpc, threadId]);
   useEffect(() => { void refresh(); return () => { requestId.current += 1; }; }, [refresh]);
   useRealtime("work-sidebar:changed", () => { void refresh(); });
+  useEffect(() => {
+    if (context?.currentThread.status !== "active" && context?.currentThread.status !== "starting") return;
+    const refreshActivity = async () => {
+      if (activityRefreshInFlight.current) return;
+      activityRefreshInFlight.current = true;
+      try {
+        const nextActivity = await rpc.call("getLatestActivity", { threadId });
+        setActivity(nextActivity);
+        setContext((current) => current ? { ...current, currentThread: { ...current.currentThread, ...nextActivity.currentThread } } : current);
+      } catch { /* Retain the last good activity during a transient poll failure. */ } finally { activityRefreshInFlight.current = false; }
+    };
+    void refreshActivity();
+    const interval = window.setInterval(() => { void refreshActivity(); }, 2_000);
+    return () => window.clearInterval(interval);
+  }, [context?.currentThread.status, rpc, threadId]);
+
+  const openWorkingTreeDiff = async (path: string) => {
+    setWorkingTreeDiff({ path, patch: null, loading: true, message: null });
+    try {
+      const result = await rpc.call("getWorkingTreeFileDiff", { threadId, path });
+      setWorkingTreeDiff({ path, patch: result.patch, loading: false, message: result.message });
+    } catch (error) {
+      setWorkingTreeDiff({ path, patch: null, loading: false, message: error instanceof Error ? error.message : "Could not load the file diff." });
+    }
+  };
 
   const createTask = async () => {
     if (!context?.tasksAvailable || !taskTitle.trim() || createTaskState === "working") return;
@@ -1274,13 +1055,38 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const outcomeTask = context?.outcome ?? context?.tasks[0] ?? null;
   const executionTasks = context?.executionTasks?.length ? context.executionTasks : (context?.subtasks ?? []);
   const bindings = context?.bindings ?? [];
+  const activityItems = context && activity ? [
+    { label: "Agent", entry: activity.latest },
+    { label: "User", entry: activity.lastUser },
+  ].filter((item, index, items) => item.entry && items.findIndex((candidate) => candidate.entry?.text === item.entry?.text) === index) : [];
+  const linkLinear = async (key: string) => { setLinearBusy(true); try { const item = await rpc.call("linkLinearIssue", { threadId, key }); toast.success(`${item.key} linked`); await refresh(); } catch (caught) { toast.error(caught instanceof Error ? caught.message : "Could not link Linear issue"); } finally { setLinearBusy(false); } };
+  const searchLinear = useCallback(async (query: string) => (await rpc.call("searchLinearIssues", { threadId, query })).items, [rpc, threadId]);
+  const unlinkLinear = async () => { setLinearBusy(true); try { await rpc.call("unlinkLinearIssue", { threadId }); await refresh(); } catch (caught) { toast.error(caught instanceof Error ? caught.message : "Could not unlink Linear issue"); } finally { setLinearBusy(false); } };
+  const moveLinear = async (statusId: string) => { if (!statusId) return; setLinearBusy(true); try { const item = await rpc.call("updateLinearIssueStatus", { threadId, statusId }); toast.success(`${item.key} moved to ${item.status}`); await refresh(); } catch (caught) { toast.error(caught instanceof Error ? caught.message : "Could not update Linear issue"); } finally { setLinearBusy(false); } };
+  const advanceOutcome = async () => {
+    if (!outcomeTask || updatingTask === outcomeTask.id) return;
+    const nextStatus = ({ backlog: "todo", todo: "in_progress", in_progress: "in_review", in_review: "done", done: undefined, canceled: undefined } as const)[outcomeTask.status];
+    if (!nextStatus) return;
+    setUpdatingTask(outcomeTask.id);
+    try { await rpc.call("updateWorkTask", { taskId: outcomeTask.id, status: nextStatus }); await refresh(); }
+    catch (caught) { toast.error(caught instanceof Error ? caught.message : "Could not update task"); }
+    finally { setUpdatingTask(null); }
+  };
+  const toggleStackBranch = (branch: string) => setExpandedStackBranches((current) => { const next = new Set(current); next.has(branch) ? next.delete(branch) : next.add(branch); return next; });
+  const checkoutStackBranch = async (branch: string) => {
+    if (checkingOutBranch) return;
+    setCheckingOutBranch(branch);
+    try { const result = await rpc.call("checkoutStackBranch", { threadId, branch }); result.ok ? toast.success(result.message) : toast.error(result.message); await refresh(); }
+    catch (caught) { toast.error(caught instanceof Error ? caught.message : "Could not check out branch"); }
+    finally { setCheckingOutBranch(null); }
+  };
 
   return (
     <div className="ws-panel">
       <header className="ws-panel-header">
         <div className="ws-panel-heading">
           <Icon name="ListTodo" className="ws-panel-icon" aria-hidden />
-          <div><strong>Current work</strong><span>{context?.currentThread.title ?? "Active thread"}</span></div>
+          <div><strong>Work</strong><span>{context?.currentThread.title ?? "Active thread"}</span></div>
         </div>
         <button type="button" className="ws-icon-button" aria-label="Refresh work context" title="Refresh work context" onClick={() => void refresh()} disabled={loading}>↻</button>
       </header>
@@ -1304,60 +1110,54 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
       <div className="ws-panel-body" role="tabpanel" id={tabPanelId} aria-labelledby={`ws-tab-${selectedTab.id}`} tabIndex={0}>
         {loading && <div className="ws-empty" role="status" aria-live="polite">Loading work context…</div>}
         {!loading && error && <div className="ws-callout" role="alert"><span>{error}</span><button type="button" onClick={() => void refresh()}>Try again</button></div>}
+        {!loading && context && <article className="ws-card ws-status-card"><div className="ws-card-heading"><strong>Status</strong></div><div className="ws-status-summary"><h3>{runtimeStatusPresentation(context.currentThread).label}</h3><p className="ws-working-state"><span title={`${context.children.filter((child) => !child.isArchived).length} child agent${context.children.filter((child) => !child.isArchived).length === 1 ? "" : "s"}`}><Icon name="Bot" aria-hidden />{context.children.filter((child) => !child.isArchived).length}</span><span title={`${context.children.filter((child) => !child.isArchived && child.status === "active").length} active child agent${context.children.filter((child) => !child.isArchived && child.status === "active").length === 1 ? "" : "s"}`}><Icon name="Wrench" aria-hidden />{context.children.filter((child) => !child.isArchived && child.status === "active").length}</span></p></div>{activityItems.length > 0 ? <div className="ws-activity-list">{activityItems.map(({ label, entry }) => entry && <button type="button" className={`ws-activity-item ${entry.kind === "command" ? "ws-activity-item-command" : ""} ${expandedActivity.has(label) ? "ws-activity-item-expanded" : ""}`} key={label} aria-expanded={expandedActivity.has(label)} onClick={() => setExpandedActivity((current) => { const next = new Set(current); next.has(label) ? next.delete(label) : next.add(label); return next; })}><span className="ws-activity-label">{label}</span>{entry.kind === "command" ? <code className="ws-activity-command">{entry.text}</code> : <span className="ws-activity-copy">{entry.text}</span>}</button>)}</div> : <p className="ws-card-note">No activity has been recorded yet.</p>}<span className={`ws-focus-state ws-working-blinker ws-focus-state-${runtimeStatusPresentation(context.currentThread).tone}`} aria-label={`${runtimeStatusPresentation(context.currentThread).label} status`} /></article>}
         {!loading && context && tab === "work" && (
           <div className="ws-section-stack">
-            <header><div><h2>Work</h2><span>{outcomeTask?.key ?? "No outcome"}</span></div><span className="ws-section-count">{executionTasks.length} execution task{executionTasks.length === 1 ? "" : "s"}</span></header>
-            {!context.tasksAvailable && <div className="ws-callout"><span>Tasks are unavailable right now. Your thread is still available here, and you can create and attach its task when Tasks reconnects.</span><button type="button" onClick={() => void refresh()}>Check again</button></div>}
+            <header><div><h2>Work</h2></div><span className="ws-work-header-badges">{outcomeTask && <span className="ws-work-header-badge" title={`${outcomeTask.key} · ${outcomeTask.title}`}>{outcomeTask.key}</span>}{context.tracker.item && <a className="ws-work-header-badge ws-linear-header-badge" href={context.tracker.item.url} target="_blank" rel="noreferrer" title={`${context.tracker.item.key} · ${context.tracker.item.title}`}>{context.tracker.item.key}</a>}</span></header>
+            <LinearCard context={context} linking={linearBusy} onLink={(key) => void linkLinear(key)} onUnlink={() => void unlinkLinear()} onMove={(statusId) => void moveLinear(statusId)} onSearch={searchLinear} />
+            {!context.tasksAvailable && <article className="ws-card ws-empty-state-card"><div className="ws-card-heading"><strong>Tasks</strong></div><p className="ws-card-note">Tasks are unavailable right now.</p><button type="button" className="ws-compact-action" onClick={() => void refresh()}>Check again</button></article>}
             {outcomeTask && (
-              <article key={outcomeTask.id} className="ws-card">
-                <div className="ws-card-heading"><strong>{outcomeTask.key}</strong><span className={`ws-pill ws-pill-${outcomeTask.status}`}>{readableStatus(outcomeTask.status)}</span></div>
-                <h3>{outcomeTask.title}</h3>
-                <div className="ws-card-meta"><span>{readableStatus(outcomeTask.priority)} priority</span>{outcomeTask.dueDate && <span>Due {outcomeTask.dueDate}</span>}</div>
-                <div className="ws-card-actions">
-                  {outcomeTask.status !== "in_review" && outcomeTask.status !== "done" && outcomeTask.status !== "canceled" && context.tasksAvailable && <Button size="sm" variant="outline" disabled={updatingTask === outcomeTask.id} onClick={async () => {
-                    setUpdatingTask(outcomeTask.id);
-                    try { await rpc.call("updateWorkTask", { taskId: outcomeTask.id, status: "in_review" }); await refresh(); }
-                    catch (caught) { toast.error(caught instanceof Error ? caught.message : "Could not update task"); }
-                    finally { setUpdatingTask(null); }
-                  }}>{updatingTask === outcomeTask.id ? "Updating…" : "Mark in review"}</Button>}
-                </div>
+              <article key={outcomeTask.id} className="ws-card ws-outcome-card">
+                <div className="ws-card-heading"><strong>Outcome</strong><span className="ws-task-card-icons">{outcomeTask.priority !== "none" && <span className="ws-pr-tooltip" data-tooltip={`${readableStatus(outcomeTask.priority)} priority`}><Icon name="AlertCircle" className={`ws-priority-icon ws-priority-${outcomeTask.priority}`} aria-label={`${readableStatus(outcomeTask.priority)} priority`} /></span>}</span></div>
+                <div className="ws-outcome-body"><div><p className="ws-card-note ws-outcome-key">{outcomeTask.key}</p><h3>{outcomeTask.title}</h3></div>{outcomeTask.status !== "done" && outcomeTask.status !== "canceled" && context.tasksAvailable && <button type="button" className={`ws-work-status-button ws-work-status-${outcomeTask.status} ws-pr-tooltip`} data-tooltip={`Move ${readableStatus(outcomeTask.status)} to the next state`} disabled={updatingTask === outcomeTask.id} onClick={() => void advanceOutcome()} aria-label={`Current task status: ${readableStatus(outcomeTask.status)}. Move to the next state.`}><Icon name={updatingTask === outcomeTask.id ? "LoaderCircle" : outcomeTask.status === "in_review" ? "Check" : "ArrowRight"} aria-hidden /></button>}</div>
+                {outcomeTask.dueDate && <div className="ws-card-meta"><span>Due {outcomeTask.dueDate}</span></div>}
               </article>
             )}
             {!outcomeTask && (
-              <div className="ws-create-task">
-                <div><h3>No current outcome yet</h3><p>Create the durable top-level outcome task for this root work item.</p></div>
-                <Input disabled={!context.tasksAvailable || createTaskState === "working"} aria-label="Outcome-oriented task title" placeholder="Outcome-oriented task title" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void createTask(); }} />
-                <Button size="sm" disabled={!context.tasksAvailable || createTaskState === "working" || !taskTitle.trim()} onClick={() => void createTask()}>{createTaskState === "working" ? "Creating and attaching…" : "Create and attach task"}</Button>
+              <article className="ws-card ws-outcome-empty">
+                <div className="ws-card-heading"><strong>Outcome</strong></div>
+                <p className="ws-card-note">No current outcome.</p>
+                <div className="ws-outcome-form">
+                  <Input disabled={!context.tasksAvailable || createTaskState === "working"} aria-label="Outcome-oriented task title" placeholder="Outcome-oriented task title" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void createTask(); }} />
+                  <button type="button" className="ws-outcome-create-button" title="Create and attach outcome task" aria-label="Create and attach outcome task" disabled={!context.tasksAvailable || createTaskState === "working" || !taskTitle.trim()} onClick={() => void createTask()}>{createTaskState === "working" ? "…" : "Create"}</button>
+                </div>
                 {createTaskError && <div className="ws-inline-error" role="alert">{createTaskError}</div>}
-              </div>
+              </article>
             )}
-            <header><div><h2>Execution tasks</h2><span>Direct child tasks</span></div><span className="ws-section-count">{executionTasks.length}</span></header>
-            {executionTasks.length > 0 ? <div className="ws-subtask-list">{executionTasks.map((task) => { const binding = bindings.find((candidate) => candidate.executionTaskId === task.id); return <div key={task.id} className="ws-subtask ws-subtask-card"><span className={`ws-status-dot ws-status-dot-${task.status}`}>{task.status === "done" ? "✓" : "•"}</span><span><strong>{task.title}</strong><small>{task.key} · {readableStatus(task.status)}</small>{binding && <small>{binding.mode ? `${readableStatus(binding.mode)} owner` : "Unowned"} · {readableStatus(binding.dispatchState)}{binding.recoveryMessage ? ` · ${binding.recoveryMessage}` : ""}</small>}</span><span className="ws-subtask-status">{readableStatus(task.status)}</span></div>; })}</div> : <div className="ws-empty">No execution tasks are attached to this outcome yet.</div>}
-            {context.goal && <article className="ws-card ws-goal"><div className="ws-card-heading"><strong>Goal</strong><span>{readableStatus(context.goal.status)}</span></div><h3>{context.goal.objective}</h3>{goalProgressPercent(context.goal) !== null && <div className="ws-progress" role="progressbar" aria-label="Goal token usage" aria-valuemin={0} aria-valuemax={100} aria-valuenow={goalProgressPercent(context.goal)!}><span style={{ width: `${goalProgressPercent(context.goal)}%` }} /></div>}</article>}
-            <header><div><h2>Plan</h2><span>Current provider steps</span></div><span className="ws-section-count">{context.todos.filter((item) => item.status === "completed").length} / {context.todos.length}</span></header>
-            <div className="ws-plan">
+            <article className="ws-card ws-execution-card"><div className="ws-card-heading"><strong>Tasks</strong><span className="ws-section-count">{executionTasks.length}</span></div>{executionTasks.length > 0 ? <div className="ws-subtask-list">{executionTasks.map((task) => { const binding = bindings.find((candidate) => candidate.executionTaskId === task.id); return <div key={task.id} className="ws-subtask ws-subtask-card"><span className={`ws-status-dot ws-status-dot-${task.status}`}>{task.status === "done" ? "✓" : "•"}</span><span><strong>{task.title}</strong><small>{task.key} · {readableStatus(task.status)}</small>{binding && <small>{binding.mode ? `${readableStatus(binding.mode)} owner` : "Unowned"} · {readableStatus(binding.dispatchState)}{binding.recoveryMessage ? ` · ${binding.recoveryMessage}` : ""}</small>}</span></div>; })}</div> : <p className="ws-card-note">No execution tasks are attached to this outcome yet.</p>}</article>
+            <section className="ws-agent-context" aria-label="Agent context">
+            <article className="ws-card ws-goal"><div className="ws-card-heading"><strong>Goal</strong>{context.goal && <span>{readableStatus(context.goal.status)}</span>}</div>{context.goal ? <><h3>{context.goal.objective}</h3>{goalProgressPercent(context.goal) !== null && <div className="ws-progress" role="progressbar" aria-label="Goal token usage" aria-valuemin={0} aria-valuemax={100} aria-valuenow={goalProgressPercent(context.goal)!}><span style={{ width: `${goalProgressPercent(context.goal)}%` }} /></div>}</> : <p className="ws-card-note">No goal supplied by this harness.</p>}</article>
+            <article className="ws-card ws-plan-card"><div className="ws-card-heading"><strong>Plan</strong>{context.todos.length > 0 && <span className="ws-section-count">{context.todos.filter((item) => item.status === "completed").length} / {context.todos.length}</span>}</div><div className="ws-plan">
               {context.todos.map((item) => <div key={item.id} className={`ws-plan-item ws-plan-${item.status}`}><span aria-hidden="true">{item.status === "completed" ? "✓" : item.status === "in_progress" ? "●" : "○"}</span><span>{item.text}</span><span className="sr-only">{readableStatus(item.status)}</span></div>)}
-              {context.todos.length === 0 && <div className="ws-empty">No active agent plan.</div>}
-            </div>
+              {context.todos.length === 0 && <p className="ws-card-note">No plan supplied by this harness.</p>}
+            </div></article>
+            </section>
           </div>
         )}
         {!loading && context && tab === "changes" && (
           <div className="ws-section-stack">
-            <header><div><h2>PR & Changes</h2><span>{context.repository.branch ?? "No workspace branch"}</span></div><span className="ws-section-count">{context.currentPullRequest ? `#${context.currentPullRequest.number}` : "No PR"}</span></header>
-            <article className="ws-card ws-repository-card"><div className="ws-card-heading"><strong>{context.repository.branch ?? "Repository"}</strong><span className={`ws-pill ${context.repository.hasUncommittedChanges ? "ws-pr-changes_requested" : ""}`}>{context.repository.hasUncommittedChanges ? "Uncommitted changes" : context.repository.outcome === "available" ? "Clean" : "Unavailable"}</span></div>{context.repository.outcome === "available" ? <><div className="ws-card-meta"><span>Base {context.repository.base ?? "—"}</span><span>{context.repository.ahead} ahead · {context.repository.behind} behind</span></div>{context.repository.changedFiles.length > 0 && <div className="ws-file-list">{context.repository.changedFiles.map((file) => <span key={file.path}><b>{file.status}</b> {file.path}</span>)}</div>}</> : <p className="ws-card-note">{context.repository.message ?? "Repository status is unavailable."}</p>}</article>
-            {context.currentPullRequest && <CurrentPullRequestCard pullRequest={context.currentPullRequest} />}
-            {context.stack ? <>
-              <ol className="ws-stack-rail" aria-label={`Stack #${context.stack.number}`}>
-              {orderStackLayers(context.stack.pullRequests, context.stack.base).map((pr) => <li key={pr.number}><a href={pr.url} target="_blank" rel="noreferrer" className="ws-stack-layer" aria-current={pr.number === context.stack?.currentPullRequest ? "page" : undefined}><span className="ws-stack-node" aria-hidden="true">{pr.state === "merged" ? "✓" : pr.draft ? "○" : "●"}</span><span><strong>#{pr.number} {pr.title}</strong><small>{pr.head} · {pr.draft ? "Draft" : readableStatus(pr.state)}</small></span><span className="ws-stack-layer-action">Open ↗</span></a></li>)}
-              </ol>
-            </> : context.currentPullRequest ? <div className="ws-callout"><span>{context.stackUnavailableReason ?? "This pull request is not part of a Stack."}</span><small>Showing the pull request directly; Stack discovery does not block its checks, review, or mergeability.</small>{context.stackUnavailableReason && <button type="button" onClick={() => void refresh()}>Retry Stack discovery</button>}</div> : <div className="ws-empty">No pull request is linked to this thread.</div>}
+            <header><div><h2>Changes</h2></div><span className="ws-section-count">{context.currentPullRequest ? `#${context.currentPullRequest.number}` : "No PR"}</span></header>
+            <article className="ws-card ws-repository-card"><div className="ws-card-heading"><strong>{context.repository.branch ?? "Repository"}</strong><span className={`ws-pill ${context.repository.hasUncommittedChanges ? "ws-pr-changes_requested" : ""}`}>{context.repository.hasUncommittedChanges ? "Changed" : context.repository.outcome === "available" ? "Clean" : "Unavailable"}</span></div>{context.repository.outcome === "available" ? <><div className="ws-card-meta"><span>{context.repository.ahead}↑ {context.repository.behind}↓</span><span>{context.repository.base ?? "—"}</span>{context.repository.changedFileCount > 0 && <button type="button" className="ws-repository-changes-toggle" aria-expanded={pendingChangesExpanded} onClick={() => setPendingChangesExpanded((expanded) => !expanded)} aria-label={`${pendingChangesExpanded ? "Hide" : "Show"} ${context.repository.changedFileCount} working-tree file${context.repository.changedFileCount === 1 ? "" : "s"}`}><b>{context.repository.changedFileCount}</b> file{context.repository.changedFileCount === 1 ? "" : "s"} <i>+{context.repository.changedInsertions}</i> <em>−{context.repository.changedDeletions}</em> {pendingChangesExpanded ? "⌄" : "›"}</button>}</div>{pendingChangesExpanded && context.repository.changedFileCount > 0 && <div className="ws-current-pr-details ws-working-tree-files">{context.repository.changedFiles.map((file) => <button type="button" className="ws-working-tree-file" key={file.path} onClick={() => void openWorkingTreeDiff(file.path)} aria-label={`Open uncommitted diff for ${file.path}`}><b className={`ws-file-${file.status}`}>{file.status[0]?.toUpperCase()}</b><em>{file.path}</em><small>{file.insertions !== null ? `+${file.insertions}` : ""} {file.deletions !== null ? `−${file.deletions}` : ""}</small></button>)}{context.repository.changedFileCount > context.repository.changedFiles.length && <small>Only the first {context.repository.changedFiles.length} files are shown.</small>}</div>}</> : <p className="ws-card-note">{context.repository.message ?? "Repository status is unavailable."}</p>}</article>
+            {workingTreeDiff && <article className="ws-card ws-working-tree-diff"><div className="ws-card-heading"><strong>{workingTreeDiff.path}</strong><button type="button" className="ws-text-button" onClick={() => setWorkingTreeDiff(null)}>Close</button></div>{workingTreeDiff.loading ? <p className="ws-card-note">Loading diff…</p> : workingTreeDiff.patch ? <ChangesWorkingTreeDiff patch={workingTreeDiff.patch} /> : <p className="ws-card-note">{workingTreeDiff.message ?? "No diff is available for this file."}</p>}</article>}
+            {context.githubStack?.stack ? <ol className="ws-stack-rail" aria-label={`GitHub Stack based on ${context.githubStack.stack.trunk}`}>
+              {context.githubStack.stack.branches.map((branch) => { const stackPullRequest = context.stack?.pullRequests.find((pullRequest) => pullRequest.number === branch.pr?.number || pullRequest.head === branch.name); const current = branch.pr?.number === context.currentPullRequest?.number ? context.currentPullRequest : null; const checks = current?.checks.state === "failing" ? "failed" : current?.checks.state === "passing" ? "passing" : current?.checks.state === "pending" ? "pending" : "none"; return <ChangesStackBranchRow key={branch.name} branch={branch} signals={stackPullRequest ?? (current ? { state: current.state, draft: current.state === "draft", checks, review: current.review.state } : undefined)} expanded={expandedStackBranches.has(branch.name)} checkingOut={checkingOutBranch === branch.name} onToggle={() => toggleStackBranch(branch.name)} onCheckout={() => void checkoutStackBranch(branch.name)} />; })}
+            </ol> : context.currentPullRequest ? <ChangesPullRequestCard pullRequest={context.currentPullRequest} expanded={currentPrExpanded} onToggle={() => setCurrentPrExpanded((expanded) => !expanded)} /> : <div className="ws-empty">No pull request is linked to this thread.</div>}
           </div>
         )}
         {!loading && context && tab === "agents" && (
           <div className="ws-section-stack">
-            <header><div><h2>Agents</h2><span>Child threads resolved by BB</span></div><span className="ws-section-count">{context.children.length}</span></header>
-            <div className="ws-current-agent"><span className="ws-status-dot ws-status-dot-running">●</span><span><strong>Current thread</strong><small>{context.currentThread.providerId} · {readableStatus(context.currentThread.runtimeStatus)}</small></span></div>
-            {context.children.map((child) => { const childTasks = ((child as typeof child & { tasks?: readonly NonNullable<typeof child.task>[] }).tasks ?? (child.task ? [child.task] : [])); const state = agentProjectionState(child.status, childTasks[0]?.status ?? null); const owned = bindings.filter((binding) => binding.ownerThreadId === child.id); return <button key={child.id} className={`ws-agent-card ws-agent-${state}`} style={{ marginLeft: `${Math.min(child.depth - 1, 4) * 0.65}rem` }} onClick={() => actions.open(child.id, { split: true })} aria-label={`Open ${child.title} in split`}><span className={`ws-agent-state ws-agent-state-${state}`} aria-hidden="true">●</span><span><strong>{child.title}</strong><small>{child.providerId} · {readableStatus(child.runtimeStatus)} · {readableStatus(state)}</small>{childTasks.map((task) => <small key={task.key}>{task.key} · {task.status === "in_review" ? "Review-ready" : readableStatus(task.liveStatus)}</small>)}{owned.map((binding) => <small key={`${binding.executionTaskId}:${binding.idempotencyKey}`}>Owned execution · {readableStatus(binding.mode ?? "unowned")} · {readableStatus(binding.dispatchState)}{binding.recoveryMessage ? ` · ${binding.recoveryMessage}` : ""}</small>)}</span><span className="ws-agent-open">Open split ↗</span></button>; })}
+            <header><div><h2>Agents</h2></div><span className="ws-section-count">{context.children.length}</span></header>
+            {context.children.map((child) => { const childTasks = ((child as typeof child & { tasks?: readonly NonNullable<typeof child.task>[] }).tasks ?? (child.task ? [child.task] : [])); const state = agentProjectionState(child.status, childTasks[0]?.status ?? null); const runtime = runtimeStatusPresentation(child); const owned = bindings.filter((binding) => binding.ownerThreadId === child.id); return <button key={child.id} className={`ws-agent-card ws-agent-${state}`} style={{ marginLeft: `${Math.min(child.depth - 1, 4) * 0.65}rem` }} onClick={() => actions.open(child.id, { split: true })} aria-label={`Open ${child.title} in split`}><Icon name="Bot" className={`ws-agent-state ws-agent-state-${runtime.tone}`} aria-hidden /><span><strong>{child.title}</strong><small>{runtime.label}{childTasks[0] ? ` · ${childTasks[0].key}` : ""}{owned[0] ? ` · ${readableStatus(owned[0].dispatchState)}` : ""}</small>{owned[0]?.recoveryMessage && <small>{owned[0].recoveryMessage}</small>}</span><Icon name="ArrowRight" className="ws-agent-open" aria-hidden /></button>; })}
             {context.children.length === 0 && <div className="ws-empty">No delegated child threads are attached to this thread.</div>}
           </div>
         )}
@@ -1368,7 +1168,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
 
 function WorkContextHeaderAction({ isCompactViewport }: PluginThreadHeaderActionProps) {
   const navigate = useBbNavigate();
-  return <button type="button" className="ws-header-action" aria-label="Open Current Work" title="Open Current Work" onClick={() => { navigate.openThreadPanel({ actionId: "work-context" }); }}>{isCompactViewport ? "▣" : "Work"}</button>;
+  return <button type="button" className="ws-header-action" aria-label="Open Work" title="Open Work" onClick={() => { navigate.openThreadPanel({ actionId: "work-context" }); }}>{isCompactViewport ? "▣" : "Work"}</button>;
 }
 
 function TrackWorkAction() {
@@ -1393,10 +1193,10 @@ export default definePluginApp((app) => {
     id: "work-queue", title: "Tasks", description: "Global outcome and execution task queue.", component: WorkThreadList,
   });
   app.slots.threadPanelAction({
-    id: "work-context", title: "Current Work", icon: "ListTodo", component: WorkPanel, layout: "flush",
+    id: "work-context", title: "Work", icon: "ListTodo", component: WorkPanel, layout: "flush",
   });
   app.slots.experimental_threadHeaderAction({
-    id: "work-context-header", title: "Current Work", component: WorkContextHeaderAction,
+    id: "work-context-header", title: "Work", component: WorkContextHeaderAction,
   });
   app.composer.customize({
     id: "task-first", scopes: ["thread"], actions: [{ id: "track-work", component: TrackWorkAction }],
