@@ -859,7 +859,7 @@ function WorkThreadList(props: PluginThreadListProps) {
       </div>}
       {view === "work" && <>
       {threadListMode === "native" ? <section className="ws-native-thread-list" aria-label="BB native threads"><Original /></section> : <><section className="ws-thread-statuses" aria-label="Thread status groups">
-      <details className="ws-later ws-active-threads" open={activeThreadsOpen} onToggle={(event) => setActiveThreadsOpen(event.currentTarget.open)}>
+      <details className="ws-later ws-active-threads" data-drop-target={threadDropTarget?.threadId === "active" || undefined} open={activeThreadsOpen} onToggle={(event) => setActiveThreadsOpen(event.currentTarget.open)} onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || !allLaterIds.has(sourceId)) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: "active", placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || !allLaterIds.has(sourceId)) return; event.preventDefault(); toggleLater(sourceId); setDragThreadId(null); setThreadDropTarget(null); }}>
       <summary>Active <span>{orderedRoots.length}</span></summary>
       <section className="ws-hierarchy" aria-label="Work threads">
         {orderedRoots.map((thread) => (
