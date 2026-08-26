@@ -136,10 +136,11 @@
 .ws-work-toolbar-actions{min-height:1.6rem}.ws-icon-button,.ws-new-thread{display:grid!important;place-items:center;flex:none;padding:0!important;line-height:0}.ws-icon-button svg,.ws-new-thread svg{display:block;width:.76rem;height:.76rem;margin:0}.ws-new-thread{width:1.6rem!important;height:1.6rem!important}
 .ws-list-toolbar{position:relative;z-index:40;isolation:isolate}.ws-thread-settings{z-index:41}.ws-thread-settings-menu{top:calc(100% + .2rem)!important;bottom:auto!important;z-index:100!important}.ws-native-thread-list{position:relative;z-index:0}
 .ws-review-diff{overflow:auto;--diff-background-color:var(--card);--diff-text-color:var(--foreground);--diff-font-family:ui-monospace,SFMono-Regular,Menlo,monospace;--diff-gutter-insert-background-color:color-mix(in srgb,var(--success) 12%,var(--card));--diff-gutter-delete-background-color:color-mix(in srgb,var(--destructive) 12%,var(--card));--diff-code-insert-background-color:color-mix(in srgb,var(--success) 8%,var(--card));--diff-code-delete-background-color:color-mix(in srgb,var(--destructive) 8%,var(--card));--diff-code-insert-edit-background-color:color-mix(in srgb,var(--success) 20%,var(--card));--diff-code-delete-edit-background-color:color-mix(in srgb,var(--destructive) 20%,var(--card)}.ws-review-diff .diff{min-width:31rem;font-size:.61rem}.ws-review-diff .diff-gutter{color:var(--muted-foreground)}.ws-review-diff .diff-code{padding-left:.45rem}.ws-review-diff .diff-gutter-col{width:4.5ch}
-.ws-list{padding:0!important;background:var(--background)}
-/* The host owns the sidebar scroll viewport. Keeping these in ordinary flow
-   prevents a plugin-local sticky layer from leaving a blank top offset or
-   painting through the tab row while the host scrolls the list. */
+.ws-list{margin:-.75rem!important;padding:0!important;background:var(--background)}
+/* Treat the selector and current-view toolbar as one opaque sticky unit. Two
+   separate sticky siblings use different containing blocks in BB's sidebar,
+   which caused their offsets to collide and exposed rows beneath the tabs. */
+.ws-list-chrome{position:sticky;z-index:45;top:0;background:var(--background);isolation:isolate}
 .ws-view-selector{position:relative;z-index:1;box-sizing:border-box!important;gap:0!important;height:2rem!important;min-height:0!important;max-height:2rem!important;margin:0!important;padding:0!important;background:var(--background)!important}
 .ws-view-selector::before{content:none}
 .ws-view-selector button{position:relative;box-sizing:border-box!important;height:2rem!important;min-height:0!important;padding:0 .25rem!important}
