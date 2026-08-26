@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent as ReactMouseEvent } from "react";
 import {
   definePluginApp,
   useBbNavigate,
@@ -151,9 +151,6 @@ function ThreadRow({
   const { splitProps, isAvailable } = experimental_useSidebarThreadSplit(thread.id);
   const { pullRequest, isLoading: pullRequestLoading } = experimental_useSidebarThreadPullRequest(thread.id);
   const controlClick = useRef(false);
-  const pointerStart = useRef<{ pointerId: number; x: number; y: number } | null>(null);
-  const pointerDragging = useRef(false);
-  const suppressClick = useRef(false);
   const [renaming, setRenaming] = useState(false);
   const [draftTitle, setDraftTitle] = useState(threadTitle(thread));
   const projectLabel = project?.isPersonal ? "Personal" : project?.name ?? "Project";
@@ -176,44 +173,15 @@ function ThreadRow({
   // recursive confirmation. Never fan out child actions here.
   const archiveTree = () => actions.archive(thread.id);
   const requestDeleteTree = () => actions.requestDelete(thread.id);
-  // Reordering deliberately uses pointer events rather than native HTML drag.
-  // Electron gives the nested <a> its own native drag session, which cancels
-  // the parent row's events before it can establish a drop target.
-  const pointerDropTarget = (event: ReactPointerEvent<HTMLAnchorElement>) => {
-    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-sidebar-thread-id]");
-    const targetId = target?.dataset.sidebarThreadId;
-    if (!targetId || targetId === thread.id || target.dataset.sidebarThreadParentId !== (thread.parentThreadId ?? "") || !canDropThread(thread.id)) return null;
-    const bounds = target.getBoundingClientRect();
-    return { threadId: targetId, placement: event.clientY > bounds.top + bounds.height / 2 ? "after" as const : "before" as const };
-  };
-  const pointerOverLater = (event: ReactPointerEvent<HTMLAnchorElement>) => !later && Boolean(document.elementFromPoint(event.clientX, event.clientY)?.closest(".ws-later"));
-  const startPointerDrag = (event: ReactPointerEvent<HTMLAnchorElement>) => {
-    if (reorderDisabled || event.button !== 0 || event.ctrlKey || event.metaKey) return;
-    pointerStart.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
-    pointerDragging.current = false;
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-  const movePointerDrag = (event: ReactPointerEvent<HTMLAnchorElement>) => {
-    const start = pointerStart.current;
-    if (!start || start.pointerId !== event.pointerId) return;
-    if (!pointerDragging.current && Math.hypot(event.clientX - start.x, event.clientY - start.y) < 5) return;
-    pointerDragging.current = true;
-    suppressClick.current = true;
-    event.preventDefault();
+  // Native drag is reliable from this dedicated grip. The thread itself stays
+  // a normal link, so BB's split gesture and text selection cannot take over.
+  const startNativeDrag = (event: DragEvent<HTMLElement>) => {
+    if (reorderDisabled) { event.preventDefault(); return; }
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", thread.id);
     onDragThreadChange(thread.id);
-    onDropTargetChange(pointerOverLater(event) ? { threadId: "later", placement: "after" } : pointerDropTarget(event));
   };
-  const finishPointerDrag = (event: ReactPointerEvent<HTMLAnchorElement>) => {
-    const start = pointerStart.current;
-    if (!start || start.pointerId !== event.pointerId) return;
-    const didDrag = pointerDragging.current;
-    const intoLater = didDrag && pointerOverLater(event);
-    const target = didDrag && !intoLater ? pointerDropTarget(event) : null;
-    pointerStart.current = null;
-    pointerDragging.current = false;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    if (intoLater) onToggleLater(thread.id);
-    else if (target) onDropThread(thread.id, target.threadId, target.placement);
+  const finishNativeDrag = () => {
     onDragThreadChange(null);
     onDropTargetChange(null);
   };
@@ -269,14 +237,9 @@ function ThreadRow({
               data-sidebar-thread-parent-id={thread.parentThreadId ?? ""}
               className={`ws-thread-anchor ${children > 0 ? "ws-thread-has-children" : ""}`}
               aria-selected={selected}
-              onPointerDown={startPointerDrag}
-              onPointerMove={movePointerDrag}
-              onPointerUp={finishPointerDrag}
-              onPointerCancel={finishPointerDrag}
               onMouseDown={(event) => { controlClick.current = event.ctrlKey && event.button === 0; }}
               onClick={(event) => {
                 event.preventDefault();
-                if (suppressClick.current) { suppressClick.current = false; return; }
                 if (!onSelect(thread, event)) open(false);
               }}
               onContextMenu={(event) => { if (!controlClick.current && !event.ctrlKey) return; controlClick.current = false; event.preventDefault(); onSelect(thread, event); }}
@@ -305,6 +268,7 @@ function ThreadRow({
                 </span>
               </span>
               <span className="ws-thread-trailing">
+                {!reorderDisabled && <span className="ws-thread-drag-handle" role="button" tabIndex={0} draggable aria-label={`Reorder ${title}`} title="Drag to reorder" onDragStart={(event) => { event.stopPropagation(); startNativeDrag(event); }} onDragEnd={(event) => { event.stopPropagation(); finishNativeDrag(); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}><Icon name="GripVertical" aria-hidden /></span>}
                 <span className={`ws-status ws-status-${indicator} ${working ? "ws-status-working" : ""}`} aria-label={thread.indicatorLabel ?? undefined}>
                   {working ? <span className="ws-status-dots" aria-hidden><i /><i /><i /></span> : indicatorGlyph(String(thread.indicator))}
                 </span>

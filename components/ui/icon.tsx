@@ -10,6 +10,7 @@ const paths: Record<string, React.ReactNode> = {
   FolderGit: <><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4H10l2 2h6.5A2.5 2.5 0 0 1 21 8.5v7A2.5 2.5 0 0 1 18.5 18h-13A2.5 2.5 0 0 1 3 15.5z" /><path d="M9 10v4m0-4 3 2-3 2" /></>,
   GitBranch: <><circle cx="6" cy="6" r="2" /><circle cx="6" cy="18" r="2" /><circle cx="18" cy="18" r="2" /><path d="M6 8v8m2 2h6a4 4 0 0 0 4-4V8" /></>,
   GitPullRequest: <><circle cx="6" cy="4" r="2" /><circle cx="6" cy="20" r="2" /><circle cx="18" cy="20" r="2" /><path d="M6 6v12m6-14v8a4 4 0 0 0 4 4h2" /></>,
+  GripVertical: <><circle cx="9" cy="5" r=".8" fill="currentColor" stroke="none" /><circle cx="15" cy="5" r=".8" fill="currentColor" stroke="none" /><circle cx="9" cy="12" r=".8" fill="currentColor" stroke="none" /><circle cx="15" cy="12" r=".8" fill="currentColor" stroke="none" /><circle cx="9" cy="19" r=".8" fill="currentColor" stroke="none" /><circle cx="15" cy="19" r=".8" fill="currentColor" stroke="none" /></>,
   Hammer: <><path d="m14 6 4 4" /><path d="m15 5 4 4-3 3-4-4z" /><path d="m14 10-8 8" /><path d="m5 19 2 2" /></>,
   Laptop: <><rect x="5" y="4" width="14" height="11" rx="1.5" /><path d="M3 18h18M9 18l1-3h4l1 3" /></>,
   Layers: <><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 12 9 5 9-5M3 17l9 5 9-5" /></>,
