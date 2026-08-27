@@ -28,6 +28,7 @@ function CardState({ title, pending, error, onRetry, children }: CardStateProps)
 function StatusCard({ threadId }: { threadId: string }) {
   const query = useWorkStatus(threadId);
   const provider = useLegacyProviderHealth(threadId);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const data = query.data;
   const runtime = data ? runtimeStatusPresentation(data.currentThread) : null;
   const total = data?.children.filter((child) => !child.isArchived).length ?? 0;
@@ -36,11 +37,21 @@ function StatusCard({ threadId }: { threadId: string }) {
     <CardState title="Status" pending={query.isPending} error={query.error} onRetry={() => void query.refetch()}>
       <h3>{runtime?.label ?? "Unknown"}</h3>
       <p className="ws-card-note">{total} child agents · {active} active</p>
-      {data?.activity.current ? <p className="ws-card-note" aria-live="polite">Current: {data.activity.current.text}</p> : null}
-      {data?.activity.latest ? <p className="ws-card-note">Latest: {data.activity.latest.text}</p> : null}
-      {provider.data ? <a className={`ws-provider-health ws-provider-health-${provider.data.tone}`} aria-label={`${provider.data.providerName} provider status: ${readableStatus(provider.data.status)}`} href={provider.data.statusUrl ?? undefined} target={provider.data.statusUrl ? "_blank" : undefined} rel={provider.data.statusUrl ? "noreferrer" : undefined}>{provider.data.message ?? provider.data.status}</a> : null}
+      {data?.activity.latest || data?.activity.lastUser ? <ul className="ws-activity-list">{data?.activity.latest ? <ActivityRow label="Agent" entry={data.activity.latest} expanded={expanded.has("agent")} onToggle={() => setExpanded((current) => { const next = new Set(current); next.has("agent") ? next.delete("agent") : next.add("agent"); return next; })} /> : null}{data?.activity.lastUser ? <ActivityRow label="User" entry={data.activity.lastUser} expanded={expanded.has("user")} onToggle={() => setExpanded((current) => { const next = new Set(current); next.has("user") ? next.delete("user") : next.add("user"); return next; })} /> : null}</ul> : null}
+      {provider.data ? <ProviderHealth provider={provider.data} /> : null}
     </CardState>
   );
+}
+
+function ActivityRow({ label, entry, expanded, onToggle }: { label: string; entry: { text: string; kind: string }; expanded: boolean; onToggle: () => void }) {
+  const text = expanded ? entry.text : entry.text.slice(0, 120);
+  return <li className={`ws-activity-item${entry.kind === "command" ? " ws-activity-item-command" : ""}${expanded ? " ws-activity-item-expanded" : ""}`}><button type="button" className="ws-activity-copy" aria-expanded={expanded} onClick={onToggle}><span className="ws-activity-label">{label}</span>{entry.kind === "command" ? <code className="ws-activity-command">{text}</code> : <span>{text}</span>}</button></li>;
+}
+
+function ProviderHealth({ provider }: { provider: { tone: string; providerName: string; status: string; statusUrl: string | null; message: string | null } }) {
+  const label = `${provider.providerName} provider status: ${readableStatus(provider.status)}. ${provider.message ?? "No provider message."}`;
+  const content = provider.message ?? provider.status;
+  return provider.statusUrl ? <a className={`ws-provider-health ws-provider-health-${provider.tone}`} aria-label={label} title={label} href={provider.statusUrl} target="_blank" rel="noreferrer">{content}</a> : <span className={`ws-provider-health ws-provider-health-${provider.tone}`} aria-label={label} title={label}>{content}</span>;
 }
 
 function OutcomeCard({ threadId }: { threadId: string }) {

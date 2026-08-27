@@ -16,10 +16,23 @@ function useWorkContextCard<T>(threadId: string, key: keyof typeof workContextCa
     queryKey: workContextCardKeys[key](threadId),
     queryFn: () => rpc.call(method, { threadId }) as Promise<T>,
     ...workContextCardPolicy,
+    refetchOnMount: "always",
   });
 }
 
-export const useWorkStatus = (threadId: string) => useWorkContextCard<WorkStatus>(threadId, "status", "getWorkStatus");
+export function useWorkStatus(threadId: string) {
+  const rpc = useRpc<typeof rpcContract>();
+  return useQuery({
+    queryKey: workContextCardKeys.status(threadId),
+    queryFn: () => rpc.call("getWorkStatus", { threadId }) as Promise<WorkStatus>,
+    ...workContextCardPolicy,
+    refetchOnMount: "always",
+    refetchInterval: (query) => {
+      const state = query.state.data?.currentThread.status;
+      return state === "active" || state === "starting" ? 2_000 : false;
+    },
+  });
+}
 export const useWorkOutcome = (threadId: string) => useWorkContextCard<WorkOutcome>(threadId, "outcome", "getWorkOutcome");
 export const useWorkGoal = (threadId: string) => useWorkContextCard<WorkGoal>(threadId, "goal", "getWorkGoal");
 export const useWorkPlan = (threadId: string) => useWorkContextCard<WorkPlan>(threadId, "plan", "getWorkPlan");

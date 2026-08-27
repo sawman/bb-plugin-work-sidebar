@@ -9,6 +9,7 @@ import { rpcContract } from "./contracts.js";
 import { type SidebarStack } from "./work-model.js";
 import { createArchivedThreadService, createThreadPreferencesService } from "./features/threads/server.js";
 import { createServerLifecycle, type GitHubApiHealth, type ServerLifecycle } from "./server-lifecycle.js";
+import { createWorkContextReadService } from "./features/work-context/server-reads.js";
 
 const execFileAsync = promisify(execFile);
 const TASKS_PLUGIN_ID = "tasks";
@@ -1438,6 +1439,13 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     return { items: timeline.pendingTodos?.items ?? [] };
   }
 
+  const workContextReads = createWorkContextReadService({
+    readStatus: readWorkStatus,
+    readOutcome: readWorkOutcome,
+    readGoal: readWorkGoal,
+    readPlan: readWorkPlan,
+  });
+
   bb.rpc.register(rpcContract, {
     async getGitHubApiHealth() { return githubReadHealth(); },
     async getSidebarOrder() {
@@ -1545,10 +1553,10 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     async getWorkContext({ threadId }) {
       return readWorkContext(threadId);
     },
-    async getWorkStatus({ threadId }) { return readWorkStatus(threadId); },
-    async getWorkOutcome({ threadId }) { return readWorkOutcome(threadId); },
-    async getWorkGoal({ threadId }) { return readWorkGoal(threadId); },
-    async getWorkPlan({ threadId }) { return readWorkPlan(threadId); },
+    async getWorkStatus({ threadId }) { return workContextReads.status(threadId); },
+    async getWorkOutcome({ threadId }) { return workContextReads.outcome(threadId); },
+    async getWorkGoal({ threadId }) { return workContextReads.goal(threadId); },
+    async getWorkPlan({ threadId }) { return workContextReads.plan(threadId); },
     async getWorkChanges({ threadId, force, pullRequests }) {
       if (force) clearGitHubReadCache();
       const thread = await bb.sdk.threads.get({ threadId });
