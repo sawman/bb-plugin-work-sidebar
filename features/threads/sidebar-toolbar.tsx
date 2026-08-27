@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import type { SidebarThreadGroup } from "./model";
-
 type SidebarToolbarProps = {
   listMode: "enhanced" | "native";
   threadCount: number;
@@ -40,15 +39,18 @@ function ThreadListSettings({
 >) {
   const [open, setOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const closeSettings = () => {
+  const closeSettings = ({ restoreFocus = true } = {}) => {
     setOpen(false);
-    triggerRef.current?.focus();
+    if (restoreFocus) triggerRef.current?.focus();
   };
   useEffect(() => {
     if (!open) return;
+    dialogRef.current?.focus();
     const dismiss = (event: PointerEvent) => {
-      if (!settingsRef.current?.contains(event.target as Node)) closeSettings();
+      if (!settingsRef.current?.contains(event.target as Node))
+        closeSettings({ restoreFocus: false });
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -81,9 +83,11 @@ function ThreadListSettings({
       </button>
       {open && (
         <div
+          ref={dialogRef}
           className="ws-thread-settings-menu"
           role="dialog"
           aria-label="Thread list settings"
+          tabIndex={-1}
         >
           <button
             aria-pressed={listMode === "enhanced"}
@@ -162,7 +166,7 @@ export function SidebarThreadToolbar({
           ? "Threads"
           : `${threadCount} thread${threadCount === 1 ? "" : "s"}`}
       </span>
-      <span className="ws-work-toolbar-actions">
+      <div className="ws-work-toolbar-actions">
         {listMode === "enhanced" && selectedCount > 1 && (
           <>
             <span className="ws-selection-count" role="status">
@@ -210,7 +214,7 @@ export function SidebarThreadToolbar({
             <Icon name="Plus" aria-hidden />
           </Button>
         )}
-      </span>
+      </div>
     </>
   );
 }

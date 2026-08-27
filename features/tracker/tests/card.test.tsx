@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { configureAxe } from "vitest-axe";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
 import type { rpcContract } from "../../../contracts";
@@ -8,6 +9,10 @@ import { getPluginQueryClient } from "../../../query-runtime";
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
+
+const axe = configureAxe({
+  runOnly: { type: "tag", values: ["cat.aria", "cat.name-role-value"] },
+});
 
 type Rpc = NonNullable<RenderSlotOptions<typeof rpcContract>["rpc"]>;
 const unlinked = {
@@ -132,6 +137,12 @@ function deferred<T>() {
   });
   return { promise, resolve, reject };
 }
+
+async function expectNoAriaViolations(container: HTMLElement) {
+  const results = await axe(container);
+  expect(results.violations).toEqual([]);
+  expect(results.incomplete).toEqual([]);
+}
 afterEach(() => {
   cleanup();
   getPluginQueryClient().clear();
@@ -140,6 +151,19 @@ afterEach(() => {
 });
 
 describe("registered tracker card", () => {
+  it("keeps an available tracker with no suggestions ARIA-valid without an empty listbox", async () => {
+    const app = await loadPluginApp(() => import("../../../app"));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_empty_tracker", params: null },
+      { rpc: fixture({ getWorkTracker: () => ({ ...unlinked, suggestions: [] }) }) },
+    );
+    await waitFor(() => expect(slot.getByText("No related issues found.")).toBeTruthy());
+    await expectNoAriaViolations(slot.container);
+    expect(slot.queryByRole("listbox", { name: "Suggested Linear issues" })).toBeNull();
+    slot.lifecycle.unmount();
+  });
+
   it("dedupes header/card context and debounces search through actual Query hooks", async () => {
     vi.useFakeTimers();
     const app = await loadPluginApp(() => import("../../../app"));
@@ -169,8 +193,8 @@ describe("registered tracker card", () => {
       query: "LIN",
     });
     expect(
-      slot.getByRole("listbox", { name: "Suggested Linear issues" }),
-    ).toBeTruthy();
+      slot.queryByRole("listbox", { name: "Suggested Linear issues" }),
+    ).toBeNull();
     slot.lifecycle.unmount();
   });
 

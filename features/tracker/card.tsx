@@ -175,25 +175,27 @@ function SuggestedTrackerCard({
           {query ? "No matching issues." : "No related issues found."}
         </small>
       )}
-      <div
-        className="ws-linear-options"
-        role="listbox"
-        aria-label="Suggested Linear issues"
-      >
-        {suggestions.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            role="option"
-            aria-selected="false"
-            onClick={() => onLink(item.key)}
-            disabled={busy}
-          >
-            <b>{item.key}</b>
-            <span>{item.title}</span>
-          </button>
-        ))}
-      </div>
+      {suggestions.length > 0 && (
+        <div
+          className="ws-linear-options"
+          role="listbox"
+          aria-label="Suggested Linear issues"
+        >
+          {suggestions.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              role="option"
+              aria-selected="false"
+              onClick={() => onLink(item.key)}
+              disabled={busy}
+            >
+              <b>{item.key}</b>
+              <span>{item.title}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </SurfaceCard>
   );
 }

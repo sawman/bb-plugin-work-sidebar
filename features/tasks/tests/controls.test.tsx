@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { configureAxe } from "vitest-axe";
 import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { rpcContract } from "../../../contracts";
@@ -9,6 +10,10 @@ import { getPluginQueryClient } from "../../../query-runtime";
 type RpcHandlers = NonNullable<RenderSlotOptions<typeof rpcContract>["rpc"]>;
 type TasksResult = Awaited<ReturnType<RpcHandlers["sidebarTasks"]>>;
 type RpcCall = (method: string, input: unknown) => Promise<unknown>;
+
+const axe = configureAxe({
+  runOnly: { type: "tag", values: ["cat.aria", "cat.name-role-value"] },
+});
 
 const task = { id: "task_1", projectId: "project_1", projectName: "Work", key: "WORK-1", title: "Ship mounted fixtures", status: "todo" as const, priority: "none" as const, dueDate: null, parentTaskId: null, position: 1024, linkedThreadIds: [] as string[], assignee: "human" as const };
 const taskTwo = { ...task, id: "task_2", key: "WORK-2", title: "Second task", position: 2048 };
@@ -27,9 +32,28 @@ async function app() { return loadPluginApp(() => import("../../../app")); }
 function leftProps(searchQuery = "") { return { activeThreadId: "thr_test", activeProjectId: null, isCompactViewport: false, onNavigate: () => undefined, searchQuery, Original: () => null }; }
 async function leftSlot(items = [task], call: RpcCall = vi.fn(() => Promise.resolve({}))) { const captured = await app(); const rendered = renderSlot(captured.threadLists[0]!, leftProps(), { rpc: rpcFixtures(() => tasks(items), call) }); fireEvent.click(rendered.getByRole("button", { name: "Tasks" })); await waitFor(() => expect(rendered.getByText(items[0]!.title)).toBeTruthy()); return { rendered, call }; }
 
+async function expectNoAriaViolations(container: HTMLElement) {
+  const results = await axe(container);
+  expect(results.violations).toEqual([]);
+  expect(results.incomplete).toEqual([]);
+}
+
 afterEach(() => { cleanup(); getPluginQueryClient().clear(); vi.restoreAllMocks(); });
 
 describe("Tasks registered controls", () => {
+  it("keeps an open filtered Combobox ARIA-valid without an empty listbox or dangling controls", async () => {
+    const { rendered } = await leftSlot();
+    fireEvent.click(rendered.getByRole("button", { name: "Add task" }));
+    const project = rendered.getByRole("combobox", { name: "Task project" });
+    fireEvent.focus(project);
+    fireEvent.change(project, { target: { value: "does not match" } });
+    await waitFor(() => expect(rendered.getByText("No matching options.")).toBeTruthy());
+    await expectNoAriaViolations(rendered.container);
+    expect(rendered.queryByRole("listbox")).toBeNull();
+    expect(project.hasAttribute("aria-controls")).toBe(false);
+    rendered.lifecycle.unmount();
+  });
+
   it("creates from the left slot with pending state and retains the composer after a failure", async () => {
     const pending = deferred<unknown>(); const { rendered, call } = await leftSlot([task], vi.fn((method) => method === "createSidebarTask" ? pending.promise : Promise.resolve({})));
     fireEvent.click(rendered.getByRole("button", { name: "Add task" }));

@@ -33,6 +33,8 @@ export function Combobox({
       ),
     [options, query],
   );
+  const optionsId = `${ariaLabel.replace(/\W+/g, "-")}-options`;
+  const showOptions = open && !disabled && visible.length > 0;
   return (
     <div className={`ws-combobox ${className}`}>
       <Input
@@ -41,8 +43,8 @@ export function Combobox({
         aria-label={ariaLabel}
         disabled={disabled}
         role="combobox"
-        aria-expanded={open}
-        aria-controls={`${ariaLabel.replace(/\W+/g, "-")}-options`}
+        aria-expanded={showOptions}
+        aria-controls={showOptions ? optionsId : undefined}
         onFocus={() => {
           setQuery("");
           setOpen(true);
@@ -60,29 +62,31 @@ export function Combobox({
       />
       {open && !disabled && (
         <>
-          <div
-            id={`${ariaLabel.replace(/\W+/g, "-")}-options`}
-            className="ws-combobox-options"
-            role="listbox"
-          >
-            {visible.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                aria-selected={option.value === value}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  onChange(option.value);
-                  setQuery("");
-                  setOpen(false);
-                }}
-              >
-                <span>{option.label}</span>
-                {option.detail && <small>{option.detail}</small>}
-              </button>
-            ))}
-          </div>
+          {showOptions && (
+            <div
+              id={optionsId}
+              className="ws-combobox-options"
+              role="listbox"
+            >
+              {visible.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={option.value === value}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    onChange(option.value);
+                    setQuery("");
+                    setOpen(false);
+                  }}
+                >
+                  <span>{option.label}</span>
+                  {option.detail && <small>{option.detail}</small>}
+                </button>
+              ))}
+            </div>
+          )}
           {visible.length === 0 && (
             <small className="ws-combobox-empty">No matching options.</small>
           )}

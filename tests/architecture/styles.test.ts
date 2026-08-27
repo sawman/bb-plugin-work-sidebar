@@ -310,6 +310,29 @@ describe("shared surface and list-row architecture", () => {
     expect(title?.declarations).toContain("text-overflow: ellipsis");
   });
 
+  test("keeps the settings dialog below and above the sticky toolbar", () => {
+    const rules = stylesheetPaths().flatMap((file) => stylesheetRules(readFileSync(file, "utf8")));
+    const menuDeclarations = rules
+      .filter(({ selector }) => selector === ".ws-thread-settings-menu")
+      .map(({ declarations }) => declarations)
+      .join("\n");
+    const toolbarDeclarations = rules
+      .filter(({ selector }) => selector === ".ws-list-toolbar")
+      .map(({ declarations }) => declarations)
+      .join("\n");
+    const settingsDeclarations = rules
+      .filter(({ selector }) => selector === ".ws-thread-settings")
+      .map(({ declarations }) => declarations)
+      .join("\n");
+
+    expect(menuDeclarations).toContain("top: calc(100% + 0.2rem) !important");
+    expect(menuDeclarations).toContain("bottom: auto !important");
+    expect(menuDeclarations).toContain("z-index: 100 !important");
+    expect(toolbarDeclarations).toContain("z-index: 40");
+    expect(toolbarDeclarations).toContain("isolation: isolate");
+    expect(settingsDeclarations).toContain("z-index: 41");
+  });
+
   test("constructs card roots and headings only through the shared primitive", () => {
     expect(directSurfacePrimitivePaths()).toEqual([]);
   });

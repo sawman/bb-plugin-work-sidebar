@@ -68,6 +68,30 @@ function mockElementAt(element: Element | null) {
 }
 
 describe("R18 registered left sidebar parity", () => {
+  it("keeps settings flow-safe and gives dialog dismissal the correct focus semantics", async () => {
+    const slot = await leftSlot();
+    const actions = slot.container.querySelector(".ws-work-toolbar-actions")!;
+    expect(actions.tagName).toBe("DIV");
+    expect(actions.closest("span")).toBeNull();
+    const trigger = slot.getByRole("button", { name: "Thread list settings" });
+    fireEvent.click(trigger);
+    const dialog = slot.getByRole("dialog", { name: "Thread list settings" });
+    await waitFor(() => expect(document.activeElement).toBe(dialog));
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    await waitFor(() => expect(slot.queryByRole("dialog", { name: "Thread list settings" })).toBeNull());
+    expect(document.activeElement).toBe(trigger);
+    fireEvent.click(trigger);
+    const external = document.createElement("button");
+    external.textContent = "External control";
+    document.body.append(external);
+    external.focus();
+    fireEvent.pointerDown(external);
+    await waitFor(() => expect(slot.queryByRole("dialog", { name: "Thread list settings" })).toBeNull());
+    expect(document.activeElement).toBe(external);
+    external.remove();
+    slot.lifecycle.unmount();
+  });
+
   it("keeps the Later default editable only while empty and exposes a dismissible settings dialog", async () => {
     const saveGroups = vi.fn(({ groups }: { groups: unknown[] }) => ({ groups }));
     const prompt = vi.spyOn(window, "prompt").mockReturnValueOnce("Soon").mockReturnValueOnce("Later renamed");
@@ -95,9 +119,6 @@ describe("R18 registered left sidebar parity", () => {
     fireEvent.pointerDown(document.body);
     await waitFor(() =>
       expect(slot.queryByRole("dialog", { name: "Thread list settings" })).toBeNull(),
-    );
-    expect(document.activeElement).toBe(
-      slot.getByRole("button", { name: "Thread list settings" }),
     );
     slot.lifecycle.unmount();
   });

@@ -37,6 +37,8 @@ export function PullRequestsLeftSidebar({
 }: PullRequestsLeftSidebarProps) {
   const rpc = useRpc<typeof rpcContract>();
   const { values: settings } = useSettings();
+  // Left sidebar tabs intentionally warm independently so opening PRs can use
+  // the shared authored cache immediately instead of starting a cold fetch.
   const list = useAuthoredPullRequests(rpc, {
     intervalMs: Number(settings?.githubLeftListRefreshSeconds ?? "300") * 1_000,
   });
