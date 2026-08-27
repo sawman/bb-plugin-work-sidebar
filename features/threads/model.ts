@@ -69,3 +69,12 @@ export function selectThreadIds(
   }
   return { selectedIds: new Set([targetId]), anchorId: targetId, handled: Boolean(modifiers.range) };
 }
+export type SidebarView = "work" | "queue" | "prs";
+
+export function sidebarViewLabel(id: SidebarView): string {
+  switch (id) {
+    case "queue": return "Tasks";
+    case "prs": return "PRs";
+    default: return "Threads";
+  }
+}

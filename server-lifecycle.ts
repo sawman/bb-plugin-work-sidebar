@@ -1,10 +1,15 @@
 export type GitHubApiHealth = { state: "available" | "rate_limited" | "unavailable"; scope: "graphql" | "rest" | "unknown"; message: string | null; retryAt: number | null };
+export type GitHubPullRequestSignal = {
+  checks: "failed" | "passing" | "pending" | "none" | "unknown";
+  review: "approved" | "changes_requested" | "changes_requested_review_requested" | "review_requested" | "review_required" | "none";
+};
+type ExpiringValue<T> = { expiresAt: number; value: T };
 
 export class ServerLifecycle {
   readonly githubReadCache = new Map<string, { expiresAt: number; value: string }>();
   readonly githubReadPending = new Map<string, Promise<string>>();
-  readonly githubPullRequestSignalCache = new Map<string, unknown>();
-  readonly githubPullRequestSignalPending = new Map<string, unknown>();
+  readonly githubPullRequestSignalCache = new Map<string, ExpiringValue<GitHubPullRequestSignal>>();
+  readonly githubPullRequestSignalPending = new Map<string, Promise<GitHubPullRequestSignal | null>>();
   archivedThreadsCache: unknown = null;
   archivedThreadsPending: unknown = null;
   githubGraphqlHealth: GitHubApiHealth = { state: "available", scope: "graphql", message: null, retryAt: null };

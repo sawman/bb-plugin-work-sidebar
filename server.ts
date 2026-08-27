@@ -5,13 +5,34 @@ import { z } from "zod";
 import { normalizePullRequestSignal } from "./features/pull-requests/presentation.js";
 import { classifyPullRequestError, createPullRequestService } from "./features/pull-requests/server.js";
 import { readSidebarTasks } from "./features/tasks/server-read.js";
+import {
+  assertExecutionTaskBinding,
+  assertOutcomeTaskBinding,
+  assertThreadEnvironmentProject,
+  projectPrefix,
+  projectSidebarTask,
+  resolveProjectSelection,
+  summarizeTask,
+} from "./features/tasks/server-model.js";
 import { rpcContract } from "./contracts.js";
 import { type SidebarStack } from "./work-model.js";
 import { createArchivedThreadService, createThreadPreferencesService } from "./features/threads/server.js";
-import { createServerLifecycle, type GitHubApiHealth, type ServerLifecycle } from "./server-lifecycle.js";
+import { createServerLifecycle, type GitHubApiHealth, type GitHubPullRequestSignal, type ServerLifecycle } from "./server-lifecycle.js";
 import { createWorkContextReadService } from "./features/work-context/server-reads.js";
+import {
+  bindExecutionOwner,
+  executionBindingDispatchProblem,
+  normalizeBindings,
+  upsertExecutionBinding,
+  type BindingMode,
+  type DispatchState,
+  type ExecutionBinding,
+  type OutcomeBinding,
+  type WorkBindings,
+} from "./features/work-context/server-bindings.js";
 import { createTrackerService, TRACKER_LINKS_KEY } from "./features/tracker/server.js";
 import { createChangesService, createWorkingTreeFileDiffReader } from "./features/changes/server.js";
+import { clearGitHubReadCache, githubReadHealth, readGitHub } from "./shared/github/read-cache.js";
 
 const execFileAsync = promisify(execFile);
 const TASKS_PLUGIN_ID = "tasks";
@@ -21,11 +42,6 @@ const GITHUB_STACK_PLUGIN_ID = "gh-stack";
 // Plugin hosts do not inherit the interactive shell PATH. BB_CLI is injected
 // by BB specifically so plugins can invoke the same daemon-compatible binary.
 const BB_CLI = process.env.BB_CLI || "bb";
-let activeLifecycle: ServerLifecycle | null = null;
-function runtime(): ServerLifecycle {
-  if (!activeLifecycle) throw new Error("Work Sidebar server lifecycle is not active");
-  return activeLifecycle;
-}
 export const SIDEBAR_ORDER_CHANNEL = "sidebar-order:changed";
 export const GITHUB_STACK_API_VERSION = "2026-03-10";
 export const GITHUB_ACCEPT_HEADER = "application/vnd.github+json";
@@ -63,8 +79,6 @@ const projectSchema = z.object({
 type Task = z.infer<typeof taskSchema>;
 const taskPageSchema = z.object({ tasks: z.array(taskSchema), nextCursor: z.string().nullable() });
 type TaskSummary = ReturnType<typeof summarizeTask>;
-type DispatchState = "ready" | "pending_spawn" | "pending_attachment" | "recovery_required";
-type BindingMode = "direct" | "delegated";
 
 // Mirrors gh-stack's public getStack payload. Keeping this boundary explicit
 // lets the Work panel reuse its authoritative per-layer diffs without taking a
@@ -80,76 +94,6 @@ const ghStackPayloadSchema = z.object({
 });
 const ghStackActionSchema = z.object({ ok: z.boolean(), message: z.string(), tone: z.enum(["success", "warning", "error"]).optional(), detail: z.string().nullable() });
 
-export interface OutcomeBinding {
-  kind: "outcome";
-  rootThreadId: string;
-  outcomeTaskId: string;
-  taskProjectId: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ExecutionBinding {
-  kind: "execution";
-  rootThreadId: string;
-  outcomeTaskId: string;
-  taskProjectId: string;
-  executionTaskId: string;
-  ownerThreadId: string | null;
-  mode: BindingMode | null;
-  idempotencyKey: string;
-  dispatchState: DispatchState;
-  recoveryMessage: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface WorkBindings { outcomes: OutcomeBinding[]; executions: ExecutionBinding[]; }
-
-function emptyBindings(): WorkBindings { return { outcomes: [], executions: [] }; }
-
-function isDispatchState(value: unknown): value is DispatchState {
-  return value === "ready" || value === "pending_spawn" || value === "pending_attachment" || value === "recovery_required";
-}
-
-/** Sanitizes only our own persisted model; Tasks attachments are never inferred as ownership. */
-export function normalizeBindings(value: unknown): WorkBindings {
-  if (!isRecord(value) || !Array.isArray(value.outcomes) || !Array.isArray(value.executions)) return emptyBindings();
-  const outcomes = value.outcomes.flatMap((row): OutcomeBinding[] => isRecord(row)
-    && row.kind === "outcome" && typeof row.rootThreadId === "string" && typeof row.outcomeTaskId === "string"
-    && typeof row.taskProjectId === "string" && typeof row.createdAt === "string" && typeof row.updatedAt === "string"
-    ? [{ kind: "outcome", rootThreadId: row.rootThreadId, outcomeTaskId: row.outcomeTaskId, taskProjectId: row.taskProjectId, createdAt: row.createdAt, updatedAt: row.updatedAt }]
-    : []);
-  const executions = value.executions.flatMap((row): ExecutionBinding[] => isRecord(row)
-    && row.kind === "execution" && typeof row.rootThreadId === "string" && typeof row.outcomeTaskId === "string"
-    && typeof row.taskProjectId === "string" && typeof row.executionTaskId === "string" && typeof row.idempotencyKey === "string"
-    && (row.ownerThreadId === null || typeof row.ownerThreadId === "string")
-    && (row.mode === null || row.mode === "direct" || row.mode === "delegated")
-    && isDispatchState(row.dispatchState) && (row.recoveryMessage === null || typeof row.recoveryMessage === "string")
-    && typeof row.createdAt === "string" && typeof row.updatedAt === "string"
-    ? [{ kind: "execution", rootThreadId: row.rootThreadId, outcomeTaskId: row.outcomeTaskId, taskProjectId: row.taskProjectId, executionTaskId: row.executionTaskId, ownerThreadId: row.ownerThreadId, mode: row.mode, idempotencyKey: row.idempotencyKey, dispatchState: row.dispatchState, recoveryMessage: row.recoveryMessage, createdAt: row.createdAt, updatedAt: row.updatedAt }]
-    : []);
-  return { outcomes, executions };
-}
-
-/** Reuses only a stable execution key in plugin-owned state, never an attachment. */
-export function upsertExecutionBinding(bindings: WorkBindings, binding: ExecutionBinding): { bindings: WorkBindings; reused: boolean } {
-  const index = bindings.executions.findIndex((item) => item.rootThreadId === binding.rootThreadId && item.idempotencyKey === binding.idempotencyKey);
-  if (index >= 0) return { bindings, reused: true };
-  return { bindings: { outcomes: [...bindings.outcomes], executions: [...bindings.executions, binding] }, reused: false };
-}
-
-export function bindExecutionOwner(binding: ExecutionBinding, mode: BindingMode, ownerThreadId: string | null, dispatchState: DispatchState, recoveryMessage: string | null): ExecutionBinding {
-  return { ...binding, mode, ownerThreadId, dispatchState, recoveryMessage, updatedAt: new Date().toISOString() };
-}
-
-export function executionBindingDispatchProblem(binding: ExecutionBinding): string | null {
-  if (binding.dispatchState === "recovery_required") return binding.recoveryMessage ?? "the prior dispatch outcome is uncertain";
-  if (binding.dispatchState === "pending_spawn") return "the prior delegated spawn is still pending or was interrupted before a child thread id was durably confirmed";
-  if (binding.dispatchState === "pending_attachment") return `the prior thread dispatch is pending task attachment${binding.ownerThreadId ? ` for ${binding.ownerThreadId}` : ""}`;
-  if (binding.mode && !binding.ownerThreadId) return `the ${binding.mode} execution binding has no durable owner thread`;
-  return null;
-}
 
 export interface CurrentPullRequest {
   number: number;
@@ -217,48 +161,9 @@ interface GitHubPullRequestDetails {
 
 export type GitHubApiRunner = (args: readonly string[], maxBuffer: number) => Promise<string>;
 
-function githubReadScope(args: readonly string[]) { return args[0] === "api" && args[1] === "graphql" ? "graphql" as const : "rest" as const; }
-function githubReadHealth(): GitHubApiHealth {
-  if (runtime().githubGraphqlHealth.state !== "available") return runtime().githubGraphqlHealth;
-  if (runtime().githubRestHealth.state !== "available") return runtime().githubRestHealth;
-  return { state: "available", scope: "unknown", message: null, retryAt: null };
+async function runCachedGitHubRead(args: readonly string[], maxBuffer: number, ttlMs: number, owner: ServerLifecycle): Promise<string> {
+  return readGitHub(owner, async (command, buffer) => (await execFileAsync("gh", [...command], { maxBuffer: buffer })).stdout, classifyPullRequestError, args, maxBuffer, ttlMs);
 }
-function clearGitHubReadCache() {
-  runtime().githubReadCache.clear();
-  runtime().githubPullRequestSignalCache.clear();
-}
-function githubReadError(owner: ServerLifecycle, scope: "graphql" | "rest", error: unknown): Error {
-  const message = error instanceof Error ? error.message : String(error);
-  const health: GitHubApiHealth = classifyPullRequestError(error, scope);
-  if (owner.isDisposed) return new Error(message);
-  if (scope === "graphql") {
-    owner.githubGraphqlHealth = health;
-    if (health.state === "rate_limited") owner.githubGraphqlBackoffUntil = health.retryAt ?? Date.now() + GITHUB_GRAPHQL_BACKOFF_MS;
-  } else owner.githubRestHealth = health;
-  return new Error(message);
-}
-async function runCachedGitHubRead(args: readonly string[], maxBuffer: number, ttlMs = GITHUB_READ_CACHE_MS, owner = runtime()): Promise<string> {
-  const scope = githubReadScope(args);
-  const health = scope === "graphql" ? owner.githubGraphqlHealth : owner.githubRestHealth;
-  if (health.state === "rate_limited" && health.retryAt && health.retryAt > Date.now()) throw new Error(health.message ?? "GitHub API is rate limited.");
-  const key = args.join("\u0000");
-  const cached = owner.githubReadCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return cached.value;
-  const pending = owner.githubReadPending.get(key);
-  if (pending) return pending;
-  const request = execFileAsync("gh", [...args], { maxBuffer }).then(({ stdout }) => {
-    if (owner.isDisposed) return stdout;
-    if (scope === "graphql") owner.githubGraphqlHealth = { state: "available", scope, message: null, retryAt: null };
-    else owner.githubRestHealth = { state: "available", scope, message: null, retryAt: null };
-    if (owner.githubReadCache.size >= 300) owner.githubReadCache.delete(owner.githubReadCache.keys().next().value!);
-    owner.cacheGitHubRead(key, stdout, Date.now() + ttlMs);
-    return stdout;
-  }).catch((error) => { throw githubReadError(owner, scope, error); }).finally(() => { owner.releasePending("githubRead", key); });
-  owner.githubReadPending.set(key, request);
-  return request;
-}
-const runGitHubApi: GitHubApiRunner = runCachedGitHubRead;
-
 export function githubStackApiArgs(owner: string, repo: string, pullRequest: number): string[] {
   return [
     "api", "--method", "GET", `repos/${owner}/${repo}/stacks`,
@@ -346,7 +251,8 @@ export async function fetchGitHubStack(
   owner: string,
   repo: string,
   pullRequest: number,
-  run: GitHubApiRunner = runGitHubApi,
+  run: GitHubApiRunner,
+  lifecycle: ServerLifecycle,
 ) : Promise<{ number: number; base: string; currentPullRequest: number; pullRequests: Array<{
   number: number; title: string; state: string; draft: boolean; url: string; head: string; base: string; reviewCommentCount: number;
   checks: "failed" | "passing" | "pending" | "none" | "unknown"; review: "approved" | "changes_requested" | "changes_requested_review_requested" | "review_requested" | "review_required" | "none";
@@ -391,7 +297,7 @@ export async function fetchGitHubStack(
       };
     }
   }));
-  const signals = await repositoryPullRequestSignals(owner, repo, pullRequests.map((item) => item.number));
+  const signals = await repositoryPullRequestSignals(owner, repo, pullRequests.map((item) => item.number), lifecycle, run);
   return { number: raw.number, base: raw.base, currentPullRequest: pullRequest, pullRequests: pullRequests.map((item) => ({
     ...item,
     ...(signals.get(item.number) ?? UNKNOWN_AUTHORED_PULL_REQUEST_SIGNAL),
@@ -407,7 +313,7 @@ function parseAuthoredPullRequestSearch(value: unknown): GitHubSearchPullRequest
 }
 
 /** Resolve repository archival in batches rather than one REST call per PR. */
-async function archivedGitHubRepositories(repositories: readonly string[]): Promise<Set<string>> {
+async function archivedGitHubRepositories(repositories: readonly string[], lifecycle: ServerLifecycle): Promise<Set<string>> {
   const unique = [...new Set(repositories)].filter((repository) => /^[^/]+\/[^/]+$/.test(repository));
   const archived = new Set<string>();
   // GitHub's search JSON includes a repository name but not its archived flag.
@@ -421,7 +327,7 @@ async function archivedGitHubRepositories(repositories: readonly string[]): Prom
       return `r${index}: repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) { isArchived }`;
     }).join(" ");
     try {
-      const stdout = await runCachedGitHubRead(["api", "graphql", "-f", `query=query { ${selections} }`], 2_000_000);
+      const stdout = await runCachedGitHubRead(["api", "graphql", "-f", `query=query { ${selections} }`], 2_000_000, GITHUB_READ_CACHE_MS, lifecycle);
       const parsed: unknown = JSON.parse(stdout);
       const data = isRecord(parsed) && isRecord(parsed.data) ? parsed.data : {};
       batch.forEach((repository, index) => {
@@ -436,23 +342,20 @@ async function archivedGitHubRepositories(repositories: readonly string[]): Prom
   return archived;
 }
 
-type AuthoredPullRequestSignal = {
-  checks: "failed" | "passing" | "pending" | "none" | "unknown";
-  review: "approved" | "changes_requested" | "changes_requested_review_requested" | "review_requested" | "review_required" | "none";
-};
+type AuthoredPullRequestSignal = GitHubPullRequestSignal;
 // A failed metadata lookup is not evidence that a PR has no CI. Keeping it
 // distinct prevents private or temporarily unavailable repositories reading as
 // an empty check set in the UI.
 const UNKNOWN_AUTHORED_PULL_REQUEST_SIGNAL: AuthoredPullRequestSignal = { checks: "unknown", review: "none" };
 
 function pullRequestSignalKey(owner: string, repo: string, number: number) { return `${owner}/${repo}#${number}`.toLowerCase(); }
-function cachedPullRequestSignal(owner: string, repo: string, number: number): AuthoredPullRequestSignal | null {
-  const cached = runtime().githubPullRequestSignalCache.get(pullRequestSignalKey(owner, repo, number)) as { expiresAt: number; value: AuthoredPullRequestSignal } | undefined;
+function cachedPullRequestSignal(owner: string, repo: string, number: number, lifecycle: ServerLifecycle): AuthoredPullRequestSignal | null {
+  const cached = lifecycle.githubPullRequestSignalCache.get(pullRequestSignalKey(owner, repo, number));
   return cached && cached.expiresAt > Date.now() ? cached.value : null;
 }
-function cachePullRequestSignal(owner: string, repo: string, number: number, value: AuthoredPullRequestSignal) {
+function cachePullRequestSignal(owner: string, repo: string, number: number, value: AuthoredPullRequestSignal, lifecycle: ServerLifecycle) {
   if (value.checks === "unknown" && value.review === "none") return;
-  runtime().githubPullRequestSignalCache.set(pullRequestSignalKey(owner, repo, number), { value, expiresAt: Date.now() + GITHUB_SIGNAL_CACHE_MS });
+  lifecycle.githubPullRequestSignalCache.set(pullRequestSignalKey(owner, repo, number), { value, expiresAt: Date.now() + GITHUB_SIGNAL_CACHE_MS });
 }
 function isGitHubGraphqlRateLimit(error: unknown) { return /graphql_rate_limit|API rate limit already exceeded|secondary rate limit/i.test(error instanceof Error ? error.message : String(error)); }
 
@@ -497,12 +400,11 @@ async function restPullRequestSignal(owner: string, repo: string, number: number
   }
 }
 
-function cachedRestPullRequestSignal(owner: string, repo: string, number: number): Promise<AuthoredPullRequestSignal | null> {
-  const lifecycle = runtime();
-  const cached = cachedPullRequestSignal(owner, repo, number);
+function cachedRestPullRequestSignal(owner: string, repo: string, number: number, lifecycle: ServerLifecycle): Promise<AuthoredPullRequestSignal | null> {
+  const cached = cachedPullRequestSignal(owner, repo, number, lifecycle);
   if (cached) return Promise.resolve(cached);
   const key = pullRequestSignalKey(owner, repo, number);
-  const pending = lifecycle.githubPullRequestSignalPending.get(key) as Promise<AuthoredPullRequestSignal | null> | undefined;
+  const pending = lifecycle.githubPullRequestSignalPending.get(key);
   if (pending) return pending;
   const request = restPullRequestSignal(owner, repo, number, lifecycle).then((signal) => {
     if (!lifecycle.isDisposed && signal && !(signal.checks === "unknown" && signal.review === "none")) {
@@ -515,18 +417,18 @@ function cachedRestPullRequestSignal(owner: string, repo: string, number: number
 }
 
 /** Fetch the compact status badges for every PR in one repository stack. */
-async function repositoryPullRequestSignals(owner: string, repo: string, numbers: readonly number[]): Promise<Map<number, AuthoredPullRequestSignal>> {
+async function repositoryPullRequestSignals(owner: string, repo: string, numbers: readonly number[], lifecycle: ServerLifecycle, run: GitHubApiRunner): Promise<Map<number, AuthoredPullRequestSignal>> {
   const unique = [...new Set(numbers)].filter((number) => Number.isInteger(number) && number > 0);
   const signals = new Map<number, AuthoredPullRequestSignal>();
   if (!unique.length) return signals;
   for (const number of unique) {
-    const cached = cachedPullRequestSignal(owner, repo, number);
+    const cached = cachedPullRequestSignal(owner, repo, number, lifecycle);
     if (cached) signals.set(number, cached);
   }
   const uncached = unique.filter((number) => !signals.has(number));
-  if (uncached.length && Date.now() >= runtime().githubGraphqlBackoffUntil) try {
+  if (uncached.length && Date.now() >= lifecycle.githubGraphqlBackoffUntil) try {
     const selections = uncached.map((number, index) => `p${index}: pullRequest(number: ${number}) { reviewDecision reviewRequests(first: 1) { totalCount } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } }`).join(" ");
-    const stdout = await runCachedGitHubRead(["api", "graphql", "-f", `query=query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${selections} } }`], 4_000_000);
+    const stdout = await run(["api", "graphql", "-f", `query=query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${selections} } }`], 4_000_000);
     const parsed: unknown = JSON.parse(stdout);
     const data = isRecord(parsed) && isRecord(parsed.data) && isRecord(parsed.data.repository) ? parsed.data.repository : {};
     uncached.forEach((number, index) => {
@@ -542,34 +444,34 @@ async function repositoryPullRequestSignals(owner: string, repo: string, numbers
       const checks: AuthoredPullRequestSignal["checks"] = state === "SUCCESS" ? "passing" : state === "FAILURE" || state === "ERROR" ? "failed" : state ? "pending" : "none";
       const signal = { checks, review };
       signals.set(number, signal);
-      cachePullRequestSignal(owner, repo, number, signal);
+      cachePullRequestSignal(owner, repo, number, signal, lifecycle);
     });
   } catch (error) {
-    if (isGitHubGraphqlRateLimit(error)) runtime().githubGraphqlBackoffUntil = Date.now() + GITHUB_GRAPHQL_BACKOFF_MS;
+    if (isGitHubGraphqlRateLimit(error)) lifecycle.githubGraphqlBackoffUntil = Date.now() + GITHUB_GRAPHQL_BACKOFF_MS;
     // REST fallback below keeps the stack useful when GraphQL is unavailable.
   }
   const missing = uncached.filter((number) => !signals.has(number));
   if (missing.length) {
-    const fallback = await Promise.all(missing.map(async (number) => [number, await cachedRestPullRequestSignal(owner, repo, number)] as const));
+    const fallback = await Promise.all(missing.map(async (number) => [number, await cachedRestPullRequestSignal(owner, repo, number, lifecycle)] as const));
     for (const [number, signal] of fallback) if (signal) signals.set(number, signal);
   }
   return signals;
 }
 
 /** Fetch the concise CI and review summaries shown beside account-wide PRs. */
-async function authoredPullRequestSignals(items: readonly GitHubSearchPullRequest[]): Promise<Map<string, AuthoredPullRequestSignal>> {
+async function authoredPullRequestSignals(items: readonly GitHubSearchPullRequest[], lifecycle: ServerLifecycle): Promise<Map<string, AuthoredPullRequestSignal>> {
   const signals = new Map<string, AuthoredPullRequestSignal>();
   const uncached = items.filter((item) => {
     const repository = item.repository.nameWithOwner;
     if (!repository) return false;
     const [owner, repo] = repository.split("/", 2);
     if (!owner || !repo) return true;
-    const cached = cachedPullRequestSignal(owner, repo, item.number);
+    const cached = cachedPullRequestSignal(owner, repo, item.number, lifecycle);
     if (cached) signals.set(`${repository}#${item.number}`, cached);
     return !cached;
   });
   for (let start = 0; start < uncached.length; start += 50) {
-    if (Date.now() < runtime().githubGraphqlBackoffUntil) break;
+    if (Date.now() < lifecycle.githubGraphqlBackoffUntil) break;
     const batch = uncached.slice(start, start + 50);
     const selections = batch.flatMap((item, index) => {
       const repository = item.repository.nameWithOwner;
@@ -581,7 +483,7 @@ async function authoredPullRequestSignals(items: readonly GitHubSearchPullReques
     }).join(" ");
     if (!selections) continue;
     try {
-      const stdout = await runCachedGitHubRead(["api", "graphql", "-f", `query=query { ${selections} }`], 4_000_000);
+      const stdout = await runCachedGitHubRead(["api", "graphql", "-f", `query=query { ${selections} }`], 4_000_000, GITHUB_READ_CACHE_MS, lifecycle);
       const parsed: unknown = JSON.parse(stdout);
       const data = isRecord(parsed) && isRecord(parsed.data) ? parsed.data : {};
       batch.forEach((item, index) => {
@@ -605,10 +507,10 @@ async function authoredPullRequestSignals(items: readonly GitHubSearchPullReques
         const signal = { checks, review };
         signals.set(`${repository}#${item.number}`, signal);
         const [owner, repo] = repository.split("/", 2);
-        if (owner && repo) cachePullRequestSignal(owner, repo, item.number, signal);
+        if (owner && repo) cachePullRequestSignal(owner, repo, item.number, signal, lifecycle);
       });
     } catch (error) {
-      if (isGitHubGraphqlRateLimit(error)) { runtime().githubGraphqlBackoffUntil = Date.now() + GITHUB_GRAPHQL_BACKOFF_MS; break; }
+      if (isGitHubGraphqlRateLimit(error)) { lifecycle.githubGraphqlBackoffUntil = Date.now() + GITHUB_GRAPHQL_BACKOFF_MS; break; }
       // The main PR search remains useful if one metadata batch fails.
     }
   }
@@ -631,73 +533,9 @@ export function projectCurrentPullRequest(pullRequest: CurrentPullRequest): Curr
   };
 }
 
-export function projectSidebarTask(task: Task, projectName: string, linkedThreadIds: readonly string[], assignee: "agent" | "human" = "human") {
-  return {
-    id: task.id, projectId: task.projectId, projectName, key: task.key, title: task.title,
-    status: task.status, priority: task.priority, dueDate: task.dueDate, parentTaskId: task.parentTaskId,
-    position: task.position,
-    linkedThreadIds: [...linkedThreadIds],
-    assignee,
-  };
-}
-
-function summarizeTask(task: Task, projectName = "Work") {
-  return {
-    id: task.id, projectId: task.projectId, projectName, key: task.key, title: task.title, status: task.status,
-    priority: task.priority, dueDate: task.dueDate, parentTaskId: task.parentTaskId,
-  };
-}
-
-function projectPrefix(name: string, projectId: string, usedPrefixes: ReadonlySet<string>): string {
-  const letters = name.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const base = /^[A-Z]/.test(letters) ? letters.slice(0, 10) : "WORK";
-  if (!usedPrefixes.has(base)) return base;
-  const suffix = projectId.replace(/[^a-zA-Z0-9]/g, "").slice(-3).toUpperCase();
-  return `${base.slice(0, 7) || "WORK"}${suffix}`.slice(0, 10);
-}
-
-export function assertThreadEnvironmentProject(threadProjectId: string, environmentProjectId: string, allowedProjectIds: readonly string[] = []) {
-  const valid = new Set([threadProjectId, ...allowedProjectIds]);
-  if (!valid.has(environmentProjectId)) throw new Error(`Environment project mismatch: environment ${environmentProjectId} does not match thread ${threadProjectId}`);
-}
-
-/** Strict precedence for a Tasks project; null means exactly one linked project must be created. */
-export function resolveProjectSelection(
-  projects: readonly { id: string; linkedBbProjectId: string | null }[],
-  threadProjectId: string,
-  options: { explicitTaskProjectId?: string | null; parentTaskProjectId?: string | null; bindingTaskProjectId?: string | null },
-  validLinkedBbProjectIds: readonly string[] = [],
-): string | null {
-  const valid = new Set([threadProjectId, ...validLinkedBbProjectIds]);
-  const validate = (taskProjectId: string, source: string) => {
-    const project = projects.find((candidate) => candidate.id === taskProjectId);
-    if (!project) throw new Error(`${source} Tasks project was not found: ${taskProjectId}`);
-    if (!project.linkedBbProjectId) throw new Error(`${source} Tasks project must be linked to a BB project`);
-    if (!valid.has(project.linkedBbProjectId)) throw new Error(`${source} Tasks project must be linked to thread project ${threadProjectId}`);
-    return project.id;
-  };
-  if (options.explicitTaskProjectId) return validate(options.explicitTaskProjectId, "Explicit");
-  if (options.parentTaskProjectId) return validate(options.parentTaskProjectId, "Outcome");
-  if (options.bindingTaskProjectId) return validate(options.bindingTaskProjectId, "Binding");
-  const linked = projects.filter((project) => project.linkedBbProjectId === threadProjectId);
-  if (linked.length > 1) throw new Error(`Ambiguous Tasks project mapping for BB project ${threadProjectId}; found ${linked.length} linked projects`);
-  return linked[0]?.id ?? null;
-}
-
-function assertOutcomeTaskBinding(binding: OutcomeBinding, task: Task) {
-  if (task.parentTaskId !== null) throw new Error("Outcome binding is not a top-level Tasks task; nesting execution work is not supported");
-  if (task.projectId !== binding.taskProjectId) throw new Error(`Outcome binding project mismatch: task ${task.id} is in ${task.projectId}, binding expects ${binding.taskProjectId}`);
-}
-
-function assertExecutionTaskBinding(binding: ExecutionBinding, task: Task) {
-  if (task.parentTaskId !== binding.outcomeTaskId) throw new Error("Execution binding is no longer a direct child of the durable outcome");
-  if (task.projectId !== binding.taskProjectId) throw new Error(`Execution binding project mismatch: task ${task.id} is in ${task.projectId}, binding expects ${binding.taskProjectId}`);
-}
-
 export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle = createServerLifecycle()) {
   const archivedThreadService = createArchivedThreadService(bb.sdk.threads);
-  activeLifecycle = lifecycle;
-  bb.onDispose(() => { lifecycle.dispose(); if (activeLifecycle === lifecycle) activeLifecycle = null; });
+  bb.onDispose(() => lifecycle.dispose());
   const githubPollingSettings = bb.settings.define({
     githubActivePollSeconds: { type: "select", label: "Right Work PR polling", description: "How often to poll the visible right-side Work PR through GitHub REST.", options: ["30", "60", "120", "300"], default: "60" },
     githubBackgroundPollSeconds: { type: "select", label: "Right Work PR background polling", description: "How often to poll the right-side Work PR while BB is not visible.", options: ["120", "300", "600", "900"], default: "300" },
@@ -819,7 +657,7 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
         const visiblePullRequest = payload.stack?.branches.find((branch) => branch.pr)?.pr ?? null;
         const match = visiblePullRequest?.url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
         if (match) {
-          try { resolvedRemoteStack = await fetchGitHubStack(match[1]!, match[2]!, Number(match[3]!)); }
+          try { resolvedRemoteStack = await fetchGitHubStack(match[1]!, match[2]!, Number(match[3]!), (args, maxBuffer) => runCachedGitHubRead(args, maxBuffer, GITHUB_READ_CACHE_MS, lifecycle), lifecycle); }
           catch { /* The active stack remains useful when the REST fallback is unavailable. */ }
         }
       }
@@ -828,7 +666,7 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
       const match = firstPullRequest?.url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+/);
       if (!stack || !match) return { stack, pending: payload.pending, error: payload.error?.message ?? null };
       const [, owner, repo] = match;
-      const signals = await repositoryPullRequestSignals(owner, repo, stack.branches.flatMap((branch) => branch.pr ? [branch.pr.number] : []));
+      const signals = await repositoryPullRequestSignals(owner, repo, stack.branches.flatMap((branch) => branch.pr ? [branch.pr.number] : []), lifecycle, (args, maxBuffer) => runCachedGitHubRead(args, maxBuffer, GITHUB_READ_CACHE_MS, lifecycle));
       return { stack: { ...stack, branches: stack.branches.map((branch) => ({
         ...branch,
         ...(branch.pr ? signals.get(branch.pr.number) ?? UNKNOWN_AUTHORED_PULL_REQUEST_SIGNAL : {}),
@@ -1182,7 +1020,7 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     if (!match) return { currentPullRequest, stack: null, reason: "The linked pull request is not hosted on GitHub." };
     const [, owner, repo] = match;
     try {
-      const stack = await fetchGitHubStack(owner, repo, currentPullRequest.number);
+      const stack = await fetchGitHubStack(owner, repo, currentPullRequest.number, (args, maxBuffer) => runCachedGitHubRead(args, maxBuffer, GITHUB_READ_CACHE_MS, lifecycle), lifecycle);
       return stack
         ? { currentPullRequest, reason: null, stack }
         : { currentPullRequest, stack: null, reason: "This pull request is not part of a Stack." };
@@ -1205,7 +1043,7 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     if (Date.now() - lastGitHubFingerprintPollAt < 60_000 / policy.maxRestPollsPerMinute) return { fingerprint: null };
     lastGitHubFingerprintPollAt = Date.now();
     try {
-      const stdout = await runCachedGitHubRead(["api", "--method", "GET", `repos/${owner}/${repo}/pulls/${number}`, "-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`], 2_000_000, 55_000);
+      const stdout = await runCachedGitHubRead(["api", "--method", "GET", `repos/${owner}/${repo}/pulls/${number}`, "-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`], 2_000_000, 55_000, lifecycle);
       const value = JSON.parse(stdout) as unknown;
       if (!isRecord(value)) return { fingerprint: null };
       // This intentionally excludes presentation-only fields: a changed value
@@ -1275,9 +1113,9 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     // GitHub search exposes at most 1,000 matches. Request that full window so
     // this is genuinely the user's account-wide open-PR list, not a 100-row
     // subset that happens to include the current checkout.
-    const stdout = await runCachedGitHubRead(["search", "prs", "--author", "@me", "--state", "open", "--limit", "1000", "--json", "number,title,url,repository,state,isDraft"], 12_000_000, GITHUB_SEARCH_CACHE_MS);
+    const stdout = await runCachedGitHubRead(["search", "prs", "--author", "@me", "--state", "open", "--limit", "1000", "--json", "number,title,url,repository,state,isDraft"], 12_000_000, GITHUB_SEARCH_CACHE_MS, lifecycle);
     const search = parseAuthoredPullRequestSearch(JSON.parse(stdout));
-    const signals = await authoredPullRequestSignals(search);
+    const signals = await authoredPullRequestSignals(search, lifecycle);
     return search.flatMap((item): AuthoredPullRequestEntry[] => {
       if (!item.repository.nameWithOwner) return [];
       const repository = item.repository.nameWithOwner!;
@@ -1289,11 +1127,11 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     const byPullRequest = new Map(base.map((item) => [`${item.repository}#${item.number}`, item]));
     const describe = async (item: AuthoredPullRequestEntry): Promise<AuthoredPullRequestEntry> => {
       try {
-        const stdout = await runCachedGitHubRead(["api", "--method", "GET", `repos/${item.repository}/stacks`, "-f", `pull_request=${item.number}`, "-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`], 2_000_000);
+        const stdout = await runCachedGitHubRead(["api", "--method", "GET", `repos/${item.repository}/stacks`, "-f", `pull_request=${item.number}`, "-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`], 2_000_000, GITHUB_READ_CACHE_MS, lifecycle);
         const raw = parseGitHubStackResponse(JSON.parse(stdout));
         if (!raw) return item;
         const [owner, repo] = item.repository.split("/", 2);
-        const signals = owner && repo ? await repositoryPullRequestSignals(owner, repo, raw.pull_requests.map((layer) => layer.number)) : new Map<number, AuthoredPullRequestSignal>();
+        const signals = owner && repo ? await repositoryPullRequestSignals(owner, repo, raw.pull_requests.map((layer) => layer.number), lifecycle, (args, maxBuffer) => runCachedGitHubRead(args, maxBuffer, GITHUB_READ_CACHE_MS, lifecycle)) : new Map<number, AuthoredPullRequestSignal>();
         const pullRequests = raw.pull_requests.flatMap((layer) => {
           const known = byPullRequest.get(`${item.repository}#${layer.number}`);
           return known ? [{ ...known, head: layer.head, base: layer.base || raw.base, ...(signals.get(layer.number) ?? {}) }] : [];
@@ -1310,10 +1148,10 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     now: () => Date.now(),
     readAuthored: readAuthoredPullRequests,
     readStacks: readAuthoredPullRequestStacks,
-    archivedRepositories: async (items) => archivedGitHubRepositories(items.map((item) => item.repository)),
+    archivedRepositories: async (items) => archivedGitHubRepositories(items.map((item) => item.repository), lifecycle),
     setDraft: async (url, draft) => {
       await execFileAsync("gh", ["pr", "ready", url, ...(draft ? ["--undo"] : [])], { maxBuffer: 1_000_000 });
-      clearGitHubReadCache();
+      clearGitHubReadCache(lifecycle);
       return { draft };
     },
   });
@@ -1414,7 +1252,7 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
   });
 
   bb.rpc.register(rpcContract, {
-    async getGitHubApiHealth() { return githubReadHealth(); },
+    async getGitHubApiHealth() { return githubReadHealth(lifecycle); },
     async getSidebarOrder() {
       return { threadIds: await threadPreferences.order() };
     },
@@ -1490,7 +1328,7 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     },
     async sidebarAuthoredPullRequests({ force }) {
       try {
-        if (force) { authoredPullRequestService.clear(); clearGitHubReadCache(); }
+        if (force) { authoredPullRequestService.clear(); clearGitHubReadCache(lifecycle); }
         return { available: true, pullRequests: await authoredPullRequestService.authored(), error: null };
       } catch (error) {
         return { available: false, pullRequests: [], error: error instanceof Error ? error.message : String(error) };
