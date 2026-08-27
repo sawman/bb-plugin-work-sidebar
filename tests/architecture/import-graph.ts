@@ -56,9 +56,18 @@ function runtimeImports(sourceFile: ts.SourceFile): string[] {
     }
   };
 
+  const allTypeOnlyNamedImports = (importClause: ts.ImportClause | undefined): boolean => {
+    if (importClause === undefined || importClause.name !== undefined || importClause.namedBindings === undefined) {
+      return false;
+    }
+    return ts.isNamedImports(importClause.namedBindings)
+      && importClause.namedBindings.elements.length > 0
+      && importClause.namedBindings.elements.every((element) => element.isTypeOnly);
+  };
+
   const visit = (node: ts.Node): void => {
     if (ts.isImportDeclaration(node)) {
-      if (!node.importClause?.isTypeOnly) {
+      if (!node.importClause?.isTypeOnly && !allTypeOnlyNamedImports(node.importClause)) {
         add(node.moduleSpecifier);
       }
     } else if (ts.isExportDeclaration(node)) {

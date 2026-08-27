@@ -102,6 +102,8 @@ describe("R1 package and compile boundary", () => {
       .toThrow("server module");
     expect(() => assertBrowserRuntimeBoundary(resolve(repositoryRoot, "tests/fixtures/nested/browser-server-directory.ts")))
       .toThrow("server module");
+    expect(() => assertBrowserRuntimeBoundary(resolve(repositoryRoot, "tests/fixtures/nested/browser-mixed-server.ts")))
+      .toThrow("server module");
   });
 
   it("allows type-only contract and server imports", () => {
