@@ -79,6 +79,7 @@ const threadRowCompositionBudgets = {
   "features/threads/thread-row-menu.tsx": { lines: 120, declarations: 1 },
   "features/threads/use-thread-row-actions.ts": { lines: 65, declarations: 1 },
   "features/threads/use-thread-row-pointer-drag.ts": { lines: 175, declarations: 1 },
+  "features/threads/thread-tree-model.ts": { lines: 40, declarations: 1 },
   "features/threads/thread-row-types.ts": { lines: 90, declarations: 0 },
 } as const;
 
@@ -219,5 +220,16 @@ describe("R16 composition boundaries", () => {
       expect(runtimeImports(path), `${path} must not own another slice's state`).not.toContain("@/features/pull-requests/store");
     }
     expect(sourceCallCount("features/threads/sidebar-controller.tsx", "useTaskLinksRead")).toBe(1);
+  });
+
+  it("keeps visible thread-tree traversal inside the Threads slice", () => {
+    const rootModel = readFileSync(resolve(repositoryRoot, "work-model.ts"), "utf8");
+    const threadTreeModel = readFileSync(
+      resolve(repositoryRoot, "features/threads/thread-tree-model.ts"),
+      "utf8",
+    );
+
+    expect(rootModel).not.toMatch(/\bvisibleThreadTreeIds\b/);
+    expect(threadTreeModel).toMatch(/export function visibleThreadTreeIds/);
   });
 });

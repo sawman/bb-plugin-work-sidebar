@@ -59,19 +59,6 @@ export function childrenByParent(threads: readonly PluginSidebarThread[], order:
   return new Map([...groups].map(([id, children]) => [id, orderSiblingThreads(children, order)]));
 }
 
-export function visibleThreadTreeIds(
-  roots: readonly PluginSidebarThread[],
-  childrenByThread: ReadonlyMap<string, readonly PluginSidebarThread[]>,
-): string[] {
-  const ids: string[] = [];
-  const visit = (thread: PluginSidebarThread) => {
-    ids.push(thread.id);
-    for (const child of childrenByThread.get(thread.id) ?? []) visit(child);
-  };
-  for (const root of roots) visit(root);
-  return ids;
-}
-
 export function filterThreadsWithAncestors(threads: readonly PluginSidebarThread[], projectNames: Readonly<Record<string, string>>, query: string) {
   const needle = query.trim().toLocaleLowerCase();
   if (!needle) return [...threads];

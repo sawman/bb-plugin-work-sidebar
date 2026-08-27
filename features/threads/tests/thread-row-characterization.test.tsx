@@ -41,6 +41,7 @@ vi.mock("@get-bb/plugin-sdk/app", async () => {
 });
 
 import { ThreadRow } from "../thread-row";
+import type { ThreadRowProps } from "../thread-row-types";
 
 const thread = {
   id: "thr_one",
@@ -60,9 +61,17 @@ const thread = {
   },
 } as PluginSidebarThread;
 
-function renderRow({ onSelect = vi.fn(() => false) } = {}) {
+function renderRow({
+  onSelect = () => false,
+  groupId = "later",
+  groups = [{ id: "later", name: "Later", threadIds: [] }],
+}: {
+  onSelect?: ThreadRowProps["onSelect"];
+  groupId?: string | null;
+  groups?: { id: string; name: string; threadIds: string[] }[];
+} = {}) {
   const props = {
-    onSelect,
+    onSelect: vi.fn(onSelect),
     onToggleChildren: vi.fn(),
     onMoveToGroup: vi.fn(),
     onNavigate: vi.fn(),
@@ -100,8 +109,8 @@ function renderRow({ onSelect = vi.fn(() => false) } = {}) {
       activeChildren={1}
       childrenExpanded={false}
       selected={false}
-      groupId="later"
-      groups={[{ id: "later", name: "Later", threadIds: [] }]}
+      groupId={groupId}
+      groups={groups}
       project={{ name: "Project", isPersonal: false }}
       reorderDisabled={false}
       canMoveUp={true}
@@ -196,5 +205,30 @@ describe("R21D ThreadRow characterization", () => {
     openMenu(afterRename);
     fireEvent.click(afterRename.getByRole("menuitem", { name: "Delete" }));
     expect(host.actions.requestDelete).toHaveBeenCalledWith(thread.id);
+  });
+
+  it("routes extracted menu movement and destination actions to the row owners", () => {
+    const view = renderRow({
+      groups: [
+        { id: "later", name: "Later", threadIds: [] },
+        { id: "soon", name: "Soon", threadIds: [] },
+      ],
+    });
+
+    openMenu(view);
+    fireEvent.click(view.getByRole("menuitem", { name: "Move up" }));
+    expect(view.onMoveThread).toHaveBeenCalledWith(thread.id, -1);
+
+    openMenu(view);
+    fireEvent.click(view.getByRole("menuitem", { name: "Move down" }));
+    expect(view.onMoveThread).toHaveBeenCalledWith(thread.id, 1);
+
+    openMenu(view);
+    fireEvent.click(view.getByRole("menuitem", { name: "Active" }));
+    expect(view.onMoveToGroup).toHaveBeenCalledWith(thread.id, null);
+
+    openMenu(view);
+    fireEvent.click(view.getByRole("menuitem", { name: "Soon" }));
+    expect(view.onMoveToGroup).toHaveBeenCalledWith(thread.id, "soon");
   });
 });
