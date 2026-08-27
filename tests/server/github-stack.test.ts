@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { fetchGitHubStack } from "../../server.js";
+import { fetchGitHubStack } from "../../features/pull-requests/server-stack.js";
+import { fetchGitHubStack as serverEntrypointFetchGitHubStack } from "../../server.js";
 import { createServerLifecycle } from "../../server-lifecycle.js";
 
 describe("GitHub Stack enrichment ownership", () => {
+  it("keeps the entrypoint export pointed at the PR-owned Stack service", () => {
+    expect(serverEntrypointFetchGitHubStack).toBe(fetchGitHubStack);
+  });
+
   it("requires the caller lifecycle and enriches each layer through that generation", async () => {
     const lifecycle = createServerLifecycle();
     const run = async (args: readonly string[]) => {

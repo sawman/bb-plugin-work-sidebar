@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PluginRpcInput } from "../../shared/server-plugin-rpc.js";
 import { taskboardDetailSchema, taskboardItemSchema, taskboardStatusOptionSchema, trackerContextSchema, type TrackerContext } from "./schemas.js";
 
 export const TRACKER_LINKS_KEY = "work-linear-links:v1";
@@ -7,7 +8,7 @@ type Link = { projectId: string; locator: string; key: string };
 type Links = Record<string, Link>;
 
 export type TrackerServiceDependencies = {
-  call<T>(method: string, input: unknown, outputSchema: z.ZodType<T>): Promise<T>;
+  call<T>(method: string, input: PluginRpcInput, outputSchema: z.ZodType<T>): Promise<T>;
   getStorage(): Promise<unknown>;
   setStorage(value: Links): Promise<void>;
   rootThread(threadId: string): Promise<{ id: string; projectId: string }>;

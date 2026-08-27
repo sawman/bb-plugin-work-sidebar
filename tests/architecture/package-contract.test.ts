@@ -100,11 +100,15 @@ describe("R1 package and compile boundary", () => {
       .toThrow("@get-bb/plugin-sdk");
     expect(() => assertBrowserRuntimeBoundary(resolve(repositoryRoot, "tests/fixtures/nested/browser-node.ts")))
       .toThrow("node:fs");
+    expect(() => assertBrowserRuntimeBoundary(resolve(repositoryRoot, "tests/fixtures/nested/browser-bare-node.ts")))
+      .toThrow("fs");
     expect(() => assertBrowserRuntimeBoundary(resolve(repositoryRoot, "tests/fixtures/nested/browser-server.ts")))
       .toThrow("server module");
     expect(() => assertBrowserRuntimeBoundary(resolve(repositoryRoot, "tests/fixtures/nested/browser-server-directory.ts")))
       .toThrow("server module");
     expect(() => assertBrowserRuntimeBoundary(resolve(repositoryRoot, "tests/fixtures/nested/browser-mixed-server.ts")))
+      .toThrow("server module");
+    expect(() => assertBrowserRuntimeBoundary(resolve(repositoryRoot, "tests/fixtures/nested/browser-server-lifecycle.ts")))
       .toThrow("server module");
   });
 

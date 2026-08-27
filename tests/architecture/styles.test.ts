@@ -3,6 +3,7 @@ import { readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import * as ts from "typescript";
 import { describe, expect, test } from "vitest";
+import { productionSourcePaths } from "./production-source-paths.js";
 
 const root = join(import.meta.dirname, "../..");
 
@@ -15,17 +16,6 @@ function stylesheetPaths() {
 
 function stripComments(source: string) {
   return source.replace(/\/\*[\s\S]*?\*\//g, "");
-}
-
-function productionSourcePaths(directory = root): string[] {
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) {
-      if (["node_modules", "dist", "tests"].includes(entry.name)) return [];
-      return productionSourcePaths(path);
-    }
-    return /\.(?:ts|tsx)$/.test(entry.name) ? [path] : [];
-  });
 }
 
 function stylesheetSelectors(source: string) {
@@ -321,7 +311,7 @@ describe("shared surface and list-row architecture", () => {
       </>;
     `, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
     expect(undocumentedIconButtons(fixture)).toEqual(["fixture.tsx:3"]);
-    const undocumented = productionSourcePaths().flatMap((file) => undocumentedIconButtons(
+    const undocumented = productionSourcePaths(root).flatMap((file) => undocumentedIconButtons(
       ts.createSourceFile(relative(root, file), readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true, scriptKind(file)),
     ));
     expect(undocumented).toEqual([]);
