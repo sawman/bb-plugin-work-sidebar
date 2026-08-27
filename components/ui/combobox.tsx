@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Input } from "./input";
 
 export type ComboboxOption = { value: string; label: string; detail?: string };
@@ -36,7 +36,7 @@ export function Combobox({
       ),
     [options, query],
   );
-  const showOptions = open && !disabled && visible.length > 0;
+  const showPopup = open && !disabled;
   const activeOption = activeIndex === null ? null : visible[activeIndex] ?? null;
   const optionId = (index: number) => `${optionsId}-option-${index}`;
 
@@ -52,6 +52,13 @@ export function Combobox({
     return () =>
       document.removeEventListener("pointerdown", dismissOutsidePointer, true);
   }, [open]);
+
+  useLayoutEffect(() => {
+    if (activeIndex === null || !showPopup) return;
+    document
+      .getElementById(optionId(activeIndex))
+      ?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, optionsId, showPopup]);
 
   const selectOption = (option: ComboboxOption) => {
     onChange(option.value);
@@ -78,10 +85,10 @@ export function Combobox({
         aria-label={ariaLabel}
         disabled={disabled}
         role="combobox"
-        aria-expanded={showOptions}
-        aria-controls={showOptions ? optionsId : undefined}
+        aria-expanded={showPopup}
+        aria-controls={showPopup ? optionsId : undefined}
         aria-activedescendant={
-          showOptions && activeOption && activeIndex !== null
+          showPopup && activeOption && activeIndex !== null
             ? optionId(activeIndex)
             : undefined
         }
@@ -135,7 +142,6 @@ export function Combobox({
           } else if (event.key === "Escape") {
             setOpen(false);
             setActiveIndex(null);
-            event.currentTarget.blur();
           }
         }}
         onClick={() => {
@@ -146,39 +152,38 @@ export function Combobox({
           }
         }}
       />
-      {open && !disabled && (
-        <>
-          {showOptions && (
-            <div
-              id={optionsId}
-              className="ws-combobox-options"
-              role="listbox"
-            >
-              {visible.map((option, index) => {
-                const active = activeIndex === index;
-                return (
-                  <button
-                    key={option.value}
-                    id={optionId(index)}
-                    type="button"
-                    role="option"
-                    aria-selected={option.value === value}
-                    data-active={active || undefined}
-                    tabIndex={-1}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => selectOption(option)}
-                  >
-                    <span>{option.label}</span>
-                    {option.detail && <small>{option.detail}</small>}
-                  </button>
-                );
-              })}
-            </div>
+      {showPopup && (
+        <div
+          id={optionsId}
+          className="ws-combobox-options"
+          role="listbox"
+        >
+          {visible.length === 0 ? (
+            <small role="option" aria-disabled="true">
+              No matching options.
+            </small>
+          ) : (
+            visible.map((option, index) => {
+              const active = activeIndex === index;
+              return (
+                <button
+                  key={option.value}
+                  id={optionId(index)}
+                  type="button"
+                  role="option"
+                  aria-selected={option.value === value}
+                  data-active={active || undefined}
+                  tabIndex={-1}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => selectOption(option)}
+                >
+                  <span>{option.label}</span>
+                  {option.detail && <small>{option.detail}</small>}
+                </button>
+              );
+            })
           )}
-          {visible.length === 0 && (
-            <small className="ws-combobox-empty">No matching options.</small>
-          )}
-        </>
+        </div>
       )}
     </div>
   );

@@ -14,6 +14,10 @@ type RpcCall = (method: string, input: unknown) => Promise<unknown>;
 const axe = configureAxe({
   runOnly: { type: "tag", values: ["cat.aria", "cat.name-role-value"] },
 });
+const scrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  "scrollIntoView",
+);
 
 const task = { id: "task_1", projectId: "project_1", projectName: "Work", key: "WORK-1", title: "Ship mounted fixtures", status: "todo" as const, priority: "none" as const, dueDate: null, parentTaskId: null, position: 1024, linkedThreadIds: [] as string[], assignee: "human" as const };
 const taskTwo = { ...task, id: "task_2", key: "WORK-2", title: "Second task", position: 2048 };
@@ -38,7 +42,20 @@ async function expectNoAriaViolations(container: HTMLElement) {
   expect(results.incomplete).toEqual([]);
 }
 
-afterEach(() => { cleanup(); getPluginQueryClient().clear(); vi.restoreAllMocks(); });
+afterEach(() => {
+  cleanup();
+  getPluginQueryClient().clear();
+  vi.restoreAllMocks();
+  if (scrollIntoViewDescriptor) {
+    Object.defineProperty(
+      HTMLElement.prototype,
+      "scrollIntoView",
+      scrollIntoViewDescriptor,
+    );
+  } else {
+    Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+  }
+});
 
 describe("Tasks registered controls", () => {
   it("keeps an open matching Combobox ARIA-valid with selected option semantics", async () => {
@@ -76,6 +93,11 @@ describe("Tasks registered controls", () => {
   });
 
   it("uses active-descendant listbox keyboard navigation in the registered Work Tasks card", async () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
     const captured = await app();
     const rendered = renderSlot(
       captured.threadPanelActions[0]!,
@@ -83,7 +105,7 @@ describe("Tasks registered controls", () => {
       { rpc: rpcFixtures(() => tasks([task, taskTwo])) },
     );
     const combo = await rendered.findByLabelText("Add task to this thread");
-    fireEvent.focus(combo);
+    combo.focus();
     const options = await rendered.findAllByRole("option");
     expect(options).toHaveLength(2);
     expect(options[0]!.id).toBeTruthy();
@@ -93,6 +115,9 @@ describe("Tasks registered controls", () => {
     expect(combo.getAttribute("aria-activedescendant")).toBe(options[0]!.id);
     expect(options[0]!.getAttribute("data-active")).toBe("true");
     expect(options[0]!.getAttribute("aria-selected")).toBe("false");
+    await waitFor(() =>
+      expect(scrollIntoView).toHaveBeenLastCalledWith({ block: "nearest" }),
+    );
     await expectNoAriaViolations(rendered.container);
     fireEvent.keyDown(combo, { key: "ArrowDown" });
     expect(combo.getAttribute("aria-activedescendant")).toBe(options[1]!.id);
@@ -109,7 +134,7 @@ describe("Tasks registered controls", () => {
     await waitFor(() => expect(combo.getAttribute("aria-expanded")).toBe("false"));
     expect((combo as HTMLInputElement).value).toBe("WORK-1");
 
-    fireEvent.focus(combo);
+    combo.focus();
     fireEvent.change(combo, { target: { value: "second" } });
     const filteredOption = await rendered.findByRole("option", {
       name: /WORK-2/,
@@ -117,16 +142,18 @@ describe("Tasks registered controls", () => {
     fireEvent.keyDown(combo, { key: "End" });
     expect(combo.getAttribute("aria-activedescendant")).toBe(filteredOption.id);
     fireEvent.keyDown(combo, { key: "Escape" });
+    expect(document.activeElement).toBe(combo);
     fireEvent.keyDown(combo, { key: "ArrowDown" });
     expect(combo.getAttribute("aria-activedescendant")).toBe(filteredOption.id);
     fireEvent.keyDown(combo, { key: "Enter" });
     await waitFor(() => expect(combo.getAttribute("aria-expanded")).toBe("false"));
     expect((combo as HTMLInputElement).value).toBe("WORK-2");
+    combo.focus();
     fireEvent.click(combo);
     await rendered.findByRole("listbox");
     fireEvent.keyDown(combo, { key: "Escape" });
     expect(combo.getAttribute("aria-expanded")).toBe("false");
-    expect(document.activeElement).not.toBe(combo);
+    expect(document.activeElement).toBe(combo);
     rendered.lifecycle.unmount();
   });
 
@@ -180,7 +207,7 @@ describe("Tasks registered controls", () => {
     malformed.remove();
   });
 
-  it("keeps an open filtered Combobox ARIA-valid without an empty listbox or dangling controls", async () => {
+  it("keeps an open filtered Combobox ARIA-valid with an announced empty popup", async () => {
     const { rendered } = await leftSlot();
     fireEvent.click(rendered.getByRole("button", { name: "Add task" }));
     const project = rendered.getByRole("combobox", { name: "Task project" });
@@ -188,8 +215,13 @@ describe("Tasks registered controls", () => {
     fireEvent.change(project, { target: { value: "does not match" } });
     await waitFor(() => expect(rendered.getByText("No matching options.")).toBeTruthy());
     await expectNoAriaViolations(rendered.container);
-    expect(rendered.queryByRole("listbox")).toBeNull();
-    expect(project.hasAttribute("aria-controls")).toBe(false);
+    const listbox = rendered.getByRole("listbox");
+    expect(project.getAttribute("aria-expanded")).toBe("true");
+    expect(project.getAttribute("aria-controls")).toBe(listbox.id);
+    expect(
+      rendered.getByRole("option", { name: "No matching options." })
+        .getAttribute("aria-disabled"),
+    ).toBe("true");
     rendered.lifecycle.unmount();
   });
 

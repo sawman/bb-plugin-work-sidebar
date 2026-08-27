@@ -23,8 +23,46 @@ function stylesheetSelectors(source: string) {
 }
 
 function stylesheetRules(source: string) {
-  return [...stripComments(source).matchAll(/([^{}]+)\{([^{}]*)\}/g)]
-    .map((match) => ({ selector: match[1].trim().replace(/\s+/g, " "), declarations: match[2] }));
+  const clean = stripComments(source);
+  const rules: Array<{ selector: string; declarations: string }> = [];
+
+  const matchingClose = (openIndex: number) => {
+    let depth = 0;
+    let quote: '"' | "'" | null = null;
+    for (let index = openIndex; index < clean.length; index += 1) {
+      const character = clean[index];
+      if (quote) {
+        if (character === quote && clean[index - 1] !== "\\") quote = null;
+      } else if (character === '"' || character === "'") {
+        quote = character;
+      } else if (character === "{") {
+        depth += 1;
+      } else if (character === "}") {
+        depth -= 1;
+        if (depth === 0) return index;
+      }
+    }
+    throw new Error("Unclosed CSS block");
+  };
+
+  const parseRange = (start: number, end: number) => {
+    let cursor = start;
+    while (cursor < end) {
+      const open = clean.indexOf("{", cursor);
+      if (open < 0 || open >= end) return;
+      const close = matchingClose(open);
+      const selector = clean.slice(cursor, open).trim().replace(/\s+/g, " ");
+      if (selector.startsWith("@")) {
+        parseRange(open + 1, close);
+      } else if (selector) {
+        rules.push({ selector, declarations: clean.slice(open + 1, close) });
+      }
+      cursor = close + 1;
+    }
+  };
+
+  parseRange(0, clean.length);
+  return rules;
 }
 
 function undocumentedImportantDeclarations(source: string): string[] {
@@ -55,11 +93,27 @@ const dynamicClassFamilies = [
   { prefix: "ws-plan-", file: "features/work-context/views.tsx", suffixes: ["completed", "in_progress", "pending"] },
   { prefix: "ws-provider-health-", file: "features/work-context/views.tsx", suffixes: ["green", "amber", "red"] },
   { prefix: "ws-status-dot-", file: "features/work-context/views.tsx", suffixes: ["in_progress", "running", "done"] },
+  { prefix: "ws-status-", file: "features/threads/thread-row-presentation.tsx", suffixes: ["none", "runtime", "workflow", "background-agent", "background-command", "goal", "plan-mode", "working-draft", "unread-error", "unread-success", "waiting-for-input"] },
   { prefix: "ws-task-priority-", file: "features/tasks/task-row.tsx", suffixes: ["urgent", "high", "medium", "low"] },
   { prefix: "ws-task-row-", file: "features/tasks/task-row.tsx", suffixes: ["outcome", "execution"] },
   { prefix: "ws-task-status-", file: "features/tasks/task-row.tsx", suffixes: ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] },
   { prefix: "ws-thread-child-depth-", file: "features/threads/thread-tree.tsx", suffixes: ["1", "2", "3", "4"] },
 ] as const;
+
+// R22 I1 audited these static hooks as intentionally unstyled from the recovery
+// baseline through f09c031. Keep the exception list explicit and narrow so a
+// newly applied class cannot silently lose its CSS owner.
+const intentionallyUnstyledProductionClasses = new Set([
+  "ws-work-context-card",
+  "ws-work-context-cards",
+  "ws-outcome-card",
+  "ws-pr-compact-row",
+  "ws-pr-stack-open",
+  "ws-pr-stack-singleton",
+  "ws-stack-expanded",
+  "ws-archived",
+  "ws-thread-statuses",
+]);
 
 function scriptKind(path: string) {
   return path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
@@ -115,6 +169,31 @@ function hasProductionConsumer(className: string, consumers: ReturnType<typeof s
   return consumers.staticClasses.has(className) || consumers.dynamicFamilies.some(({ prefix, suffixes }) =>
     suffixes.some((suffix) => className === `${prefix}${suffix}`),
   );
+}
+
+function styledProductionClasses() {
+  return new Set(
+    stylesheetPaths().flatMap((file) =>
+      stylesheetRules(readFileSync(file, "utf8")).flatMap(({ selector }) =>
+        selectorClassNames(selector),
+      ),
+    ),
+  );
+}
+
+function staticClassesWithoutStylesheetOwner() {
+  const styledClasses = styledProductionClasses();
+  const dynamicPrefixes = new Set<string>(
+    dynamicClassFamilies.map(({ prefix }) => prefix),
+  );
+  return [...sourceClassConsumers().staticClasses]
+    .filter(
+      (className) =>
+        !intentionallyUnstyledProductionClasses.has(className) &&
+        !dynamicPrefixes.has(className) &&
+        !styledClasses.has(className),
+    )
+    .sort();
 }
 
 function directSurfacePrimitivePaths() {
@@ -254,7 +333,27 @@ describe("shared surface and list-row architecture", () => {
     );
 
     expect(activeOption?.declarations).toContain("background: var(--accent)");
-    expect(activeOption?.declarations).toContain("color: var(--accent-foreground)");
+    expect(activeOption?.declarations).toContain(
+      "box-shadow: inset 0 0 0 1px var(--ring)",
+    );
+  });
+
+  test("preserves the Changes stack disclosure grid and chevron control", () => {
+    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const toggle = rules.find(({ selector }) => selector === ".ws-stack-layer-toggle");
+    const chevron = rules.find(({ selector }) => selector === ".ws-stack-expand");
+
+    expect(toggle?.declarations).toContain(
+      "grid-template-columns: minmax(0, 1fr) auto",
+    );
+    expect(toggle?.declarations).toMatch(
+      /grid-template-areas:\s+"title chevron"\s+"subtitle chevron"/,
+    );
+    expect(chevron?.declarations).toContain("grid-area: chevron");
+    expect(chevron?.declarations).toContain("place-items: center");
+    expect(chevron?.declarations).toContain("width: 1rem");
+    expect(chevron?.declarations).toContain("height: 1rem");
+    expect(chevron?.declarations).toContain("color: var(--muted-foreground)");
   });
 
   test("associates each important declaration with its immediately preceding R17 comment", () => {
@@ -285,6 +384,28 @@ describe("shared surface and list-row architecture", () => {
     expect(hasProductionConsumer("ws-file-modified", consumers)).toBe(true);
     expect(hasProductionConsumer("ws-file-list", consumers)).toBe(consumers.staticClasses.has("ws-file-list"));
     expect(hasProductionConsumer("ws-file-legacy", consumers)).toBe(false);
+  });
+
+  test("records classes nested in an at-rule as stylesheet owners", () => {
+    expect(
+      stylesheetRules("@media (min-width: 1px) { .ws-at-rule-only { color: red; } }")
+        .map(({ selector }) => selector),
+    ).toEqual([".ws-at-rule-only"]);
+  });
+
+  test("gives every static production class an audited stylesheet owner", () => {
+    expect(staticClassesWithoutStylesheetOwner()).toEqual([]);
+    expect(styledProductionClasses()).toContain("ws-stack-expand");
+  });
+
+  test("removes the unimplemented Button wrapper and its production imports", () => {
+    const sourcePaths = productionSourcePaths().map((file) => relative(root, file));
+    const productionSource = productionSourcePaths()
+      .map((file) => readFileSync(file, "utf8"))
+      .join("\n");
+
+    expect(sourcePaths).not.toContain("components/ui/button.tsx");
+    expect(productionSource).not.toContain("components/ui/button");
   });
 
   test("keeps one consumed surface contract and no broad primitive typography overrides", () => {

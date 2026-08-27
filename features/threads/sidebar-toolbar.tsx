@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import type { SidebarThreadGroup } from "./model";
 type SidebarToolbarProps = {
@@ -203,16 +202,15 @@ export function SidebarThreadToolbar({
           <Icon name="RefreshCw" aria-hidden />
         </button>
         {activeProjectId && (
-          <Button
+          <button
+            type="button"
             className="ws-new-thread"
-            variant="ghost"
-            size="icon"
             title="New thread in project"
             aria-label="New thread in project"
             onClick={() => onNewThread(activeProjectId)}
           >
             <Icon name="Plus" aria-hidden />
-          </Button>
+          </button>
         )}
       </div>
     </>
