@@ -27,8 +27,8 @@ export function summarizeTask(task: TaskRecord, projectName = "Work") {
   };
 }
 
-export function projectPrefix(name: string, projectId: string, usedPrefixes: ReadonlySet<string>): string {
-  const letters = name.toUpperCase().replace(/[^A-Z0-9]/g, "");
+export function projectPrefix(projectName: string, projectId: string, usedPrefixes: ReadonlySet<string>): string {
+  const letters = projectName.toUpperCase().replace(/[^A-Z0-9]/g, "");
   const base = /^[A-Z]/.test(letters) ? letters.slice(0, 10) : "WORK";
   if (!usedPrefixes.has(base)) return base;
   const suffix = projectId.replace(/[^a-zA-Z0-9]/g, "").slice(-3).toUpperCase();

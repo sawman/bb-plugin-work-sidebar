@@ -21,6 +21,52 @@ export function clearGitHubReadCache(lifecycle: ServerLifecycle): void {
   lifecycle.githubPullRequestSignalCache.clear();
 }
 
+function recordGitHubReadSuccess(
+  lifecycle: ServerLifecycle,
+  scope: GitHubReadScope,
+  key: string,
+  stdout: string,
+  ttlMs: number,
+): string {
+  if (lifecycle.isDisposed) return stdout;
+  recordGitHubReadAvailability(lifecycle, scope);
+  if (lifecycle.githubReadCache.size >= 300) lifecycle.githubReadCache.delete(lifecycle.githubReadCache.keys().next().value!);
+  lifecycle.cacheGitHubRead(key, stdout, Date.now() + ttlMs);
+  return stdout;
+}
+
+function recordGitHubReadAvailability(lifecycle: ServerLifecycle, scope: GitHubReadScope): void {
+  if (scope === "graphql") {
+    lifecycle.githubGraphqlHealth = { state: "available", scope, message: null, retryAt: null };
+    return;
+  }
+  lifecycle.githubRestHealth = { state: "available", scope, message: null, retryAt: null };
+}
+
+function asGitHubReadError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function recordGitHubReadHealth(lifecycle: ServerLifecycle, scope: GitHubReadScope, health: GitHubApiHealth): void {
+  if (scope !== "graphql") {
+    lifecycle.githubRestHealth = health;
+    return;
+  }
+  lifecycle.githubGraphqlHealth = health;
+  if (health.state === "rate_limited") lifecycle.githubGraphqlBackoffUntil = health.retryAt ?? Date.now() + GRAPHQL_BACKOFF_MS;
+}
+
+function recordGitHubReadFailure(
+  lifecycle: ServerLifecycle,
+  scope: GitHubReadScope,
+  error: unknown,
+  classifyError: GitHubErrorClassifier,
+): never {
+  if (lifecycle.isDisposed) throw asGitHubReadError(error);
+  recordGitHubReadHealth(lifecycle, scope, classifyError(error, scope));
+  throw asGitHubReadError(error);
+}
+
 /**
  * Factory-owned GitHub command cache used by both the Changes stack and the
  * authored-PR sidebar. Late commands may resolve, but never mutate a disposed
@@ -34,6 +80,7 @@ export async function readGitHub(
   maxBuffer: number,
   ttlMs: number,
 ): Promise<string> {
+  if (lifecycle.isDisposed) throw new Error("GitHub read lifecycle is disposed.");
   const scope = scopeFor(args);
   const health = scope === "graphql" ? lifecycle.githubGraphqlHealth : lifecycle.githubRestHealth;
   if (health.state === "rate_limited" && health.retryAt && health.retryAt > Date.now()) {
@@ -45,23 +92,10 @@ export async function readGitHub(
   const pending = lifecycle.githubReadPending.get(key);
   if (pending) return pending;
 
-  const request = command(args, maxBuffer).then((stdout) => {
-    if (lifecycle.isDisposed) return stdout;
-    if (scope === "graphql") lifecycle.githubGraphqlHealth = { state: "available", scope, message: null, retryAt: null };
-    else lifecycle.githubRestHealth = { state: "available", scope, message: null, retryAt: null };
-    if (lifecycle.githubReadCache.size >= 300) lifecycle.githubReadCache.delete(lifecycle.githubReadCache.keys().next().value!);
-    lifecycle.cacheGitHubRead(key, stdout, Date.now() + ttlMs);
-    return stdout;
-  }).catch((error) => {
-    if (!lifecycle.isDisposed) {
-      const classified = classifyError(error, scope);
-      if (scope === "graphql") {
-        lifecycle.githubGraphqlHealth = classified;
-        if (classified.state === "rate_limited") lifecycle.githubGraphqlBackoffUntil = classified.retryAt ?? Date.now() + GRAPHQL_BACKOFF_MS;
-      } else lifecycle.githubRestHealth = classified;
-    }
-    throw error instanceof Error ? error : new Error(String(error));
-  }).finally(() => lifecycle.releasePending("githubRead", key));
+  const request = command(args, maxBuffer)
+    .then((stdout) => recordGitHubReadSuccess(lifecycle, scope, key, stdout, ttlMs))
+    .catch((error) => recordGitHubReadFailure(lifecycle, scope, error, classifyError))
+    .finally(() => lifecycle.releasePending("githubRead", key));
   lifecycle.githubReadPending.set(key, request);
   return request;
 }

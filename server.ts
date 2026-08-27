@@ -17,7 +17,7 @@ import {
 import { rpcContract } from "./contracts.js";
 import { type SidebarStack } from "./work-model.js";
 import { createArchivedThreadService, createThreadPreferencesService } from "./features/threads/server.js";
-import { createServerLifecycle, type GitHubApiHealth, type ServerLifecycle } from "./server-lifecycle.js";
+import { createServerLifecycle, type GitHubApiHealth, type GitHubPullRequestSignal, type ServerLifecycle } from "./server-lifecycle.js";
 import { createWorkContextReadService } from "./features/work-context/server-reads.js";
 import {
   bindExecutionOwner,
@@ -342,10 +342,7 @@ async function archivedGitHubRepositories(repositories: readonly string[], lifec
   return archived;
 }
 
-type AuthoredPullRequestSignal = {
-  checks: "failed" | "passing" | "pending" | "none" | "unknown";
-  review: "approved" | "changes_requested" | "changes_requested_review_requested" | "review_requested" | "review_required" | "none";
-};
+type AuthoredPullRequestSignal = GitHubPullRequestSignal;
 // A failed metadata lookup is not evidence that a PR has no CI. Keeping it
 // distinct prevents private or temporarily unavailable repositories reading as
 // an empty check set in the UI.
@@ -353,7 +350,7 @@ const UNKNOWN_AUTHORED_PULL_REQUEST_SIGNAL: AuthoredPullRequestSignal = { checks
 
 function pullRequestSignalKey(owner: string, repo: string, number: number) { return `${owner}/${repo}#${number}`.toLowerCase(); }
 function cachedPullRequestSignal(owner: string, repo: string, number: number, lifecycle: ServerLifecycle): AuthoredPullRequestSignal | null {
-  const cached = lifecycle.githubPullRequestSignalCache.get(pullRequestSignalKey(owner, repo, number)) as { expiresAt: number; value: AuthoredPullRequestSignal } | undefined;
+  const cached = lifecycle.githubPullRequestSignalCache.get(pullRequestSignalKey(owner, repo, number));
   return cached && cached.expiresAt > Date.now() ? cached.value : null;
 }
 function cachePullRequestSignal(owner: string, repo: string, number: number, value: AuthoredPullRequestSignal, lifecycle: ServerLifecycle) {
@@ -407,7 +404,7 @@ function cachedRestPullRequestSignal(owner: string, repo: string, number: number
   const cached = cachedPullRequestSignal(owner, repo, number, lifecycle);
   if (cached) return Promise.resolve(cached);
   const key = pullRequestSignalKey(owner, repo, number);
-  const pending = lifecycle.githubPullRequestSignalPending.get(key) as Promise<AuthoredPullRequestSignal | null> | undefined;
+  const pending = lifecycle.githubPullRequestSignalPending.get(key);
   if (pending) return pending;
   const request = restPullRequestSignal(owner, repo, number, lifecycle).then((signal) => {
     if (!lifecycle.isDisposed && signal && !(signal.checks === "unknown" && signal.review === "none")) {

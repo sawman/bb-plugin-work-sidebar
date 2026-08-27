@@ -31,7 +31,7 @@ describe("R2 server registration and disposal", () => {
 
     lifecycle.githubReadCache.set("read", { expiresAt: Infinity, value: "cached" });
     lifecycle.githubReadPending.set("read", Promise.resolve("pending"));
-    lifecycle.githubPullRequestSignalCache.set("signal", { expiresAt: Infinity, value: "cached" });
+    lifecycle.githubPullRequestSignalCache.set("signal", { expiresAt: Infinity, value: { checks: "passing", review: "approved" } });
     lifecycle.githubPullRequestSignalPending.set("signal", Promise.resolve(null));
     lifecycle.archivedThreadsCache = { expiresAt: Infinity, value: [] };
     lifecycle.archivedThreadsPending = Promise.resolve([]);
@@ -71,6 +71,7 @@ describe("R2 server registration and disposal", () => {
     await expect(host.harness.behavior.callRpc("sidebarAuthoredPullRequests", {
       force: false,
       unexpected: true,
+      // Intentionally violates the strict RPC schema at the raw transport boundary.
     } as never)).rejects.toMatchObject({ code: "invalid_input", message: "rpc input validation failed" });
 
     first.githubReadCache.set("first", { expiresAt: Infinity, value: "cached" });

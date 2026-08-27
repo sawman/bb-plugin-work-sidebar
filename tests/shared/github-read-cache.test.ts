@@ -3,6 +3,28 @@ import { readGitHub } from "../../shared/github/read-cache.js";
 import { createServerLifecycle } from "../../server-lifecycle.js";
 
 describe("shared GitHub read-cache lifecycle", () => {
+  it("refuses reads started after disposal without invoking external work", async () => {
+    const lifecycle = createServerLifecycle();
+    lifecycle.dispose();
+    const command = vi.fn(async () => "unexpected command");
+    const classifier = vi.fn(() => ({
+      state: "unavailable" as const,
+      scope: "rest" as const,
+      message: "unexpected classifier",
+      retryAt: null,
+    }));
+
+    await expect(readGitHub(lifecycle, command, classifier, ["api", "repos/acme/work"], 1_000_000, 60_000))
+      .rejects.toThrow("GitHub read lifecycle is disposed.");
+
+    expect(command).not.toHaveBeenCalled();
+    expect(classifier).not.toHaveBeenCalled();
+    expect(lifecycle.inspect()).toEqual({ disposed: true, caches: 0, archived: false, backoffUntil: 0 });
+    expect(lifecycle.githubReadCache.size).toBe(0);
+    expect(lifecycle.githubReadPending.size).toBe(0);
+    expect(lifecycle.githubRestHealth).toEqual({ state: "available", scope: "rest", message: null, retryAt: null });
+  });
+
   it("does not let a disposed generation write caches, health, or replacement pending work", async () => {
     let resolveFirst!: (value: string) => void;
     const firstCommand = new Promise<string>((resolve) => { resolveFirst = resolve; });
