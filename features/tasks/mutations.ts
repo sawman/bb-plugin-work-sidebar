@@ -9,6 +9,8 @@ type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 type TaskScope = "list" | "links";
 
 export const taskOptimisticMutationKey = ["tasks", "optimistic"] as const;
+const taskAssignmentMutationScope = { id: "tasks-assignment" };
+const taskReorderMutationScope = { id: "tasks-reorder" };
 
 const invalidationState = new WeakMap<QueryClient, { deferred: Set<TaskScope> }>();
 
@@ -54,7 +56,19 @@ export function useTasksMutations(rpc: Rpc) {
   const cancel = async (scopes: readonly TaskScope[]) => Promise.all(scopes.map((scope) => queryClient.cancelQueries({ queryKey: key(scope) })));
   const settle = (scopes: readonly TaskScope[], settlingOptimistic = false) => invalidateTaskQueries(queryClient, scopes, settlingOptimistic);
   const snapshot = () => queryClient.getQueryData<TaskList>(key("list"));
-  const rollback = (previous: TaskList | undefined) => queryClient.setQueryData(key("list"), previous);
+  const rollbackAssignment = (taskId: string, assignee: SidebarTask["assignee"] | undefined) => {
+    if (!assignee) return;
+    queryClient.setQueryData<TaskList>(key("list"), (current) => current && {
+      ...current,
+      tasks: current.tasks.map((task) => task.id === taskId ? { ...task, assignee } : task),
+    });
+  };
+  const rollbackReorder = (positions: ReadonlyMap<string, number | undefined>) => {
+    queryClient.setQueryData<TaskList>(key("list"), (current) => current && {
+      ...current,
+      tasks: current.tasks.map((task) => positions.has(task.id) ? { ...task, position: positions.get(task.id) } : task),
+    });
+  };
 
   const create = useMutation({
     mutationFn: (input: { projectId: string; title: string; assignee: SidebarTask["assignee"] }) => rpc.call("createSidebarTask", input),
@@ -82,25 +96,32 @@ export function useTasksMutations(rpc: Rpc) {
   });
   const assignment = useMutation({
     mutationKey: taskOptimisticMutationKey,
+    scope: taskAssignmentMutationScope,
     mutationFn: (input: { taskId: string; assignee: SidebarTask["assignee"] }) => rpc.call("updateTaskAssignee", input),
     onMutate: async ({ taskId, assignee }) => {
       await cancel(taskMutationPlan.assignment.cancel);
       const previous = snapshot();
+      const previousAssignee = previous?.tasks.find((task) => task.id === taskId)?.assignee;
       queryClient.setQueryData<TaskList>(key("list"), (current) => current && {
         ...current,
         tasks: current.tasks.map((task) => task.id === taskId ? { ...task, assignee } : task),
       });
-      return { previous };
+      return { previousAssignee };
     },
-    onError: (_error, _input, context) => rollback(context?.previous),
+    onError: (_error, { taskId }, context) => rollbackAssignment(taskId, context?.previousAssignee),
     onSettled: () => settle(taskMutationPlan.assignment.invalidate, true),
   });
   const reorder = useMutation({
     mutationKey: taskOptimisticMutationKey,
+    scope: taskReorderMutationScope,
     mutationFn: (input: { taskId: string; beforeTaskId: string | null; afterTaskId: string | null }) => rpc.call("reorderTask", input),
     onMutate: async ({ taskId, beforeTaskId, afterTaskId }) => {
       await cancel(taskMutationPlan.reorder.cancel);
       const previous = snapshot();
+      const source = previous?.tasks.find((task) => task.id === taskId);
+      const previousPositions = new Map((previous?.tasks ?? [])
+        .filter((task) => source && task.projectId === source.projectId && task.status === source.status && task.parentTaskId === source.parentTaskId)
+        .map((task) => [task.id, task.position]));
       if (previous) {
         const targetId = beforeTaskId ?? afterTaskId;
         if (targetId) queryClient.setQueryData<TaskList>(key("list"), {
@@ -108,9 +129,9 @@ export function useTasksMutations(rpc: Rpc) {
           tasks: reorderTaskSiblings(previous.tasks, taskId, targetId, beforeTaskId ? "before" : "after"),
         });
       }
-      return { previous };
+      return { previousPositions };
     },
-    onError: (_error, _input, context) => rollback(context?.previous),
+    onError: (_error, _input, context) => rollbackReorder(context?.previousPositions ?? new Map()),
     onSettled: () => settle(taskMutationPlan.reorder.invalidate, true),
   });
   return { create, remove, attachment, status, assignment, reorder };
