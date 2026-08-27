@@ -4,12 +4,13 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
 import type { rpcSchemas } from "../../contracts.schemas";
 import type { z } from "zod";
-import { workContextCardKeys, workContextCardPolicy } from "./model";
+import { shouldPollWorkActivity, workActivityPolicy, workContextCardKeys, workContextCardPolicy } from "./model";
 
 type WorkStatus = z.infer<typeof rpcSchemas.getWorkStatus.output>;
 type WorkOutcome = z.infer<typeof rpcSchemas.getWorkOutcome.output>;
 type WorkGoal = z.infer<typeof rpcSchemas.getWorkGoal.output>;
 type WorkPlan = z.infer<typeof rpcSchemas.getWorkPlan.output>;
+type WorkActivity = z.infer<typeof rpcSchemas.getLatestActivity.output>;
 
 function useWorkContextCard<T>(threadId: string, key: keyof typeof workContextCardKeys, method: "getWorkStatus" | "getWorkOutcome" | "getWorkGoal" | "getWorkPlan") {
   const rpc = useRpc<typeof rpcContract>();
@@ -28,10 +29,18 @@ export function useWorkStatus(threadId: string) {
     queryFn: () => rpc.call("getWorkStatus", { threadId }) as Promise<WorkStatus>,
     ...workContextCardPolicy,
     refetchOnMount: "always",
-    refetchInterval: (query) => {
-      const state = query.state.data?.currentThread.status;
-      return state === "active" || state === "starting" ? 2_000 : false;
-    },
+  });
+}
+
+export function useLatestActivity(threadId: string, status: string | undefined) {
+  const rpc = useRpc<typeof rpcContract>();
+  return useQuery({
+    queryKey: workContextCardKeys.activity(threadId),
+    queryFn: () => rpc.call("getLatestActivity", { threadId }) as Promise<WorkActivity>,
+    enabled: Boolean(threadId),
+    ...workActivityPolicy,
+    refetchIntervalInBackground: false,
+    refetchInterval: (query) => query.state.fetchStatus !== "fetching" && shouldPollWorkActivity(query.state.data?.currentThread.status ?? status) ? 2_000 : false,
   });
 }
 export const useWorkOutcome = (threadId: string) => useWorkContextCard<WorkOutcome>(threadId, "outcome", "getWorkOutcome");

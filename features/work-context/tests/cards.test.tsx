@@ -8,13 +8,13 @@ import { getPluginQueryClient } from "../../../query-runtime";
 
 type Rpc = NonNullable<RenderSlotOptions<typeof rpcContract>["rpc"]>;
 const taskResult = { available: true, tasks: [], projects: [], error: null };
-const aggregate = { tasksAvailable: true, currentThread: { title: "Thread", status: "idle" as const, runtimeStatus: "idle", providerId: "codex" }, tasks: [], subtasks: [], outcome: null, executionTasks: [], bindings: [], legacy: { state: "none" as const, taskIds: [], message: null }, goal: null, todos: [], activity: { latest: null, lastUser: null, current: null }, children: [], currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null, repository: { outcome: "absent" as const, message: null, branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFileCount: 0, changedInsertions: 0, changedDeletions: 0, changedFiles: [] }, tracker: { visible: false, available: false, message: null, suggestions: [], item: null, statusOptions: [] } };
-const status = { currentThread: aggregate.currentThread, children: [], activity: aggregate.activity };
+const aggregate = { tasksAvailable: true, currentThread: { title: "Thread", status: "idle" as const, runtimeStatus: "idle", providerId: "codex" }, tasks: [], subtasks: [], outcome: null, executionTasks: [], bindings: [], legacy: { state: "none" as const, taskIds: [], message: null }, goal: null, todos: [], children: [], currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null, repository: { outcome: "absent" as const, message: null, branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFileCount: 0, changedInsertions: 0, changedDeletions: 0, changedFiles: [] }, tracker: { visible: false, available: false, message: null, suggestions: [], item: null, statusOptions: [] } };
+const status = { currentThread: aggregate.currentThread, children: [] };
 const outcome = { tasksAvailable: true, outcome: null, executionTasks: [], bindings: [] };
 const populatedOutcome = { tasksAvailable: true, outcome: { id: "task_1", projectId: "project_1", projectName: "Work", key: "WORK-1", title: "Ship cards", status: "todo" as const, priority: "high" as const, dueDate: "2026-08-30", parentTaskId: null, position: 1 }, executionTasks: [], bindings: [] };
 
 function fixture(overrides: Partial<Rpc> = {}): Rpc {
-  return { sidebarTasks: () => taskResult, sidebarTaskLinks: () => ({ available: true, links: {}, error: null }), getWorkContext: () => aggregate, getWorkChanges: () => ({ currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null, repository: aggregate.repository }), getWorkTracker: () => aggregate.tracker, getWorkProviderStatus: () => ({ tone: "green", providerId: "codex", providerName: "Codex", statusUrl: null, status: "ready", message: null }), getGitHubApiHealth: () => ({ state: "available", scope: "unknown", message: null, retryAt: null }), getWorkStatus: () => status, getWorkOutcome: () => outcome, getWorkGoal: () => null, getWorkPlan: () => ({ items: [] }), ...overrides } as Rpc;
+  return { sidebarTasks: () => taskResult, sidebarTaskLinks: () => ({ available: true, links: {}, error: null }), getWorkContext: () => aggregate, getWorkChanges: () => ({ currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null, repository: aggregate.repository }), getWorkTracker: () => aggregate.tracker, getWorkProviderStatus: () => ({ tone: "green", providerId: "codex", providerName: "Codex", statusUrl: null, status: "ready", message: null }), getGitHubApiHealth: () => ({ state: "available", scope: "unknown", message: null, retryAt: null }), getWorkStatus: () => status, getLatestActivity: () => ({ currentThread: { status: "idle", runtimeStatus: "idle" }, latest: null, lastUser: null, current: null }), getWorkOutcome: () => outcome, getWorkGoal: () => null, getWorkPlan: () => ({ items: [] }), ...overrides } as Rpc;
 }
 
 describe("registered Work context cards", () => {
@@ -94,16 +94,17 @@ describe("registered Work context cards", () => {
   it("keeps cached A visible across A-to-B-to-A registered slot switches while revalidating", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));
-    const getWorkStatus = vi.fn(({ threadId }) => ({ ...status, activity: { latest: { text: `activity ${threadId}`, kind: "activity" as const }, lastUser: null, current: null } }));
-    const first = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_a", params: null }, { rpc: fixture({ getWorkStatus }) });
+    const getWorkStatus = vi.fn(() => ({ ...status, currentThread: { ...status.currentThread, status: "active" as const } }));
+    const getLatestActivity = vi.fn(({ threadId }) => ({ currentThread: { status: "active" as const, runtimeStatus: "active" }, latest: { text: `activity ${threadId}`, kind: "activity" as const }, lastUser: null, current: null }));
+    const first = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_a", params: null }, { rpc: fixture({ getWorkStatus, getLatestActivity }) });
     await waitFor(() => expect(first.getByText("activity thr_a")).toBeTruthy());
     first.lifecycle.unmount();
-    const second = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_b", params: null }, { rpc: fixture({ getWorkStatus }) });
+    const second = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_b", params: null }, { rpc: fixture({ getWorkStatus, getLatestActivity }) });
     await waitFor(() => expect(second.getByText("activity thr_b")).toBeTruthy());
     second.lifecycle.unmount();
-    const returned = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_a", params: null }, { rpc: fixture({ getWorkStatus }) });
+    const returned = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_a", params: null }, { rpc: fixture({ getWorkStatus, getLatestActivity }) });
     expect(returned.getByText("activity thr_a")).toBeTruthy();
-    await waitFor(() => expect(getWorkStatus.mock.calls.filter(([input]) => input.threadId === "thr_a").length).toBeGreaterThanOrEqual(2));
+    await waitFor(() => expect(getLatestActivity.mock.calls.filter(([input]) => input.threadId === "thr_a").length).toBeGreaterThanOrEqual(2));
     returned.lifecycle.unmount(); getPluginQueryClient().clear();
   });
 });

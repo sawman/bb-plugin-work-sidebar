@@ -6,6 +6,7 @@ export type QueryPolicy = Readonly<{
   gcTime: number;
   retry: false | 1;
   refetchOnWindowFocus: false;
+  refetchOnReconnect?: boolean;
 }>;
 
 const queryRoot = ["work-sidebar"] as const;
