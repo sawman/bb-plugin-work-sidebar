@@ -25,25 +25,6 @@
   flex: none;
   color: var(--muted-foreground);
 }
-.ws-thread-disclosure {
-  position: absolute;
-  left: 0.28rem;
-  top: 0.52rem;
-  z-index: 1;
-  width: 0.9rem;
-  height: 0.9rem;
-  border: 0;
-  background: transparent;
-  color: var(--muted-foreground);
-  font-size: 0.78rem;
-  line-height: 0.8rem;
-  cursor: pointer;
-}
-.ws-thread-disclosure:hover {
-  color: var(--foreground);
-  background: var(--accent);
-  border-radius: calc(var(--radius) - 3px);
-}
 .ws-thread[data-depth="child"] {
   margin-left: 0;
   border-left: 0;
@@ -128,12 +109,9 @@
 }
 .ws-tabs button:focus-visible,
 .ws-icon-button:focus-visible,
-.ws-card-actions button:focus-visible,
 .ws-agent-card:focus-visible,
 .ws-stack-layer:focus-visible,
-.ws-callout button:focus-visible,
-.ws-create-task button:focus-visible,
-.ws-create-task input:focus-visible {
+.ws-callout button:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 1px;
 }
@@ -153,20 +131,6 @@
 .ws-section-count {
   color: var(--muted-foreground);
   font-size: 0.66rem;
-}
-.ws-create-task h3 {
-  margin: 0;
-  color: var(--foreground);
-  font-size: 0.82rem;
-}
-.ws-create-task p {
-  margin: 0;
-  line-height: 1.35;
-}
-.ws-inline-error {
-  color: var(--destructive);
-  font-size: 0.68rem;
-  line-height: 1.35;
 }
 .ws-current-pr-card h3 a {
   color: inherit;
@@ -205,48 +169,6 @@
   font-size: 0.64rem;
   line-height: 1.35;
 }
-.ws-disclosure {
-  border-top: 1px solid var(--border);
-  padding-top: 0.5rem;
-  font-size: 0.72rem;
-}
-.ws-disclosure summary {
-  display: flex;
-  justify-content: space-between;
-  cursor: pointer;
-  font-weight: 650;
-}
-.ws-disclosure summary span {
-  color: var(--muted-foreground);
-  font-weight: 400;
-}
-.ws-subtask-list {
-  display: grid;
-  gap: 0.2rem;
-  margin-top: 0.45rem;
-}
-.ws-subtask {
-  display: grid;
-  grid-template-columns: 0.8rem 1fr auto;
-  align-items: start;
-  gap: 0.35rem;
-  padding: 0.35rem 0;
-}
-.ws-subtask > span:nth-child(2) {
-  display: grid;
-  min-width: 0;
-}
-.ws-subtask small {
-  overflow: hidden;
-  color: var(--muted-foreground);
-  font-size: 0.64rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ws-subtask-status {
-  color: var(--muted-foreground);
-  font-size: 0.6rem;
-}
 .ws-status-dot {
   font-size: 0.72rem;
 }
@@ -256,25 +178,6 @@
 }
 .ws-status-dot-done {
   color: var(--muted-foreground);
-}
-.ws-file-list {
-  display: grid;
-  gap: 0.2rem;
-  margin-top: 0.15rem;
-}
-.ws-file-list span {
-  overflow: hidden;
-  color: var(--muted-foreground);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.6rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ws-file-list b {
-  display: inline-block;
-  width: 1.1rem;
-  color: var(--foreground);
-  font-family: inherit;
 }
 .ws-progress {
   height: 0.35rem;
@@ -288,9 +191,6 @@
   border-radius: inherit;
   background: var(--primary);
   transition: width 0.2s ease;
-}
-.ws-card p {
-  margin: 0;
 }
 .ws-callout {
   display: grid;
@@ -338,22 +238,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ws-stack-layer-action {
-  color: var(--muted-foreground);
-  font-size: 0.6rem;
-}
-.ws-current-agent {
-  display: grid;
-  grid-template-columns: 0.85rem 1fr;
-  gap: 0.45rem;
-  align-items: start;
-  border-bottom: 1px solid var(--border);
-  padding: 0 0 0.55rem;
-}
-.ws-current-agent span:last-child {
-  display: grid;
-}
-.ws-current-agent small,
 .ws-agent-card small {
   color: var(--muted-foreground);
   font-size: 0.62rem;
@@ -374,21 +258,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ws-agent-open {
-  color: var(--muted-foreground);
-  font-size: 0.6rem;
-  white-space: nowrap;
-}
-.ws-agent-state-running,
-.ws-agent-state-review {
-  color: var(--primary);
-}
-.ws-agent-state-failed {
-  color: var(--destructive);
-}
 .ws-agent-state-waiting,
-.ws-agent-state-idle,
-.ws-agent-state-stopping {
+.ws-agent-state-idle {
   color: var(--muted-foreground);
 }
 .ws-agent-review {
@@ -413,22 +284,6 @@
   grid-template-columns: 0.9rem minmax(0, 1fr);
   align-items: center;
   cursor: grab;
-}
-.ws-thread-disclosure,
-.ws-thread-disclosure-placeholder {
-  grid-column: 1;
-  grid-row: 1;
-}
-.ws-thread-disclosure {
-  position: static;
-  justify-self: center;
-  width: 0.9rem;
-  height: 0.9rem;
-  padding: 0;
-}
-.ws-thread-disclosure-placeholder {
-  width: 0.9rem;
-  height: 0.9rem;
 }
 .ws-thread:active {
   cursor: grabbing;
@@ -520,6 +375,7 @@
   font-weight: 650;
   cursor: pointer;
 }
+/* R17 important: host sidebar tab styles otherwise override the active state. */
 .ws-view-selector button:hover,
 .ws-view-active {
   background: var(--accent) !important;
@@ -559,18 +415,6 @@
   display: grid;
   gap: 0.28rem;
 }
-.ws-task-open {
-  min-width: 0;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.ws-task-open:disabled {
-  cursor: default;
-}
 .ws-task-title {
   display: block;
   overflow: hidden;
@@ -578,9 +422,6 @@
   white-space: nowrap;
   font-size: 0.79rem;
   line-height: 1.3;
-}
-.ws-task-open:not(:disabled):hover .ws-task-title {
-  text-decoration: underline;
 }
 .ws-task-meta {
   display: flex;
@@ -599,13 +440,6 @@
 .ws-task-key-badge {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--foreground);
-}
-.ws-task-priority-urgent {
-  color: var(--destructive);
-}
-.ws-task-actions {
-  display: flex;
-  align-items: flex-start;
 }
 .ws-task-status-picker {
   display: inline-flex;
@@ -654,7 +488,6 @@
   padding-left: 0.4rem;
   border-left: 1px solid var(--border);
 }
-.ws-task-actions button,
 .ws-callout button {
   font-size: 0.64rem;
 }
@@ -662,37 +495,6 @@
   position: relative;
   border-radius: calc(var(--radius) - 2px);
 }
-.ws-pr-state {
-  width: 0.75rem;
-  text-align: center;
-}
-.ws-pr-state-label {
-  color: var(--muted-foreground);
-  font-size: 0.62rem;
-}
-.ws-pr-split {
-  display: none;
-  position: absolute;
-  right: 0.35rem;
-  bottom: 0.35rem;
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 3px);
-  background: var(--popover);
-  color: inherit;
-  font-size: 0.6rem;
-  cursor: pointer;
-}
-.ws-pr-row:hover .ws-pr-split,
-.ws-pr-row:focus-within .ws-pr-split {
-  display: block;
-}
-.ws-pr-ready_to_merge,
-.ws-pr-review_requested {
-  color: var(--primary);
-}
-.ws-pr-blocked,
-.ws-pr-checks_failed,
-.ws-pr-conflicts,
 .ws-pr-changes_requested {
   color: var(--destructive);
 }
@@ -730,12 +532,6 @@
   width: 0.82rem;
   height: 0.82rem;
 }
-.ws-pr-stack-rail {
-  display: grid;
-  gap: 0.08rem;
-  margin: 0;
-  padding: 0.08rem 0 0;
-}
 .ws-pr-stack-layer-item {
   min-width: 0;
   padding-left: 0.28rem;
@@ -743,10 +539,6 @@
 .ws-pr-stack-layer-item .ws-pr-row {
   padding-left: 0.28rem;
   border-bottom: 0;
-}
-.ws-pr-stack-identity {
-  color: var(--primary);
-  font-weight: 650;
 }
 .ws-pr-stack-closed {
   opacity: 0.95;
@@ -764,9 +556,6 @@
 .ws-pr-row:hover {
   background: var(--accent);
 }
-.ws-pr-row-main {
-  min-width: 0;
-}
 .ws-pr-target {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -777,19 +566,11 @@
   color: inherit;
   text-decoration: none;
 }
-.ws-pr-target-meta {
-  grid-area: meta;
-  flex-wrap: wrap;
-}
 .ws-pr-target-title {
   grid-area: title;
 }
 .ws-pr-target-context {
   grid-area: context;
-}
-.ws-pr-target > .ws-pr-list-badge {
-  grid-area: badges;
-  align-self: center;
 }
 .ws-pr-meta,
 .ws-pr-context {
@@ -801,25 +582,16 @@
   font-size: 0.58rem;
   line-height: 1.1;
 }
-.ws-pr-context span,
-.ws-pr-repository {
+.ws-pr-context span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ws-pr-repository,
 .ws-pr-number {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .ws-pr-number {
   font-weight: 650;
-}
-.ws-pr-signal {
-  padding: 0.06rem 0.22rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 0.53rem;
-  line-height: 1.1;
 }
 .ws-pr-title {
   overflow: hidden;
@@ -828,34 +600,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ws-pr-list-badge {
-  display: inline-flex;
-  width: 1.05rem;
-  height: 1.05rem;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--muted-foreground);
-  font-size: 0.65rem;
-}
-.ws-pr-list-state-open {
-  color: var(--primary);
-}
-.ws-pr-list-state-merged {
-  color: var(--foreground);
-}
-.ws-pr-list-state-draft,
-.ws-pr-list-state-closed {
-  color: var(--muted-foreground);
-}
 .ws-pr-target:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 1px;
-}
-.ws-pr-review-review_requested,
-.ws-pr-review-review_required {
-  color: var(--muted-foreground);
 }
 .ws-pr-row {
   min-height: 3.35rem;
@@ -986,9 +733,6 @@
   background: var(--accent);
   border-radius: calc(var(--radius) - 3px);
 }
-.ws-pr-list-badge {
-  display: none;
-}
 .ws-pr-state-toggle {
   display: inline-flex;
   padding: 0;
@@ -1004,14 +748,6 @@
   outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-radius: 2px;
-}
-.ws-pr-status-spinning {
-  animation: ws-pr-spin 0.7s linear infinite;
-}
-@keyframes ws-pr-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* PR rows intentionally use only a title and one compact subtitle line. */
@@ -1048,9 +784,6 @@
 }
 .ws-pr-stack-layer-item > .ws-pr-row {
   margin-left: 0.12rem;
-}
-.ws-pr-state-open {
-  color: #22c55e;
 }
 
 /* Keep project creation available without turning it into a full-width footer. */
@@ -1111,6 +844,7 @@
   font-size: 0.62rem;
   white-space: nowrap;
 }
+/* R17 important: host toolbar controls inject spacing that breaks the compact action. */
 .ws-selection-archive {
   padding: 0.15rem 0.3rem !important;
   border: 1px solid var(--border) !important;
@@ -1118,9 +852,11 @@
   font-size: 0.6rem !important;
   white-space: nowrap;
 }
+/* R17 important: host toolbar hover styling hides the archive affordance. */
 .ws-selection-archive:hover {
   background: var(--accent) !important;
 }
+/* R17 important: the host Button preset must not change the icon-only hit target. */
 .ws-new-thread {
   display: inline-flex !important;
   width: 1.55rem !important;
@@ -1133,6 +869,7 @@
   border-radius: calc(var(--radius) - 3px) !important;
   color: var(--muted-foreground) !important;
 }
+/* R17 important: the host Button hover preset overrides this semantic action state. */
 .ws-new-thread:hover {
   border-color: var(--border) !important;
   background: var(--accent) !important;
@@ -1147,23 +884,6 @@
   height: 0.86rem;
 }
 
-.ws-pr-authored-note {
-  padding: 0.2rem 0.45rem 0.35rem;
-  color: var(--muted-foreground);
-  font-size: 0.61rem;
-  line-height: 1.3;
-}
-.ws-pr-stack-base-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-}
-.ws-pr-stack-base-item > .ws-pr-row {
-  min-width: 0;
-}
-.ws-pr-stack-base-item > .ws-pr-stack-disclosure {
-  margin-right: 0.35rem;
-}
 
 /* Modifier-selected rows stay visible without changing their normal layout. */
 .ws-task-row-selected,
@@ -1174,17 +894,16 @@
 .ws-pr-row-selected:hover {
   background: color-mix(in srgb, var(--accent) 72%, var(--primary) 28%);
 }
-.ws-task-open[aria-disabled="true"] {
-  cursor: default;
-}
 
 /* Stack hierarchy lives entirely in the fixed control gutter.  The content
    column must never shift: ordinary PRs, stack roots, and stack layers all
    begin at exactly the same x-coordinate. */
+/* R17 important: host list indentation must not move the fixed stack rail gutter. */
 .ws-pr-stack-layer-item {
   margin-left: 0 !important;
   padding-left: 0 !important;
 }
+/* R17 important: host row indentation must not shift stack content from ordinary rows. */
 .ws-pr-stack-layer-item > .ws-pr-row {
   margin-left: 0 !important;
   padding-left: 0 !important;
@@ -1205,6 +924,7 @@
   grid-template-columns: var(--ws-pr-stack-gutter) minmax(0, 1fr) auto;
   padding-left: 0;
 }
+/* R17 important: host pseudo-element offsets must not move the calculated rail. */
 .ws-pr-stack-layer-item::before {
   left: calc(
     var(--ws-pr-row-inline-padding) + (var(--ws-pr-stack-gutter) - 1px) / 2 -
@@ -1213,18 +933,6 @@
   width: 1px;
 }
 
-.ws-thread-filter {
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 3px);
-  padding: 0.15rem 0.3rem;
-  background: transparent;
-  color: inherit;
-  font-size: 0.6rem;
-  cursor: pointer;
-}
-.ws-thread-filter:hover {
-  background: var(--accent);
-}
 .ws-archived-thread {
   opacity: 0.8;
 }
@@ -1341,9 +1049,6 @@
 .ws-thread-pr-token[data-tone="destructive"],
 .ws-thread-pr-token[data-tone="closed"] { color: var(--destructive); }
 .ws-thread-pr-token[data-tone="merged"] { color: var(--primary); }
-.ws-thread-agent-count svg {
-  transform: translateY(0.35px);
-}
 .ws-child-agent-working {
   color: var(--primary);
   animation: ws-child-agent-dance 1.1s ease-in-out infinite;
@@ -1376,65 +1081,8 @@
   white-space: nowrap;
 }
 
-/* Work V2: a shared focus strip prevents each tab from repeating the same
-   thread/PR/task details. It is intentionally compact enough for the panel. */
-.ws-focus-strip {
-  display: grid;
-  gap: 0.38rem;
-  margin: 0 0 0.7rem;
-}
-.ws-focus-summary {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.38rem;
-}
-.ws-focus-summary > span:not(.ws-focus-state) {
-  display: grid;
-  min-width: 0;
-  gap: 0.04rem;
-}
-.ws-focus-summary strong {
-  font-size: 0.68rem;
-  line-height: 1.1;
-}
-.ws-focus-summary small {
-  overflow: hidden;
-  color: var(--muted-foreground);
-  font-size: 0.59rem;
-  line-height: 1.1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ws-focus-state {
-  width: 0.42rem;
-  height: 0.42rem;
-  flex: none;
-  border-radius: 999px;
-  background: var(--muted-foreground);
-}
-.ws-focus-state-active,
-.ws-focus-state-starting {
-  background: #22c55e;
-}
-.ws-focus-state-error {
-  background: var(--destructive);
-}
-.ws-focus-pr {
-  margin-left: auto;
-  flex: none;
-  color: var(--primary);
-  font-size: 0.61rem;
-  text-decoration: none;
-}
-.ws-focus-pr:hover {
-  text-decoration: underline;
-}
 .ws-linear-card {
   gap: 0.36rem;
-}
-.ws-linear-card .ws-card-heading {
-  align-items: center;
 }
 .ws-linear-controls {
   display: flex;
@@ -1474,7 +1122,7 @@
 }
 .ws-linear-issue b {
   flex: none;
-  color: #8b5cf6;
+  color: var(--primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .ws-linear-issue span {
@@ -1482,31 +1130,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ws-linear-search {
-  display: flex;
-  min-width: 0;
-  gap: 0.32rem;
-}
-.ws-linear-search input {
-  min-width: 0;
-  height: 1.5rem;
-  border-radius: 999px;
-  font-size: 0.61rem;
-}
-.ws-linear-search button {
-  height: 1.5rem;
-  padding: 0.1rem 0.35rem;
-  font-size: 0.58rem;
-}
 .ws-linear-error {
   color: var(--destructive);
   font-size: 0.56rem;
 }
 .ws-panel-header .ws-panel-heading strong {
   letter-spacing: 0.01em;
-}
-.ws-activity-card {
-  gap: 0.35rem;
 }
 .ws-activity-copy {
   display: -webkit-box;
@@ -1539,14 +1168,6 @@
 .ws-agent-card:hover {
   background: var(--accent);
 }
-.ws-agent-open {
-  align-self: center;
-  color: var(--muted-foreground);
-  font-size: 0.57rem;
-}
-.ws-current-agent {
-  padding: 0.4rem 0;
-}
 
 /* The tree no longer reserves a leading column solely for child disclosure.
    Agent count/expand belongs with the row’s compact status controls. */
@@ -1562,9 +1183,6 @@
 }
 .ws-thread > .ws-thread-anchor.ws-thread-has-children {
   padding-left: 0;
-}
-.ws-thread-disclosure-placeholder {
-  display: none;
 }
 .ws-thread-child-depth-1,
 .ws-thread-child-depth-2,
@@ -1622,65 +1240,6 @@
   display: block;
   min-width: 1rem;
   height: 1.76rem;
-}
-
-/* Compact state advancement: the visible status is itself the control. */
-.ws-task-card-icons {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-.ws-priority-icon {
-  width: 0.78rem;
-  height: 0.78rem;
-}
-.ws-priority-urgent,
-.ws-priority-high {
-  color: var(--destructive);
-}
-.ws-priority-medium {
-  color: #eab308;
-}
-.ws-priority-low {
-  color: var(--muted-foreground);
-}
-.ws-work-status-button {
-  display: grid;
-  place-items: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  border: 1px solid color-mix(in srgb, currentColor 32%, var(--border));
-  border-radius: 999px;
-  padding: 0;
-  background: color-mix(in srgb, currentColor 8%, transparent);
-  cursor: pointer;
-}
-.ws-work-status-button svg {
-  width: 0.68rem;
-  height: 0.68rem;
-}
-.ws-work-status-button:hover:not(:disabled) {
-  background: color-mix(in srgb, currentColor 16%, var(--accent));
-}
-.ws-work-status-button:disabled {
-  opacity: 0.55;
-  cursor: wait;
-}
-.ws-work-status-backlog,
-.ws-work-status-todo {
-  color: var(--muted-foreground);
-}
-.ws-work-status-in_progress {
-  color: var(--primary);
-}
-.ws-work-status-in_review {
-  color: #8b5cf6;
-}
-.ws-agent-context {
-  display: grid;
-  gap: 0.42rem;
-  margin-top: 0.12rem;
-  padding-top: 0;
 }
 
 /* Changes is a stack inspector. PR activation expands the change list; the
@@ -1752,33 +1311,11 @@
   color: var(--muted-foreground);
   font-size: 0.57rem;
 }
-.ws-pr-state-icon {
-  font-size: 0.72rem;
-  text-align: center;
-}
-.ws-pr-ready_to_merge {
-  color: #22c55e;
-}
-.ws-pr-checks_failed,
-.ws-pr-conflicts,
 .ws-pr-changes_requested {
   color: var(--destructive);
 }
-.ws-pr-draft {
-  color: var(--muted-foreground);
-}
 .ws-repository-card {
   gap: 0.32rem;
-}
-.ws-file-list {
-  max-height: 13rem;
-  overflow: auto;
-  border-top: 1px solid var(--border);
-  margin-top: 0.08rem;
-  padding-top: 0.3rem;
-}
-.ws-stack-current .ws-stack-layer {
-  background: color-mix(in srgb, var(--primary) 6%, transparent) !important;
 }
 .ws-stack-rail {
   display: grid;
@@ -1790,6 +1327,7 @@
 .ws-stack-layer-item {
   position: relative;
 }
+/* R17 important: host link and button defaults must not alter stack rail geometry. */
 .ws-stack-layer {
   display: grid;
   grid-template-columns: 0.8rem minmax(0, 1fr) auto;
@@ -1805,28 +1343,6 @@
 }
 .ws-stack-layer:hover {
   background: var(--accent);
-}
-.ws-stack-node {
-  display: grid;
-  place-items: center;
-  width: 0.7rem;
-  height: 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  font-size: 0.48rem;
-  line-height: 1;
-}
-.ws-stack-node-open {
-  color: var(--success);
-}
-.ws-stack-node-draft {
-  color: var(--muted-foreground);
-}
-.ws-stack-node-blocked {
-  color: var(--destructive);
-}
-.ws-stack-node-merged {
-  color: #9c6ade;
 }
 .ws-stack-layer-toggle {
   display: grid;
@@ -1943,7 +1459,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--popover);
-  box-shadow: 0 8px 24px color-mix(in srgb, #000 18%, transparent);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--foreground) 18%, transparent);
 }
 .ws-thread-settings-menu button {
   border: 0;
@@ -2059,36 +1575,47 @@
   font-size: 0.61rem;
 }
 .ws-card {
+  display: grid;
+  min-width: 0;
   gap: 0.38rem;
   padding: 0.58rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--foreground);
+}
+.ws-card :is(button, input, select):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
 }
 .ws-card-heading {
-  font-size: 0.63rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 0.8rem;
+  gap: 0.4rem;
+  font-size: 0.58rem;
+  line-height: 1;
 }
 .ws-card-heading strong {
+  font: inherit;
   font-weight: 700;
 }
-.ws-card h3 {
+.ws-card-title {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 400;
-  line-height: 1.3;
+  line-height: 1.35;
 }
-.ws-card p,
+.ws-card-note {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 0.64rem;
+  line-height: 1.35;
+}
 .ws-plan-item {
   font-size: 0.68rem;
-}
-.ws-plan-item {
   padding: 0.3rem 0.12rem;
-}
-.ws-subtask-list {
-  margin-top: 0.08rem;
-}
-.ws-subtask {
-  padding: 0.28rem 0;
-}
-.ws-agent-context > header {
-  margin-top: 0;
 }
 .ws-pr-tooltip {
   position: relative;
@@ -2163,63 +1690,6 @@
 .ws-agent-state-complete {
   color: var(--success);
 }
-.ws-agent-open {
-  width: 0.66rem;
-  height: 0.66rem;
-  justify-self: end;
-  color: var(--muted-foreground);
-}
-.ws-agent-card:hover .ws-agent-open {
-  color: var(--foreground);
-}
-.ws-execution-card {
-  gap: 0.24rem;
-}
-.ws-execution-card .ws-subtask-list {
-  gap: 0;
-}
-.ws-execution-card .ws-subtask {
-  grid-template-columns: 0.62rem minmax(0, 1fr);
-  gap: 0.26rem;
-  padding: 0.22rem 0;
-}
-.ws-execution-card .ws-subtask strong {
-  font-size: 0.64rem;
-  font-weight: 400;
-  line-height: 1.2;
-}
-.ws-execution-card .ws-subtask small {
-  font-size: 0.54rem;
-  line-height: 1.15;
-}
-.ws-execution-card .ws-status-dot {
-  font-size: 0.6rem;
-}
-.ws-goal,
-.ws-plan-card {
-  gap: 0.32rem;
-  padding: 0.58rem;
-}
-.ws-goal .ws-card-heading,
-.ws-plan-card .ws-card-heading {
-  min-height: 0.72rem;
-  font-size: 0.58rem;
-}
-.ws-goal h3 {
-  font-size: 0.68rem;
-  font-weight: 400;
-  line-height: 1.28;
-}
-.ws-plan-card .ws-plan {
-  gap: 0;
-}
-.ws-plan-card .ws-plan-item {
-  gap: 0.38rem;
-  padding: 0.22rem 0.08rem;
-  font-size: 0.62rem;
-  line-height: 1.28;
-}
-.ws-card-heading,
 .ws-section-count {
   font-size: 0.58rem;
 }
@@ -2238,8 +1708,7 @@
   height: 1.5rem;
   font-size: 0.61rem;
 }
-.ws-outcome-create-button,
-.ws-compact-action {
+.ws-outcome-create-button {
   height: 1.5rem;
   flex: none;
   border: 1px solid var(--border);
@@ -2251,19 +1720,12 @@
   line-height: 1;
   cursor: pointer;
 }
-.ws-outcome-create-button:hover:not(:disabled),
-.ws-compact-action:hover {
+.ws-outcome-create-button:hover:not(:disabled) {
   background: var(--accent);
 }
 .ws-outcome-create-button:disabled {
   opacity: 0.5;
   cursor: wait;
-}
-.ws-empty-state-card .ws-compact-action {
-  justify-self: start;
-}
-.ws-outcome-empty .ws-inline-error {
-  font-size: 0.56rem;
 }
 .ws-activity-list {
   display: grid;
@@ -2319,7 +1781,7 @@
   opacity: 0.5;
 }
 .ws-linear-options b {
-  color: #8b5cf6;
+  color: var(--primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-weight: 600;
 }
@@ -2333,9 +1795,6 @@
   padding: 0.35rem;
   color: var(--muted-foreground);
   font-size: 0.57rem;
-}
-.ws-working-tree-card .ws-current-pr-summary {
-  padding-right: 1.85rem;
 }
 .ws-working-tree-files {
   display: grid;
@@ -2392,10 +1851,10 @@ button.ws-provider-health:focus-visible {
   outline-offset: 2px;
 }
 .ws-provider-health-green {
-  background: #22c55e;
+  background: var(--success);
 }
 .ws-provider-health-amber {
-  background: #d97706;
+  background: var(--warning);
 }
 .ws-provider-health-red {
   background: var(--destructive);
@@ -2472,17 +1931,6 @@ button.ws-provider-health:focus-visible {
   white-space: pre-wrap;
   word-break: break-word;
 }
-.ws-outcome-body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.4rem;
-  align-items: center;
-}
-.ws-outcome-body > div {
-  display: grid;
-  gap: 0.16rem;
-  min-width: 0;
-}
 .ws-outcome-key {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
@@ -2506,7 +1954,7 @@ button.ws-provider-health:focus-visible {
   white-space: nowrap;
 }
 .ws-linear-header-badge {
-  color: #8b5cf6;
+  color: var(--primary);
 }
 .ws-linear-header-badge:hover {
   background: var(--accent);
@@ -2576,55 +2024,6 @@ button.ws-provider-health:focus-visible {
   gap: 0.18rem;
   padding-right: 0.08rem;
 }
-.ws-current-pr-signal {
-  display: grid;
-  place-items: center;
-  width: 0.7rem;
-  height: 0.7rem;
-  border-radius: 999px;
-  font-size: 0.58rem;
-  line-height: 1;
-}
-.ws-current-pr-signal svg,
-.ws-pr-state-icon svg {
-  width: 0.68rem;
-  height: 0.68rem;
-}
-.ws-pr-state-open,
-.ws-pr-state-success {
-  color: var(--success);
-}
-.ws-pr-state-draft,
-.ws-pr-state-pending {
-  color: var(--muted-foreground);
-}
-.ws-pr-state-problem,
-.ws-pr-state-closed {
-  color: var(--destructive);
-}
-.ws-pr-state-merged {
-  color: #9c6ade;
-}
-.ws-focus-state-working {
-  background: var(--primary);
-  animation: ws-status-blink 1.5s ease-in-out infinite;
-}
-.ws-focus-state-waiting,
-.ws-focus-state-idle {
-  background: var(--muted-foreground);
-}
-.ws-focus-state-blocked {
-  background: var(--destructive);
-}
-.ws-focus-state-complete {
-  background: var(--success);
-}
-@keyframes ws-status-blink {
-  50% {
-    opacity: 0.42;
-    transform: scale(0.86);
-  }
-}
 .ws-working-tree-files .ws-working-tree-file {
   display: grid;
   grid-template-columns: 0.65rem minmax(0, 1fr) auto;
@@ -2652,14 +2051,7 @@ button.ws-provider-health:focus-visible {
   top: 0;
   background: var(--card);
 }
-.ws-stack-signal {
-  display: grid;
-  place-items: center;
-  width: 0.7rem;
-  height: 0.7rem;
-  font-size: 0.58rem;
-  line-height: 1;
-}
+/* R17 important: host selection backgrounds must not bleed into the nested stack. */
 .ws-stack-current .ws-stack-layer {
   background: color-mix(in srgb, var(--primary) 3%, transparent) !important;
 }
@@ -2731,6 +2123,7 @@ button.ws-provider-health:focus-visible {
 .ws-stack-current {
   background: transparent;
 }
+/* R17 important: host nested selection backgrounds must leave expanded files neutral. */
 .ws-stack-current > .ws-stack-files,
 .ws-stack-current > .ws-stack-files * {
   background: transparent !important;
@@ -2744,19 +2137,6 @@ button.ws-provider-health:focus-visible {
 .ws-stack-state-icon svg {
   width: 0.67rem;
   height: 0.67rem;
-}
-.ws-stack-node-open {
-  color: var(--success);
-}
-.ws-stack-node-draft {
-  color: var(--muted-foreground);
-}
-.ws-stack-node-blocked,
-.ws-stack-node-closed {
-  color: var(--destructive);
-}
-.ws-stack-node-merged {
-  color: #9c6ade;
 }
 .ws-stack-subtitle-signals {
   display: inline-flex;
@@ -2804,18 +2184,10 @@ button.ws-provider-health:focus-visible {
 .ws-status[data-tone="merged"] {
   color: var(--primary);
 }
-.ws-stack-review {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.06rem;
-}
-.ws-stack-review b {
-  font-size: 0.52rem;
-  font-weight: 500;
-}
 .ws-work-toolbar-actions {
   min-height: 1.6rem;
 }
+/* R17 important: host icon controls inject padding that breaks the fixed hit target. */
 .ws-icon-button,
 .ws-new-thread {
   display: grid !important;
@@ -2831,6 +2203,7 @@ button.ws-provider-health:focus-visible {
   height: 0.76rem;
   margin: 0;
 }
+/* R17 important: host Button sizing must keep the new-thread action aligned with icons. */
 .ws-new-thread {
   width: 1.6rem !important;
   height: 1.6rem !important;
@@ -2843,6 +2216,7 @@ button.ws-provider-health:focus-visible {
 .ws-thread-settings {
   z-index: 41;
 }
+/* R17 important: host popover placement must overlay the sticky toolbar. */
 .ws-thread-settings-menu {
   top: calc(100% + 0.2rem) !important;
   bottom: auto !important;
@@ -2852,6 +2226,7 @@ button.ws-provider-health:focus-visible {
   position: relative;
   z-index: 0;
 }
+/* R17 important: the enhanced list must cancel host slot padding edge-to-edge. */
 .ws-list {
   margin: -0.75rem !important;
   padding: 0 !important;
@@ -2859,6 +2234,7 @@ button.ws-provider-health:focus-visible {
 }
 /* Both headers are direct children of the full list. That gives their sticky
    offsets the sidebar scrollport, rather than the short header wrapper. */
+/* R17 important: host sidebar layout rules otherwise defeat sticky selector geometry. */
 .ws-view-selector {
   position: sticky !important;
   z-index: 45;
@@ -2875,6 +2251,7 @@ button.ws-provider-health:focus-visible {
 .ws-view-selector::before {
   content: none;
 }
+/* R17 important: host tab sizing otherwise changes the sticky selector height. */
 .ws-view-selector button {
   position: relative;
   box-sizing: border-box !important;
@@ -2882,6 +2259,7 @@ button.ws-provider-health:focus-visible {
   min-height: 0 !important;
   padding: 0 0.25rem !important;
 }
+/* R17 important: host toolbar margins otherwise break its sticky offset. */
 .ws-list-toolbar {
   position: sticky !important;
   z-index: 44;
@@ -2939,78 +2317,6 @@ button.ws-provider-health:focus-visible {
   display: grid;
   gap: 0.36rem;
 }
-.ws-thread-task-list {
-  display: grid;
-  gap: 0.2rem;
-}
-.ws-thread-task-list > span {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 0.28rem;
-  align-items: center;
-  color: var(--muted-foreground);
-  font-size: 0.61rem;
-}
-.ws-thread-task-list b {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: var(--foreground);
-  font-weight: 600;
-}
-.ws-thread-task-list em {
-  overflow: hidden;
-  font-style: normal;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ws-thread-task-list button {
-  display: grid;
-  place-items: center;
-  width: 1rem;
-  height: 1rem;
-  border: 0;
-  border-radius: 3px;
-  padding: 0;
-  background: transparent;
-  color: var(--muted-foreground);
-  cursor: pointer;
-}
-.ws-thread-task-list button:hover {
-  background: var(--accent);
-  color: var(--destructive);
-}
-.ws-thread-task-list button svg {
-  width: 0.65rem;
-  height: 0.65rem;
-}
-.ws-thread-task-attach {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.28rem;
-}
-.ws-thread-task-attach select {
-  min-width: 0;
-  height: 1.6rem;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  padding: 0 0.3rem;
-  background: var(--background);
-  color: var(--foreground);
-  font-size: 0.61rem;
-}
-.ws-thread-task-attach button {
-  height: 1.6rem;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  padding: 0 0.36rem;
-  background: transparent;
-  color: var(--primary);
-  font-size: 0.6rem;
-  cursor: pointer;
-}
-.ws-thread-task-attach button:disabled {
-  opacity: 0.5;
-  cursor: wait;
-}
 .ws-github-api-indicator {
   display: inline-flex;
   align-items: center;
@@ -3028,7 +2334,7 @@ button.ws-provider-health:focus-visible {
   flex: none;
 }
 .ws-github-api-rate_limited {
-  color: #b45309;
+  color: var(--warning);
 }
 .ws-github-api-unavailable {
   color: var(--destructive);
@@ -3055,9 +2361,6 @@ button.ws-provider-health:focus-visible {
 .ws-task-badge svg {
   width: 0.58rem;
   height: 0.58rem;
-}
-.ws-task-actions {
-  align-items: start;
 }
 .ws-task-status-picker {
   position: relative;
@@ -3089,31 +2392,6 @@ button.ws-provider-health:focus-visible {
 .ws-task-status-picker:has(select:disabled) {
   opacity: 0.55;
   cursor: wait;
-}
-.ws-thread-execution-list {
-  display: grid;
-  gap: 0;
-  margin-top: 0.08rem;
-  border-top: 1px solid var(--border);
-  padding-top: 0.24rem;
-}
-.ws-thread-execution-list .ws-subtask {
-  display: grid;
-  grid-template-columns: 0.62rem minmax(0, 1fr);
-  gap: 0.26rem;
-  padding: 0.22rem 0;
-}
-.ws-thread-execution-list .ws-subtask strong {
-  display: block;
-  font-size: 0.64rem;
-  font-weight: 400;
-  line-height: 1.2;
-}
-.ws-thread-execution-list .ws-subtask small {
-  display: block;
-  color: var(--muted-foreground);
-  font-size: 0.54rem;
-  line-height: 1.15;
 }
 .ws-combobox {
   position: relative;
@@ -3171,31 +2449,6 @@ button.ws-provider-health:focus-visible {
 .ws-combobox-options > small {
   padding: 0.35rem;
 }
-.ws-task-assignee {
-  width: 3.45rem;
-}
-.ws-task-assignee input {
-  height: 1rem !important;
-  min-height: 1rem;
-  border: 1px solid var(--border) !important;
-  border-radius: 999px !important;
-  padding: 0.03rem 0.2rem !important;
-  background: transparent !important;
-  font-size: 0.54rem !important;
-  line-height: 1 !important;
-}
-.ws-thread-task-attach .ws-combobox {
-  min-width: 0;
-}
-.ws-thread-task-attach .ws-combobox input {
-  height: 1.6rem;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  padding: 0 0.3rem;
-  background: var(--background);
-  color: var(--foreground);
-  font-size: 0.61rem;
-}
 .ws-linear-search-row {
   border-bottom: 1px solid var(--border);
   padding: 0.28rem;
@@ -3221,53 +2474,6 @@ button.ws-provider-health:focus-visible {
   gap: 0.38rem;
   padding: 0.58rem;
 }
-.ws-thread-task-card .ws-card-heading {
-  font-size: 0.58rem;
-}
-.ws-thread-task-list > span {
-  font-size: 0.68rem;
-  line-height: 1.3;
-}
-.ws-thread-task-list b {
-  font-family: inherit;
-  font-weight: 400;
-}
-.ws-thread-task-list em {
-  color: var(--muted-foreground);
-}
-.ws-thread-task-attach {
-  gap: 0.35rem;
-}
-.ws-thread-task-attach .ws-combobox input,
-.ws-thread-task-attach button {
-  height: 1.5rem;
-  font: inherit;
-  font-size: 0.61rem;
-}
-.ws-thread-task-attach button {
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  background: transparent;
-  color: var(--foreground);
-}
-.ws-thread-task-attach button:hover:not(:disabled) {
-  background: var(--accent);
-}
-.ws-thread-execution-list {
-  margin-top: 0.04rem;
-  padding-top: 0.32rem;
-}
-.ws-thread-execution-list .ws-subtask {
-  padding: 0.3rem 0;
-}
-.ws-thread-execution-list .ws-subtask strong {
-  font-size: 0.68rem;
-  line-height: 1.3;
-}
-.ws-thread-execution-list .ws-subtask small {
-  font-size: 0.61rem;
-  line-height: 1.3;
-}
 .ws-task-meta .ws-task-key-badge,
 .ws-task-meta .ws-task-badge {
   min-height: 0;
@@ -3275,17 +2481,6 @@ button.ws-provider-health:focus-visible {
   padding: 0.08rem 0.24rem;
   font-size: 0.58rem;
   line-height: 1.1;
-}
-.ws-task-assignee {
-  width: 3.8rem;
-}
-.ws-task-assignee input {
-  height: auto !important;
-  min-height: 0 !important;
-  border-radius: 3px !important;
-  padding: 0.08rem 0.24rem !important;
-  font-size: 0.58rem !important;
-  line-height: 1.1 !important;
 }
 .ws-task-status-picker {
   width: 1rem;
@@ -3298,76 +2493,7 @@ button.ws-provider-health:focus-visible {
   width: 0.62rem;
   height: 0.62rem;
 }
-.ws-task-assignee {
-  width: auto;
-  min-width: 3.8rem;
-  height: 1.2rem;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  padding: 0 0.18rem;
-  background: transparent;
-  color: var(--muted-foreground);
-  font: inherit;
-  font-size: 0.58rem;
-  line-height: 1;
-  cursor: pointer;
-}
-.ws-task-actions {
-  gap: 0.14rem;
-}
-.ws-task-thread-link {
-  display: grid;
-  place-items: center;
-  width: 1rem;
-  height: 1rem;
-  border: 0;
-  border-radius: 2px;
-  padding: 0;
-  background: transparent;
-  color: var(--muted-foreground);
-  cursor: pointer;
-}
-.ws-task-thread-link svg {
-  width: 0.62rem;
-  height: 0.62rem;
-}
-.ws-task-thread-link:hover {
-  background: var(--accent);
-  color: var(--foreground);
-}
-.ws-task-thread-linked {
-  color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 9%, transparent);
-}
 
-/* Atomic Work card primitives. Content never declares another type scale: it
-   composes headings, rows, and controls from these shared slots instead. */
-.ws-work-card {
-  display: grid;
-  gap: 0.38rem;
-  padding: 0.58rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--card);
-  color: var(--foreground);
-}
-.ws-work-card-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 0.78rem;
-  color: var(--foreground);
-  font-size: 0.58rem;
-  line-height: 1;
-}
-.ws-work-card-heading strong {
-  font: inherit;
-  font-weight: 650;
-}
-.ws-work-card-heading > *:last-child:not(strong) {
-  color: var(--muted-foreground);
-  font-size: 0.58rem;
-}
 .ws-work-card-list {
   display: grid;
   gap: 0;
@@ -3462,18 +2588,6 @@ button.ws-provider-health:focus-visible {
   opacity: 0.5;
   cursor: wait;
 }
-/* Reset legacy task rules so this card cannot inherit its own competing scale. */
-.ws-work-card.ws-thread-task-card,
-.ws-work-card.ws-thread-task-card .ws-card-heading {
-  gap: 0.38rem;
-  padding: 0.58rem;
-  font-size: inherit;
-}
-.ws-work-card.ws-thread-task-card .ws-thread-task-list,
-.ws-work-card.ws-thread-task-card .ws-thread-task-attach,
-.ws-work-card.ws-thread-task-card .ws-thread-execution-list {
-  all: unset;
-}
 .ws-settings-card {
   display: grid;
   gap: 0.28rem;
@@ -3495,56 +2609,6 @@ button.ws-provider-health:focus-visible {
 }
 .ws-settings-card small {
   font-size: 0.64rem;
-}
-.ws-surface {
-  --ws-surface-gap: 0.4rem;
-  --ws-surface-pad: 0.62rem;
-  display: grid;
-  gap: var(--ws-surface-gap);
-  min-width: 0;
-  padding: var(--ws-surface-pad);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--card);
-  color: var(--foreground);
-  font-size: 0.64rem;
-  line-height: 1.35;
-}
-.ws-surface-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 0.8rem;
-  gap: 0.4rem;
-  font-size: 0.6rem;
-  line-height: 1;
-}
-.ws-surface-heading strong {
-  font: inherit;
-  font-weight: 650;
-}
-.ws-surface-heading > span,
-.ws-surface-heading > div {
-  color: var(--muted-foreground);
-  font-size: 0.58rem;
-}
-.ws-surface p {
-  margin: 0;
-  color: var(--muted-foreground);
-  font-size: inherit;
-  line-height: inherit;
-}
-.ws-surface h3 {
-  margin: 0;
-  font-size: 0.72rem;
-  font-weight: 400;
-  line-height: 1.35;
-}
-.ws-surface button:focus-visible,
-.ws-surface input:focus-visible,
-.ws-surface select:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 1px;
 }
 .ws-task-assign {
   min-width: 0;
@@ -3580,7 +2644,7 @@ button.ws-provider-health:focus-visible {
   color: var(--destructive);
 }
 .ws-task-priority-medium {
-  color: #d97706;
+  color: var(--warning);
 }
 .ws-task-priority-low {
   color: var(--muted-foreground);

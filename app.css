@@ -8,12 +8,8 @@
   padding: 0.35rem;
 }
 .ws-list-toolbar,
-.ws-group-header,
 .ws-thread-anchor,
 .ws-thread-meta,
-.ws-tabs,
-.ws-card-heading,
-.ws-card-actions,
 .ws-agent-card {
   display: flex;
   align-items: center;
@@ -25,31 +21,11 @@
   font-size: 0.7rem;
 }
 .ws-list-toolbar button,
-.ws-group-header,
-.ws-tabs button,
 .ws-track-action {
   border: 0;
   background: transparent;
   color: inherit;
   cursor: pointer;
-}
-.ws-group {
-  margin-bottom: 0.45rem;
-}
-.ws-group-header {
-  width: 100%;
-  justify-content: space-between;
-  padding: 0.42rem 0.5rem;
-  font-size: 0.72rem;
-  font-weight: 650;
-  color: var(--muted-foreground);
-  text-transform: uppercase;
-  letter-spacing: 0.035em;
-}
-.ws-project-label {
-  padding: 0.12rem 0.65rem 0;
-  font-size: 0.62rem;
-  color: var(--muted-foreground);
 }
 .ws-thread {
   position: relative;
@@ -77,17 +53,6 @@
   color: var(--muted-foreground);
   text-align: center;
 }
-.ws-status-runtime,
-.ws-status-workflow,
-.ws-status-background-agent {
-  color: var(--primary);
-}
-.ws-status-unread-error {
-  color: var(--destructive);
-}
-.ws-status-unread-success {
-  color: var(--primary);
-}
 .ws-thread-main {
   min-width: 0;
   flex: 1;
@@ -113,21 +78,14 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ws-task-key,
-.ws-pr {
+.ws-task-key {
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0 0.25rem;
   color: var(--foreground);
 }
-.ws-pr-checks_failed,
-.ws-pr-conflicts,
 .ws-pr-changes_requested {
   color: var(--destructive);
-}
-.ws-state {
-  font-size: 0.65rem;
-  color: var(--muted-foreground);
 }
 .ws-unread-dot {
   width: 0.38rem;
@@ -139,48 +97,25 @@
   padding: 0.35rem;
 }
 .ws-empty,
-.ws-callout,
-.ws-create-task {
+.ws-callout {
   padding: 1rem;
   color: var(--muted-foreground);
   font-size: 0.8rem;
 }
-.ws-callout,
-.ws-create-task {
+.ws-callout {
   border: 1px dashed var(--border);
   border-radius: var(--radius);
-}
-.ws-create-task {
-  display: grid;
-  gap: 0.6rem;
 }
 .ws-new-thread {
   width: calc(100% - 1rem);
   margin: 0.5rem;
-}
-.ws-native-fallback {
-  margin: 0.75rem 0.5rem;
-  color: var(--muted-foreground);
-  font-size: 0.7rem;
 }
 .ws-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
-.ws-tabs {
-  flex: 0 0 auto;
-  gap: 0.15rem;
-  border-bottom: 1px solid var(--border);
-  padding: 0.45rem;
-}
-.ws-tabs button {
-  flex: 1;
-  padding: 0.45rem 0.25rem;
-  border-radius: calc(var(--radius) - 2px);
-  font-size: 0.72rem;
-}
-.ws-tabs button:hover,
+/* R17 important: host tab button styles otherwise override the active state. */
 .ws-tab-active {
   background: var(--accent) !important;
   color: var(--accent-foreground) !important;
@@ -206,37 +141,10 @@
   color: var(--muted-foreground);
   font-size: 0.68rem;
 }
-.ws-card {
-  display: grid;
-  gap: 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.8rem;
-  background: var(--card);
-}
-.ws-card-heading {
-  justify-content: space-between;
-  font-size: 0.7rem;
-}
-.ws-card h3 {
-  font-size: 0.9rem;
-  line-height: 1.35;
-}
-.ws-card p {
-  color: var(--muted-foreground);
-  font-size: 0.7rem;
-}
 .ws-pill {
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.1rem 0.4rem;
-}
-.ws-pill-in_progress {
-  color: var(--primary);
-}
-.ws-pill-in_review {
-  color: var(--foreground);
-  background: var(--accent);
 }
 .ws-plan {
   display: grid;
@@ -254,9 +162,6 @@
 }
 .ws-plan-in_progress {
   font-weight: 650;
-}
-.ws-stack-rail {
-  display: grid;
 }
 .ws-stack-layer {
   display: grid;
@@ -280,14 +185,6 @@
   color: var(--muted-foreground);
   font-size: 0.65rem;
 }
-.ws-stack-node {
-  color: var(--primary);
-}
-.ws-stack-trunk {
-  padding: 0.5rem;
-  color: var(--muted-foreground);
-  font-size: 0.72rem;
-}
 .ws-agent-card {
   width: 100%;
   display: grid;
@@ -306,13 +203,6 @@
 }
 .ws-agent-state {
   color: var(--muted-foreground);
-}
-.ws-agent-active,
-.ws-agent-starting {
-  color: var(--primary);
-}
-.ws-agent-error {
-  color: var(--destructive);
 }
 .ws-track-action {
   border: 1px solid var(--border);

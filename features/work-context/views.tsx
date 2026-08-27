@@ -3,7 +3,7 @@ import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Icon } from "../../components/ui/icon";
 import { Input } from "../../components/ui/input";
-import { WorkCard, WorkCardHeading } from "../../components/work/card";
+import { SurfaceCard, SurfaceCardHeading } from "../../components/ui/surface-card";
 import { Combobox } from "../../components/ui/combobox";
 import { AssigneePicker } from "../../components/tasks/assignee-picker";
 import type { rpcContract } from "../../contracts";
@@ -17,12 +17,12 @@ type CardStateProps = { title: string; className?: string; pending: boolean; err
 
 function CardState({ title, className = "", pending, error, onRetry, children }: CardStateProps) {
   return (
-    <WorkCard className={`ws-work-context-card ${className}`} data-card={title.toLowerCase()}>
-      <WorkCardHeading title={title} />
+    <SurfaceCard className={`ws-work-context-card ${className}`} data-card={title.toLowerCase()}>
+      <SurfaceCardHeading title={title} />
       {pending ? <p className="ws-card-note" role="status" aria-busy="true">Loading {title.toLowerCase()}…</p> : null}
       {error ? <div className="ws-card-note" role="alert"><span>{error.message}</span><button type="button" onClick={onRetry}>Try again</button></div> : null}
       {!pending && !error ? children : null}
-    </WorkCard>
+    </SurfaceCard>
   );
 }
 
@@ -37,7 +37,7 @@ function StatusCard({ threadId }: { threadId: string }) {
   const active = data?.children.filter((child) => !child.isArchived && ["active", "starting"].includes(child.status)).length ?? 0;
   return (
     <CardState title="Status" className="ws-status-card" pending={query.isPending} error={query.error} onRetry={() => void query.refetch()}>
-      <div className="ws-status-summary"><h3>{runtime?.label ?? "Unknown"}</h3><p className="ws-working-state"><span title={`${total} child agents`}><Icon name="Bot" aria-hidden />{total}</span><span title={`${active} active child agents`}><Icon name="Wrench" aria-hidden />{active}</span></p></div>
+      <div className="ws-status-summary"><h3 className="ws-card-title">{runtime?.label ?? "Unknown"}</h3><p className="ws-working-state"><span title={`${total} child agents`}><Icon name="Bot" aria-hidden />{total}</span><span title={`${active} active child agents`}><Icon name="Wrench" aria-hidden />{active}</span></p></div>
       {latestActivity.data?.latest || latestActivity.data?.lastUser ? <div className="ws-activity-list">{latestActivity.data?.latest ? <ActivityRow label="Agent" entry={latestActivity.data.latest} expanded={expanded.has("agent")} onToggle={() => setExpanded((current) => { const next = new Set(current); next.has("agent") ? next.delete("agent") : next.add("agent"); return next; })} /> : null}{latestActivity.data?.lastUser ? <ActivityRow label="User" entry={latestActivity.data.lastUser} expanded={expanded.has("user")} onToggle={() => setExpanded((current) => { const next = new Set(current); next.has("user") ? next.delete("user") : next.add("user"); return next; })} /> : null}</div> : null}
       {provider.data ? <ProviderHealth provider={provider.data} /> : null}
     </CardState>
@@ -68,7 +68,7 @@ function OutcomeCard({ threadId }: { threadId: string }) {
     <CardState title="Outcome" className={outcome ? "ws-outcome-card" : "ws-outcome-empty"} pending={query.isPending} error={query.error} onRetry={() => void query.refetch()}>
       {outcome ? <>
         <p className="ws-card-note ws-outcome-key">{outcome.key}</p>
-        <h3>{outcome.title}</h3>
+        <h3 className="ws-card-title">{outcome.title}</h3>
         {outcome.priority !== "none" ? <p className="ws-card-note">{readableStatus(outcome.priority)} priority</p> : null}
         {outcome.dueDate ? <p className="ws-card-note">Due {outcome.dueDate}</p> : null}
         {next ? <button type="button" disabled={mutation.update.isPending} aria-label={`Move ${outcome.title} to ${readableStatus(next)}`} onClick={() => void report(mutation.update.mutateAsync({ taskId: outcome.id, status: next }), "Outcome updated", "Could not update outcome")}>{mutation.update.isPending ? "Updating…" : `Move to ${readableStatus(next)}`}</button> : null}
@@ -86,7 +86,7 @@ function OutcomeCard({ threadId }: { threadId: string }) {
 function GoalCard({ threadId }: { threadId: string }) {
   const query = useWorkGoal(threadId);
   const percent = query.data ? goalProgressPercent(query.data) : null;
-  return <CardState title="Goal" pending={query.isPending} error={query.error} onRetry={() => void query.refetch()}>{query.data ? <><h3>{query.data.objective}</h3>{percent !== null ? <div className="ws-progress" role="progressbar" aria-label="Goal token usage" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><span style={{ width: `${percent}%` }} /></div> : null}</> : <p className="ws-card-note">No goal supplied by this harness.</p>}</CardState>;
+  return <CardState title="Goal" pending={query.isPending} error={query.error} onRetry={() => void query.refetch()}>{query.data ? <><h3 className="ws-card-title">{query.data.objective}</h3>{percent !== null ? <div className="ws-progress" role="progressbar" aria-label="Goal token usage" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><span style={{ width: `${percent}%` }} /></div> : null}</> : <p className="ws-card-note">No goal supplied by this harness.</p>}</CardState>;
 }
 
 function PlanCard({ threadId }: { threadId: string }) {

@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import type { GitHubStackBranch, GitHubStackSignal } from "../../contracts.js";
 import { Status } from "../../components/ui/status.js";
+import { SurfaceCard, SurfaceCardHeading } from "../../components/ui/surface-card.js";
 import type { CurrentPullRequestView } from "../../work-model.js";
 import { normalizePullRequestSignal, pullRequestPresentation, pullRequestSignalPresentation, type PullRequestSignal } from "../pull-requests/presentation.js";
 import { HostWorkingTreeRenderer } from "./host-renderer.js";
@@ -121,28 +122,25 @@ export function ChangesRepositoryCard({
 }) {
   if (loading)
     return (
-      <article className="ws-card ws-empty-state-card" aria-busy="true">
-        <div className="ws-card-heading">
-          <strong>Repository</strong>
-        </div>
+      <SurfaceCard className="ws-empty-state-card" aria-busy="true">
+        <SurfaceCardHeading title="Repository" />
         <p className="ws-card-note">
           Loading pull requests and working-tree changes…
         </p>
-      </article>
+      </SurfaceCard>
     );
   const presentation = repository
     ? repositoryPresentation(repository)
     : { label: "Unavailable", tone: "unavailable" as const };
   return (
-    <article className="ws-card ws-repository-card">
-      <div className="ws-card-heading">
-        <strong>{repository?.branch ?? "Repository"}</strong>
+    <SurfaceCard className="ws-repository-card">
+      <SurfaceCardHeading title={repository?.branch ?? "Repository"} trailing={
         <span
           className={`ws-pill ${presentation.tone === "changed" ? "ws-pr-changes_requested" : ""}`}
         >
           {presentation.label}
         </span>
-      </div>
+      } />
       {repository?.outcome === "available" ? (
         <RepositoryDetails
           repository={repository}
@@ -155,7 +153,7 @@ export function ChangesRepositoryCard({
           {repository?.message ?? "Repository status is unavailable."}
         </p>
       )}
-    </article>
+    </SurfaceCard>
   );
 }
 
@@ -186,15 +184,14 @@ export function ChangesWorkingTreePreview({
     content = <p className="ws-card-note">{query.data?.message ?? "No diff is available for this file."}</p>;
   }
   return (
-    <article className="ws-card ws-working-tree-diff">
-      <div className="ws-card-heading">
-        <strong>{path}</strong>
+    <SurfaceCard className="ws-working-tree-diff">
+      <SurfaceCardHeading title={path} trailing={
         <button type="button" className="ws-text-button" onClick={onClose} aria-label={`Close diff for ${path}`}>
           Close
         </button>
-      </div>
+      } />
       {content}
-    </article>
+    </SurfaceCard>
   );
 }
 
