@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, type QueryClient } from "@tanstack/react-query";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
 import { trackerKeys, trackerPolicy } from "./model";
@@ -20,10 +20,12 @@ export function invalidateTracker(queryClient: QueryClient, threadId: string) {
 }
 
 export function useTrackerMutations(rpc: Rpc, threadId: string) {
-  const client = useQueryClient(); const invalidate = () => invalidateTracker(client, threadId);
+  // Taskboard mutations publish work-sidebar:changed from the server after
+  // durable storage/status writes. The Work panel owns that one invalidation;
+  // mutating here too can cause a duplicate context read.
   return {
-    link: useMutation({ mutationKey: [...trackerKeys.context(threadId), "link"], mutationFn: (key: string) => rpc.call("linkLinearIssue", { threadId, key }), onSuccess: invalidate }),
-    unlink: useMutation({ mutationKey: [...trackerKeys.context(threadId), "unlink"], mutationFn: () => rpc.call("unlinkLinearIssue", { threadId }), onSuccess: invalidate }),
-    status: useMutation({ mutationKey: [...trackerKeys.context(threadId), "status"], mutationFn: (statusId: string) => rpc.call("updateLinearIssueStatus", { threadId, statusId }), onSuccess: invalidate }),
+    link: useMutation({ mutationKey: [...trackerKeys.context(threadId), "link"], mutationFn: (key: string) => rpc.call("linkLinearIssue", { threadId, key }) }),
+    unlink: useMutation({ mutationKey: [...trackerKeys.context(threadId), "unlink"], mutationFn: () => rpc.call("unlinkLinearIssue", { threadId }) }),
+    status: useMutation({ mutationKey: [...trackerKeys.context(threadId), "status"], mutationFn: (statusId: string) => rpc.call("updateLinearIssueStatus", { threadId, statusId }) }),
   };
 }
