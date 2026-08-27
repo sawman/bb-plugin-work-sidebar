@@ -75,6 +75,7 @@ describe("R18 registered left sidebar parity", () => {
     const prompt = vi.spyOn(window, "prompt").mockReturnValueOnce("Soon").mockReturnValueOnce("Later renamed");
     const slot = await leftSlot({ rpc: { saveThreadGroups: saveGroups } });
     await waitFor(() => expect(slot.getByRole("link", { name: /One/ })).toBeTruthy());
+    await waitFor(() => expect(slot.getByText("Later")).toBeTruthy());
     fireEvent.click(slot.getByRole("button", { name: "Thread list settings" }));
     const menu = slot.getByRole("menu");
     expect(menu.classList.contains("ws-thread-settings-menu")).toBe(true);
