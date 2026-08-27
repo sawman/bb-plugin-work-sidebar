@@ -4,7 +4,6 @@ exports[`stylesheet architecture baseline > every plugin stylesheet parses, stay
 [
   "app.css: .ws-tabs button:hover, .ws-tab-active: undocumented !important",
   "views.css: .ws-view-selector button:hover, .ws-view-active: undocumented !important",
-  "views.css: .ws-pr-checks-passing, .ws-pr-review-approved: hardcoded palette #22c55e",
   "views.css: .ws-pr-state-open: hardcoded palette #22c55e",
   "views.css: .ws-selection-archive: undocumented !important",
   "views.css: .ws-selection-archive:hover: undocumented !important",
@@ -29,9 +28,7 @@ exports[`stylesheet architecture baseline > every plugin stylesheet parses, stay
   "views.css: .ws-provider-health-amber: hardcoded palette #d97706",
   "views.css: .ws-linear-header-badge: hardcoded palette #8b5cf6",
   "views.css: .ws-pr-state-merged: hardcoded palette #9c6ade",
-  "views.css: .ws-stack-signal-review_requested, .ws-pr-state-review-requested, .ws-pr-review-review_requested: hardcoded palette #d97706",
   "views.css: .ws-stack-current .ws-stack-layer: undocumented !important",
-  "views.css: .ws-review-rerequest: hardcoded palette #b45309",
   "views.css: .ws-stack-current > .ws-stack-files, .ws-stack-current > .ws-stack-files *: undocumented !important",
   "views.css: .ws-stack-node-merged: hardcoded palette #9c6ade",
   "views.css: .ws-icon-button, .ws-new-thread: undocumented !important",

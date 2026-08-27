@@ -368,8 +368,9 @@ export interface StackLayer {
   head: string;
   base: string;
   attention?: string | null;
-  checks?: "failed" | "passing" | "pending" | "none" | "unknown";
-  review?: "approved" | "changes_requested" | "changes_requested_review_requested" | "review_requested" | "review_required" | "none";
+  checks: "failed" | "passing" | "pending" | "none" | "unknown";
+  review: "approved" | "changes_requested" | "changes_requested_review_requested" | "review_requested" | "review_required" | "none";
+  reviewCommentCount: number;
 }
 
 /** The compact, host-neutral stack payload used by the PR-sidebar adapter. */
@@ -437,6 +438,11 @@ export interface CurrentPullRequestView {
     mergeStateStatus: "BEHIND" | "BLOCKED" | "CLEAN" | "DRAFT" | "HAS_HOOKS" | "DIRTY" | "UNKNOWN" | "UNSTABLE" | null;
     mergeable: "CONFLICTING" | "MERGEABLE" | "UNKNOWN" | null;
     state: "blocked" | "conflicts" | "draft" | "mergeable" | "unknown";
+  };
+  signal: {
+    checks: "failed" | "passing" | "pending" | "none" | "unknown";
+    review: "approved" | "changes_requested" | "changes_requested_review_requested" | "review_requested" | "review_required" | "none";
+    reviewCommentCount: number;
   };
 }
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { pullRequestSignal } from "./features/pull-requests/schemas.js";
 
 const taskStatus = z.enum(["backlog", "todo", "in_progress", "in_review", "done", "canceled"]);
 const taskPriority = z.enum(["urgent", "high", "medium", "low", "none"]);
@@ -68,19 +69,17 @@ const pullRequest = z.object({
     mergeable: z.enum(["CONFLICTING", "MERGEABLE", "UNKNOWN"]).nullable(),
     state: z.enum(["blocked", "conflicts", "draft", "mergeable", "unknown"]),
   }),
+  signal: pullRequestSignal,
 });
-const sidebarStackLayer = z.object({
+const sidebarStackLayer = pullRequestSignal.extend({
   number: z.number().int().positive(), title: z.string(), state: z.string(), draft: z.boolean(),
   url: z.string(), head: z.string(), base: z.string(), attention: z.string().nullable().optional(),
-  checks: z.enum(["failed", "passing", "pending", "none", "unknown"]).optional(),
-  review: z.enum(["approved", "changes_requested", "changes_requested_review_requested", "review_requested", "review_required", "none"]).optional(),
-  reviewCommentCount: z.number().int().nonnegative().optional(),
 });
 const sidebarStack = z.object({
   id: z.string(), number: z.number().int().positive().nullable(), base: z.string(),
   currentPullRequest: z.number().int().positive().nullable(), pullRequests: z.array(sidebarStackLayer),
 });
-const authoredPullRequest = z.object({
+const authoredPullRequest = pullRequestSignal.extend({
   number: z.number().int().positive(),
   title: z.string(),
   url: z.string().url(),
@@ -89,8 +88,6 @@ const authoredPullRequest = z.object({
   draft: z.boolean(),
   head: z.string(),
   base: z.string(),
-  checks: z.enum(["failed", "passing", "pending", "none", "unknown"]),
-  review: z.enum(["approved", "changes_requested", "changes_requested_review_requested", "review_requested", "review_required", "none"]),
   stack: sidebarStack.nullable(),
 });
 const sidebarThreadPullRequest = z.object({
@@ -119,7 +116,7 @@ const githubStackBranch = z.object({
 const githubStack = z.object({ trunk: z.string(), currentBranch: z.string().nullable(), branches: z.array(githubStackBranch), trunkBehind: z.number().nullable(), prunableBranchCount: z.number().int().nonnegative().nullable() });
 const workChanges = z.object({
   currentPullRequest: pullRequest.nullable(),
-  stack: z.object({ number: z.number(), base: z.string(), currentPullRequest: z.number(), pullRequests: z.array(z.object({ number: z.number(), title: z.string(), state: z.string(), draft: z.boolean(), url: z.string(), head: z.string(), base: z.string() })) }).nullable(),
+  stack: z.object({ number: z.number(), base: z.string(), currentPullRequest: z.number(), pullRequests: z.array(sidebarStackLayer) }).nullable(),
   stackUnavailableReason: z.string().nullable(),
   githubStack: z.object({ stack: githubStack.nullable(), pending: stackChange.nullable(), error: z.string().nullable() }).nullable(),
   repository: z.object({ outcome: z.enum(["available", "not_applicable", "unavailable", "absent"]), message: z.string().nullable(), branch: z.string().nullable(), base: z.string().nullable(), ahead: z.number(), behind: z.number(), worktreeState: z.string().nullable(), hasUncommittedChanges: z.boolean(), changedFileCount: z.number().int().nonnegative(), changedInsertions: z.number().int().nonnegative(), changedDeletions: z.number().int().nonnegative(), changedFiles: z.array(z.object({ path: z.string(), status: z.string(), insertions: z.number().nullable(), deletions: z.number().nullable() })) }),
@@ -274,20 +271,7 @@ export const rpcSchemas = {
         }).nullable(),
       })),
       currentPullRequest: pullRequest.nullable(),
-      stack: z.object({
-        number: z.number(),
-        base: z.string(),
-        currentPullRequest: z.number(),
-        pullRequests: z.array(z.object({
-          number: z.number(),
-          title: z.string(),
-          state: z.string(),
-          draft: z.boolean(),
-          url: z.string(),
-          head: z.string(),
-          base: z.string(),
-        })),
-      }).nullable(),
+      stack: z.object({ number: z.number(), base: z.string(), currentPullRequest: z.number(), pullRequests: z.array(sidebarStackLayer) }).nullable(),
       stackUnavailableReason: z.string().nullable(),
       githubStack: z.object({ stack: githubStack.nullable(), pending: stackChange.nullable(), error: z.string().nullable() }).nullable(),
       repository: z.object({

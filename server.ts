@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { normalizePullRequestSignal } from "./features/pull-requests/presentation.js";
 import { rpcContract } from "./contracts.js";
 import { sanitizeThreadOrder, type SidebarStack } from "./work-model.js";
 import { createServerLifecycle, type GitHubApiHealth, type ServerLifecycle } from "./server-lifecycle.js";
@@ -185,6 +186,7 @@ export interface CurrentPullRequest {
     mergeable: "CONFLICTING" | "MERGEABLE" | "UNKNOWN" | null;
     state: "blocked" | "conflicts" | "draft" | "mergeable" | "unknown";
   };
+  signal: { checks: "failed" | "passing" | "pending" | "none" | "unknown"; review: "approved" | "changes_requested" | "changes_requested_review_requested" | "review_requested" | "review_required" | "none"; reviewCommentCount: number; };
 }
 
 interface StackPullRequest {
@@ -656,6 +658,7 @@ export function projectCurrentPullRequest(pullRequest: CurrentPullRequest): Curr
     review: { ...pullRequest.review },
     attention: pullRequest.attention,
     mergeability: { ...pullRequest.mergeability },
+    signal: { ...pullRequest.signal },
   };
 }
 
@@ -1264,6 +1267,7 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
       review: prResult.pullRequest.review,
       attention: prResult.pullRequest.attention,
       mergeability: prResult.pullRequest.mergeability,
+      signal: normalizePullRequestSignal({ checks: prResult.pullRequest.checks, review: prResult.pullRequest.review }),
     });
     const match = prResult.pullRequest.url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
     if (!match) return { currentPullRequest, stack: null, reason: "The linked pull request is not hosted on GitHub." };
@@ -1355,7 +1359,7 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     }
   }
 
-  type AuthoredPullRequestEntry = { number: number; title: string; url: string; repository: string; state: "open" | "draft"; draft: boolean; head: string; base: string; checks: AuthoredPullRequestSignal["checks"]; review: AuthoredPullRequestSignal["review"]; stack: SidebarStack | null };
+  type AuthoredPullRequestEntry = { number: number; title: string; url: string; repository: string; state: "open" | "draft"; draft: boolean; head: string; base: string; checks: AuthoredPullRequestSignal["checks"]; review: AuthoredPullRequestSignal["review"]; reviewCommentCount: number; stack: SidebarStack | null };
   let authoredPullRequestCache: { expiresAt: number; value: AuthoredPullRequestEntry[] } | null = null;
   let authoredPullRequestStacksCache: { expiresAt: number; value: AuthoredPullRequestEntry[] } | null = null;
   async function authoredPullRequests() {
@@ -1373,7 +1377,7 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     const result: AuthoredPullRequestEntry[] = activeSearch.map((item) => {
       const repository = item.repository.nameWithOwner!;
       const signal = signals.get(`${repository}#${item.number}`) ?? UNKNOWN_AUTHORED_PULL_REQUEST_SIGNAL;
-      return { number: item.number, title: item.title, url: item.url, repository, state: item.isDraft ? "draft" as const : "open" as const, draft: item.isDraft === true, head: "", base: "", checks: signal.checks, review: signal.review, stack: null };
+      return { number: item.number, title: item.title, url: item.url, repository, state: item.isDraft ? "draft" as const : "open" as const, draft: item.isDraft === true, head: "", base: "", checks: signal.checks, review: signal.review, reviewCommentCount: 0, stack: null };
     });
     // Render account-wide open PRs as soon as search, archive filtering, and
     // status signals arrive. Stack discovery is deliberately a second request.
