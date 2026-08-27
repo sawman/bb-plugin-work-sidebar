@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
 import { queryKeys, queryPolicies } from "../../query-runtime";
+import { invalidateTaskQueries } from "./mutations";
 
 export function useTasksRead() {
   const rpc = useRpc<typeof rpcContract>();
@@ -34,7 +35,6 @@ export function useTaskLinksRead() {
 export function useTasksRealtimeInvalidation() {
   const queryClient = useQueryClient();
   useRealtime("work-sidebar:changed", () => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.sidebar.tasks.list() });
-    void queryClient.invalidateQueries({ queryKey: queryKeys.sidebar.tasks.links() });
+    void invalidateTaskQueries(queryClient, ["list", "links"]);
   });
 }
