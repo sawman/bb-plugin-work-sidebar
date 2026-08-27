@@ -147,12 +147,26 @@ export function createTasksService(
       return adapter.deleteSidebar(taskId);
     },
     async attachTaskToThread({ taskId, threadId }) {
-      return adapter.call("taskThreadsAttach", { taskId, threadId }, z.object({ threadId: taskThreadIdSchema }));
+      const root = await bindings.rootThread(threadId);
+      const result = await adapter.call(
+        "taskThreadsAttach",
+        { taskId, threadId },
+        z.object({ threadId: taskThreadIdSchema }),
+      );
+      bindings.invalidateLegacy(root.id, root.projectId);
+      return result;
     },
     async detachTaskFromThread({ taskId, threadId }) {
       if (isBoundOwnerTask(await bindings.read(), taskId, threadId))
         throw new Error(DURABLE_BOUND_TASK_DETACH_ERROR);
-      return adapter.call("taskThreadsDetach", { taskId, threadId }, z.object({ threadId: taskThreadIdSchema }));
+      const root = await bindings.rootThread(threadId);
+      const result = await adapter.call(
+        "taskThreadsDetach",
+        { taskId, threadId },
+        z.object({ threadId: taskThreadIdSchema }),
+      );
+      bindings.invalidateLegacy(root.id, root.projectId);
+      return result;
     },
     async reorderTask({ taskId, beforeTaskId, afterTaskId }) { return adapter.reorder(taskId, beforeTaskId, afterTaskId); },
   };

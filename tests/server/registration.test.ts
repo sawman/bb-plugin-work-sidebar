@@ -1,10 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
-import plugin, {
-  createServerLifecycle,
-  MAX_LEGACY_WORK_CACHE,
-} from "../../server";
+import plugin, { createServerLifecycle } from "../../server";
 import { rpcContract } from "../../contracts";
+import { MAX_LEGACY_WORK_CACHE } from "../../server-lifecycle";
 
 describe("R2 server registration and disposal", () => {
   it("bounds legacy probes with LRU expiry pruning without disturbing pending replacement isolation", async () => {

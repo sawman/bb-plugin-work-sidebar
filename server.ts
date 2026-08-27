@@ -14,7 +14,6 @@ import { createTrackerRegistration } from "./features/tracker/server-registratio
 import { createWorkContextRegistration } from "./features/work-context/server-registration.js";
 import {
   createServerLifecycle,
-  MAX_LEGACY_WORK_CACHE,
   type ServerLifecycle,
 } from "./server-lifecycle.js";
 import type { ServerCompositionDependencies } from "./shared/server-composition-dependencies.js";
@@ -91,5 +90,5 @@ export default function plugin(
   bb.log.info("Work Sidebar backend loaded");
 }
 
-export { fetchGitHubStack, createServerLifecycle, MAX_LEGACY_WORK_CACHE };
+export { fetchGitHubStack, createServerLifecycle };
 export { rpcContract };

@@ -57,6 +57,7 @@ function task(
 
 function createBindingsFixture(options: {
   listTaskThreads?: (taskId: string) => Promise<unknown>;
+  failRootResolution?: boolean;
 } = {}) {
   const tasks = new Map([
     [OUTCOME_TASK_ID, task(OUTCOME_TASK_ID, "Durable outcome")],
@@ -69,8 +70,10 @@ function createBindingsFixture(options: {
   const host = createFakePluginHost({
     sdk: {
       threads: {
-        get: async ({ threadId }: { threadId: string }) =>
-          threadId === CHILD_THREAD_ID
+        get: async ({ threadId }: { threadId: string }) => {
+          if (options.failRootResolution)
+            throw new Error("root lookup unavailable");
+          return threadId === CHILD_THREAD_ID
             ? {
               id: CHILD_THREAD_ID,
               parentThreadId: ROOT_THREAD_ID,
@@ -94,7 +97,8 @@ function createBindingsFixture(options: {
               runtime: { displayStatus: "idle" },
               providerId: "codex",
               archivedAt: null,
-            },
+            };
+        },
         list: async () => [],
         spawn: async () => ({ id: CHILD_THREAD_ID }),
         timeline: async () => ({ goal: null, pendingTodos: { items: [] } }),
@@ -168,6 +172,72 @@ function createBindingsFixture(options: {
 }
 
 describe("durable Work/Tasks binding parity", () => {
+  it("resolves an ordinary link root before mutation so a lookup failure changes neither links nor cache", async () => {
+    const { host, taskThreads, tasks } = createBindingsFixture({
+      failRootResolution: true,
+    });
+    tasks.clear();
+    tasks.set(GENERIC_TASK_ID, task(GENERIC_TASK_ID, "Ordinary legacy task"));
+    const lifecycle = createServerLifecycle();
+    await lifecycle.readLegacyWork(
+      `${ROOT_THREAD_ID}\u0000${BB_PROJECT_ID}`,
+      5_000,
+      async () => ({ state: "none", taskIds: [], message: null }),
+    );
+    await plugin(host.bb, lifecycle);
+
+    await expect(
+      host.harness.behavior.callRpc("attachTaskToThread", {
+        taskId: GENERIC_TASK_ID,
+        threadId: ROOT_THREAD_ID,
+      }),
+    ).rejects.toThrow("root lookup unavailable");
+    expect(taskThreads.get(GENERIC_TASK_ID)).toBeUndefined();
+    expect(lifecycle.legacyWorkCache.size).toBe(1);
+
+    taskThreads.set(GENERIC_TASK_ID, new Set([ROOT_THREAD_ID]));
+    await expect(
+      host.harness.behavior.callRpc("detachTaskFromThread", {
+        taskId: GENERIC_TASK_ID,
+        threadId: ROOT_THREAD_ID,
+      }),
+    ).rejects.toThrow("root lookup unavailable");
+    expect(taskThreads.get(GENERIC_TASK_ID)).toEqual(new Set([ROOT_THREAD_ID]));
+    expect(lifecycle.legacyWorkCache.size).toBe(1);
+  });
+
+  it("invalidates a warm legacy result immediately after ordinary attach and detach", async () => {
+    const { host, taskThreads, tasks } = createBindingsFixture();
+    tasks.clear();
+    tasks.set(GENERIC_TASK_ID, task(GENERIC_TASK_ID, "Ordinary legacy task"));
+    await plugin(host.bb, createServerLifecycle());
+
+    await expect(
+      host.harness.behavior.callRpc("getWorkOutcome", { threadId: ROOT_THREAD_ID }),
+    ).resolves.toMatchObject({ legacy: { state: "none" } });
+    await expect(
+      host.harness.behavior.callRpc("attachTaskToThread", {
+        taskId: GENERIC_TASK_ID,
+        threadId: ROOT_THREAD_ID,
+      }),
+    ).resolves.toEqual({ threadId: ROOT_THREAD_ID });
+    expect(taskThreads.get(GENERIC_TASK_ID)).toEqual(new Set([ROOT_THREAD_ID]));
+    await expect(
+      host.harness.behavior.callRpc("getWorkOutcome", { threadId: ROOT_THREAD_ID }),
+    ).resolves.toMatchObject({ legacy: { state: "adoptable", taskIds: [GENERIC_TASK_ID] } });
+
+    await expect(
+      host.harness.behavior.callRpc("detachTaskFromThread", {
+        taskId: GENERIC_TASK_ID,
+        threadId: ROOT_THREAD_ID,
+      }),
+    ).resolves.toEqual({ threadId: ROOT_THREAD_ID });
+    expect(taskThreads.get(GENERIC_TASK_ID)).toEqual(new Set());
+    await expect(
+      host.harness.behavior.callRpc("getWorkOutcome", { threadId: ROOT_THREAD_ID }),
+    ).resolves.toMatchObject({ legacy: { state: "none" } });
+  });
+
   it("bounds parallel legacy discovery, caches it per root/project, expires it, and clears it after adoption", async () => {
     let open = false;
     let release!: () => void;
@@ -319,6 +389,12 @@ describe("durable Work/Tasks binding parity", () => {
 
   it("rejects detaching outcome and execution targets from their bound owners while ordinary links remain mutable", async () => {
     const { host } = createBindingsFixture();
+    const lifecycle = createServerLifecycle();
+    await lifecycle.readLegacyWork(
+      `${ROOT_THREAD_ID}\u0000${BB_PROJECT_ID}`,
+      5_000,
+      async () => ({ state: "none", taskIds: [], message: null }),
+    );
     await host.bb.storage.kv.set(WORK_BINDINGS_KEY, {
       outcomes: [{
         kind: "outcome",
@@ -359,7 +435,7 @@ describe("durable Work/Tasks binding parity", () => {
         },
       ],
     });
-    await plugin(host.bb);
+    await plugin(host.bb, lifecycle);
 
     for (const [taskId, threadId] of [
       [OUTCOME_TASK_ID, ROOT_THREAD_ID],
@@ -372,6 +448,7 @@ describe("durable Work/Tasks binding parity", () => {
         "This task is part of a durable work binding and cannot be detached from its bound owner.",
       );
     }
+    expect(lifecycle.legacyWorkCache.size).toBe(1);
 
     await expect(
       host.harness.behavior.callRpc("detachTaskFromThread", {
