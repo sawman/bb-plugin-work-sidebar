@@ -110,7 +110,7 @@
 .ws-tabs button:focus-visible,
 .ws-icon-button:focus-visible,
 .ws-agent-card:focus-visible,
-.ws-stack-layer:focus-visible,
+.ws-stack-layer-toggle:focus-visible,
 .ws-callout button:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 1px;
@@ -1348,6 +1348,13 @@
   display: grid;
   min-width: 0;
   gap: 0.05rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 .ws-stack-layer-toggle strong,
 .ws-stack-layer-toggle small {
@@ -1376,8 +1383,7 @@
   align-items: center;
 }
 .ws-stack-actions a,
-.ws-stack-checkout,
-.ws-stack-expand {
+.ws-stack-checkout {
   display: grid;
   place-items: center;
   width: 1rem;
@@ -1391,8 +1397,7 @@
   cursor: pointer;
 }
 .ws-stack-actions a:hover,
-.ws-stack-checkout:hover:not(:disabled),
-.ws-stack-expand:hover {
+.ws-stack-checkout:hover:not(:disabled) {
   background: var(--accent);
   color: var(--foreground);
 }
