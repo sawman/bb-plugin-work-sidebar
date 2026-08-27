@@ -31,7 +31,7 @@ describe("Tasks mutations", () => {
     const assign = deferred<unknown>(); const reorder = deferred<unknown>();
     const rpc = { call: vi.fn((method: string) => method === "updateTaskAssignee" ? assign.promise : method === "reorderTask" ? reorder.promise : Promise.resolve({})) };
     const { client, hook } = setup(rpc); client.setQueryData(queryKeys.sidebar.tasks.list(), { tasks: [task, { ...task, id: "task_2", position: 2 }] });
-    const invalidations: string[] = []; vi.spyOn(client, "invalidateQueries").mockImplementation(async ({ queryKey }) => { invalidations.push((queryKey as string[]).at(-1)!); });
+    const invalidations: string[] = []; vi.spyOn(client, "invalidateQueries").mockImplementation(async (filters) => { invalidations.push(((filters?.queryKey ?? []) as string[]).at(-1)!); });
     const a = hook.result.current.assignment.mutateAsync({ taskId: task.id, assignee: "agent" }); const r = hook.result.current.reorder.mutateAsync({ taskId: task.id, beforeTaskId: "task_2", afterTaskId: null });
     await waitFor(() => expect(rpc.call).toHaveBeenCalledTimes(2)); await invalidateTaskQueries(client, ["list", "links"]); expect(invalidations).toEqual([]);
     assign.resolve({}); await a; expect(invalidations).toEqual([]);
