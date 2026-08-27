@@ -101,9 +101,7 @@ function isServerModule(path: string): boolean {
   const segments = resolve(path).split(sep);
   const basename = segments.at(-1) ?? "";
   return segments.slice(0, -1).includes("server")
-    || basename === "server.ts"
-    || basename === "server-lifecycle.ts"
-    || basename.startsWith("server-");
+    || /(?:^|[._-])server(?:[._-]|$)/.test(basename);
 }
 
 function isForbiddenBrowserRuntimeSpecifier(specifier: string): boolean {

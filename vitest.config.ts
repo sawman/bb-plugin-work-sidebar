@@ -18,6 +18,7 @@ export default defineConfig({
           name: "frontend",
           environment: "jsdom",
           include: ["**/*.test.tsx"],
+          setupFiles: ["./tests/vitest-axe.setup.ts"],
         },
       },
     ],

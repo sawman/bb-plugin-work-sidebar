@@ -2,11 +2,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { configureAxe } from "vitest-axe";
-import { toHaveNoViolations } from "vitest-axe/dist/matchers.js";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { getPluginQueryClient } from "../../query-runtime";
-
-expect.extend({ toHaveNoViolations });
 
 // The fixture gate is deliberately scoped to ARIA validity and accessible
 // name/role/value semantics. This keeps jsdom's non-layout canvas from
@@ -42,6 +39,15 @@ const task = {
 
 function fixture() {
   return {
+    getSidebarOrder: () => ({ threadIds: ["thr_accessible"] }),
+    getThreadListMode: () => ({ mode: "enhanced" }),
+    getThreadGroups: () => ({
+      groups: [{ id: "group_later", name: "Later", threadIds: [] }],
+    }),
+    saveThreadGroups: ({ groups }: { groups: unknown[] }) => ({ groups }),
+    saveSiblingOrder: ({ threadIds }: { threadIds: string[] }) => ({ threadIds }),
+    saveThreadListMode: ({ mode }: { mode: "enhanced" | "native" }) => ({ mode }),
+    sidebarArchivedThreads: () => ({ available: true, threads: [], error: null }),
     sidebarTasks: () => ({
       available: true,
       tasks: [task],
@@ -159,8 +165,7 @@ function fixture() {
 
 async function expectNoAriaViolations(container: HTMLElement) {
   const results = await axe(container);
-  const outcome = toHaveNoViolations(results);
-  expect(outcome.pass, outcome.message()).toBe(true);
+  expect(results).toHaveNoViolations();
 }
 
 function expectTabRelationships(container: HTMLElement) {
@@ -182,21 +187,61 @@ describe("R19D registered slot accessibility", () => {
     host.sidebarThreads = {
       status: "ready",
       projects: [{ id: "project_1", name: "Project", isPersonal: false }],
-      threads: [],
+      threads: [
+        {
+          id: "thr_accessible",
+          projectId: "project_1",
+          title: "Accessible thread",
+          titleFallback: null,
+          parentThreadId: null,
+          sectionId: null,
+          originKind: null,
+          originPluginId: null,
+          providerId: "codex",
+          hasPendingInteraction: false,
+          activity: {
+            workflows: 0,
+            backgroundAgents: 0,
+            backgroundCommands: 0,
+            planMode: 0,
+            goals: 0,
+          },
+          indicator: "none",
+          indicatorLabel: null,
+          isUnread: false,
+          isPinned: false,
+          isArchived: false,
+          environment: null,
+          host: null,
+          createdAt: 0,
+          updatedAt: 0,
+          lastReadAt: null,
+          latestAttentionAt: 0,
+        },
+      ],
     };
     const app = await loadPluginApp(() => import("../../app"));
     const slot = renderSlot(
       app.threadLists[0]!,
       {
-        activeThreadId: null,
-        activeProjectId: null,
+        activeThreadId: "thr_accessible",
+        activeProjectId: "project_1",
         isCompactViewport: false,
         onNavigate: () => undefined,
         searchQuery: "",
-        Original: () => <div>Threads</div>,
+        Original: () => null,
       },
       { rpc: fixture() },
     );
+    const threadLink = await slot.findByRole("link", {
+      name: /Accessible thread/,
+    });
+    fireEvent.click(threadLink, { ctrlKey: true });
+    await waitFor(() =>
+      expect(threadLink.getAttribute("data-selected")).toBe("true"),
+    );
+    expect(threadLink.getAttribute("aria-current")).toBe("true");
+    expect(threadLink.hasAttribute("aria-selected")).toBe(false);
     await expectNoAriaViolations(slot.container);
     fireEvent.click(slot.getByRole("button", { name: "Tasks" }));
     await waitFor(() => expect(slot.getByText("Accessible task")).toBeTruthy());

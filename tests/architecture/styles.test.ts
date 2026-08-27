@@ -31,13 +31,18 @@ function undocumentedImportantDeclarations(source: string): string[] {
   const violations: string[] = [];
   let hasDeclarationComment = false;
   for (const [index, line] of source.split("\n").entries()) {
-    if (/^\s*\/\* R17 important: .+ \*\/\s*$/.test(line)) {
+    const trimmed = line.trim();
+    if (/^\/\* R17 important: .+ \*\/$/.test(trimmed)) {
       hasDeclarationComment = true;
       continue;
     }
-    if (!line.includes("!important")) continue;
-    if (!hasDeclarationComment)
-      violations.push(`${index + 1}: ${line.trim()}`);
+    if (!trimmed || /^\/\*.*\*\/$/.test(trimmed)) continue;
+    if (line.includes("!important")) {
+      if (!hasDeclarationComment)
+        violations.push(`${index + 1}: ${trimmed}`);
+      hasDeclarationComment = false;
+      continue;
+    }
     hasDeclarationComment = false;
   }
   return violations;
@@ -242,6 +247,18 @@ describe("stylesheet architecture baseline", () => {
 });
 
 describe("shared surface and list-row architecture", () => {
+  test("associates each important declaration with its immediately preceding R17 comment", () => {
+    expect(undocumentedImportantDeclarations(`
+      /* R17 important: a former blanket comment. */
+      color: inherit;
+      background: var(--accent) !important;
+    `)).toEqual(["4: background: var(--accent) !important;"]);
+    expect(undocumentedImportantDeclarations(`
+      /* R17 important: host styling overrides this background. */
+      background: var(--accent) !important;
+    `)).toEqual([]);
+  });
+
   test("finds every static class in multi-class and template JSX attributes", () => {
     const fixture = classAttributeTokens("fixture.tsx", `
       const fixture = <article className="ws-card ws-empty-state-card">

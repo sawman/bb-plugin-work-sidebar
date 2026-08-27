@@ -78,7 +78,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
   };
   return (
     <div className="ws-panel">
-      <div className="ws-panel-header">
+      <header className="ws-panel-header">
         <div className="ws-panel-heading">
           <Icon name="ListTodo" className="ws-panel-icon" aria-hidden />
           <div>
@@ -101,7 +101,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
         >
           ↻
         </button>
-      </div>
+      </header>
       <nav className="ws-tabs" role="tablist" aria-label="Work context views">
         {WORK_TABS.map((candidate) => (
           <button
@@ -149,8 +149,8 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
         role="tabpanel"
         id="ws-panel-changes"
         aria-labelledby="ws-tab-changes"
-      hidden={tab !== "changes"}
-      tabIndex={0}
+        hidden={tab !== "changes"}
+        tabIndex={0}
       >
         <ChangesPanel threadId={threadId} />
       </div>
