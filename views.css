@@ -733,31 +733,31 @@
   background: var(--accent) !important;
 }
 .ws-new-thread {
-  /* R17 important: the host Button preset must not change the icon-only display. */
+  /* R17 important: host sidebar button rules must not change the icon-only display. */
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  /* R17 important: the host Button preset must not add icon-only margins. */
+  /* R17 important: host sidebar button rules must not add icon-only margins. */
   margin: 0 !important;
-  /* R17 important: the host Button preset must not add icon-only padding. */
+  /* R17 important: host sidebar button rules must not add icon-only padding. */
   padding: 0 !important;
-  /* R17 important: the host Button preset must not alter the icon-only border. */
+  /* R17 important: host sidebar button rules must not alter the icon-only border. */
   border: 1px solid transparent !important;
-  /* R17 important: the host Button preset must not alter the icon-only radius. */
+  /* R17 important: host sidebar button rules must not alter the icon-only radius. */
   border-radius: calc(var(--radius) - 3px) !important;
-  /* R17 important: the host Button preset must not alter the icon-only color. */
+  /* R17 important: host sidebar button rules must not alter the icon-only color. */
   color: var(--muted-foreground) !important;
-  /* R17 important: host Button sizing must keep the new-thread action width aligned with icons. */
+  /* R17 important: host sidebar button sizing must keep the action aligned with icons. */
   width: 1.6rem !important;
-  /* R17 important: host Button sizing must keep the new-thread action height aligned with icons. */
+  /* R17 important: host sidebar button sizing must keep the action aligned with icons. */
   height: 1.6rem !important;
 }
 .ws-new-thread:hover {
-  /* R17 important: the host Button hover preset overrides this semantic action border. */
+  /* R17 important: host sidebar button hover rules override this semantic action border. */
   border-color: var(--border) !important;
-  /* R17 important: the host Button hover preset overrides this semantic action background. */
+  /* R17 important: host sidebar button hover rules override this semantic action background. */
   background: var(--accent) !important;
-  /* R17 important: the host Button hover preset overrides this semantic action color. */
+  /* R17 important: host sidebar button hover rules override this semantic action color. */
   color: var(--foreground) !important;
 }
 .ws-new-thread:focus-visible {
@@ -1219,6 +1219,10 @@
 }
 .ws-stack-layer-toggle {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "title chevron"
+    "subtitle chevron";
   min-width: 0;
   gap: 0.05rem;
   border: 0;
@@ -1236,9 +1240,11 @@
   white-space: nowrap;
 }
 .ws-stack-layer-toggle strong {
+  grid-area: title;
   font-size: 0.72rem;
 }
 .ws-stack-layer-toggle small {
+  grid-area: subtitle;
   font-size: 0.61rem;
   color: var(--muted-foreground);
 }
@@ -1249,6 +1255,15 @@
 .ws-stack-layer-toggle small i {
   color: var(--destructive);
   font-style: normal;
+}
+.ws-stack-expand {
+  grid-area: chevron;
+  display: grid;
+  place-items: center;
+  align-self: center;
+  width: 1rem;
+  height: 1rem;
+  color: var(--muted-foreground);
 }
 .ws-stack-actions {
   display: flex;
@@ -2298,7 +2313,7 @@ button.ws-provider-health:focus-visible {
 }
 .ws-combobox-options button[data-active="true"] {
   background: var(--accent);
-  color: var(--accent-foreground);
+  box-shadow: inset 0 0 0 1px var(--ring);
 }
 .ws-combobox-options small {
   overflow: hidden;

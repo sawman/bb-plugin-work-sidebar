@@ -491,7 +491,7 @@ function parseRules(source: string): Rule[] {
       const prelude = normalizeWhitespace(clean.slice(cursor, open));
       if (prelude.startsWith("@")) {
         parseRange(open + 1, close, [...atRules, prelude]);
-      } else if (atRules.length === 0 && prelude.startsWith(".")) {
+      } else if (prelude.startsWith(".")) {
         rules.push({
           selector: prelude,
           declarations: parseDeclarations(clean, open + 1, close),
@@ -552,6 +552,24 @@ function emptyRules(rules: Rule[]) {
 }
 
 describe("protected stylesheet duplicate ownership", () => {
+  test("records class rules nested in at-rules for ownership checks", () => {
+    expect(parseRules("@media (min-width: 1px) { .ws-at-rule-only { color: red; } }")).toEqual([
+      {
+        selector: ".ws-at-rule-only",
+        declarations: [
+          {
+            property: "color",
+            value: "red",
+            important: false,
+            line: 1,
+          },
+        ],
+        line: 1,
+        atRules: ["@media (min-width: 1px)"],
+      },
+    ]);
+  });
+
   test("preserves the exact RED inventory and effective declarations", () => {
     const rules = parseRules(readFileSync(stylesheetPath, "utf8"));
     const inventory = overlappingProperties(rules);
