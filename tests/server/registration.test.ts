@@ -30,11 +30,27 @@ describe("R2 server registration and disposal", () => {
     ]);
     expect(Object.keys(rpcContract)).toEqual(host.harness.inspection.registrations.rpcMethods);
 
-    lifecycle.seedForTest();
-    expect(lifecycle.inspect()).toMatchObject({ disposed: false, timers: 1, subscriptions: 1, caches: 4, archived: true, backoffUntil: 1 });
+    lifecycle.githubReadCache.set("read", { expiresAt: Infinity, value: "cached" });
+    lifecycle.githubReadPending.set("read", Promise.resolve("pending"));
+    lifecycle.githubPullRequestSignalCache.set("signal", { expiresAt: Infinity, value: "cached" });
+    lifecycle.githubPullRequestSignalPending.set("signal", Promise.resolve(null));
+    lifecycle.archivedThreadsCache = { expiresAt: Infinity, value: [] };
+    lifecycle.archivedThreadsPending = Promise.resolve([]);
+    lifecycle.githubGraphqlHealth = { state: "rate_limited", scope: "graphql", message: "limited", retryAt: 1 };
+    lifecycle.githubRestHealth = { state: "unavailable", scope: "rest", message: "unavailable", retryAt: null };
+    lifecycle.githubGraphqlBackoffUntil = 1;
+    expect(lifecycle.inspect()).toMatchObject({ disposed: false, caches: 4, archived: true, backoffUntil: 1 });
     await host.harness.lifecycle.dispose();
-    expect(lifecycle.inspect()).toEqual({ disposed: true, timers: 0, subscriptions: 0, caches: 0, archived: false, backoffUntil: 0 });
+    expect(lifecycle.inspect()).toEqual({ disposed: true, caches: 0, archived: false, backoffUntil: 0 });
     lifecycle.dispose();
-    expect(lifecycle.inspect()).toEqual({ disposed: true, timers: 0, subscriptions: 0, caches: 0, archived: false, backoffUntil: 0 });
+    expect(lifecycle.inspect()).toEqual({ disposed: true, caches: 0, archived: false, backoffUntil: 0 });
+
+    // A late cleanup targets the lifecycle captured by its request, never a
+    // replacement generation that happens to be active by the time it settles.
+    const replacement = createServerLifecycle();
+    lifecycle.githubReadPending.set("same-key", Promise.resolve("old"));
+    replacement.githubReadPending.set("same-key", Promise.resolve("new"));
+    lifecycle.releasePending("githubRead", "same-key");
+    expect(replacement.githubReadPending.has("same-key")).toBe(true);
   });
 });

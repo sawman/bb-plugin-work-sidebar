@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
-import { getMountedPluginProviderCount, getPluginQueryClient, pluginInteractionStore, queryKeys, queryPolicies } from "../../query-runtime";
+import { describe, expect, it, vi } from "vitest";
+import { getPluginQueryClient, pluginInteractionStore, queryKeys, queryPolicies } from "../../query-runtime";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 
 describe("R2 app registration and Query lifecycle", () => {
@@ -17,23 +17,32 @@ describe("R2 app registration and Query lifecycle", () => {
     expect(queryKeys.sidebar.order()).toEqual(["work-sidebar", "sidebar", "order"]);
     expect(queryKeys.work.context("thr_test")).toEqual(["work-sidebar", "work", "context", "thr_test"]);
     expect(queryKeys.github.health()).toEqual(["work-sidebar", "github", "health"]);
-    expect(queryPolicies.sidebar).toMatchObject({ staleTime: 0, retry: false });
-    expect(queryPolicies.work).toMatchObject({ staleTime: 30_000, retry: false });
+    expect(queryPolicies.sidebarOrderPreferences).toMatchObject({ staleTime: Infinity, gcTime: 30 * 60_000, retry: false });
+    expect(queryPolicies.sidebarTasks).toMatchObject({ staleTime: 30_000, gcTime: 5 * 60_000, retry: false });
+    expect(queryPolicies.workContext).toMatchObject({ staleTime: 15_000, gcTime: 5 * 60_000, retry: false });
+    expect(queryPolicies.workChanges).toMatchObject({ staleTime: 30_000, gcTime: 5 * 60_000, retry: false });
+    expect(queryPolicies.githubHealth).toMatchObject({ staleTime: 30_000, gcTime: 5 * 60_000, retry: false });
     expect(pluginInteractionStore.getState().selectedWorkTab).toBe("work");
+    pluginInteractionStore.getState().setSelectedWorkTab("changes");
+    expect(pluginInteractionStore.getState().selectedWorkTab).toBe("changes");
+    pluginInteractionStore.getState().setSelectedWorkTab("work");
 
     // The harness mounts slots independently, matching BB's left/right slot
     // ownership. These registrations only provide the runtime foundation in
     // R2, so neither creates an observer, timer, or subscription yet.
+    const client = getPluginQueryClient();
+    const mount = vi.spyOn(client, "mount");
+    const unmount = vi.spyOn(client, "unmount");
     const left = renderSlot(app.threadLists[0]!, {
       activeThreadId: null, activeProjectId: null, isCompactViewport: false,
       onNavigate: () => undefined, searchQuery: "", Original: () => null,
     });
     const right = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_test", params: null });
-    expect(getMountedPluginProviderCount()).toBe(2);
-    expect(getPluginQueryClient().getQueryCache().getAll()).toEqual([]);
+    expect(mount).toHaveBeenCalledTimes(2);
+    expect(client.getQueryCache().getAll()).toEqual([]);
     left.unmount();
     right.unmount();
-    expect(getMountedPluginProviderCount()).toBe(0);
-    expect(getPluginQueryClient().getQueryCache().getAll()).toEqual([]);
+    expect(unmount).toHaveBeenCalledTimes(2);
+    expect(client.getQueryCache().getAll()).toEqual([]);
   });
 });

@@ -236,35 +236,35 @@ function clearGitHubReadCache() {
   runtime().githubReadCache.clear();
   runtime().githubPullRequestSignalCache.clear();
 }
-function githubReadError(scope: "graphql" | "rest", error: unknown): Error {
+function githubReadError(owner: ServerLifecycle, scope: "graphql" | "rest", error: unknown): Error {
   const message = error instanceof Error ? error.message : String(error);
   const rateLimited = /graphql_rate_limit|API rate limit already exceeded|secondary rate limit|rate limit/i.test(message);
   const health: GitHubApiHealth = rateLimited
     ? { state: "rate_limited", scope, message: scope === "graphql" ? "GitHub GraphQL is rate limited; using REST where possible." : "GitHub REST API is rate limited.", retryAt: Date.now() + 60 * 60_000 }
     : { state: "unavailable", scope, message: `GitHub ${scope === "graphql" ? "GraphQL" : "REST"} request failed.`, retryAt: null };
   if (scope === "graphql") {
-    runtime().githubGraphqlHealth = health;
-    if (health.state === "rate_limited") runtime().githubGraphqlBackoffUntil = health.retryAt ?? Date.now() + GITHUB_GRAPHQL_BACKOFF_MS;
-  } else runtime().githubRestHealth = health;
+    owner.githubGraphqlHealth = health;
+    if (health.state === "rate_limited") owner.githubGraphqlBackoffUntil = health.retryAt ?? Date.now() + GITHUB_GRAPHQL_BACKOFF_MS;
+  } else owner.githubRestHealth = health;
   return new Error(message);
 }
-async function runCachedGitHubRead(args: readonly string[], maxBuffer: number, ttlMs = GITHUB_READ_CACHE_MS): Promise<string> {
+async function runCachedGitHubRead(args: readonly string[], maxBuffer: number, ttlMs = GITHUB_READ_CACHE_MS, owner = runtime()): Promise<string> {
   const scope = githubReadScope(args);
-  const health = scope === "graphql" ? runtime().githubGraphqlHealth : runtime().githubRestHealth;
+  const health = scope === "graphql" ? owner.githubGraphqlHealth : owner.githubRestHealth;
   if (health.state === "rate_limited" && health.retryAt && health.retryAt > Date.now()) throw new Error(health.message ?? "GitHub API is rate limited.");
   const key = args.join("\u0000");
-  const cached = runtime().githubReadCache.get(key);
+  const cached = owner.githubReadCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
-  const pending = runtime().githubReadPending.get(key);
+  const pending = owner.githubReadPending.get(key);
   if (pending) return pending;
   const request = execFileAsync("gh", [...args], { maxBuffer }).then(({ stdout }) => {
-    if (scope === "graphql") runtime().githubGraphqlHealth = { state: "available", scope, message: null, retryAt: null };
-    else runtime().githubRestHealth = { state: "available", scope, message: null, retryAt: null };
-    if (runtime().githubReadCache.size >= 300) runtime().githubReadCache.delete(runtime().githubReadCache.keys().next().value!);
-    runtime().githubReadCache.set(key, { value: stdout, expiresAt: Date.now() + ttlMs });
+    if (scope === "graphql") owner.githubGraphqlHealth = { state: "available", scope, message: null, retryAt: null };
+    else owner.githubRestHealth = { state: "available", scope, message: null, retryAt: null };
+    if (owner.githubReadCache.size >= 300) owner.githubReadCache.delete(owner.githubReadCache.keys().next().value!);
+    owner.githubReadCache.set(key, { value: stdout, expiresAt: Date.now() + ttlMs });
     return stdout;
-  }).catch((error) => { throw githubReadError(scope, error); }).finally(() => { runtime().githubReadPending.delete(key); });
-  runtime().githubReadPending.set(key, request);
+  }).catch((error) => { throw githubReadError(owner, scope, error); }).finally(() => { owner.releasePending("githubRead", key); });
+  owner.githubReadPending.set(key, request);
   return request;
 }
 const runGitHubApi: GitHubApiRunner = runCachedGitHubRead;
@@ -489,10 +489,10 @@ function isGitHubGraphqlRateLimit(error: unknown) { return /graphql_rate_limit|A
  * limit). REST keeps the status badges truthful instead of showing the
  * misleading "no reviewer / pending" fallback in that case.
  */
-async function restPullRequestSignal(owner: string, repo: string, number: number): Promise<AuthoredPullRequestSignal | null> {
+async function restPullRequestSignal(owner: string, repo: string, number: number, lifecycle: ServerLifecycle): Promise<AuthoredPullRequestSignal | null> {
   try {
-    const pullRequestPromise = runCachedGitHubRead(["api", "--method", "GET", `repos/${owner}/${repo}/pulls/${number}`, "-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`], 2_000_000);
-    const reviewsPromise = runCachedGitHubRead(["api", "--method", "GET", `repos/${owner}/${repo}/pulls/${number}/reviews?per_page=100`, "-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`], 2_000_000);
+    const pullRequestPromise = runCachedGitHubRead(["api", "--method", "GET", `repos/${owner}/${repo}/pulls/${number}`, "-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`], 2_000_000, GITHUB_READ_CACHE_MS, lifecycle);
+    const reviewsPromise = runCachedGitHubRead(["api", "--method", "GET", `repos/${owner}/${repo}/pulls/${number}/reviews?per_page=100`, "-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`], 2_000_000, GITHUB_READ_CACHE_MS, lifecycle);
     const [pullRequestStdout, reviewsStdout] = await Promise.all([pullRequestPromise, reviewsPromise]);
     const pullRequest = JSON.parse(pullRequestStdout) as unknown;
     const reviews = JSON.parse(reviewsStdout) as unknown;
@@ -512,7 +512,7 @@ async function restPullRequestSignal(owner: string, repo: string, number: number
       : reviewRequests > 0 ? "review_requested" : "none";
     const sha = isRecord(pullRequest.head) && typeof pullRequest.head.sha === "string" ? pullRequest.head.sha : null;
     if (!sha) return { checks: "unknown", review };
-    const checksStdout = await runCachedGitHubRead(["api", "--method", "GET", `repos/${owner}/${repo}/commits/${sha}/check-runs?per_page=100`, "-H", "Accept: application/vnd.github+json", "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`], 4_000_000);
+    const checksStdout = await runCachedGitHubRead(["api", "--method", "GET", `repos/${owner}/${repo}/commits/${sha}/check-runs?per_page=100`, "-H", "Accept: application/vnd.github+json", "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`], 4_000_000, GITHUB_READ_CACHE_MS, lifecycle);
     const checksResponse = JSON.parse(checksStdout) as unknown;
     const checkRuns = isRecord(checksResponse) && Array.isArray(checksResponse.check_runs) ? checksResponse.check_runs : [];
     const conclusions = checkRuns.map((check) => isRecord(check) ? String(check.conclusion ?? "") : "");
@@ -525,16 +525,19 @@ async function restPullRequestSignal(owner: string, repo: string, number: number
 }
 
 function cachedRestPullRequestSignal(owner: string, repo: string, number: number): Promise<AuthoredPullRequestSignal | null> {
+  const lifecycle = runtime();
   const cached = cachedPullRequestSignal(owner, repo, number);
   if (cached) return Promise.resolve(cached);
   const key = pullRequestSignalKey(owner, repo, number);
-  const pending = runtime().githubPullRequestSignalPending.get(key) as Promise<AuthoredPullRequestSignal | null> | undefined;
+  const pending = lifecycle.githubPullRequestSignalPending.get(key) as Promise<AuthoredPullRequestSignal | null> | undefined;
   if (pending) return pending;
-  const request = restPullRequestSignal(owner, repo, number).then((signal) => {
-    if (signal) cachePullRequestSignal(owner, repo, number, signal);
+  const request = restPullRequestSignal(owner, repo, number, lifecycle).then((signal) => {
+    if (signal && !(signal.checks === "unknown" && signal.review === "none")) {
+      lifecycle.githubPullRequestSignalCache.set(key, { value: signal, expiresAt: Date.now() + GITHUB_SIGNAL_CACHE_MS });
+    }
     return signal;
-  }).finally(() => { runtime().githubPullRequestSignalPending.delete(key); });
-  runtime().githubPullRequestSignalPending.set(key, request);
+  }).finally(() => { lifecycle.releasePending("pullRequestSignal", key); });
+  lifecycle.githubPullRequestSignalPending.set(key, request);
   return request;
 }
 
@@ -742,13 +745,14 @@ async function loadSidebarArchivedThreads() {
 }
 
 async function sidebarArchivedThreads() {
-  const cached = runtime().archivedThreadsCache as { expiresAt: number; value: Awaited<ReturnType<typeof loadSidebarArchivedThreads>> } | null;
+  const lifecycle = runtime();
+  const cached = lifecycle.archivedThreadsCache as { expiresAt: number; value: Awaited<ReturnType<typeof loadSidebarArchivedThreads>> } | null;
   if (cached && cached.expiresAt > Date.now()) return cached.value;
-  if (!runtime().archivedThreadsPending) runtime().archivedThreadsPending = loadSidebarArchivedThreads().then((value) => {
-    runtime().archivedThreadsCache = { value, expiresAt: Date.now() + 5 * 60_000 };
+  if (!lifecycle.archivedThreadsPending) lifecycle.archivedThreadsPending = loadSidebarArchivedThreads().then((value) => {
+    lifecycle.archivedThreadsCache = { value, expiresAt: Date.now() + 5 * 60_000 };
     return value;
-  }).finally(() => { runtime().archivedThreadsPending = null; });
-  return runtime().archivedThreadsPending as Promise<Awaited<ReturnType<typeof loadSidebarArchivedThreads>>>;
+  }).finally(() => { lifecycle.archivedThreadsPending = null; });
+  return lifecycle.archivedThreadsPending as Promise<Awaited<ReturnType<typeof loadSidebarArchivedThreads>>>;
 }
 
 export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle = createServerLifecycle()) {

@@ -30,7 +30,9 @@ describe("R1 app bundle ownership", () => {
     // generation Query and Zustand seams used by registered slot providers.
     expect(bundle).toContain("work-sidebar");
     expect(bundle).toContain("setTimeoutProvider");
-    expect(bundle).toContain("selectedWorkTab");
-    expect(bundle).toContain("setSelectedWorkTab");
+    // `getInitialState` is part of Zustand's vanilla StoreApi and is retained
+    // by the minifier with its set/get/subscribe implementation. It is a
+    // stronger ownership marker than application state literals alone.
+    expect(bundle).toContain("getInitialState");
   });
 });

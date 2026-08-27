@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider, type QueryKey } from "@tanstack/react-query";
 import { createStore } from "zustand/vanilla";
-import { useEffect, type PropsWithChildren, type ReactElement } from "react";
+import type { PropsWithChildren, ReactElement } from "react";
 
 export type QueryPolicy = Readonly<{
   staleTime: number;
@@ -26,19 +26,31 @@ export const queryKeys = {
 } as const;
 
 export const queryPolicies = {
-  sidebar: {
-    staleTime: 0,
-    gcTime: 5 * 60_000,
+  sidebarOrderPreferences: {
+    staleTime: Infinity,
+    gcTime: 30 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
   },
-  work: {
+  sidebarTasks: {
     staleTime: 30_000,
     gcTime: 5 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
   },
-  github: {
+  workContext: {
+    staleTime: 15_000,
+    gcTime: 5 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  },
+  workChanges: {
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  },
+  githubHealth: {
     staleTime: 30_000,
     gcTime: 5 * 60_000,
     retry: false,
@@ -51,7 +63,7 @@ export const queryPolicies = {
 // reload naturally creates a fresh generation and client.
 const pluginQueryClient = new QueryClient({
   defaultOptions: {
-    queries: queryPolicies.sidebar,
+    queries: queryPolicies.sidebarOrderPreferences,
   },
 });
 
@@ -67,18 +79,10 @@ export const pluginInteractionStore = createStore<PluginInteractionState>((set) 
   setSelectedWorkTab: (selectedWorkTab) => set({ selectedWorkTab }),
 }));
 
-let mountedProviderCount = 0;
-
 export function getPluginQueryClient(): QueryClient {
   return pluginQueryClient;
 }
 
-export function getMountedPluginProviderCount(): number { return mountedProviderCount; }
-
 export function PluginProviders({ children }: PropsWithChildren): ReactElement {
-  useEffect(() => {
-    mountedProviderCount += 1;
-    return () => { mountedProviderCount -= 1; };
-  }, []);
   return <QueryClientProvider client={pluginQueryClient}>{children}</QueryClientProvider>;
 }
