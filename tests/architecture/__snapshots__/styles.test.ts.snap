@@ -10,7 +10,7 @@ exports[`stylesheet architecture baseline > every plugin stylesheet parses, stay
   "views.css: .ws-selection-archive:hover: undocumented !important",
   "views.css: .ws-new-thread: undocumented !important",
   "views.css: .ws-new-thread:hover: undocumented !important",
-  "views.css: /* Stack hierarchy lives entirely in the fixed control gutter. The content column must never shift: ordinary PRs, stack roots, and stack layers all begin at exactly the same x-coordinate. */ .ws-pr-stack-layer-item: undocumented !important",
+  "views.css: .ws-pr-stack-layer-item: undocumented !important",
   "views.css: .ws-pr-stack-layer-item > .ws-pr-row: undocumented !important",
   "views.css: .ws-pr-stack-layer-item::before: undocumented !important",
   "views.css: .ws-thread-pr-open: hardcoded palette #22c55e",
@@ -38,12 +38,13 @@ exports[`stylesheet architecture baseline > every plugin stylesheet parses, stay
   "views.css: .ws-new-thread: undocumented !important",
   "views.css: .ws-thread-settings-menu: undocumented !important",
   "views.css: .ws-list: undocumented !important",
-  "views.css: /* Both headers are direct children of the full list. That gives their sticky offsets the sidebar scrollport, rather than the short header wrapper. */ .ws-view-selector: undocumented !important",
+  "views.css: .ws-view-selector: undocumented !important",
   "views.css: .ws-view-selector button: undocumented !important",
   "views.css: .ws-list-toolbar: undocumented !important",
   "views.css: .ws-github-api-rate_limited: hardcoded palette #b45309",
   "views.css: .ws-task-assignee input: undocumented !important",
   "views.css: .ws-task-assignee input: undocumented !important",
+  "views.css: .ws-work-card.ws-thread-task-card .ws-thread-task-list, .ws-work-card.ws-thread-task-card .ws-thread-task-attach, .ws-work-card.ws-thread-task-card .ws-thread-execution-list: all: unset",
   "views.css: .ws-task-priority-medium: hardcoded palette #d97706",
 ]
 `;
