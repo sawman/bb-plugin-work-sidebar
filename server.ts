@@ -24,7 +24,7 @@ export default function plugin(
   lifecycle: ServerLifecycle = createServerLifecycle(),
 ) {
   bb.onDispose(() => lifecycle.dispose());
-  const tasks = createTasksRegistration(bb);
+  const tasks = createTasksRegistration(bb, lifecycle);
   const pullRequests = createPullRequestRegistration(bb, lifecycle);
   const dependencies: ServerCompositionDependencies = { bb, lifecycle, pullRequests, tasks };
   const changes = createChangesRegistration(dependencies);

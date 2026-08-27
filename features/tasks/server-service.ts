@@ -9,6 +9,7 @@ import {
   publishWorkBindingReady,
   type WorkBindingsState,
 } from "./server-work-bindings.js";
+import type { ServerLifecycle } from "../../server-lifecycle.js";
 
 export const DURABLE_BOUND_TASK_DETACH_ERROR =
   "This task is part of a durable work binding and cannot be detached from its bound owner.";
@@ -74,9 +75,12 @@ export type TasksRegistration = TaskHandlers & Pick<
 };
 
 /** Task RPC handler composition over narrow plugin, binding, and tool services. */
-export function createTasksService(bb: BbPluginApi): TasksRegistration {
+export function createTasksService(
+  bb: BbPluginApi,
+  lifecycle: ServerLifecycle,
+): TasksRegistration {
   const adapter = createTasksPluginAdapter(bb);
-  const bindings = createWorkBindingsService(bb, adapter);
+  const bindings = createWorkBindingsService(bb, adapter, lifecycle);
   const taskWithProject = async (task: Parameters<typeof summarizeTask>[0]) => {
     const projects = await adapter.projects();
     return summarizeTask(task, projects.find((project) => project.id === task.projectId)?.name ?? "Work");
@@ -127,6 +131,7 @@ export function createTasksService(bb: BbPluginApi): TasksRegistration {
       const now = new Date().toISOString();
       const binding = { kind: "outcome" as const, rootThreadId: root.id, outcomeTaskId: task.id, taskProjectId: task.projectId, createdAt: now, updatedAt: now };
       await bindings.write({ ...saved, outcomes: [...saved.outcomes, binding] });
+      bindings.invalidateLegacy(root.id, root.projectId);
       publishWorkBindingReady(bb.realtime, root.id);
       return { task: await taskWithProject(task), binding: bindings.summarize(binding) };
     },
@@ -142,12 +147,26 @@ export function createTasksService(bb: BbPluginApi): TasksRegistration {
       return adapter.deleteSidebar(taskId);
     },
     async attachTaskToThread({ taskId, threadId }) {
-      return adapter.call("taskThreadsAttach", { taskId, threadId }, z.object({ threadId: taskThreadIdSchema }));
+      const root = await bindings.rootThread(threadId);
+      const result = await adapter.call(
+        "taskThreadsAttach",
+        { taskId, threadId },
+        z.object({ threadId: taskThreadIdSchema }),
+      );
+      bindings.invalidateLegacy(root.id, root.projectId);
+      return result;
     },
     async detachTaskFromThread({ taskId, threadId }) {
       if (isBoundOwnerTask(await bindings.read(), taskId, threadId))
         throw new Error(DURABLE_BOUND_TASK_DETACH_ERROR);
-      return adapter.call("taskThreadsDetach", { taskId, threadId }, z.object({ threadId: taskThreadIdSchema }));
+      const root = await bindings.rootThread(threadId);
+      const result = await adapter.call(
+        "taskThreadsDetach",
+        { taskId, threadId },
+        z.object({ threadId: taskThreadIdSchema }),
+      );
+      bindings.invalidateLegacy(root.id, root.projectId);
+      return result;
     },
     async reorderTask({ taskId, beforeTaskId, afterTaskId }) { return adapter.reorder(taskId, beforeTaskId, afterTaskId); },
   };
