@@ -21,7 +21,6 @@ export const queryKeys = {
   },
   work: {
     context: (threadId: string): QueryKey => [...queryRoot, "work", "context", threadId],
-    changes: (threadId: string): QueryKey => [...queryRoot, "work", "changes", threadId],
   },
 } as const;
 
@@ -38,12 +37,6 @@ export const queryPolicies = {
     staleTime: 5_000,
     gcTime: 10 * 60_000,
     retry: 1,
-    refetchOnWindowFocus: false,
-  },
-  workChanges: {
-    staleTime: 30_000,
-    gcTime: 10 * 60_000,
-    retry: false,
     refetchOnWindowFocus: false,
   },
 } as const satisfies Record<string, QueryPolicy>;

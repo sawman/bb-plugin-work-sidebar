@@ -11,6 +11,7 @@ import { createArchivedThreadService, createThreadPreferencesService } from "./f
 import { createServerLifecycle, type GitHubApiHealth, type ServerLifecycle } from "./server-lifecycle.js";
 import { createWorkContextReadService } from "./features/work-context/server-reads.js";
 import { createTrackerService, TRACKER_LINKS_KEY } from "./features/tracker/server.js";
+import { createChangesService } from "./features/changes/server.js";
 
 const execFileAsync = promisify(execFile);
 const TASKS_PLUGIN_ID = "tasks";
@@ -847,11 +848,6 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     const enhancedStack = await enhancedGithubStack(threadId, stackResult.stack);
     return { currentPullRequest: stackResult.currentPullRequest, stack: stackResult.stack, stackUnavailableReason: stackResult.reason, githubStack: enhancedStack };
   }
-  async function workChanges(threadId: string, thread: Awaited<ReturnType<typeof bb.sdk.threads.get>>, includePullRequests = true) {
-    const repository = await repositorySummary(thread);
-    if (!includePullRequests) return { currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null, repository };
-    return { ...(await pullRequestChanges(threadId)), repository };
-  }
 
   async function workProviderStatus(threadId: string) {
     const thread = await bb.sdk.threads.get({ threadId });
@@ -1353,8 +1349,6 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
       goal: timeline.goal ? { objective: timeline.goal.objective, status: timeline.goal.status, tokensUsed: timeline.goal.tokensUsed, tokenBudget: timeline.goal.tokenBudget, timeUsedSeconds: timeline.goal.timeUsedSeconds } : null,
       todos: timeline.pendingTodos?.items ?? [],
       children: children.map(({ thread: child, depth }) => ({ id: child.id, title: child.title ?? child.titleFallback ?? "Untitled agent", depth, status: child.status, runtimeStatus: child.runtime.displayStatus, providerId: child.providerId, isArchived: child.archivedAt !== null, task: links[child.id]?.[0] ? { key: links[child.id]![0].task.key, status: links[child.id]![0].task.status, liveStatus: links[child.id]![0].liveStatus } : null })),
-      currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null,
-      repository: { outcome: "absent" as const, message: null, branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFileCount: 0, changedInsertions: 0, changedDeletions: 0, changedFiles: [] },
     };
   }
 
@@ -1405,6 +1399,11 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     readOutcome: readWorkOutcome,
     readGoal: readWorkGoal,
     readPlan: readWorkPlan,
+  });
+  const changesService = createChangesService({
+    repository: async (threadId) => repositorySummary(await bb.sdk.threads.get({ threadId })),
+    projection: pullRequestChanges,
+    fingerprint: (_threadId, url) => pullRequestFingerprint(url),
   });
 
   bb.rpc.register(rpcContract, {
@@ -1518,13 +1517,8 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     async getWorkOutcome({ threadId }) { return workContextReads.outcome(threadId); },
     async getWorkGoal({ threadId }) { return workContextReads.goal(threadId); },
     async getWorkPlan({ threadId }) { return workContextReads.plan(threadId); },
-    async getWorkChanges({ threadId, force, pullRequests }) {
-      if (force) clearGitHubReadCache();
-      const thread = await bb.sdk.threads.get({ threadId });
-      return workChanges(threadId, thread, pullRequests !== false);
-    },
-    async getThreadPullRequestChanges({ threadId }) { return pullRequestChanges(threadId); },
-    async getPullRequestFingerprint({ url }) { return pullRequestFingerprint(url); },
+    async getChanges({ threadId }) { return changesService.get(threadId); },
+    async getChangesFingerprint({ threadId, url }) { return changesService.fingerprint(threadId, url); },
     async getGitHubPollingPolicy() { return githubPollingPolicy(); },
     async getWorkTracker({ threadId }) {
       return trackerService.context(threadId);

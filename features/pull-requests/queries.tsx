@@ -1,13 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import type { PluginRpcClient } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
 
 // This remains type-only: the app bundle sees neither the server contract
 // composer nor the root SDK runtime.
 export type PullRequestRpc = PluginRpcClient<typeof rpcContract>;
-export type PullRequestPolling = { visiblePollMs: number; backgroundPollMs: number };
 export type AuthoredPullRequestPolling = { intervalMs: number };
 
 const root = ["work-sidebar", "pull-requests"] as const;
@@ -16,27 +15,14 @@ export const pullRequestKeys = {
   authored: (): QueryKey => [...root, "authored"],
   authoredStacks: (): QueryKey => [...root, "authored", "stacks"],
   health: (): QueryKey => [...root, "health"],
-  threadChanges: (threadId: string): QueryKey => [...root, "thread", threadId],
-  fingerprint: (url: string): QueryKey => [...root, "fingerprint", url],
 } as const;
 
 export const pullRequestPolicies = {
   authored: { staleTime: 60_000, gcTime: 15 * 60_000, retry: false, refetchOnWindowFocus: false, refetchInterval: (polling: AuthoredPullRequestPolling): number => polling.intervalMs },
   authoredStacks: { staleTime: 60_000, gcTime: 15 * 60_000, retry: false, refetchOnWindowFocus: false, refetchInterval: (polling: AuthoredPullRequestPolling): number => polling.intervalMs },
   health: { staleTime: 15_000, gcTime: 2 * 60_000, retry: false, refetchOnWindowFocus: false, refetchInterval: 30_000 },
-  threadChanges: { staleTime: 30_000, gcTime: 10 * 60_000, retry: false, refetchOnWindowFocus: false },
-  fingerprint: { staleTime: 0, gcTime: 2 * 60_000, retry: false, refetchOnWindowFocus: false, refetchIntervalInBackground: true },
 } as const;
 
-function useDocumentVisibility(): boolean {
-  const [visible, setVisible] = useState(() => typeof document === "undefined" || document.visibilityState === "visible");
-  useEffect(() => {
-    const update = () => setVisible(document.visibilityState === "visible");
-    document.addEventListener("visibilitychange", update);
-    return () => document.removeEventListener("visibilitychange", update);
-  }, []);
-  return visible;
-}
 
 async function authoredPullRequests(rpc: PullRequestRpc, force = false) {
   const base = await rpc.call("sidebarAuthoredPullRequests", force ? { force: true } : {});
@@ -92,31 +78,4 @@ export function useSetAuthoredPullRequestDraft(rpc: PullRequestRpc) {
       ]);
     },
   });
-}
-
-export function useThreadPullRequestChanges(rpc: PullRequestRpc, threadId: string, polling: PullRequestPolling) {
-  const client = useQueryClient();
-  const visible = useDocumentVisibility();
-  const changes = useQuery({ queryKey: pullRequestKeys.threadChanges(threadId), queryFn: () => rpc.call("getThreadPullRequestChanges", { threadId }), ...pullRequestPolicies.threadChanges });
-  const url = changes.data?.currentPullRequest?.url;
-  const fingerprint = useQuery({
-    queryKey: pullRequestKeys.fingerprint(url ?? "none"),
-    queryFn: () => rpc.call("getPullRequestFingerprint", { url: url! }),
-    enabled: Boolean(url),
-    ...pullRequestPolicies.fingerprint,
-    refetchInterval: visible ? polling.visiblePollMs : polling.backgroundPollMs,
-  });
-  const previousFingerprint = useRef<string | null>(null);
-  useEffect(() => {
-    const next = fingerprint.data?.fingerprint;
-    if (!next) return;
-    const previous = previousFingerprint.current;
-    previousFingerprint.current = next;
-    if (previous && previous !== next) void invalidateThreadPullRequestChanges(client, threadId);
-  }, [client, fingerprint.data?.fingerprint, threadId]);
-  return changes;
-}
-
-export function invalidateThreadPullRequestChanges(client: { invalidateQueries(filters: { queryKey: QueryKey }): Promise<unknown> | unknown }, threadId: string) {
-  return client.invalidateQueries({ queryKey: pullRequestKeys.threadChanges(threadId) });
 }
