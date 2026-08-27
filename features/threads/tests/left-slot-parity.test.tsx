@@ -56,7 +56,7 @@ async function leftSlot({
   };
   return renderSlot(
     app.threadLists[0]!,
-    { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: vi.fn(), searchQuery: "", Original: () => null, experimental_Original: () => <div>Native BB list</div> },
+    { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: vi.fn(), searchQuery: "", Original: () => <div>Native BB list</div>, experimental_Original: () => <div>Deprecated native BB list</div> },
     { sidebarThreads: { status: "ready", projects: [project], threads }, rpc: defaults as never },
   );
 }
@@ -125,7 +125,10 @@ describe("R18 registered left sidebar parity", () => {
     expect(slot.getByTitle("Checks passing")).toBeTruthy();
     expect(slot.getByTitle("Approved")).toBeTruthy();
     fireEvent.click(slot.getByRole("link", { name: /Base/ }), { ctrlKey: true });
-    expect(slot.getByRole("link", { name: /Base/ }).closest("article")?.getAttribute("aria-selected")).toBe("true");
+    const selectedRow = slot.getByRole("link", { name: /Base/ }).closest("article")!;
+    expect(selectedRow.getAttribute("data-selected")).toBe("true");
+    expect(selectedRow.hasAttribute("aria-selected")).toBe(false);
+    expect(slot.getByRole("link", { name: /Base/ }).getAttribute("aria-current")).toBe("true");
     fireEvent.click(slot.getByRole("button", { name: "Expand stack layers" }));
     expect(slot.getByRole("link", { name: /Child/ })).toBeTruthy();
     fireEvent.click(slot.getAllByRole("button", { name: "Mark draft" })[0]!);

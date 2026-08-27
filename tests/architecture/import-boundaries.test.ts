@@ -11,6 +11,14 @@ function physicalLines(path: string): number {
   return readFileSync(resolve(repositoryRoot, path), "utf8").split("\n").length - 1;
 }
 
+function longestLine(path: string): number {
+  return Math.max(
+    ...readFileSync(resolve(repositoryRoot, path), "utf8")
+      .split("\n")
+      .map((line) => line.length),
+  );
+}
+
 function topLevelImplementationDeclarations(path: string): number {
   const source = ts.createSourceFile(path, readFileSync(resolve(repositoryRoot, path), "utf8"), ts.ScriptTarget.Latest, true);
   return source.statements.filter((statement) => {
@@ -30,7 +38,7 @@ describe("R16 composition boundaries", () => {
     // target is the concrete remaining ownership: app loses its generic slot
     // provider wrapper, server loses the Work-binding workflow, and
     // contracts stay a server-only composition plus browser-safe schemas.
-    expect(physicalLines("app.tsx")).toBeLessThanOrEqual(650);
+    expect(physicalLines("app.tsx")).toBeLessThanOrEqual(350);
     expect(physicalLines("server.ts")).toBeLessThanOrEqual(1_600);
     expect(physicalLines("contracts.ts")).toBeLessThanOrEqual(12);
     expect(physicalLines("contracts.schemas.ts")).toBeLessThanOrEqual(250);
@@ -40,6 +48,7 @@ describe("R16 composition boundaries", () => {
     // reformatting this entrypoint.
     expect(topLevelImplementationDeclarations("app.tsx")).toBeLessThanOrEqual(30);
     expect(topLevelImplementationDeclarations("server.ts")).toBeLessThanOrEqual(45);
+    expect(longestLine("app.tsx")).toBeLessThanOrEqual(240);
   });
 
   it("does not retain a module-global server generation handle", () => {

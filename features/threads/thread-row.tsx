@@ -315,14 +315,15 @@ export function ThreadRow({
   const cleanupRef = useRef<(() => void) | null>(null);
   useEffect(() => () => cleanupRef.current?.(), []);
   const startUnifiedDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
-    // Native split is deliberately called first; BB takes the gesture when it exits the sidebar.
-    splitProps.onPointerDown?.(event);
+    // Editing and non-primary gestures remain fully local to their controls.
+    // For every primary, non-interactive row pointer BB receives the gesture
+    // first, then optional plugin reordering may begin inside the sidebar.
     if (
-      reorderDisabled ||
       event.button !== 0 ||
       (event.target as HTMLElement).closest("button,input,textarea")
-    )
-      return;
+    ) return;
+    splitProps.onPointerDown?.(event);
+    if (reorderDisabled) return;
     const pointerId = event.pointerId;
     let active = false;
     const targetAt = (x: number, y: number) =>
@@ -470,7 +471,8 @@ export function ThreadRow({
                   ? "Drag into the main area to open; drop at an edge to split"
                   : undefined
               }
-              aria-selected={selected}
+              aria-current={selected ? "true" : undefined}
+              data-selected={selected || undefined}
               onMouseDown={(event) => {
                 controlClick.current = event.ctrlKey && event.button === 0;
               }}
