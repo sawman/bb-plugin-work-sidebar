@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Icon } from "../../components/ui/icon";
+import { Input } from "../../components/ui/input";
 import { WorkCard, WorkCardHeading } from "../../components/work/card";
 import { Combobox } from "../../components/ui/combobox";
 import { AssigneePicker } from "../../components/tasks/assignee-picker";
@@ -63,7 +64,7 @@ function OutcomeCard({ threadId }: { threadId: string }) {
     try { await operation; toast.success(success); } catch (error) { toast.error(error instanceof Error ? error.message : failure); }
   };
   return (
-    <CardState title="Outcome" pending={query.isPending} error={query.error} onRetry={() => void query.refetch()}>
+    <CardState title="Outcome" className={outcome ? "ws-outcome-card" : "ws-outcome-empty"} pending={query.isPending} error={query.error} onRetry={() => void query.refetch()}>
       {outcome ? <>
         <p className="ws-card-note ws-outcome-key">{outcome.key}</p>
         <h3>{outcome.title}</h3>
@@ -73,8 +74,8 @@ function OutcomeCard({ threadId }: { threadId: string }) {
       </> : <>
         <p className="ws-card-note">No current outcome.</p>
         <div className="ws-outcome-form">
-          <input aria-label="Outcome-oriented task title" value={title} disabled={!query.data?.tasksAvailable || mutation.create.isPending} onChange={(event) => setTitle(event.target.value)} />
-          <button type="button" disabled={!title.trim() || !query.data?.tasksAvailable || mutation.create.isPending} aria-label="Create and attach outcome task" onClick={() => void report(mutation.create.mutateAsync({ title: title.trim() }).then(() => setTitle("")), "Outcome created and attached", "Could not create outcome")}>{mutation.create.isPending ? "Creating…" : "Create"}</button>
+          <Input aria-label="Outcome-oriented task title" placeholder="Outcome-oriented task title" value={title} disabled={!query.data?.tasksAvailable || mutation.create.isPending} onChange={(event) => setTitle(event.target.value)} />
+          <button type="button" className="ws-outcome-create-button" disabled={!title.trim() || !query.data?.tasksAvailable || mutation.create.isPending} aria-label="Create and attach outcome task" onClick={() => void report(mutation.create.mutateAsync({ title: title.trim() }).then(() => setTitle("")), "Outcome created and attached", "Could not create outcome")}>{mutation.create.isPending ? "Creating…" : "Create"}</button>
         </div>
       </>}
     </CardState>
