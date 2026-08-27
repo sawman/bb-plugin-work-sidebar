@@ -60,15 +60,6 @@ export function useLegacyWorkContext(threadId: string) {
   });
 }
 
-export function useLegacyWorkChanges(threadId: string) {
-  const rpc = useRpc<typeof rpcContract>();
-  return useQuery({
-    queryKey: ["work-sidebar", "legacy-work-changes", threadId],
-    queryFn: () => rpc.call("getWorkChanges", { threadId, pullRequests: false }),
-    ...workContextCardPolicy,
-  });
-}
-
 export function useLegacyProviderHealth(threadId: string) {
   const rpc = useRpc<typeof rpcContract>();
   return useQuery({

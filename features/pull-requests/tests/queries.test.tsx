@@ -8,7 +8,6 @@ import {
   pullRequestPolicies,
   useAuthoredPullRequests,
   useSetAuthoredPullRequestDraft,
-  useThreadPullRequestChanges,
   useGitHubApiHealth,
   type PullRequestRpc,
 } from "../queries";
@@ -143,44 +142,6 @@ describe("R5 pull-request queries", () => {
     expect(view.result.current.list.data?.[0]?.title).toBe("new stack");
     view.unmount();
     client.clear();
-  });
-
-  it("reschedules fingerprint polling on document visibility changes, leaves no observers or timers after unmount, and never retries a classified rate limit", async () => {
-    vi.useFakeTimers();
-    let fingerprintReads = 0;
-    const rpc = {
-      call: vi.fn(async (method: string) => {
-        if (method === "getThreadPullRequestChanges") return { currentPullRequest: { url: "https://github.com/acme/sidebar/pull/12" }, stack: null, stackUnavailableReason: null, githubStack: null };
-        if (method === "getPullRequestFingerprint") { fingerprintReads += 1; throw Object.assign(new Error("GitHub API is rate limited."), { code: "github_rate_limited" }); }
-        throw new Error(`unexpected ${method}`);
-      }),
-    };
-    const client = new QueryClient({ defaultOptions: { queries: { retry: 3 } } });
-    const previousVisibility = Object.getOwnPropertyDescriptor(document, "visibilityState");
-    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
-    const view = renderHook(() => useThreadPullRequestChanges(rpc as PullRequestRpc, "thr_r5", {
-      visiblePollMs: 1_000,
-      backgroundPollMs: 9_000,
-    }), { wrapper: wrapper(client) });
-    await act(async () => { await vi.advanceTimersByTimeAsync(0); await Promise.resolve(); });
-    expect(view.result.current.data?.currentPullRequest?.url).toContain("/12");
-    await vi.advanceTimersByTimeAsync(1_000);
-    // One immediate observation and exactly one visible-policy interval;
-    // the rate-limit error itself is not retried by the client.
-    expect(fingerprintReads).toBe(2);
-    expect(pullRequestPolicies.threadChanges.retry).toBe(false);
-    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
-    act(() => document.dispatchEvent(new Event("visibilitychange")));
-    await vi.advanceTimersByTimeAsync(8_999);
-    expect(fingerprintReads).toBe(2);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(fingerprintReads).toBe(3);
-    view.unmount();
-    expect(client.getQueryCache().findAll({ queryKey: pullRequestKeys.threadChanges("thr_r5") })[0]?.getObserversCount()).toBe(0);
-    client.clear();
-    expect(vi.getTimerCount()).toBe(0);
-    if (previousVisibility) Object.defineProperty(document, "visibilityState", previousVisibility);
-    else delete (document as { visibilityState?: string }).visibilityState;
   });
 
   it("gives the stable left surface the only Query-owned visible health interval", async () => {

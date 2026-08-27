@@ -3,6 +3,7 @@ import { authoredPullRequest, pullRequest, pullRequestSignal, sidebarStack, side
 import { sidebarTaskProjectSchema, sidebarTaskSchema, taskLinkSchema, taskPrioritySchema, taskStatusSchema, taskSummarySchema } from "./features/tasks/schemas.js";
 import { threadArchiveSchemas, threadPreferenceSchemas } from "./features/threads/schemas.js";
 import { trackerRpcSchemas } from "./features/tracker/schemas.js";
+import { changesRpcSchemas, githubStackBranchSchema } from "./features/changes/schemas.js";
 
 const taskStatus = taskStatusSchema;
 const taskPriority = taskPrioritySchema;
@@ -32,22 +33,6 @@ const sidebarThreadPullRequest = z.object({
   attention: z.enum(["blocked", "changes_requested", "checks_failed", "checks_pending", "closed", "conflicts", "draft", "merged", "none", "ready_to_merge", "review_requested"]),
 });
 const stackChange = z.object({ additions: z.number(), deletions: z.number(), files: z.array(z.object({ path: z.string(), previousPath: z.string().nullable(), status: z.enum(["added", "deleted", "modified", "renamed", "untracked"]), additions: z.number().nullable(), deletions: z.number().nullable() })), truncated: z.boolean() });
-const githubStackBranch = z.object({
-  name: z.string(), isCurrent: z.boolean(), isMerged: z.boolean(), isQueued: z.boolean(), needsRebase: z.boolean(), hasStash: z.boolean(), stashCount: z.number().int().nonnegative().nullable(),
-  pr: z.object({ number: z.number(), url: z.string().url(), state: z.string(), title: z.string().nullable(), isDraft: z.boolean(), metadataStale: z.boolean() }).nullable(),
-  diff: stackChange.nullable(), aheadOfRemote: z.number().nullable(), behindRemote: z.number().nullable(),
-  checks: z.enum(["failed", "passing", "pending", "none", "unknown"]).optional(),
-  review: z.enum(["approved", "changes_requested", "changes_requested_review_requested", "review_requested", "review_required", "none"]).optional(),
-});
-const githubStack = z.object({ trunk: z.string(), currentBranch: z.string().nullable(), branches: z.array(githubStackBranch), trunkBehind: z.number().nullable(), prunableBranchCount: z.number().int().nonnegative().nullable() });
-const workChanges = z.object({
-  currentPullRequest: pullRequest.nullable(),
-  stack: z.object({ number: z.number(), base: z.string(), currentPullRequest: z.number(), pullRequests: z.array(sidebarStackLayer) }).nullable(),
-  stackUnavailableReason: z.string().nullable(),
-  githubStack: z.object({ stack: githubStack.nullable(), pending: stackChange.nullable(), error: z.string().nullable() }).nullable(),
-  repository: z.object({ outcome: z.enum(["available", "not_applicable", "unavailable", "absent"]), message: z.string().nullable(), branch: z.string().nullable(), base: z.string().nullable(), ahead: z.number(), behind: z.number(), worktreeState: z.string().nullable(), hasUncommittedChanges: z.boolean(), changedFileCount: z.number().int().nonnegative(), changedInsertions: z.number().int().nonnegative(), changedDeletions: z.number().int().nonnegative(), changedFiles: z.array(z.object({ path: z.string(), status: z.string(), insertions: z.number().nullable(), deletions: z.number().nullable() })) }),
-});
-const threadPullRequestChanges = workChanges.pick({ currentPullRequest: true, stack: true, stackUnavailableReason: true, githubStack: true });
 const workProviderStatus = z.object({
   tone: z.enum(["green", "amber", "red"]),
   providerId: z.string(),
@@ -65,10 +50,11 @@ const workOutcome = z.object({ tasksAvailable: z.boolean(), outcome: taskSummary
 const workGoal = z.object({ objective: z.string(), status: z.enum(["active", "budgetLimited", "complete", "paused"]), tokensUsed: z.number(), tokenBudget: z.number().nullable(), timeUsedSeconds: z.number() }).nullable();
 const workPlan = z.object({ items: z.array(z.object({ id: z.string(), text: z.string(), status: z.enum(["completed", "in_progress", "pending"]) })) });
 
-export type GitHubStackBranch = z.infer<typeof githubStackBranch>;
+export type GitHubStackBranch = z.infer<typeof githubStackBranchSchema>;
 export type GitHubStackSignal = z.infer<typeof sidebarStackLayer>;
 
 export const rpcSchemas = {
+  ...changesRpcSchemas,
   ...threadPreferenceSchemas,
   sidebarTasks: {
     input: z.null(),
@@ -161,33 +147,12 @@ export const rpcSchemas = {
           liveStatus: z.enum(["starting", "working", "idle", "completed", "failed"]),
         }).nullable(),
       })),
-      currentPullRequest: pullRequest.nullable(),
-      stack: z.object({ number: z.number(), base: z.string(), currentPullRequest: z.number(), pullRequests: z.array(sidebarStackLayer) }).nullable(),
-      stackUnavailableReason: z.string().nullable(),
-      githubStack: z.object({ stack: githubStack.nullable(), pending: stackChange.nullable(), error: z.string().nullable() }).nullable(),
-      repository: z.object({
-        outcome: z.enum(["available", "not_applicable", "unavailable", "absent"]),
-        message: z.string().nullable(),
-        branch: z.string().nullable(),
-        base: z.string().nullable(),
-        ahead: z.number(),
-        behind: z.number(),
-        worktreeState: z.string().nullable(),
-        hasUncommittedChanges: z.boolean(),
-        changedFileCount: z.number().int().nonnegative(),
-        changedInsertions: z.number().int().nonnegative(),
-        changedDeletions: z.number().int().nonnegative(),
-        changedFiles: z.array(z.object({ path: z.string(), status: z.string(), insertions: z.number().nullable(), deletions: z.number().nullable() })),
-      }),
     }),
   },
   getWorkStatus: { input: workCardInput, output: workStatus },
   getWorkOutcome: { input: workCardInput, output: workOutcome },
   getWorkGoal: { input: workCardInput, output: workGoal },
   getWorkPlan: { input: workCardInput, output: workPlan },
-  getWorkChanges: { input: z.object({ threadId: z.string(), force: z.boolean().optional(), pullRequests: z.boolean().optional() }).strict(), output: workChanges },
-  getThreadPullRequestChanges: { input: z.object({ threadId: z.string().startsWith("thr_") }).strict(), output: threadPullRequestChanges },
-  getPullRequestFingerprint: { input: z.object({ url: z.string().url() }).strict(), output: z.object({ fingerprint: z.string().nullable() }) },
   getGitHubPollingPolicy: { input: z.null(), output: z.object({ activePollMs: z.number().int().positive(), backgroundPollMs: z.number().int().positive(), maxRestPollsPerMinute: z.number().int().positive() }) },
   ...trackerRpcSchemas,
   getWorkProviderStatus: { input: z.object({ threadId: z.string() }).strict(), output: workProviderStatus },

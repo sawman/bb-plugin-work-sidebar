@@ -15,14 +15,13 @@ const populatedTasks: TasksResult = { ...emptyTasks, tasks: [task] };
 const workContext = {
   tasksAvailable: true, currentThread: { title: "Fixture thread", status: "idle" as const, runtimeStatus: "idle", providerId: "codex" },
   tasks: [], subtasks: [], outcome: null, executionTasks: [], bindings: [], legacy: { state: "none" as const, taskIds: [], message: null }, goal: null, todos: [],
-  children: [], currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null,
-  repository: { outcome: "not_applicable" as const, message: null, branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFileCount: 0, changedInsertions: 0, changedDeletions: 0, changedFiles: [] },
+  children: [],
 } satisfies Awaited<ReturnType<RpcHandlers["getWorkContext"]>>;
 
 function rpcFixtures(sidebarTasks: RpcHandlers["sidebarTasks"]): RpcHandlers {
   return {
     sidebarTasks, sidebarTaskLinks: () => ({ available: true, links: {}, error: null }), getWorkContext: () => workContext,
-    getWorkChanges: () => ({ currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null, repository: workContext.repository }),
+    getChanges: () => ({ currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null, repository: { outcome: "absent", message: null, branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFileCount: 0, changedInsertions: 0, changedDeletions: 0, changedFiles: [] } }),
     getWorkTracker: () => ({ visible: false, available: false, message: null, suggestions: [], item: null, statusOptions: [] }),
     getWorkProviderStatus: () => ({ tone: "green", providerId: "codex", providerName: "Codex", statusUrl: null, status: "ready", message: null }),
     getWorkStatus: () => ({ currentThread: workContext.currentThread, children: [] }),
