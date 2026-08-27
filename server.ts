@@ -4,6 +4,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { rpcContract } from "./contracts.js";
 import { sanitizeThreadOrder, type SidebarStack } from "./work-model.js";
+import { createServerLifecycle, type GitHubApiHealth, type ServerLifecycle } from "./server-lifecycle.js";
 
 const execFileAsync = promisify(execFile);
 const TASKS_PLUGIN_ID = "tasks";
@@ -29,21 +30,20 @@ const PROVIDER_STATUS_URLS: Readonly<Record<string, string>> = {
   "claude-code": "https://status.claude.com/",
   "acp-cursor": "https://status.cursor.com/",
 };
-type GitHubApiHealth = { state: "available" | "rate_limited" | "unavailable"; scope: "graphql" | "rest" | "unknown"; message: string | null; retryAt: number | null };
 const GITHUB_READ_CACHE_MS = 2 * 60_000;
 const GITHUB_SEARCH_CACHE_MS = 5 * 60_000;
-const githubReadCache = new Map<string, { expiresAt: number; value: string }>();
-const githubReadPending = new Map<string, Promise<string>>();
-let githubGraphqlHealth: GitHubApiHealth = { state: "available", scope: "graphql", message: null, retryAt: null };
-let githubRestHealth: GitHubApiHealth = { state: "available", scope: "rest", message: null, retryAt: null };
+let githubReadCache: Map<string, { expiresAt: number; value: string }>;
+let githubReadPending: Map<string, Promise<string>>;
+let githubGraphqlHealth: GitHubApiHealth;
+let githubRestHealth: GitHubApiHealth;
 const GITHUB_SIGNAL_CACHE_MS = 2 * 60_000;
 // GitHub does not reliably include reset headers in gh's GraphQL error text.
 // A full window is conservative, but prevents every sidebar refresh from
 // immediately re-probing a bucket that GitHub has already exhausted.
 const GITHUB_GRAPHQL_BACKOFF_MS = 60 * 60_000;
-const githubPullRequestSignalCache = new Map<string, { expiresAt: number; value: AuthoredPullRequestSignal }>();
-const githubPullRequestSignalPending = new Map<string, Promise<AuthoredPullRequestSignal | null>>();
-let githubGraphqlBackoffUntil = 0;
+let githubPullRequestSignalCache: Map<string, { expiresAt: number; value: AuthoredPullRequestSignal }>;
+let githubPullRequestSignalPending: Map<string, Promise<AuthoredPullRequestSignal | null>>;
+let githubGraphqlBackoffUntil: number;
 const taskIdSchema = z.string().regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/);
 const taskThreadIdSchema = z.string().startsWith("thr_");
 
@@ -754,7 +754,17 @@ async function sidebarArchivedThreads() {
   return archivedThreadsPending;
 }
 
-export default async function plugin(bb: BbPluginApi) {
+export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle = createServerLifecycle()) {
+  // These caches are allocated by the factory, rather than at module load, so
+  // a reload gets a fresh generation and disposal can release every handle.
+  githubReadCache = lifecycle.githubReadCache;
+  githubReadPending = lifecycle.githubReadPending;
+  githubPullRequestSignalCache = lifecycle.githubPullRequestSignalCache as Map<string, { expiresAt: number; value: AuthoredPullRequestSignal }>;
+  githubPullRequestSignalPending = lifecycle.githubPullRequestSignalPending as Map<string, Promise<AuthoredPullRequestSignal | null>>;
+  githubGraphqlHealth = lifecycle.githubGraphqlHealth;
+  githubRestHealth = lifecycle.githubRestHealth;
+  githubGraphqlBackoffUntil = lifecycle.githubGraphqlBackoffUntil;
+  bb.onDispose(() => lifecycle.dispose());
   const githubPollingSettings = bb.settings.define({
     githubActivePollSeconds: { type: "select", label: "Right Work PR polling", description: "How often to poll the visible right-side Work PR through GitHub REST.", options: ["30", "60", "120", "300"], default: "60" },
     githubBackgroundPollSeconds: { type: "select", label: "Right Work PR background polling", description: "How often to poll the right-side Work PR while BB is not visible.", options: ["120", "300", "600", "900"], default: "300" },
@@ -1844,3 +1854,4 @@ export default async function plugin(bb: BbPluginApi) {
 }
 
 export { rpcContract } from "./contracts.js";
+export { createServerLifecycle } from "./server-lifecycle.js";

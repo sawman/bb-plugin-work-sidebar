@@ -26,7 +26,9 @@ describe("R1 app bundle ownership", () => {
     expect(bundle).not.toContain("REACT_ELEMENT_TYPE");
     expect(bundle).not.toContain("ReactCurrentDispatcher");
     expect(bundle).not.toContain("react-dom/client");
-    expect(bundle).toMatch(/QueryClient|QueryObserver/);
-    expect(bundle).toMatch(/zustand|createStore|subscribeWithSelector/);
+    // R2 replaces the temporary R1 reachability export with the real runtime
+    // seam: a module-generation QueryClient and its provider are bundled.
+    expect(bundle).toContain("work-sidebar");
+    expect(bundle).toContain("setTimeoutProvider");
   });
 });

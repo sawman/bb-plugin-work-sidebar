@@ -1,6 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { QueryClient } from "@tanstack/react-query";
-import { createStore } from "zustand/vanilla";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import {
   definePluginApp,
   useBbNavigate,
@@ -68,9 +66,16 @@ import { Icon } from "@/components/ui/icon";
 import "./app.css";
 import "./scrollbar.css";
 import "./views.css";
+import { PluginProviders } from "./query-runtime";
 
 const SIDEBAR_ORDER_CHANNEL = "sidebar-order:changed";
 type SidebarThreadGroup = { id: string; name: string; threadIds: string[] };
+
+function withPluginProviders<Props extends object>(Component: ComponentType<Props>): ComponentType<Props> {
+  return function PluginSlot(props: Props) {
+    return <PluginProviders><Component {...props} /></PluginProviders>;
+  };
+}
 
 function indicatorGlyph(value: string): string {
   switch (normalizeIndicator(value)) {
@@ -1483,21 +1488,17 @@ function TrackWorkAction() {
 }
 
 export default definePluginApp((app) => {
-  app.slots.settingsSection({ id: "github-polling", title: "GitHub polling", description: "Control Work Sidebar GitHub polling and shared REST budget.", component: GitHubPollingSettings });
+  app.slots.settingsSection({ id: "github-polling", title: "GitHub polling", description: "Control Work Sidebar GitHub polling and shared REST budget.", component: withPluginProviders(GitHubPollingSettings) });
   app.slots.experimental_threadList({
-    id: "work-queue", title: "Tasks", description: "Global outcome and execution task queue.", component: WorkThreadList,
+    id: "work-queue", title: "Tasks", description: "Global outcome and execution task queue.", component: withPluginProviders(WorkThreadList),
   });
   app.slots.threadPanelAction({
-    id: "work-context", title: "Work", icon: "ListTodo", component: WorkPanel, layout: "flush",
+    id: "work-context", title: "Work", icon: "ListTodo", component: withPluginProviders(WorkPanel), layout: "flush",
   });
   app.slots.experimental_threadHeaderAction({
-    id: "work-context-header", title: "Work", component: WorkContextHeaderAction,
+    id: "work-context-header", title: "Work", component: withPluginProviders(WorkContextHeaderAction),
   });
   app.composer.customize({
-    id: "task-first", scopes: ["thread"], actions: [{ id: "track-work", component: TrackWorkAction }],
+    id: "task-first", scopes: ["thread"], actions: [{ id: "track-work", component: withPluginProviders(TrackWorkAction) }],
   });
 });
-
-// R1 keeps the plugin-owned runtimes reachable from the app artifact. R2 owns
-// their providers and lifecycle; this export deliberately creates neither.
-export const r1BundleOwnership = { QueryClient, createStore };

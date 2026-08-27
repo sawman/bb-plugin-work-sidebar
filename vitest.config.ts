@@ -1,9 +1,11 @@
 import { defineConfig } from "vitest/config";
+import { fileURLToPath } from "node:url";
 
 export default defineConfig({
   test: {
     projects: [
       {
+        resolve: { alias: { "@": fileURLToPath(new URL("./", import.meta.url)) } },
         test: {
           name: "backend",
           environment: "node",
@@ -11,6 +13,7 @@ export default defineConfig({
         },
       },
       {
+        resolve: { alias: { "@": fileURLToPath(new URL("./", import.meta.url)) } },
         test: {
           name: "frontend",
           environment: "jsdom",

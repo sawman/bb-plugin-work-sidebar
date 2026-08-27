@@ -50,6 +50,8 @@
     "better-sqlite3": "^13.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cron-parser": "^5.10.0",
+    "hono": "^4.13.5",
     "jsdom": "^30.0.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
