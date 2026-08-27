@@ -57,8 +57,6 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
     if (event.family === "changes")
       void invalidateChanges(queryClient, threadId);
   });
-  const selectedTab =
-    WORK_TABS.find((candidate) => candidate.id === tab) ?? WORK_TABS[0]!;
   const selectTab = (next: WorkTab) =>
     threadInteractionStore.getState().setWorkTab(threadId, next);
   const onTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
@@ -80,7 +78,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
   };
   return (
     <div className="ws-panel">
-      <header className="ws-panel-header">
+      <div className="ws-panel-header">
         <div className="ws-panel-heading">
           <Icon name="ListTodo" className="ws-panel-icon" aria-hidden />
           <div>
@@ -103,7 +101,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
         >
           ↻
         </button>
-      </header>
+      </div>
       <nav className="ws-tabs" role="tablist" aria-label="Work context views">
         {WORK_TABS.map((candidate) => (
           <button
@@ -126,8 +124,9 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
       <div
         className="ws-panel-body"
         role="tabpanel"
-        id={`ws-panel-${selectedTab.id}`}
-        aria-labelledby={`ws-tab-${selectedTab.id}`}
+        id="ws-panel-work"
+        aria-labelledby="ws-tab-work"
+        hidden={tab !== "work"}
         tabIndex={0}
       >
         {tab === "work" && (
@@ -144,9 +143,25 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
             <TrackerCard threadId={threadId} />
           </div>
         )}
-        <div hidden={tab !== "changes"}>
-          <ChangesPanel threadId={threadId} />
-        </div>
+      </div>
+      <div
+        className="ws-panel-body"
+        role="tabpanel"
+        id="ws-panel-changes"
+        aria-labelledby="ws-tab-changes"
+      hidden={tab !== "changes"}
+      tabIndex={0}
+      >
+        <ChangesPanel threadId={threadId} />
+      </div>
+      <div
+        className="ws-panel-body"
+        role="tabpanel"
+        id="ws-panel-agents"
+        aria-labelledby="ws-tab-agents"
+        hidden={tab !== "agents"}
+        tabIndex={0}
+      >
         {tab === "agents" && <AgentsView threadId={threadId} />}
       </div>
     </div>

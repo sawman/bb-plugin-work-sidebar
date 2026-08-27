@@ -378,7 +378,9 @@
 /* R17 important: host sidebar tab styles otherwise override the active state. */
 .ws-view-selector button:hover,
 .ws-view-active {
+  /* R17 important: host sidebar tab styles otherwise override the active background. */
   background: var(--accent) !important;
+  /* R17 important: host sidebar tab styles otherwise override the active foreground. */
   color: var(--accent-foreground) !important;
 }
 .ws-view-content {
@@ -846,33 +848,49 @@
 }
 /* R17 important: host toolbar controls inject spacing that breaks the compact action. */
 .ws-selection-archive {
+  /* R17 important: host toolbar controls inject padding that breaks the compact action. */
   padding: 0.15rem 0.3rem !important;
+  /* R17 important: host toolbar controls inject a border that breaks the compact action. */
   border: 1px solid var(--border) !important;
+  /* R17 important: host toolbar controls inject a radius that breaks the compact action. */
   border-radius: calc(var(--radius) - 3px) !important;
+  /* R17 important: host toolbar controls inject a font size that breaks the compact action. */
   font-size: 0.6rem !important;
   white-space: nowrap;
 }
 /* R17 important: host toolbar hover styling hides the archive affordance. */
 .ws-selection-archive:hover {
+  /* R17 important: host toolbar hover styling hides the archive affordance. */
   background: var(--accent) !important;
 }
 /* R17 important: the host Button preset must not change the icon-only hit target. */
 .ws-new-thread {
+  /* R17 important: the host Button preset must not change the icon-only display. */
   display: inline-flex !important;
+  /* R17 important: the host Button preset must not change the icon-only width. */
   width: 1.55rem !important;
+  /* R17 important: the host Button preset must not change the icon-only height. */
   height: 1.55rem !important;
   align-items: center;
   justify-content: center;
+  /* R17 important: the host Button preset must not add icon-only margins. */
   margin: 0 !important;
+  /* R17 important: the host Button preset must not add icon-only padding. */
   padding: 0 !important;
+  /* R17 important: the host Button preset must not alter the icon-only border. */
   border: 1px solid transparent !important;
+  /* R17 important: the host Button preset must not alter the icon-only radius. */
   border-radius: calc(var(--radius) - 3px) !important;
+  /* R17 important: the host Button preset must not alter the icon-only color. */
   color: var(--muted-foreground) !important;
 }
 /* R17 important: the host Button hover preset overrides this semantic action state. */
 .ws-new-thread:hover {
+  /* R17 important: the host Button hover preset overrides this semantic action border. */
   border-color: var(--border) !important;
+  /* R17 important: the host Button hover preset overrides this semantic action background. */
   background: var(--accent) !important;
+  /* R17 important: the host Button hover preset overrides this semantic action color. */
   color: var(--foreground) !important;
 }
 .ws-new-thread:focus-visible {
@@ -900,12 +918,16 @@
    begin at exactly the same x-coordinate. */
 /* R17 important: host list indentation must not move the fixed stack rail gutter. */
 .ws-pr-stack-layer-item {
+  /* R17 important: host list indentation must not move the fixed stack rail gutter. */
   margin-left: 0 !important;
+  /* R17 important: host list indentation must not move the fixed stack rail gutter. */
   padding-left: 0 !important;
 }
 /* R17 important: host row indentation must not shift stack content from ordinary rows. */
 .ws-pr-stack-layer-item > .ws-pr-row {
+  /* R17 important: host row indentation must not shift stack content from ordinary rows. */
   margin-left: 0 !important;
+  /* R17 important: host row indentation must not shift stack content from ordinary rows. */
   padding-left: 0 !important;
   background: linear-gradient(
     90deg,
@@ -926,6 +948,7 @@
 }
 /* R17 important: host pseudo-element offsets must not move the calculated rail. */
 .ws-pr-stack-layer-item::before {
+  /* R17 important: host pseudo-element offsets must not move the calculated rail. */
   left: calc(
     var(--ws-pr-row-inline-padding) + (var(--ws-pr-stack-gutter) - 1px) / 2 -
       1px
@@ -1334,8 +1357,10 @@
   width: 100%;
   gap: 0.32rem;
   align-items: center;
+  /* R17 important: host link and button defaults must not alter stack rail geometry. */
   border: 0 !important;
   border-radius: calc(var(--radius) - 3px);
+  /* R17 important: host link and button defaults must not alter stack rail geometry. */
   padding: 0.38rem 0.28rem !important;
   background: transparent;
   color: inherit;
@@ -2058,6 +2083,7 @@ button.ws-provider-health:focus-visible {
 }
 /* R17 important: host selection backgrounds must not bleed into the nested stack. */
 .ws-stack-current .ws-stack-layer {
+  /* R17 important: host selection backgrounds must not bleed into the nested stack. */
   background: color-mix(in srgb, var(--primary) 3%, transparent) !important;
 }
 .ws-stack-current .ws-stack-files {
@@ -2131,6 +2157,7 @@ button.ws-provider-health:focus-visible {
 /* R17 important: host nested selection backgrounds must leave expanded files neutral. */
 .ws-stack-current > .ws-stack-files,
 .ws-stack-current > .ws-stack-files * {
+  /* R17 important: host nested selection backgrounds must leave expanded files neutral. */
   background: transparent !important;
 }
 .ws-stack-state-icon {
@@ -2195,9 +2222,11 @@ button.ws-provider-health:focus-visible {
 /* R17 important: host icon controls inject padding that breaks the fixed hit target. */
 .ws-icon-button,
 .ws-new-thread {
+  /* R17 important: host icon controls must use the fixed hit-target display. */
   display: grid !important;
   place-items: center;
   flex: none;
+  /* R17 important: host icon controls must not inject fixed-hit-target padding. */
   padding: 0 !important;
   line-height: 0;
 }
@@ -2210,7 +2239,9 @@ button.ws-provider-health:focus-visible {
 }
 /* R17 important: host Button sizing must keep the new-thread action aligned with icons. */
 .ws-new-thread {
+  /* R17 important: host Button sizing must keep the new-thread action width aligned with icons. */
   width: 1.6rem !important;
+  /* R17 important: host Button sizing must keep the new-thread action height aligned with icons. */
   height: 1.6rem !important;
 }
 .ws-list-toolbar {
@@ -2223,8 +2254,11 @@ button.ws-provider-health:focus-visible {
 }
 /* R17 important: host popover placement must overlay the sticky toolbar. */
 .ws-thread-settings-menu {
+  /* R17 important: host popover placement must overlay the sticky toolbar from the top. */
   top: calc(100% + 0.2rem) !important;
+  /* R17 important: host popover placement must not anchor below the sticky toolbar. */
   bottom: auto !important;
+  /* R17 important: host popover placement must clear the sticky toolbar stacking context. */
   z-index: 100 !important;
 }
 .ws-native-thread-list {
@@ -2233,7 +2267,9 @@ button.ws-provider-health:focus-visible {
 }
 /* R17 important: the enhanced list must cancel host slot padding edge-to-edge. */
 .ws-list {
+  /* R17 important: the enhanced list must cancel host slot margin edge-to-edge. */
   margin: -0.75rem !important;
+  /* R17 important: the enhanced list must cancel host slot padding edge-to-edge. */
   padding: 0 !important;
   background: var(--background);
 }
@@ -2241,16 +2277,25 @@ button.ws-provider-health:focus-visible {
    offsets the sidebar scrollport, rather than the short header wrapper. */
 /* R17 important: host sidebar layout rules otherwise defeat sticky selector geometry. */
 .ws-view-selector {
+  /* R17 important: host sidebar layout rules otherwise defeat sticky selector positioning. */
   position: sticky !important;
   z-index: 45;
   top: 0;
+  /* R17 important: host sidebar layout rules otherwise change selector box sizing. */
   box-sizing: border-box !important;
+  /* R17 important: host sidebar layout rules otherwise add selector gaps. */
   gap: 0 !important;
+  /* R17 important: host sidebar layout rules otherwise change selector height. */
   height: 2rem !important;
+  /* R17 important: host sidebar layout rules otherwise change selector minimum height. */
   min-height: 0 !important;
+  /* R17 important: host sidebar layout rules otherwise change selector maximum height. */
   max-height: 2rem !important;
+  /* R17 important: host sidebar layout rules otherwise add selector margins. */
   margin: 0 !important;
+  /* R17 important: host sidebar layout rules otherwise add selector padding. */
   padding: 0 !important;
+  /* R17 important: host sidebar layout rules otherwise override selector background. */
   background: var(--background) !important;
 }
 .ws-view-selector::before {
@@ -2259,18 +2304,26 @@ button.ws-provider-health:focus-visible {
 /* R17 important: host tab sizing otherwise changes the sticky selector height. */
 .ws-view-selector button {
   position: relative;
+  /* R17 important: host tab sizing otherwise changes the sticky selector box sizing. */
   box-sizing: border-box !important;
+  /* R17 important: host tab sizing otherwise changes the sticky selector height. */
   height: 2rem !important;
+  /* R17 important: host tab sizing otherwise changes the sticky selector minimum height. */
   min-height: 0 !important;
+  /* R17 important: host tab sizing otherwise changes the sticky selector padding. */
   padding: 0 0.25rem !important;
 }
 /* R17 important: host toolbar margins otherwise break its sticky offset. */
 .ws-list-toolbar {
+  /* R17 important: host toolbar margins otherwise break its sticky positioning. */
   position: sticky !important;
   z-index: 44;
   top: 2rem;
+  /* R17 important: host toolbar margins otherwise add sticky toolbar margins. */
   margin: 0 !important;
+  /* R17 important: host toolbar margins otherwise add sticky toolbar top padding. */
   padding-top: 0 !important;
+  /* R17 important: host toolbar margins otherwise override the sticky toolbar background. */
   background: var(--background) !important;
 }
 .ws-task-composer {

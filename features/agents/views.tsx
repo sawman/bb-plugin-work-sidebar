@@ -17,9 +17,17 @@ type AgentAnnotation = {
   recoveryMessage: string | null;
 };
 
-function AgentRow({ child, annotation }: { child: ReturnType<typeof projectAgentChildren>[number]; annotation: AgentAnnotation }) {
+function AgentRow({
+  child,
+  annotation,
+}: {
+  child: ReturnType<typeof projectAgentChildren>[number];
+  annotation: AgentAnnotation;
+}) {
   const actions = experimental_useSidebarThreadActions();
-  const { splitProps, isAvailable } = experimental_useSidebarThreadSplit(child.thread.id);
+  const { splitProps, isAvailable } = experimental_useSidebarThreadSplit(
+    child.thread.id,
+  );
   const runtime = agentRuntimePresentation(child.thread);
   const open = (split: boolean) => actions.open(child.thread.id, { split });
   return (
@@ -28,7 +36,11 @@ function AgentRow({ child, annotation }: { child: ReturnType<typeof projectAgent
       data-agent-state={runtime.tone}
       style={{ marginLeft: `${Math.min(child.depth - 1, 4) * 0.65}rem` }}
     >
-      <Icon name="Bot" className={`ws-agent-state ws-agent-state-${runtime.tone}`} aria-label={child.thread.indicatorLabel ?? runtime.label} />
+      <Icon
+        name="Bot"
+        className={`ws-agent-state ws-agent-state-${runtime.tone}`}
+        aria-label={child.thread.indicatorLabel ?? runtime.label}
+      />
       <a
         {...splitProps}
         href="#"
@@ -41,9 +53,19 @@ function AgentRow({ child, annotation }: { child: ReturnType<typeof projectAgent
           open(event.metaKey || event.ctrlKey);
         }}
       >
-        <strong>{child.thread.title ?? child.thread.titleFallback ?? "Untitled agent"}</strong>
-        <small>{runtime.label}{annotation.taskKey ? ` · ${annotation.taskKey}` : ""}{annotation.dispatchState ? ` · ${readableStatus(annotation.dispatchState)}` : ""}</small>
-        {annotation.recoveryMessage ? <small>{annotation.recoveryMessage}</small> : null}
+        <strong>
+          {child.thread.title ?? child.thread.titleFallback ?? "Untitled agent"}
+        </strong>
+        <small>
+          {runtime.label}
+          {annotation.taskKey ? ` · ${annotation.taskKey}` : ""}
+          {annotation.dispatchState
+            ? ` · ${readableStatus(annotation.dispatchState)}`
+            : ""}
+        </small>
+        {annotation.recoveryMessage ? (
+          <small>{annotation.recoveryMessage}</small>
+        ) : null}
       </a>
       {isAvailable ? (
         <button
@@ -70,23 +92,48 @@ export function AgentsView({ threadId }: { threadId: string }) {
   );
 
   if (hostThreads.status === "loading")
-    return <div className="ws-empty" role="status" aria-live="polite">Loading agents…</div>;
+    return (
+      <div className="ws-empty" role="status" aria-live="polite">
+        Loading agents…
+      </div>
+    );
   if (hostThreads.status === "error")
-    return <div className="ws-callout" role="alert">Could not load agents from BB.</div>;
+    return (
+      <div className="ws-callout" role="alert">
+        Could not load agents from BB.
+      </div>
+    );
 
   return (
     <div className="ws-section-stack" data-agent-view>
       <header>
-        <div><h2>Agents</h2></div>
+        <div>
+          <h2>Agents</h2>
+        </div>
         <span className="ws-section-count">{children.length}</span>
       </header>
       {children.map((child) => {
         const taskLink = taskLinks.data?.links[child.thread.id]?.[0];
-        const binding = outcome.data?.bindings.find((candidate) => candidate.ownerThreadId === child.thread.id);
-        return <AgentRow key={child.thread.id} child={child} annotation={{ taskKey: taskLink?.task.key ?? null, taskStatus: taskLink?.task.status ?? null, dispatchState: binding?.dispatchState ?? null, recoveryMessage: binding?.recoveryMessage ?? null }} />;
+        const binding = outcome.data?.bindings.find(
+          (candidate) => candidate.ownerThreadId === child.thread.id,
+        );
+        return (
+          <AgentRow
+            key={child.thread.id}
+            child={child}
+            annotation={{
+              taskKey: taskLink?.task.key ?? null,
+              taskStatus: taskLink?.task.status ?? null,
+              dispatchState: binding?.dispatchState ?? null,
+              recoveryMessage: binding?.recoveryMessage ?? null,
+            }}
+          />
+        );
       })}
       {children.length === 0 ? (
-        <div className="ws-empty">No active delegated child threads are attached to this thread.</div>
+        <div className="ws-empty">
+          No active delegated child threads are attached to this thread.
+        </div>
       ) : null}
     </div>
   );

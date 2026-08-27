@@ -27,6 +27,22 @@ function stylesheetRules(source: string) {
     .map((match) => ({ selector: match[1].trim().replace(/\s+/g, " "), declarations: match[2] }));
 }
 
+function undocumentedImportantDeclarations(source: string): string[] {
+  const violations: string[] = [];
+  let hasDeclarationComment = false;
+  for (const [index, line] of source.split("\n").entries()) {
+    if (/^\s*\/\* R17 important: .+ \*\/\s*$/.test(line)) {
+      hasDeclarationComment = true;
+      continue;
+    }
+    if (!line.includes("!important")) continue;
+    if (!hasDeclarationComment)
+      violations.push(`${index + 1}: ${line.trim()}`);
+    hasDeclarationComment = false;
+  }
+  return violations;
+}
+
 const dynamicClassFamilies = [
   { prefix: "ws-agent-state-", file: "features/agents/views.tsx", suffixes: ["working", "waiting", "blocked", "complete", "idle"] },
   { prefix: "ws-file-", file: "features/changes/views.tsx", suffixes: ["added", "deleted", "modified", "renamed", "untracked"] },
@@ -289,15 +305,15 @@ describe("shared surface and list-row architecture", () => {
           selector: stripComments(match[1]!).trim().replace(/\s+/g, " "),
           declarations: match[2]!,
           file,
-          documented: /\/\* R17 important: [\s\S]+\*\/\s*[^{}]+$/.test(match[1]!),
         }));
     });
 
-    const undocumentedImportant = importantRules
-      .filter(({ documented }) => !documented)
-      .map(({ file, selector }) => `${relative(root, file)}: ${selector}`);
+    const undocumentedImportant = stylesheetPaths().flatMap((file) =>
+      undocumentedImportantDeclarations(readFileSync(file, "utf8"))
+        .map((violation) => `${relative(root, file)}: ${violation}`),
+    );
 
-    expect(undocumentedImportant, "every host override documents its reason at the CSS declaration").toEqual([]);
+    expect(undocumentedImportant, "every important declaration directly documents its host override reason").toEqual([]);
     expect(importantRules.every(({ selector }) => selectorClassNames(selector).every((className) => hasProductionConsumer(className, consumers))), "important overrides must retain production consumers").toBe(true);
     expect(obsolete, "every ws-* selector must retain a production consumer").toEqual([]);
   });
