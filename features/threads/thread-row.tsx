@@ -83,7 +83,7 @@ type WorkThreadTreeProps = Omit<
   | "onToggleChildren"
 > & {
   childrenByThread: ReadonlyMap<string, PluginSidebarThread[]>;
-  taskLinks: Readonly<Record<string, readonly ThreadTaskLink[]>>;
+  taskLinks?: Readonly<Record<string, readonly ThreadTaskLink[]>>;
   activeThreadId: string | null;
   selectedThreadIds: ReadonlySet<string>;
   groupIds: ReadonlyMap<string, string>;
@@ -321,7 +321,8 @@ export function ThreadRow({
     if (
       event.button !== 0 ||
       (event.target as HTMLElement).closest("button,input,textarea")
-    ) return;
+    )
+      return;
     splitProps.onPointerDown?.(event);
     if (reorderDisabled) return;
     const pointerId = event.pointerId;
@@ -658,7 +659,7 @@ export function WorkThreadTree({
         key={`${thread.id}:${subtextRefreshKey}`}
         thread={thread}
         active={thread.id === activeThreadId}
-        taskLinks={taskLinks[thread.id]}
+        taskLinks={taskLinks?.[thread.id]}
         children={children.length}
         activeChildren={activeChildren}
         childrenExpanded={childrenExpanded}

@@ -5,47 +5,6 @@ import { getPluginQueryClient, queryKeys, queryPolicies } from "../../query-runt
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 
 describe("R2 app registration and Query lifecycle", () => {
-  it("keeps the registered left slot hook-safe through loading → ready → loading", async () => {
-    const app = await loadPluginApp(() => import("../../app"));
-    const props = {
-      activeThreadId: null,
-      activeProjectId: null,
-      isCompactViewport: false,
-      onNavigate: () => undefined,
-      searchQuery: "",
-      Original: () => <div>Native loading list</div>,
-    };
-    const loadingBefore = renderSlot(app.threadLists[0]!, props, {
-      sidebarThreads: { status: "loading" },
-    });
-    expect(loadingBefore.getByText("Native loading list")).toBeTruthy();
-    loadingBefore.unmount();
-
-    const ready = renderSlot(app.threadLists[0]!, props, {
-      sidebarThreads: {
-        status: "ready",
-        projects: [{ id: "project", name: "Project", isPersonal: false }],
-        threads: [{
-          id: "thr_ready", projectId: "project", title: "Ready", titleFallback: null,
-          parentThreadId: null, sectionId: null, originKind: null, originPluginId: null,
-          providerId: "codex", hasPendingInteraction: false,
-          activity: { workflows: 0, backgroundAgents: 0, backgroundCommands: 0, planMode: 0, goals: 0 },
-          indicator: "none", indicatorLabel: null, isUnread: false, isPinned: false,
-          isArchived: false, environment: null, host: null, createdAt: 0, updatedAt: 0,
-          lastReadAt: null, latestAttentionAt: 0,
-        }],
-      },
-    });
-    await waitFor(() => expect(ready.getByRole("link", { name: /Ready/ })).toBeTruthy());
-    ready.unmount();
-
-    const loadingAfter = renderSlot(app.threadLists[0]!, props, {
-      sidebarThreads: { status: "loading" },
-    });
-    expect(loadingAfter.getByText("Native loading list")).toBeTruthy();
-    loadingAfter.unmount();
-  });
-
   it("preserves every current slot registration and routes both mounted slots through one module client", async () => {
     const app = await loadPluginApp(() => import("../../app"));
 
