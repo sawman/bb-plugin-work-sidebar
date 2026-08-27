@@ -70,6 +70,19 @@ const threadsCompositionBudgets = {
   "features/threads/sidebar-group-tree.tsx": 240,
 } as const;
 
+const threadRowCompositionBudgets = {
+  // R21D refuses the former 725-line row aggregator. Each budget protects one
+  // named responsibility, rather than allowing a differently named monolith.
+  "features/threads/thread-row.tsx": { lines: 240, declarations: 1 },
+  "features/threads/thread-tree.tsx": { lines: 130, declarations: 1 },
+  "features/threads/thread-row-presentation.tsx": { lines: 170, declarations: 4 },
+  "features/threads/thread-row-menu.tsx": { lines: 120, declarations: 1 },
+  "features/threads/use-thread-row-actions.ts": { lines: 65, declarations: 1 },
+  "features/threads/use-thread-row-pointer-drag.ts": { lines: 175, declarations: 1 },
+  "features/threads/thread-tree-model.ts": { lines: 40, declarations: 1 },
+  "features/threads/thread-row-types.ts": { lines: 90, declarations: 0 },
+} as const;
+
 function runtimeImports(path: string): string[] {
   const source = ts.createSourceFile(path, readFileSync(resolve(repositoryRoot, path), "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   return source.statements.flatMap((statement) =>
@@ -197,10 +210,26 @@ describe("R16 composition boundaries", () => {
       expect(physicalLines(path), `${path} physical-line budget`).toBeLessThanOrEqual(budget);
       expect(longestPhysicalLine(path), `${path} maximum physical line length`).toBeLessThanOrEqual(240);
     }
+    for (const [path, budget] of Object.entries(threadRowCompositionBudgets)) {
+      expect(physicalLines(path), `${path} physical-line budget`).toBeLessThanOrEqual(budget.lines);
+      expect(topLevelImplementationDeclarations(path), `${path} declaration budget`).toBeLessThanOrEqual(budget.declarations);
+      expect(longestPhysicalLine(path), `${path} maximum physical line length`).toBeLessThanOrEqual(240);
+    }
     for (const path of threadSourcePaths()) {
       expect(runtimeImports(path), `${path} must not own another slice's state`).not.toContain("@/features/tasks/store");
       expect(runtimeImports(path), `${path} must not own another slice's state`).not.toContain("@/features/pull-requests/store");
     }
     expect(sourceCallCount("features/threads/sidebar-controller.tsx", "useTaskLinksRead")).toBe(1);
+  });
+
+  it("keeps visible thread-tree traversal inside the Threads slice", () => {
+    const rootModel = readFileSync(resolve(repositoryRoot, "work-model.ts"), "utf8");
+    const threadTreeModel = readFileSync(
+      resolve(repositoryRoot, "features/threads/thread-tree-model.ts"),
+      "utf8",
+    );
+
+    expect(rootModel).not.toMatch(/\bvisibleThreadTreeIds\b/);
+    expect(threadTreeModel).toMatch(/export function visibleThreadTreeIds/);
   });
 });

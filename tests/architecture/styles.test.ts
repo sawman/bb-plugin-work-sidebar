@@ -58,7 +58,7 @@ const dynamicClassFamilies = [
   { prefix: "ws-task-priority-", file: "features/tasks/task-row.tsx", suffixes: ["urgent", "high", "medium", "low"] },
   { prefix: "ws-task-row-", file: "features/tasks/task-row.tsx", suffixes: ["outcome", "execution"] },
   { prefix: "ws-task-status-", file: "features/tasks/task-row.tsx", suffixes: ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] },
-  { prefix: "ws-thread-child-depth-", file: "features/threads/thread-row.tsx", suffixes: ["1", "2", "3", "4"] },
+  { prefix: "ws-thread-child-depth-", file: "features/threads/thread-tree.tsx", suffixes: ["1", "2", "3", "4"] },
 ] as const;
 
 function scriptKind(path: string) {

@@ -3,7 +3,7 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import type { ThreadTaskLink } from "@/work-model";
 import { ArchivedThreads } from "./archived-threads";
 import type { SidebarThreadOrganization } from "./sidebar-organization";
-import { WorkThreadTree } from "./thread-row";
+import { WorkThreadTree } from "./thread-tree";
 
 type SidebarGroupTreeProps = {
   organization: SidebarThreadOrganization;

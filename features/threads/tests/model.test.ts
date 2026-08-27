@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { selectThreadIds } from "../model";
+import { visibleThreadTreeIds } from "../thread-tree-model";
 
 describe("thread interaction selection", () => {
   const visibleIds = ["thr_a", "thr_b", "thr_c", "thr_d"];
@@ -19,5 +20,17 @@ describe("thread interaction selection", () => {
   it("falls back to a single selected target when its anchor left the roster", () => {
     expect(selectThreadIds(new Set(["thr_a"]), "thr_x", visibleIds, "thr_c", { range: true }))
       .toEqual({ selectedIds: new Set(["thr_c"]), anchorId: "thr_c", handled: true });
+  });
+});
+
+describe("thread tree traversal", () => {
+  it("keeps visible parent and child ids in tree order inside the Threads slice", () => {
+    const parent = { id: "thr_parent" } as never;
+    const child = { id: "thr_child" } as never;
+    const sibling = { id: "thr_sibling" } as never;
+
+    expect(
+      visibleThreadTreeIds([parent, sibling], new Map([["thr_parent", [child]]])),
+    ).toEqual(["thr_parent", "thr_child", "thr_sibling"]);
   });
 });
