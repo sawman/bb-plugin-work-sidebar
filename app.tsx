@@ -106,7 +106,7 @@ function WorkThreadList(props: PluginThreadListProps) {
   const threadListMode = threadPreferences.listMode.data ?? "enhanced";
   const [threadSettingsOpen, setThreadSettingsOpen] = useState(false);
   const [activeThreadsOpen, setActiveThreadsOpen] = useState(true);
-  const archivedThreads = archivedThreadQuery.archive.data ?? [];
+  const archivedThreads = (archivedThreadQuery.archive.data ?? []) as ArchivedThread[];
   const archivedThreadState = archivedThreadQuery.archive.isPending ? "loading" : archivedThreadQuery.archive.isError ? "error" : archivedThreadQuery.archive.isSuccess ? "ready" : "idle";
   const archivedThreadError = archivedThreadQuery.archive.error?.message ?? null;
   const tasks = tasksData?.tasks ?? [];
@@ -248,8 +248,6 @@ function WorkThreadList(props: PluginThreadListProps) {
   const projectNames = useMemo(() => Object.fromEntries(projects.map((project) => [project.id, project.name])), [projects]);
   const effectiveOrder = useMemo(() => reconcileThreadOrder(threadOrder, threads), [threadOrder, threads]);
   const allChildrenByThread = useMemo(() => childrenByParent(threads, effectiveOrder), [effectiveOrder, threads]);
-  // A group follows the whole thread subtree, just as archive does. This
-  // keeps child agents from being stranded in a different status section.
   const threadGroupIds = useMemo(() => {
     const result = new Map<string, string>();
     const includeDescendants = (threadId: string, groupId: string) => {
