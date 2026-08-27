@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
+import { waitFor } from "@testing-library/react";
 import { getPluginQueryClient, pluginInteractionStore, queryKeys, queryPolicies } from "../../query-runtime";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 
@@ -49,5 +50,37 @@ describe("R2 app registration and Query lifecycle", () => {
     expect(unmount).toHaveBeenCalledTimes(2);
     client.clear();
     expect(client.getQueryCache().getAll()).toEqual([]);
+  });
+});
+
+describe("R6 mounted Tasks reads", () => {
+  it("dedupes the shared task read across real left/right slots and cleans observers", async () => {
+    const app = await loadPluginApp(() => import("../../app"));
+    const client = getPluginQueryClient();
+    client.clear();
+    const rpc = {
+      sidebarTasks: () => ({ available: true, tasks: [], projects: [], error: null }),
+      sidebarTaskLinks: () => ({ available: true, links: {}, error: null }),
+    } as never;
+    const left = renderSlot(app.threadLists[0]!, { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => undefined, searchQuery: "", Original: () => null }, { rpc });
+    const right = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_test", params: null }, { rpc });
+    await waitFor(() => expect(left.inspection.rpcCalls.filter((call) => call.method === "sidebarTasks")).toHaveLength(1));
+    expect(left.inspection.rpcCalls.filter((call) => call.method === "sidebarTaskLinks")).toHaveLength(1);
+    expect(right.inspection.rpcCalls.filter((call) => call.method === "sidebarTasks")).toHaveLength(0);
+    left.lifecycle.unmount(); right.lifecycle.unmount();
+    expect(client.getQueryCache().getAll().map((query) => query.getObserversCount())).toEqual([0, 0]);
+    client.clear();
+  });
+
+  it("polls only task links every 30 seconds", async () => {
+    vi.useFakeTimers();
+    const app = await loadPluginApp(() => import("../../app"));
+    const client = getPluginQueryClient(); client.clear();
+    const slot = renderSlot(app.threadLists[0]!, { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => undefined, searchQuery: "", Original: () => null }, { rpc: { sidebarTasks: () => ({ available: true, tasks: [], projects: [], error: null }), sidebarTaskLinks: () => ({ available: true, links: {}, error: null }) } as never });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(slot.inspection.rpcCalls.filter((call) => call.method === "sidebarTaskLinks")).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(slot.inspection.rpcCalls.filter((call) => call.method === "sidebarTaskLinks")).toHaveLength(2);
+    slot.lifecycle.unmount(); client.clear(); vi.useRealTimers();
   });
 });
