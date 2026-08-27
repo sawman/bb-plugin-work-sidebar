@@ -441,12 +441,13 @@ Use multiple bounded BB children only after a reproducible baseline exists:
   tests pass.
 
 After integration and full validation, create a read-only review child in the
-integrated environment with a verified Cursor Opus model when available, or a
-separate Codex `gpt-5.6-sol` child when Opus capacity is unavailable, using high
-or xhigh reasoning. The review must cover behavior parity, architecture
-boundaries, BB SDK lifecycle/bundling, CSS collisions, accessibility, test gaps,
-and visual regressions. Address every valid finding before asking the user to
-accept the work.
+integrated environment with provider `acp-cursor` and model `claude-opus-5`
+when available. Cursor currently exposes provider-managed `medium` reasoning
+for that model. If Opus capacity is unavailable, use a separate Codex
+`gpt-5.6-sol` child at high or xhigh reasoning. The review must cover behavior
+parity, architecture boundaries, BB SDK lifecycle/bundling, CSS collisions,
+accessibility, test gaps, and visual regressions. Address every valid finding
+before asking the user to accept the work.
 
 ## First actions when the implementation thread resumes
 

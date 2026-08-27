@@ -630,11 +630,12 @@ than normalizing the difference.
 #### Loop R19 — independent final review and remediation
 
 - **Red:** spawn one read-only child in the integrated environment with
-  a verified Cursor Opus model, or provider `codex` and model `gpt-5.6-sol`
-  when Opus capacity is unavailable, at high or xhigh reasoning. Every valid
-  architecture, behavior, test, accessibility, style, SDK lifecycle, or
-  bundling/runtime finding becomes a failing test or reproducible check in its
-  owning slice.
+  provider `acp-cursor` and model `claude-opus-5` when available. Cursor's ACP
+  catalog manages that model's reasoning internally and currently exposes only
+  `medium`; when Opus capacity is unavailable, use provider `codex`, model
+  `gpt-5.6-sol`, and high or xhigh reasoning. Every valid architecture,
+  behavior, test, accessibility, style, SDK lifecycle, or bundling/runtime
+  finding becomes a failing test or reproducible check in its owning slice.
 - **Green:** assign one bounded owner to each remediation and implement the
   smallest fix; the reviewer never edits the checkout.
 - **Refactor/removal:** integrate and inspect each fix, remove any superseded
