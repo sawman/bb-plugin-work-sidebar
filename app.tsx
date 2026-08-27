@@ -64,11 +64,12 @@ import { useTasksMutations } from "@/features/tasks/mutations";
 import "./app.css";
 import "./scrollbar.css";
 import "./views.css";
-import { PluginProviders } from "./query-runtime";
+import { PluginProviders, getPluginQueryClient, queryKeys } from "./query-runtime";
 import { selectThreadIds, type SidebarThreadGroup } from "./features/threads/model";
 import { threadInteractionStore, type ThreadDropTarget, type WorkTab } from "./features/threads/store";
 import { useArchivedThreads, useThreadPreferences } from "./features/threads/queries";
 import { WorkThreadTree, threadIsWorking, visibleThreadTreeIds } from "./features/threads/thread-row";
+import { WorkContextCards } from "./features/work-context/views";
 
 function withPluginProviders<Props extends object>(Component: ComponentType<Props>): ComponentType<Props> {
   return function PluginSlot(props: Props) {
@@ -500,31 +501,20 @@ type WorkPanelChild = {
 };
 
 type WorkPanelBinding = { ownerThreadId: string | null; dispatchState: string; recoveryMessage: string | null };
-type WorkPanelContext = Extract<Awaited<ReturnType<ReturnType<typeof useRpc<typeof rpcContract>>["call"]>>, { tasksAvailable: boolean }>;
+type WorkPanelContext = Extract<Awaited<ReturnType<ReturnType<typeof useRpc<typeof rpcContract>>["call"]>>, { repository: unknown; tasks: unknown }>;
 type WorkPanelChanges = Pick<WorkPanelContext, "repository">;
 type WorkPanelTracker = Pick<WorkPanelContext, "tracker">;
 type WorkProviderHealth = { tone: "green" | "amber" | "red"; providerId: string; providerName: string; statusUrl: string | null; status: string; message: string | null };
 
-// Thread panels unmount as the focused thread changes. Keep their last useful
-// snapshot in this app-session cache so switching back is immediate; every
-// cache hit still revalidates in the background.
-const WORK_PANEL_CACHE_LIMIT = 40;
-const workPanelCache = new Map<string, WorkPanelContext>();
-const workPanelDetailsCache = new Map<string, Partial<WorkPanelChanges & WorkPanelTracker>>();
+function cachedWorkPanelContext(threadId: string) {
+  return getPluginQueryClient().getQueryData<WorkPanelContext>(queryKeys.work.context(threadId));
+}
 function cacheWorkPanelContext(threadId: string, context: WorkPanelContext) {
-  workPanelCache.delete(threadId);
-  workPanelCache.set(threadId, context);
-  if (workPanelCache.size > WORK_PANEL_CACHE_LIMIT) {
-    const oldestThreadId = workPanelCache.keys().next().value!;
-    workPanelCache.delete(oldestThreadId);
-    workPanelDetailsCache.delete(oldestThreadId);
-  }
+  getPluginQueryClient().setQueryData(queryKeys.work.context(threadId), context);
 }
 function cacheWorkPanelDetails(threadId: string, details: Partial<WorkPanelChanges & WorkPanelTracker>) {
-  const merged = { ...workPanelDetailsCache.get(threadId), ...details };
-  workPanelDetailsCache.set(threadId, merged);
-  const context = workPanelCache.get(threadId);
-  if (context) cacheWorkPanelContext(threadId, { ...context, ...merged });
+  const merged = { ...cachedWorkPanelContext(threadId), ...details };
+  if (cachedWorkPanelContext(threadId)) cacheWorkPanelContext(threadId, merged as WorkPanelContext);
   return merged;
 }
 
@@ -564,17 +554,13 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   useEffect(() => {
     threadInteractionStore.getState().touchWorkTab(threadId);
   }, [threadId]);
-  const [context, setContext] = useState<WorkPanelContext | null>(() => workPanelCache.get(threadId) ?? null);
-  const [loading, setLoading] = useState(() => !workPanelCache.has(threadId));
-  const [changesLoading, setChangesLoading] = useState(() => !workPanelDetailsCache.get(threadId)?.repository);
-  const [trackerLoading, setTrackerLoading] = useState(() => !workPanelDetailsCache.get(threadId)?.tracker);
+  const [context, setContext] = useState<WorkPanelContext | null>(() => cachedWorkPanelContext(threadId) ?? null);
+  const [loading, setLoading] = useState(() => !cachedWorkPanelContext(threadId));
+  const [changesLoading, setChangesLoading] = useState(() => !cachedWorkPanelContext(threadId)?.repository);
+  const [trackerLoading, setTrackerLoading] = useState(() => !cachedWorkPanelContext(threadId)?.tracker);
   const [providerHealth, setProviderHealth] = useState<WorkProviderHealth>({ tone: "amber", providerId: "", providerName: "Provider", statusUrl: null, status: "unknown", message: "Checking provider health…" });
   const [error, setError] = useState<string | null>(null);
   const [updatingTask, setUpdatingTask] = useState<string | null>(null);
-  const requestId = useRef(0);
-  const changesRequestId = useRef(0);
-  const trackerRequestId = useRef(0);
-  const providerHealthRequestId = useRef(0);
   const activityRefreshInFlight = useRef(false);
   const [activity, setActivity] = useState<{ latest: { text: string; kind: "assistant" | "user" | "command" | "activity" } | null; lastUser: { text: string; kind: "user" } | null; current: { text: string; kind: "assistant" | "user" | "command" | "activity" } | null } | null>(null);
   const [expandedActivity, setExpandedActivity] = useState<Set<string>>(() => new Set());
@@ -590,13 +576,11 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const [workingTreeDiff, setWorkingTreeDiff] = useState<{ path: string; patch: string | null; loading: boolean; message: string | null } | null>(null);
 
   const refresh = useCallback(async (background = false) => {
-    const request = ++requestId.current;
-    if (!background && !workPanelCache.has(threadId)) setLoading(true);
+    if (!background && !cachedWorkPanelContext(threadId)) setLoading(true);
     setError(null);
     try {
       const next = await rpc.call("getWorkContext", { threadId });
-      if (request !== requestId.current) return;
-      const hydrated = { ...next, ...workPanelDetailsCache.get(threadId) };
+      const hydrated = { ...next, ...cachedWorkPanelContext(threadId) };
       cacheWorkPanelContext(threadId, hydrated);
       setContext(hydrated);
       setActivity(hydrated.activity);
@@ -604,53 +588,47 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
       setCreateTaskState("idle");
       setCreateTaskError(null);
     } catch (caught) {
-      if (request !== requestId.current) return;
       setContext(null);
       setError(caught instanceof Error ? caught.message : "Could not load work context");
     } finally {
-      if (request === requestId.current) setLoading(false);
+      setLoading(false);
     }
   }, [rpc, threadId]);
   const refreshChanges = useCallback(async (background = false, force = false) => {
-    const request = ++changesRequestId.current;
-    if (!background || !workPanelDetailsCache.get(threadId)?.repository) setChangesLoading(true);
+    if (!background || !cachedWorkPanelContext(threadId)?.repository) setChangesLoading(true);
     try {
       const details = await rpc.call("getWorkChanges", { threadId, pullRequests: false, ...(force ? { force: true } : {}) });
-      if (request !== changesRequestId.current) return;
       const merged = cacheWorkPanelDetails(threadId, { repository: details.repository });
       setContext((current) => current ? { ...current, ...merged } : current);
     } catch (caught) {
-      if (request === changesRequestId.current) toast.error(caught instanceof Error ? caught.message : "Could not load changes");
+      toast.error(caught instanceof Error ? caught.message : "Could not load changes");
     } finally {
-      if (request === changesRequestId.current) setChangesLoading(false);
+      setChangesLoading(false);
     }
   }, [rpc, threadId]);
   const refreshTracker = useCallback(async (background = false) => {
-    const request = ++trackerRequestId.current;
-    if (!background || !workPanelDetailsCache.get(threadId)?.tracker) setTrackerLoading(true);
+    if (!background || !cachedWorkPanelContext(threadId)?.tracker) setTrackerLoading(true);
     try {
       const tracker = await rpc.call("getWorkTracker", { threadId });
-      if (request !== trackerRequestId.current) return;
       const merged = cacheWorkPanelDetails(threadId, { tracker });
       setContext((current) => current ? { ...current, ...merged } : current);
     } catch (caught) {
-      if (request === trackerRequestId.current) toast.error(caught instanceof Error ? caught.message : "Could not load tracker");
+      toast.error(caught instanceof Error ? caught.message : "Could not load tracker");
     } finally {
-      if (request === trackerRequestId.current) setTrackerLoading(false);
+      setTrackerLoading(false);
     }
   }, [rpc, threadId]);
   const refreshProviderHealth = useCallback(async () => {
-    const request = ++providerHealthRequestId.current;
     try {
       const next = await rpc.call("getWorkProviderStatus", { threadId });
-      if (request === providerHealthRequestId.current) setProviderHealth(next);
+      setProviderHealth(next);
     } catch {
-      if (request === providerHealthRequestId.current) setProviderHealth({ tone: "amber", providerId: "", providerName: "Provider", statusUrl: null, status: "unknown", message: "Provider health could not be checked." });
+      setProviderHealth({ tone: "amber", providerId: "", providerName: "Provider", statusUrl: null, status: "unknown", message: "Provider health could not be checked." });
     }
   }, [rpc, threadId]);
   useEffect(() => {
-    const cached = workPanelCache.get(threadId);
-    const details = workPanelDetailsCache.get(threadId);
+    const cached = cachedWorkPanelContext(threadId);
+    const details = cached;
     if (cached) { setContext(cached); setActivity(cached.activity); setLoading(false); setError(null); }
     else { setContext(null); setActivity(null); setLoading(true); }
     setChangesLoading(!details?.repository);
@@ -659,7 +637,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
     void refreshChanges(Boolean(details?.repository));
     void refreshTracker(Boolean(details?.tracker));
     void refreshProviderHealth();
-    return () => { requestId.current += 1; changesRequestId.current += 1; trackerRequestId.current += 1; providerHealthRequestId.current += 1; };
+    return undefined;
   }, [refresh, refreshChanges, refreshProviderHealth, refreshTracker, threadId]);
   useRealtime("work-sidebar:changed", () => { void refresh(true); void refreshChanges(true); void refreshTracker(true); void refreshProviderHealth(); void invalidateThreadPullRequestChanges(queryClient, threadId); });
   useEffect(() => {
@@ -796,10 +774,10 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
       <div className="ws-panel-body" role="tabpanel" id={tabPanelId} aria-labelledby={`ws-tab-${selectedTab.id}`} tabIndex={0}>
         {loading && <div className="ws-empty" role="status" aria-live="polite">Loading work context…</div>}
         {!loading && error && <div className="ws-callout" role="alert"><span>{error}</span><button type="button" onClick={() => { void refresh(); void refreshChanges(); void refreshTracker(); void refreshProviderHealth(); void pullRequestChanges.refetch(); void githubHealthQuery.refetch(); }}>Try again</button></div>}
-        {!loading && context && <article className="ws-card ws-status-card"><div className="ws-card-heading"><strong>Status</strong></div><div className="ws-status-summary"><h3>{runtimeStatusPresentation(context.currentThread).label}</h3><p className="ws-working-state"><span title={`${context.children.filter((child) => !child.isArchived).length} child agent${context.children.filter((child) => !child.isArchived).length === 1 ? "" : "s"}`}><Icon name="Bot" aria-hidden />{context.children.filter((child) => !child.isArchived).length}</span><span title={`${context.children.filter((child) => !child.isArchived && child.status === "active").length} active child agent${context.children.filter((child) => !child.isArchived && child.status === "active").length === 1 ? "" : "s"}`}><Icon name="Wrench" aria-hidden />{context.children.filter((child) => !child.isArchived && child.status === "active").length}</span></p></div>{activityItems.length > 0 ? <div className="ws-activity-list">{activityItems.map(({ label, entry }) => entry && <button type="button" className={`ws-activity-item ${entry.kind === "command" ? "ws-activity-item-command" : ""} ${expandedActivity.has(label) ? "ws-activity-item-expanded" : ""}`} key={label} aria-expanded={expandedActivity.has(label)} onClick={() => setExpandedActivity((current) => { const next = new Set(current); next.has(label) ? next.delete(label) : next.add(label); return next; })}><span className="ws-activity-label">{label}</span>{entry.kind === "command" ? <code className="ws-activity-command">{entry.text}</code> : <span className="ws-activity-copy">{entry.text}</span>}</button>)}</div> : <p className="ws-card-note">No activity has been recorded yet.</p>}{providerHealth.statusUrl ? <button type="button" className={`ws-provider-health ws-provider-health-${providerHealth.tone}`} onClick={() => { navigate.openUrl(providerHealth.statusUrl!); }} title={`${providerHealth.providerName}: ${providerHealth.message ?? readableStatus(providerHealth.status)}. Open service status.`} aria-label={`${providerHealth.providerName} provider status: ${providerHealth.message ?? readableStatus(providerHealth.status)}. Open service status.`} /> : <span className={`ws-provider-health ws-provider-health-${providerHealth.tone}`} title={`${providerHealth.providerName}: ${providerHealth.message ?? readableStatus(providerHealth.status)}`} aria-label={`${providerHealth.providerName} provider status: ${providerHealth.message ?? readableStatus(providerHealth.status)}`} />}</article>}
         {!loading && context && tab === "work" && (
           <div className="ws-section-stack">
             <header><div><h2>Work</h2></div><span className="ws-work-header-badges">{outcomeTask && <span className="ws-work-header-badge" title={`${outcomeTask.key} · ${outcomeTask.title}`}>{outcomeTask.key}</span>}{!trackerLoading && context.tracker.item && <a className="ws-work-header-badge ws-linear-header-badge" href={context.tracker.item.url} target="_blank" rel="noreferrer" title={`${context.tracker.item.key} · ${context.tracker.item.title}`}>{context.tracker.item.key}</a>}</span></header>
+            <WorkContextCards threadId={threadId} />
             {trackerLoading ? <article className="ws-card ws-empty-state-card" aria-busy="true"><div className="ws-card-heading"><strong>Linear</strong></div><p className="ws-card-note">Loading linked work…</p></article> : <LinearCard context={context} linking={linearBusy} onLink={(key) => void linkLinear(key)} onUnlink={() => void unlinkLinear()} onMove={(statusId) => void moveLinear(statusId)} onSearch={searchLinear} />}
             {!context.tasksAvailable && <article className="ws-card ws-empty-state-card"><div className="ws-card-heading"><strong>Tasks</strong></div><p className="ws-card-note">Tasks are unavailable right now.</p><button type="button" className="ws-compact-action" onClick={() => void refresh()}>Check again</button></article>}
             {context.tasksAvailable && tasksReadPending && <article className="ws-card ws-empty-state-card" role="status" aria-live="polite" aria-busy="true"><div className="ws-card-heading"><strong>Tasks</strong></div><p className="ws-card-note">Loading tasks…</p></article>}

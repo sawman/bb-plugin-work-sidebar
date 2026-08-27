@@ -26,6 +26,10 @@ function rpcFixtures(sidebarTasks: RpcHandlers["sidebarTasks"]): RpcHandlers {
     getWorkChanges: () => ({ currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null, repository: workContext.repository }),
     getWorkTracker: () => workContext.tracker,
     getWorkProviderStatus: () => ({ tone: "green", providerId: "codex", providerName: "Codex", statusUrl: null, status: "ready", message: null }),
+    getWorkStatus: () => ({ currentThread: workContext.currentThread, children: [], activity: workContext.activity }),
+    getWorkOutcome: () => ({ tasksAvailable: true, outcome: null, executionTasks: [], bindings: [] }),
+    getWorkGoal: () => null,
+    getWorkPlan: () => ({ items: [] }),
     getGitHubApiHealth: () => ({ state: "available", scope: "unknown", message: null, retryAt: null }),
   } as unknown as RpcHandlers;
 }

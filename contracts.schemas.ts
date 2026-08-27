@@ -56,6 +56,15 @@ const workProviderStatus = z.object({
   status: z.enum(["ready", "not_installed", "unauthenticated", "expired", "unsupported_version", "unknown", "unavailable"]),
   message: z.string().nullable(),
 });
+const workCardInput = z.object({ threadId: z.string() }).strict();
+const workStatus = z.object({
+  currentThread: z.object({ title: z.string(), status: z.enum(["active", "error", "idle", "starting", "stopping"]), runtimeStatus: z.string(), providerId: z.string() }),
+  children: z.array(z.object({ id: z.string(), title: z.string(), depth: z.number().int().nonnegative(), status: z.string(), runtimeStatus: z.string(), providerId: z.string(), isArchived: z.boolean(), task: z.object({ key: z.string(), status: taskStatus, liveStatus: z.enum(["starting", "working", "idle", "completed", "failed"]) }).nullable() })),
+  activity: z.object({ latest: z.object({ text: z.string(), kind: z.enum(["assistant", "user", "command", "activity"]) }).nullable(), lastUser: z.object({ text: z.string(), kind: z.literal("user") }).nullable(), current: z.object({ text: z.string(), kind: z.enum(["assistant", "user", "command", "activity"]) }).nullable() }),
+});
+const workOutcome = z.object({ tasksAvailable: z.boolean(), outcome: taskSummary.nullable(), executionTasks: z.array(taskSummary), bindings: z.array(binding) });
+const workGoal = z.object({ objective: z.string(), status: z.enum(["active", "budgetLimited", "complete", "paused"]), tokensUsed: z.number(), tokenBudget: z.number().nullable(), timeUsedSeconds: z.number() }).nullable();
+const workPlan = z.object({ items: z.array(z.object({ id: z.string(), text: z.string(), status: z.enum(["completed", "in_progress", "pending"]) })) });
 
 export type GitHubStackBranch = z.infer<typeof githubStackBranch>;
 export type GitHubStackSignal = z.infer<typeof sidebarStackLayer>;
@@ -190,6 +199,10 @@ export const rpcSchemas = {
       }),
     }),
   },
+  getWorkStatus: { input: workCardInput, output: workStatus },
+  getWorkOutcome: { input: workCardInput, output: workOutcome },
+  getWorkGoal: { input: workCardInput, output: workGoal },
+  getWorkPlan: { input: workCardInput, output: workPlan },
   getWorkChanges: { input: z.object({ threadId: z.string(), force: z.boolean().optional(), pullRequests: z.boolean().optional() }).strict(), output: workChanges },
   getThreadPullRequestChanges: { input: z.object({ threadId: z.string().startsWith("thr_") }).strict(), output: threadPullRequestChanges },
   getPullRequestFingerprint: { input: z.object({ url: z.string().url() }).strict(), output: z.object({ fingerprint: z.string().nullable() }) },
