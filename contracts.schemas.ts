@@ -56,7 +56,7 @@ const workOutcome = z.object({
   outcome: taskSummary.nullable(),
   executionTasks: z.array(taskSummary),
   bindings: z.array(binding),
-  legacy: legacyContext.optional(),
+  legacy: legacyContext,
 });
 const workGoal = z.object({ objective: z.string(), status: z.enum(["active", "budgetLimited", "complete", "paused"]), tokensUsed: z.number(), tokenBudget: z.number().nullable(), timeUsedSeconds: z.number() }).nullable();
 const workPlan = z.object({ items: z.array(z.object({ id: z.string(), text: z.string(), status: z.enum(["completed", "in_progress", "pending"]) })) });

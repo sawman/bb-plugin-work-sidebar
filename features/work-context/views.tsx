@@ -551,7 +551,10 @@ function TasksCard({ threadId }: { threadId: string }) {
           >
             {outcome.data.executionTasks.map((task) => (
               <div key={task.id} className="ws-work-card-row">
-                <span className={`ws-status-dot ws-status-dot-${task.status}`}>
+                <span
+                  className={`ws-status-dot ws-status-dot-${task.status}`}
+                  aria-hidden
+                >
                   {task.status === "done" ? "✓" : "•"}
                 </span>
                 <span className="ws-work-card-copy">

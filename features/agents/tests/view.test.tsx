@@ -90,7 +90,7 @@ function rpcFixture(overrides: Record<string, unknown> = {}) {
     getWorkTracker: () => ({ visible: false, available: false, message: null, suggestions: [], item: null, statusOptions: [] }),
     getWorkStatus: () => ({ currentThread: context.currentThread, children: [] }),
     getLatestActivity: () => ({ currentThread: { status: "idle", runtimeStatus: "idle" }, latest: null, lastUser: null, current: null }),
-    getWorkOutcome: () => ({ tasksAvailable: true, outcome: null, executionTasks: [], bindings: [] }),
+    getWorkOutcome: () => ({ tasksAvailable: true, outcome: null, executionTasks: [], bindings: [], legacy: { state: "none", taskIds: [], message: null } }),
     getWorkGoal: () => null,
     getWorkPlan: () => ({ items: [] }),
     sidebarTasks: () => ({ available: true, tasks: [], projects: [], error: null }),
@@ -154,7 +154,7 @@ describe("R15 registered Agents Work slot", () => {
       { status: "ready", threads: [thread("thr_root", null), thread("thr_child", "thr_root", { indicator: "runtime" })] },
       rpcFixture({
         sidebarTaskLinks: () => ({ available: true, links: { thr_child: [{ task: { id: "task_1", projectId: "project", projectName: "Work", key: "WORK-1", title: "Child task", status: "in_review", priority: "none", dueDate: null, parentTaskId: null }, threadId: "thr_child", liveStatus: "working", role: "execution", mode: "delegated", idempotencyKey: "child-1", dispatchState: "recovery_required" }] }, error: null }),
-        getWorkOutcome: () => ({ tasksAvailable: true, outcome: null, executionTasks: [], bindings: [{ rootThreadId: "thr_root", outcomeTaskId: "outcome", taskProjectId: "project", executionTaskId: "task_1", ownerThreadId: "thr_child", mode: "delegated", idempotencyKey: "child-1", dispatchState: "recovery_required", recoveryMessage: "Recovery required before retry." }] }),
+        getWorkOutcome: () => ({ tasksAvailable: true, outcome: null, executionTasks: [], bindings: [{ rootThreadId: "thr_root", outcomeTaskId: "outcome", taskProjectId: "project", executionTaskId: "task_1", ownerThreadId: "thr_child", mode: "delegated", idempotencyKey: "child-1", dispatchState: "recovery_required", recoveryMessage: "Recovery required before retry." }], legacy: { state: "none", taskIds: [], message: null } }),
       }),
     );
     await waitFor(() => expect(slot.getByRole("link", { name: "Open thr_child" })).toBeTruthy());

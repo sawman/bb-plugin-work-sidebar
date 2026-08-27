@@ -105,6 +105,7 @@ function rpcFixtures(sidebarTasks: RpcHandlers["sidebarTasks"]): RpcHandlers {
       outcome: null,
       executionTasks: [],
       bindings: [],
+      legacy: { state: "none", taskIds: [], message: null },
     }),
     getWorkGoal: () => null,
     getWorkPlan: () => ({ items: [] }),

@@ -158,6 +158,7 @@ function rpc({
       outcome: null,
       executionTasks: [],
       bindings: [],
+      legacy: { state: "none", taskIds: [], message: null },
     }),
     getWorkGoal: () => null,
     getWorkPlan: () => ({ items: [] }),
