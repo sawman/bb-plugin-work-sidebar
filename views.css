@@ -265,7 +265,7 @@
 .ws-agent-review {
   border-color: var(--primary);
 }
-.sr-only {
+.ws-sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1490,10 +1490,10 @@
   cursor: pointer;
 }
 .ws-thread-settings-menu button:hover,
-.ws-thread-settings-menu button[aria-checked="true"] {
+.ws-thread-settings-menu button[aria-pressed="true"] {
   background: var(--accent);
 }
-.ws-thread-settings-menu button[aria-checked="true"]::before {
+.ws-thread-settings-menu button[aria-pressed="true"]::before {
   content: "✓ ";
   color: var(--primary);
 }
@@ -1504,7 +1504,7 @@
   padding: 0.28rem 0 0;
   border-top: 1px solid var(--border);
 }
-.ws-thread-group-settings > b {
+.ws-thread-group-settings > strong {
   padding: 0 0.45rem;
   color: var(--muted-foreground);
   font-size: 0.57rem;
@@ -1512,12 +1512,12 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.ws-thread-group-settings > span {
+.ws-thread-group-settings > div {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 1.55rem;
   align-items: center;
 }
-.ws-thread-group-settings > span > button:first-child {
+.ws-thread-group-settings > div > button:first-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1545,9 +1545,6 @@
 }
 .ws-native-thread-list {
   min-width: 0;
-}
-.ws-stack-layer-toggle:disabled {
-  cursor: default;
 }
 .ws-repository-changes-toggle {
   display: inline-flex;

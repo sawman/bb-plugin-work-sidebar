@@ -218,7 +218,7 @@ export function TaskRow(props: TaskRowProps) {
             title={status.label}
           >
             <Icon name={status.icon} aria-hidden />
-            <span className="sr-only">Change status for {task.key}</span>
+            <span className="ws-sr-only">Change status for {task.key}</span>
             <select
               value={task.status}
               disabled={updatingTaskId === task.id}
@@ -240,6 +240,7 @@ export function TaskRow(props: TaskRowProps) {
           {node.children.length > 0 && (
             <div
               className="ws-task-children"
+              role="group"
               aria-label={`Execution tasks for ${task.title}`}
             >
               {node.children.map((child) => (

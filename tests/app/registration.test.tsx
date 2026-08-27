@@ -7,6 +7,7 @@ import {
   queryPolicies,
 } from "../../query-runtime";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
+import { changesKeys } from "../../features/changes/model";
 
 describe("R2 app registration and Query lifecycle", () => {
   it("preserves every current slot registration and routes both mounted slots through one module client", async () => {
@@ -90,8 +91,8 @@ describe("R2 app registration and Query lifecycle", () => {
     });
     expect(mount).toHaveBeenCalledTimes(2);
     // R14 keeps the selected-file query mounted but disabled until a file is
-    // opened; this preserves hook order without starting a diff request.
-    expect(client.getQueryCache().getAll()).toHaveLength(20);
+    // opened; Changes has no cache entries until its tab owns the panel.
+    expect(client.getQueryCache().getAll()).toHaveLength(17);
     expect(
       client
         .getQueryCache()
@@ -123,7 +124,7 @@ describe("R2 app registration and Query lifecycle", () => {
         .getQueryCache()
         .findAll({ queryKey: ["work-sidebar", "pull-requests", "health"] })[0]
         ?.getObserversCount(),
-    ).toBe(2);
+    ).toBe(1);
     expect(
       client
         .getQueryCache()
@@ -136,6 +137,15 @@ describe("R2 app registration and Query lifecycle", () => {
         .find({ queryKey: queryKeys.sidebar.tasks.links() })
         ?.getObserversCount(),
     ).toBe(1);
+    expect(
+      client
+        .getQueryCache()
+        .find({ queryKey: changesKeys.projection("thr_test") })
+        ?.getObserversCount() ?? 0,
+    ).toBe(0);
+    expect(
+      right.inspection.rpcCalls.filter((call) => call.method === "getChanges"),
+    ).toHaveLength(0);
     left.unmount();
     right.unmount();
     expect(unmount).toHaveBeenCalledTimes(2);

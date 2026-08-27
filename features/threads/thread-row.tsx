@@ -190,7 +190,7 @@ function ThreadMetadata({
         </span>
       ))}
       {pullRequestLoading && (
-        <span className="ws-pr-meta" aria-label="Pull request loading">
+        <span className="ws-pr-meta" role="status" aria-label="Pull request loading">
           PR loading…
         </span>
       )}
@@ -220,6 +220,7 @@ function ThreadStatus({
       )}
       <span
         className={`ws-status ws-status-${indicator} ${working ? "ws-status-working" : ""}`}
+        role={thread.indicatorLabel ? "img" : undefined}
         aria-label={thread.indicatorLabel ?? undefined}
       >
         {working ? (
