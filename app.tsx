@@ -99,12 +99,13 @@ function WorkThreadList(props: PluginThreadListProps) {
   const { values: pluginSettings } = useSettings();
   const taskLinks = taskLinksData?.links ?? {};
   const threadPreferences = useThreadPreferences();
-  const archivedThreadQuery = useArchivedThreads();
+  const [archivedOpen, setArchivedOpen] = useState(false);
+  const archivedRosterFingerprint = useMemo(() => threads.map((thread) => `${thread.id}:${thread.isArchived}`).sort().join("|"), [threads]);
+  const archivedThreadQuery = useArchivedThreads(archivedOpen, archivedRosterFingerprint);
   const [view, setView] = useState<SidebarView>("work");
   const threadListMode = threadPreferences.listMode.data ?? "enhanced";
   const [threadSettingsOpen, setThreadSettingsOpen] = useState(false);
   const [activeThreadsOpen, setActiveThreadsOpen] = useState(true);
-  const [archivedOpen, setArchivedOpen] = useState(false);
   const archivedThreads = archivedThreadQuery.archive.data ?? [];
   const archivedThreadState = archivedThreadQuery.archive.isPending ? "loading" : archivedThreadQuery.archive.isError ? "error" : archivedThreadQuery.archive.isSuccess ? "ready" : "idle";
   const archivedThreadError = archivedThreadQuery.archive.error?.message ?? null;
@@ -157,7 +158,7 @@ function WorkThreadList(props: PluginThreadListProps) {
 
   const refreshSidebarOrder = useCallback(async () => { await threadPreferences.order.refetch(); }, [threadPreferences.order]);
   const refreshThreadGroups = useCallback(async () => { await threadPreferences.groups.refetch(); }, [threadPreferences.groups]);
-  const refreshArchivedThreads = useCallback(async (force = false) => {
+  const refreshArchivedThreads = useCallback(async () => {
     await archivedThreadQuery.archive.refetch();
   }, [archivedThreadQuery.archive]);
   const saveThreadGroups = useCallback((next: SidebarThreadGroup[], previous = threadGroups) => {
@@ -184,7 +185,7 @@ function WorkThreadList(props: PluginThreadListProps) {
     void refreshSidebarOrder();
     void refreshThreadGroups();
     void refreshTaskLinks();
-    void refreshArchivedThreads(true);
+    void refreshArchivedThreads();
     setSubtextRefreshKey((current) => current + 1);
   }, [refreshArchivedThreads, refreshThreadGroups, refreshSidebarOrder, refreshTaskLinks]);
   const refreshTasks = useCallback(async () => { await refetchTasks(); }, [refetchTasks]);
@@ -476,7 +477,7 @@ function WorkThreadList(props: PluginThreadListProps) {
       </section>
       </details>
       {threadGroups.map((group) => { const tree = groupedThreadTrees.get(group.id); const roots = tree?.roots ?? []; return <details key={group.id} className="ws-later" data-ws-thread-drop-zone={group.id} data-drop-target={threadDropTarget?.threadId === group.id || undefined} open onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || threadGroupIds.get(sourceId) === group.id) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: group.id, placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || threadGroupIds.get(sourceId) === group.id) return; event.preventDefault(); if (archivedThreadIds.has(sourceId)) unarchiveThread(sourceId, group.id); else moveThreadToGroup(sourceId, group.id); setDragThreadId(null); setThreadDropTarget(null); }}><summary>{group.name} <span>{roots.length}</span></summary>{roots.length > 0 ? <section className="ws-hierarchy" aria-label={`${group.name} threads`}>{roots.map((thread) => <WorkThreadTree key={thread.id} thread={thread} childrenByThread={tree?.children ?? new Map()} taskLinks={taskLinks} activeThreadId={props.activeThreadId} selectedThreadIds={selectedThreadIds} groupIds={threadGroupIds} groups={threadGroups} projectsById={projectsById} onNavigate={props.onNavigate} onSelect={selectThread} onMoveToGroup={moveThreadToGroup} orderedSiblings={roots} reorderDisabled={reorderDisabled} dragThreadId={dragThreadId} onDragThreadChange={setDragThreadId} dropTarget={threadDropTarget} onDropTargetChange={setThreadDropTarget} onDropThread={reorder} onMoveThread={move} subtextRefreshKey={subtextRefreshKey} />)}</section> : <div className="ws-later-empty">Right-click a thread to move it here.</div>}</details>; })}
-      <details className="ws-later ws-archived" data-ws-thread-drop-zone="archive" data-drop-target={threadDropTarget?.threadId === "archive" || undefined} open={archivedOpen} onToggle={(event) => setArchivedOpen(event.currentTarget.open)} onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || archivedThreadIds.has(sourceId)) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: "archive", placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || archivedThreadIds.has(sourceId)) return; event.preventDefault(); if (threadGroupIds.has(sourceId)) moveThreadToGroup(sourceId, null); actions.archive(sourceId); window.setTimeout(() => void refreshArchivedThreads(true), 250); setDragThreadId(null); setThreadDropTarget(null); }}><summary>Archive <span>{archivedThreadState === "ready" ? archivedThreads.length : ""}</span></summary>{archivedThreadState === "idle" || archivedThreadState === "loading" ? <div className="ws-later-empty">Loading archive threads…</div> : archivedThreadState === "error" ? <div className="ws-callout">{archivedThreadError ?? "Could not load archive threads."}<button onClick={() => void refreshArchivedThreads(true)}>Try again</button></div> : archivedThreads.length > 0 ? <section className="ws-hierarchy" aria-label="Archive threads">{archivedThreads.map((thread) => <ArchivedThreadRow key={thread.id} thread={thread} project={projectsById.get(thread.projectId)} groups={threadGroups} onUnarchive={unarchiveThread} onNavigate={props.onNavigate} onDragThreadChange={setDragThreadId} onDropTargetChange={() => setThreadDropTarget(null)} />)}</section> : <div className="ws-later-empty">No archive threads.</div>}</details>
+      <details className="ws-later ws-archived" data-ws-thread-drop-zone="archive" data-drop-target={threadDropTarget?.threadId === "archive" || undefined} open={archivedOpen} onToggle={(event) => setArchivedOpen(event.currentTarget.open)} onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || archivedThreadIds.has(sourceId)) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: "archive", placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || archivedThreadIds.has(sourceId)) return; event.preventDefault(); if (threadGroupIds.has(sourceId)) moveThreadToGroup(sourceId, null); actions.archive(sourceId); setDragThreadId(null); setThreadDropTarget(null); }}><summary>Archive <span>{archivedThreadState === "ready" ? archivedThreads.length : ""}</span></summary>{archivedThreadState === "idle" || archivedThreadState === "loading" ? <div className="ws-later-empty">Loading archive threads…</div> : archivedThreadState === "error" ? <div className="ws-callout">{archivedThreadError ?? "Could not load archive threads."}<button onClick={() => void refreshArchivedThreads()}>Try again</button></div> : archivedThreads.length > 0 ? <section className="ws-hierarchy" aria-label="Archive threads">{archivedThreads.map((thread) => <ArchivedThreadRow key={thread.id} thread={thread} project={projectsById.get(thread.projectId)} groups={threadGroups} onUnarchive={unarchiveThread} onNavigate={props.onNavigate} onDragThreadChange={setDragThreadId} onDropTargetChange={() => setThreadDropTarget(null)} />)}</section> : <div className="ws-later-empty">No archive threads.</div>}</details>
       </section>
       {filtered.length === 0 && <div className="ws-empty">{props.searchQuery ? `No threads match “${props.searchQuery}”.` : "No active threads."}</div>}
       </>}

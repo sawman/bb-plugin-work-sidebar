@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
 import { queryPolicies } from "../../query-runtime";
@@ -39,7 +40,8 @@ export function useThreadPreferences() {
   return { order, listMode, groups, saveGroups, saveOrder, saveListMode };
 }
 
-export function useArchivedThreads() {
+export const archivedThreadQueryPolicy = { staleTime: 30_000, gcTime: 5 * 60_000, retry: 1, refetchOnWindowFocus: false } as const;
+export function useArchivedThreads(enabled: boolean, rosterFingerprint: string) {
   const rpc = useRpc<typeof rpcContract>();
   const client = useQueryClient();
   const archive = useQuery({
@@ -49,9 +51,11 @@ export function useArchivedThreads() {
       if (!result.available) throw new Error(result.error ?? "Archive threads are unavailable.");
       return result.threads;
     },
-    ...threadQueryPolicies.groups,
-    enabled: false,
+    ...archivedThreadQueryPolicy,
+    enabled,
   });
+  const previousRoster = useRef(rosterFingerprint);
+  useEffect(() => { if (enabled && previousRoster.current !== rosterFingerprint) void client.invalidateQueries({ queryKey: threadQueryKeys.archived() }); previousRoster.current = rosterFingerprint; }, [client, enabled, rosterFingerprint]);
   const unarchive = useMutation({ mutationFn: async (threadId: string) => {
     const result = await rpc.call("unarchiveSidebarThread", { threadId });
     await client.invalidateQueries({ queryKey: threadQueryKeys.archived() });

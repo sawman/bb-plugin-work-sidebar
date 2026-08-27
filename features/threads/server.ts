@@ -21,6 +21,9 @@ export function sanitizeThreadOrder(value: unknown): string[] {
 
 type Storage = { get(key: string): Promise<unknown>; set(key: string, value: unknown): Promise<void> };
 type ThreadPreferenceAdapter = { get: Storage["get"]; set: Storage["set"]; publish(channel: string, payload: unknown): void };
+type ArchivedThreadRow = { id: string; projectId: string; title: string | null; titleFallback: string | null; parentThreadId: string | null; environmentBranchName: string | null; pinnedAt: number | null; createdAt: number; updatedAt: number; archivedAt: number | null; deletedAt: number | null };
+type ArchivedThreadAdapter = { list(options: { archived: true; includeHidden: true; limit: number }): Promise<ArchivedThreadRow[]>; unarchive(input: { threadId: string }): Promise<unknown> };
+export function createArchivedThreadService(adapter: ArchivedThreadAdapter) { return { async list() { const rows = await adapter.list({ archived: true, includeHidden: true, limit: 2_000 }); return rows.flatMap((row) => row.archivedAt === null || row.deletedAt !== null ? [] : [{ id: row.id, projectId: row.projectId, title: row.title, titleFallback: row.titleFallback, parentThreadId: row.parentThreadId, environmentBranchName: row.environmentBranchName, isPinned: row.pinnedAt !== null, isUnread: false, createdAt: row.createdAt, updatedAt: row.updatedAt, archivedAt: row.archivedAt }]); }, unarchive(threadId: string) { return adapter.unarchive({ threadId }); } }; }
 
 /** Server adapter for durable preferences only. Archive/delete stay BB native actions. */
 export function createThreadPreferencesService(adapter: ThreadPreferenceAdapter) {

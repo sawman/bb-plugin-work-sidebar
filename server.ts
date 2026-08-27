@@ -7,7 +7,7 @@ import { classifyPullRequestError, createPullRequestService } from "./features/p
 import { readSidebarTasks } from "./features/tasks/server-read.js";
 import { rpcContract } from "./contracts.js";
 import { type SidebarStack } from "./work-model.js";
-import { createThreadPreferencesService } from "./features/threads/server.js";
+import { createArchivedThreadService, createThreadPreferencesService } from "./features/threads/server.js";
 import { createServerLifecycle, type GitHubApiHealth, type ServerLifecycle } from "./server-lifecycle.js";
 
 const execFileAsync = promisify(execFile);
@@ -704,29 +704,8 @@ function assertExecutionTaskBinding(binding: ExecutionBinding, task: Task) {
   if (task.projectId !== binding.taskProjectId) throw new Error(`Execution binding project mismatch: task ${task.id} is in ${task.projectId}, binding expects ${binding.taskProjectId}`);
 }
 
-async function loadSidebarArchivedThreads(bb: BbPluginApi) {
-  const threads = await bb.sdk.threads.list({ archived: true, includeHidden: true, limit: 2_000 });
-  return threads.flatMap((row) => {
-    if (row.archivedAt === null || row.deletedAt !== null) return [];
-    return [{
-      id: row.id,
-      projectId: row.projectId,
-      title: row.title,
-      titleFallback: row.titleFallback,
-      parentThreadId: row.parentThreadId,
-      environmentBranchName: row.environmentBranchName,
-      isPinned: row.pinnedAt !== null,
-      isUnread: false,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      archivedAt: row.archivedAt,
-    }];
-  });
-}
-
 export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle = createServerLifecycle()) {
-  // These caches are allocated by the factory, rather than at module load, so
-  // a reload gets a fresh generation and disposal can release every handle.
+  const archivedThreadService = createArchivedThreadService(bb.sdk.threads);
   activeLifecycle = lifecycle;
   bb.onDispose(() => { lifecycle.dispose(); if (activeLifecycle === lifecycle) activeLifecycle = null; });
   const githubPollingSettings = bb.settings.define({
@@ -1475,15 +1454,15 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     async setAuthoredPullRequestDraft({ url, draft }) {
       return authoredPullRequestService.setDraft(url, draft);
     },
-    async sidebarArchivedThreads({ force }) {
+    async sidebarArchivedThreads() {
       try {
-        return { available: true, threads: await loadSidebarArchivedThreads(bb), error: null };
+        return { available: true, threads: await archivedThreadService.list(), error: null };
       } catch (error) {
         return { available: false, threads: [], error: error instanceof Error ? error.message : String(error) };
       }
     },
     async unarchiveSidebarThread({ threadId }) {
-      await bb.sdk.threads.unarchive({ threadId });
+      await archivedThreadService.unarchive(threadId);
       return { threadId };
     },
     async getWorkContext({ threadId }) {
