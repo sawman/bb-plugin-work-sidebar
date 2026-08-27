@@ -55,9 +55,9 @@ const dynamicClassFamilies = [
   { prefix: "ws-plan-", file: "features/work-context/views.tsx", suffixes: ["completed", "in_progress", "pending"] },
   { prefix: "ws-provider-health-", file: "features/work-context/views.tsx", suffixes: ["green", "amber", "red"] },
   { prefix: "ws-status-dot-", file: "features/work-context/views.tsx", suffixes: ["in_progress", "running", "done"] },
-  { prefix: "ws-task-priority-", file: "components/threads/task-row.tsx", suffixes: ["urgent", "high", "medium", "low"] },
-  { prefix: "ws-task-row-", file: "components/threads/task-row.tsx", suffixes: ["outcome", "execution"] },
-  { prefix: "ws-task-status-", file: "components/threads/task-row.tsx", suffixes: ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] },
+  { prefix: "ws-task-priority-", file: "features/tasks/task-row.tsx", suffixes: ["urgent", "high", "medium", "low"] },
+  { prefix: "ws-task-row-", file: "features/tasks/task-row.tsx", suffixes: ["outcome", "execution"] },
+  { prefix: "ws-task-status-", file: "features/tasks/task-row.tsx", suffixes: ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] },
   { prefix: "ws-thread-child-depth-", file: "features/threads/thread-row.tsx", suffixes: ["1", "2", "3", "4"] },
 ] as const;
 

@@ -117,7 +117,7 @@ export async function readGitHubSignals(
         const signal = signalFromGraphql(repository[`p${index}`]);
         if (!signal) return;
         signals.set(number, signal);
-        lifecycle.githubPullRequestSignalCache.set(signalKey(owner, repo, number), { value: signal, expiresAt: Date.now() + GITHUB_SIGNAL_CACHE_MS });
+        lifecycle.cacheGitHubPullRequestSignal(signalKey(owner, repo, number), signal, Date.now() + GITHUB_SIGNAL_CACHE_MS);
       });
     } catch (error) {
       if (graphQlRateLimited(error)) lifecycle.githubGraphqlBackoffUntil = Date.now() + GITHUB_GRAPHQL_BACKOFF_MS;
@@ -178,7 +178,7 @@ async function readRestSignal(
     const failed = conclusions.some((state) => ["FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE"].includes(state));
     const pending = runs.some((item) => !isRecord(item) || item.status !== "completed" || item.conclusion === null);
     const signal = { checks: failed ? "failed" : pending ? "pending" : runs.length ? "passing" : "none", review } satisfies GitHubSignal;
-    if (!lifecycle.isDisposed) lifecycle.githubPullRequestSignalCache.set(signalKey(owner, repo, number), { value: signal, expiresAt: Date.now() + GITHUB_SIGNAL_CACHE_MS });
+    lifecycle.cacheGitHubPullRequestSignal(signalKey(owner, repo, number), signal, Date.now() + GITHUB_SIGNAL_CACHE_MS);
     return signal;
   } catch {
     return null;

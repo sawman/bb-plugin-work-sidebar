@@ -6,10 +6,10 @@ import {
   ContextMenuLabel,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from "../ui/context-menu";
-import { Icon, type IconName } from "../ui/icon";
+} from "../../components/ui/context-menu";
+import { Icon, type IconName } from "../../components/ui/icon";
 import type { SidebarTask, TaskQueueNode } from "../../work-model";
-import { taskStatusPresentation } from "../../features/tasks/model";
+import { taskStatusPresentation } from "./model";
 
 const TASK_STATUSES: readonly SidebarTask["status"][] = [
   "backlog",

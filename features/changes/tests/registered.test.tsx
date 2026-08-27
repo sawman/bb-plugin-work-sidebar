@@ -521,7 +521,7 @@ describe("R13 registered Changes Work slot", () => {
     slot.lifecycle.unmount();
   });
 
-  it("clears an opened file selection on panel unmount without disturbing another thread", async () => {
+  it("preserves an opened file selection on panel unmount without disturbing another thread", async () => {
     const getWorkingTreeFileDiff = vi.fn(({ path }: { path: string }) => ({
       kind: "binary" as const,
       path,
@@ -557,7 +557,7 @@ describe("R13 registered Changes Work slot", () => {
     expect(
       changesInteractionStore.getState().byThread.get("thr_changes")
         ?.selectedFilePath,
-    ).toBeNull();
+    ).toBe("renamed.ts");
     expect(
       changesInteractionStore.getState().byThread.get("thr_other")
         ?.selectedFilePath,
@@ -567,7 +567,7 @@ describe("R13 registered Changes Work slot", () => {
     await waitFor(() => expect(remounted.getByText("Changed")).toBeTruthy());
     expect(
       remounted.queryByRole("button", { name: "Close diff for renamed.ts" }),
-    ).toBeNull();
+    ).toBeTruthy();
     remounted.lifecycle.unmount();
   });
 });

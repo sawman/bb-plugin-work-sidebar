@@ -156,6 +156,7 @@ describe("R5 pull-request queries", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const left = renderHook(() => useGitHubApiHealth(rpc, { poll: true }), { wrapper: wrapper(client) });
     const right = renderHook(() => useGitHubApiHealth(rpc, { poll: false }), { wrapper: wrapper(client) });
+    const inactive = renderHook(() => useGitHubApiHealth(rpc, { poll: true, enabled: false }), { wrapper: wrapper(client) });
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(rpc.call).toHaveBeenCalledTimes(1);
     expect(pullRequestPolicies.health).toMatchObject({ staleTime: 15_000, gcTime: 2 * 60_000, retry: false, refetchInterval: 30_000 });
@@ -173,6 +174,7 @@ describe("R5 pull-request queries", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
     expect(rpc.call).toHaveBeenCalledTimes(3);
     await act(async () => { right.unmount(); await Promise.resolve(); });
+    inactive.unmount();
     client.clear();
     await act(async () => { await vi.runAllTimersAsync(); });
     expect(vi.getTimerCount()).toBe(0);

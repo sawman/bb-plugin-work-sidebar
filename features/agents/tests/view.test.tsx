@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { PluginSidebarThread, PluginSidebarThreadsState } from "@get-bb/plugin-sdk/app";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { getPluginQueryClient } from "../../../query-runtime";
@@ -189,6 +189,31 @@ describe("R15 registered Agents Work slot", () => {
     await waitFor(() => expect(slot.getByRole("link", { name: "Open thr_child" })).toBeTruthy());
     expect(slot.queryByRole("alert")).toBeNull();
     slot.lifecycle.unmount();
+  });
+
+  it("uses shared task-link data without adding a second polling observer", async () => {
+    vi.useFakeTimers();
+    let reads = 0;
+    const slot = await agentsSlot(
+      { status: "ready", threads: [thread("thr_root", null), thread("thr_child", "thr_root")] },
+      rpcFixture({
+        sidebarTaskLinks: () => {
+          reads += 1;
+          return { available: true, links: {}, error: null };
+        },
+      }),
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+      await Promise.resolve();
+    });
+    expect(reads).toBe(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(reads).toBe(1);
+    slot.lifecycle.unmount();
+    vi.useRealTimers();
   });
 
   it("uses host open actions for normal, modifier, explicit split, and shortcut navigation", async () => {

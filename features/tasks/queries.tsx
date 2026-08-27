@@ -19,7 +19,7 @@ export function useTasksRead() {
   });
 }
 
-export function useTaskLinksRead() {
+export function useTaskLinksRead({ poll = true }: { poll?: boolean } = {}) {
   const rpc = useRpc<typeof rpcContract>();
   return useQuery({
     queryKey: queryKeys.sidebar.tasks.links(),
@@ -30,7 +30,8 @@ export function useTaskLinksRead() {
       return result;
     },
     ...queryPolicies.sidebarTaskLinks,
-    refetchInterval: 30_000,
+    refetchInterval: poll ? 30_000 : false,
+    refetchIntervalInBackground: false,
   });
 }
 

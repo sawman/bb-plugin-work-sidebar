@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Icon } from "../ui/icon";
+import { Icon } from "../../components/ui/icon";
 import type { SidebarTask } from "../../work-model";
 
 export function AssigneePicker({

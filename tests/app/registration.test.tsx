@@ -91,7 +91,7 @@ describe("R2 app registration and Query lifecycle", () => {
     expect(mount).toHaveBeenCalledTimes(2);
     // R14 keeps the selected-file query mounted but disabled until a file is
     // opened; this preserves hook order without starting a diff request.
-    expect(client.getQueryCache().getAll()).toHaveLength(20);
+    expect(client.getQueryCache().getAll()).toHaveLength(17);
     expect(
       client
         .getQueryCache()
@@ -123,7 +123,7 @@ describe("R2 app registration and Query lifecycle", () => {
         .getQueryCache()
         .findAll({ queryKey: ["work-sidebar", "pull-requests", "health"] })[0]
         ?.getObserversCount(),
-    ).toBe(2);
+    ).toBe(1);
     expect(
       client
         .getQueryCache()

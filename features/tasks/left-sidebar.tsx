@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Icon } from "@/components/ui/icon";
-import { TaskRow } from "@/components/threads/task-row";
+import { TaskRow } from "./task-row";
 import type { rpcContract } from "../../contracts";
 import {
   orderTaskLinksByRelevance,

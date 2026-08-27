@@ -12,7 +12,7 @@ import {
   AuthoredPullRequestRow,
   AuthoredPullRequestStack,
   type AuthoredPullRequest,
-} from "@/components/threads/authored-pull-requests";
+} from "./authored-pull-requests";
 import type { rpcContract } from "../../contracts";
 import { orderStackLayers, type SidebarStack } from "../../work-model";
 import { pullRequestsSidebarStore } from "./store";
@@ -41,7 +41,7 @@ export function PullRequestsLeftSidebar({
     intervalMs: Number(settings?.githubLeftListRefreshSeconds ?? "300") * 1_000,
   });
   const draft = useSetAuthoredPullRequestDraft(rpc);
-  const healthQuery = useGitHubApiHealth(rpc, { poll: true });
+  const healthQuery = useGitHubApiHealth(rpc, { poll: active, enabled: active });
   const selectedIds = useStore(
     pullRequestsSidebarStore,
     (state) => state.selectedIds,

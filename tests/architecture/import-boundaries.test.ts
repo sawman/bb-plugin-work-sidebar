@@ -3,7 +3,11 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
-import { assertBrowserRuntimeBoundary } from "./import-graph.js";
+import {
+  assertBrowserRuntimeBoundary,
+  assertNoComponentsToFeaturesRuntimeImports,
+  collectComponentsRuntimeImportGraph,
+} from "./import-graph.js";
 import { productionSourcePaths } from "./production-source-paths.js";
 
 const repositoryRoot = resolve(fileURLToPath(import.meta.url), "../../..");
@@ -104,6 +108,19 @@ function topLevelImplementationDeclarations(path: string): number {
 }
 
 describe("R16 composition boundaries", () => {
+  it("keeps components runtime-independent from feature slices and proves the gate rejects an illegal edge", () => {
+    const graph = collectComponentsRuntimeImportGraph(repositoryRoot);
+    expect(() => assertNoComponentsToFeaturesRuntimeImports(graph, repositoryRoot)).not.toThrow();
+
+    const negativeControl = new Map(graph);
+    negativeControl.set(resolve(repositoryRoot, "components/negative-control.tsx"), [
+      resolve(repositoryRoot, "features/tasks/model.ts"),
+    ]);
+    expect(() => assertNoComponentsToFeaturesRuntimeImports(negativeControl, repositoryRoot)).toThrow(
+      /components\/ runtime imports must not reach features\//,
+    );
+  });
+
   it("caps every production TypeScript physical line at 240 characters", () => {
     const violations = productionSourcePaths(repositoryRoot)
       .map((path) => ({

@@ -4,13 +4,13 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
-import { Icon } from "../ui/icon";
-import { Status } from "../ui/status";
+import { Icon } from "../../components/ui/icon";
+import { Status } from "../../components/ui/status";
 import {
   pullRequestPresentation,
   pullRequestSignalPresentation,
   type PullRequestSignal,
-} from "../../features/pull-requests/presentation";
+} from "./presentation";
 import { orderStackLayers, type SidebarStack } from "../../work-model";
 
 export type AuthoredPullRequest = {

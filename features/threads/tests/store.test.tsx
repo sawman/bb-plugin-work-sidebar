@@ -24,7 +24,7 @@ describe("thread interaction store", () => {
     expect(createThreadInteractionStore().getState().workTabFor("thr_a")).toBe("work");
   });
 
-  it("cleans departed roster entries and applies a deterministic 40-entry LRU cap", () => {
+  it("cleans left-roster interaction entries while preserving right-panel tabs for archived threads", () => {
     const store = createThreadInteractionStore();
     for (let index = 0; index < 41; index += 1) store.getState().setWorkTab(`thr_${index}`, "changes");
     expect(store.getState().workTabFor("thr_0")).toBe("work");
@@ -38,7 +38,7 @@ describe("thread interaction store", () => {
     expect(store.getState().expandedThreadIds).toEqual(new Set());
     expect(store.getState().dragThreadId).toBeNull();
     expect(store.getState().dropTarget).toBeNull();
-    expect(store.getState().workTabFor("thr_2")).toBe("work");
+    expect(store.getState().workTabFor("thr_2")).toBe("changes");
   });
 
   it("refreshes recency on access so the second-oldest entry is evicted", () => {

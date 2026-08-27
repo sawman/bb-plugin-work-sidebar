@@ -88,6 +88,12 @@ export const queryPolicies = {
     retry: 1,
     refetchOnWindowFocus: false,
   },
+  health: {
+    staleTime: 15_000,
+    gcTime: 2 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  },
   workActivity: {
     staleTime: 0,
     gcTime: 2 * 60_000,

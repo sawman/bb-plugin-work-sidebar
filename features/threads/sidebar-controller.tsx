@@ -7,7 +7,6 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { threadTitle } from "@/work-model";
-import { changesInteractionStore } from "@/features/changes/store";
 import { TasksLeftSidebar } from "@/features/tasks/left-sidebar";
 import { useTaskLinksRead } from "@/features/tasks/queries";
 import { PullRequestsLeftSidebar } from "@/features/pull-requests/left-sidebar";
@@ -88,7 +87,6 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   useEffect(() => {
     const threadIds = threads.map((thread) => thread.id);
     threadInteractionStore.getState().reconcileRoster(threadIds);
-    changesInteractionStore.getState().cleanup(threadIds);
   }, [threads]);
 
   const refreshThreadDetails = useCallback(() => {

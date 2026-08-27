@@ -84,7 +84,10 @@ function AgentRow({
 
 export function AgentsView({ threadId }: { threadId: string }) {
   const hostThreads = experimental_useSidebarThreads();
-  const taskLinks = useTaskLinksRead();
+  // The Threads controller owns the single visible polling observer. Agents
+  // still observe the shared cache for annotations but never add another
+  // 30-second poller.
+  const taskLinks = useTaskLinksRead({ poll: false });
   const outcome = useWorkOutcome(threadId);
   const children = useMemo(
     () => projectAgentChildren(hostThreads.threads, threadId),

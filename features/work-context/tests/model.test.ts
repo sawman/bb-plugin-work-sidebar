@@ -38,4 +38,13 @@ describe("work-context card model", () => {
     expect(shouldPollWorkActivity("starting")).toBe(true);
     expect(shouldPollWorkActivity("idle")).toBe(false);
   });
+
+  it("declares the documented provider-health policy exactly", () => {
+    expect(queryPolicies.health).toEqual({
+      staleTime: 15_000,
+      gcTime: 2 * 60_000,
+      retry: false,
+      refetchOnWindowFocus: false,
+    });
+  });
 });
