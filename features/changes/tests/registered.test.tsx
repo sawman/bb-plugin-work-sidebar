@@ -3,6 +3,10 @@ import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getPluginQueryClient } from "../../../query-runtime";
+import { changesInteractionStore } from "../store";
+
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock("sonner", () => ({ toast }));
 
 const repository = (
   outcome: "available" | "absent" | "unavailable",
@@ -83,11 +87,15 @@ type ChangesFixture = {
   getChanges: () => Promise<ChangesResult> | ChangesResult;
   getWorkContext?: () => typeof context;
   githubHealth?: "available" | "rate_limited";
+  checkoutStackBranch?: (input: { threadId: string; branch: string }) => unknown;
+  getWorkingTreeFileDiff?: (input: { threadId: string; path: string }) => unknown;
 };
 function rpc({
   getChanges,
   getWorkContext = () => context,
   githubHealth = "available",
+  checkoutStackBranch = () => ({ ok: true, message: "Checked out", detail: null }),
+  getWorkingTreeFileDiff = ({ path }) => ({ kind: "absent", path, patch: null, message: "No diff" }),
 }: ChangesFixture) {
   return {
     getWorkContext,
@@ -132,6 +140,8 @@ function rpc({
     }),
     getWorkGoal: () => null,
     getWorkPlan: () => ({ items: [] }),
+    checkoutStackBranch,
+    getWorkingTreeFileDiff,
     sidebarTasks: () => ({
       available: true,
       tasks: [],
@@ -155,6 +165,9 @@ async function changesSlot(fixture: ChangesFixture) {
 afterEach(() => {
   cleanup();
   getPluginQueryClient().clear();
+  changesInteractionStore.getState().cleanup([]);
+  toast.success.mockReset();
+  toast.error.mockReset();
 });
 
 describe("R13 registered Changes Work slot", () => {
@@ -337,6 +350,64 @@ describe("R13 registered Changes Work slot", () => {
     expect(slot.getByText("old.ts")).toBeTruthy();
     expect(slot.getByText("GitHub unavailable")).toBeTruthy();
     expect(getChanges).toHaveBeenCalledTimes(1);
+    slot.lifecycle.unmount();
+  });
+  it("keeps checkout busy through success and failure, and lazily opens/closes isolated file previews", async () => {
+    const checkout = deferred<{ ok: boolean; message: string; tone?: "success" | "warning" | "error"; detail: null }>();
+    let shouldFailCheckout = false;
+    const getWorkingTreeFileDiff = vi.fn(({ path }: { path: string }) => ({
+      kind: "binary" as const,
+      path,
+      patch: null,
+      message: "This binary file cannot be shown as a text diff.",
+    }));
+    const branch = {
+      name: "feature/checkout",
+      isCurrent: false,
+      isMerged: false,
+      isQueued: false,
+      needsRebase: false,
+      hasStash: false,
+      stashCount: null,
+      pr: null,
+      diff: { additions: 1, deletions: 0, files: [], truncated: false },
+      aheadOfRemote: 0,
+      behindRemote: 0,
+    };
+    const slot = await changesSlot({
+      getChanges: () => changesResult(repository("available", true), {
+        githubStack: {
+          stack: {
+            trunk: "main",
+            currentBranch: "main",
+            branches: [branch],
+            trunkBehind: 0,
+            prunableBranchCount: 0,
+          },
+          pending: null,
+          error: null,
+        },
+      }),
+      checkoutStackBranch: () => shouldFailCheckout ? { ok: false, message: "Checkout blocked", tone: "error", detail: null } : checkout.promise,
+      getWorkingTreeFileDiff,
+    });
+
+    await waitFor(() => expect(slot.getByRole("button", { name: "Check out feature/checkout" })).toBeTruthy());
+    fireEvent.click(slot.getByRole("button", { name: "Check out feature/checkout" }));
+    await waitFor(() => expect(slot.getByRole("button", { name: "Checking out feature/checkout" }).hasAttribute("disabled")).toBe(true));
+    checkout.resolve({ ok: true, message: "Checked out", detail: null });
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Checked out"));
+    shouldFailCheckout = true;
+    fireEvent.click(slot.getByRole("button", { name: "Check out feature/checkout" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Checkout blocked"));
+    expect(slot.inspection.rpcCalls.filter((call) => call.method === "checkoutStackBranch")).toHaveLength(2);
+
+    fireEvent.click(slot.getByRole("button", { name: /(?:Show|Hide) 3 working-tree files/ }));
+    fireEvent.click(slot.getByRole("button", { name: "Open uncommitted diff for renamed.ts" }));
+    await waitFor(() => expect(getWorkingTreeFileDiff).toHaveBeenCalledWith({ threadId: "thr_changes", path: "renamed.ts" }));
+    await waitFor(() => expect(slot.getByText("This binary file cannot be shown as a text diff.")).toBeTruthy());
+    fireEvent.click(slot.getByRole("button", { name: "Close diff for renamed.ts" }));
+    expect(slot.queryByRole("button", { name: "Close diff for renamed.ts" })).toBeNull();
     slot.lifecycle.unmount();
   });
 });

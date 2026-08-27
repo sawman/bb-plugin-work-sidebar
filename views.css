@@ -2652,15 +2652,6 @@ button.ws-provider-health:focus-visible {
   top: 0;
   background: var(--card);
 }
-.ws-working-tree-patch {
-  overflow: auto;
-  margin: 0;
-  color: var(--foreground);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.58rem;
-  line-height: 1.4;
-  white-space: pre-wrap;
-}
 .ws-stack-signal {
   display: grid;
   place-items: center;
@@ -2743,62 +2734,6 @@ button.ws-provider-health:focus-visible {
 .ws-stack-current > .ws-stack-files,
 .ws-stack-current > .ws-stack-files * {
   background: transparent !important;
-}
-.ws-diff-toolbar {
-  display: flex;
-  gap: 0.18rem;
-}
-.ws-diff-toolbar button {
-  border: 0;
-  border-radius: 3px;
-  padding: 0.14rem 0.3rem;
-  background: transparent;
-  color: var(--muted-foreground);
-  font-size: 0.57rem;
-  cursor: pointer;
-}
-.ws-diff-toolbar button:hover,
-.ws-diff-toolbar .ws-diff-view-selected {
-  background: var(--accent);
-  color: var(--foreground);
-}
-.ws-working-tree-patch,
-.ws-split-diff pre {
-  display: grid;
-  overflow: auto;
-  margin: 0;
-  color: var(--foreground);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.58rem;
-  line-height: 1.42;
-  white-space: pre;
-}
-.ws-working-tree-patch span,
-.ws-split-diff pre span {
-  display: block;
-  padding: 0 0.25rem;
-}
-.ws-diff-added {
-  background: color-mix(in srgb, var(--success) 14%, transparent);
-  color: var(--success);
-}
-.ws-diff-deleted {
-  background: color-mix(in srgb, var(--destructive) 13%, transparent);
-  color: var(--destructive);
-}
-.ws-diff-hunk {
-  background: color-mix(in srgb, var(--primary) 10%, transparent);
-  color: var(--primary);
-}
-.ws-split-diff {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-}
-.ws-split-diff pre + pre {
-  border-left: 1px solid var(--border);
 }
 .ws-stack-state-icon {
   display: grid;
@@ -2916,55 +2851,6 @@ button.ws-provider-health:focus-visible {
 .ws-native-thread-list {
   position: relative;
   z-index: 0;
-}
-.ws-review-diff {
-  overflow: auto;
-  --diff-background-color: var(--card);
-  --diff-text-color: var(--foreground);
-  --diff-font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  --diff-gutter-insert-background-color: color-mix(
-    in srgb,
-    var(--success) 12%,
-    var(--card)
-  );
-  --diff-gutter-delete-background-color: color-mix(
-    in srgb,
-    var(--destructive) 12%,
-    var(--card)
-  );
-  --diff-code-insert-background-color: color-mix(
-    in srgb,
-    var(--success) 8%,
-    var(--card)
-  );
-  --diff-code-delete-background-color: color-mix(
-    in srgb,
-    var(--destructive) 8%,
-    var(--card)
-  );
-  --diff-code-insert-edit-background-color: color-mix(
-    in srgb,
-    var(--success) 20%,
-    var(--card)
-  );
-  --diff-code-delete-edit-background-color: color-mix(
-    in srgb,
-    var(--destructive) 20%,
-    var(--card)
-  );
-}
-.ws-review-diff .diff {
-  min-width: 31rem;
-  font-size: 0.61rem;
-}
-.ws-review-diff .diff-gutter {
-  color: var(--muted-foreground);
-}
-.ws-review-diff .diff-code {
-  padding-left: 0.45rem;
-}
-.ws-review-diff .diff-gutter-col {
-  width: 4.5ch;
 }
 .ws-list {
   margin: -0.75rem !important;

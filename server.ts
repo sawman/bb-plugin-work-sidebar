@@ -1400,10 +1400,33 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     readGoal: readWorkGoal,
     readPlan: readWorkPlan,
   });
+  async function workingTreeFileDiff(threadId: string, path: string) {
+    const thread = await bb.sdk.threads.get({ threadId });
+    if (!thread.environmentId)
+      return { kind: "unavailable" as const, path, patch: null, message: "This thread has no workspace." };
+    try {
+      const [patchResult, filesResult] = await Promise.all([
+        bb.sdk.environments.diffPatch({ environmentId: thread.environmentId, target: { type: "uncommitted" }, paths: [path] }),
+        bb.sdk.environments.diffFiles({ environmentId: thread.environmentId, target: "uncommitted" }),
+      ]);
+      if (patchResult.outcome !== "available")
+        return { kind: "unavailable" as const, path, patch: null, message: "message" in patchResult ? patchResult.message : patchResult.failure.message };
+      if (filesResult.outcome === "available" && filesResult.files.find((file) => file.path === path)?.binary)
+        return { kind: "binary" as const, path, patch: null, message: "This binary file cannot be shown as a text diff." };
+      const patch = patchResult.patches.find((entry) => entry.path === path)?.patch ?? null;
+      return patch
+        ? { kind: "patch" as const, path, patch, message: null }
+        : { kind: "absent" as const, path, patch: null, message: "No diff is available for this file." };
+    } catch (error) {
+      return { kind: "unavailable" as const, path, patch: null, message: error instanceof Error ? error.message : "Could not load the file diff." };
+    }
+  }
   const changesService = createChangesService({
     repository: async (threadId) => repositorySummary(await bb.sdk.threads.get({ threadId })),
     projection: pullRequestChanges,
     fingerprint: (_threadId, url) => pullRequestFingerprint(url),
+    checkout: (threadId, branch) => githubStackCall("checkoutBranch", { threadId, branch }, ghStackActionSchema),
+    fileDiff: workingTreeFileDiff,
   });
 
   bb.rpc.register(rpcContract, {
@@ -1519,15 +1542,14 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     async getWorkPlan({ threadId }) { return workContextReads.plan(threadId); },
     async getChanges({ threadId }) { return changesService.get(threadId); },
     async getChangesFingerprint({ threadId, url }) { return changesService.fingerprint(threadId, url); },
+    async checkoutStackBranch({ threadId, branch }) { return changesService.checkout(threadId, branch); },
+    async getWorkingTreeFileDiff({ threadId, path }) { return changesService.fileDiff(threadId, path); },
     async getGitHubPollingPolicy() { return githubPollingPolicy(); },
     async getWorkTracker({ threadId }) {
       return trackerService.context(threadId);
     },
     async getWorkProviderStatus({ threadId }) {
       return workProviderStatus(threadId);
-    },
-    async checkoutStackBranch({ threadId, branch }) {
-      return githubStackCall("checkoutBranch", { threadId, branch }, ghStackActionSchema);
     },
     async linkLinearIssue({ threadId, key }) {
       return trackerService.link(threadId, key);
@@ -1545,13 +1567,6 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
         currentThread: { status: thread.status, runtimeStatus: thread.runtime.displayStatus },
         ...latestActivity(timeline.rows, output.output, thread.status === "active" || thread.status === "starting"),
       };
-    },
-    async getWorkingTreeFileDiff({ threadId, path }) {
-      const thread = await bb.sdk.threads.get({ threadId });
-      if (!thread.environmentId) return { available: false, patch: null, message: "This thread has no workspace." };
-      const result = await bb.sdk.environments.diffPatch({ environmentId: thread.environmentId, target: { type: "uncommitted" }, paths: [path] });
-      if (result.outcome !== "available") return { available: false, patch: null, message: "message" in result ? result.message : result.failure.message };
-      return { available: true, patch: result.patches[0]?.patch ?? null, message: result.patches[0] ? null : "No diff is available for this file." };
     },
     async unlinkLinearIssue({ threadId }) {
       return trackerService.unlink(threadId);

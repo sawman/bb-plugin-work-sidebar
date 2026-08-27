@@ -63,6 +63,8 @@ describe("R1 package and compile boundary", () => {
     expect(rootLockPackage.devDependencies?.["@get-bb/plugin-sdk"]).toBe("0.4.21");
     expect(rootLockPackage.dependencies?.["@tanstack/react-query"]).toBe(packageJson.dependencies?.["@tanstack/react-query"]);
     expect(rootLockPackage.dependencies?.zustand).toBe(packageJson.dependencies?.zustand);
+    expect(packageJson.dependencies?.["react-diff-view"]).toBeUndefined();
+    expect(rootLockPackage.dependencies?.["react-diff-view"]).toBeUndefined();
   });
 
   it("includes nested source and test TypeScript files", () => {

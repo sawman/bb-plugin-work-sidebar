@@ -156,10 +156,6 @@ export const rpcSchemas = {
   ...trackerRpcSchemas,
   getWorkProviderStatus: { input: z.object({ threadId: z.string() }).strict(), output: workProviderStatus },
   getGitHubApiHealth: { input: z.null(), output: z.object({ state: z.enum(["available", "rate_limited", "unavailable"]), scope: z.enum(["graphql", "rest", "unknown"]), message: z.string().nullable(), retryAt: z.number().nullable() }) },
-  checkoutStackBranch: {
-    input: z.object({ threadId: z.string().startsWith("thr_"), branch: z.string().min(1).max(255) }).strict(),
-    output: z.object({ ok: z.boolean(), message: z.string(), tone: z.enum(["success", "warning", "error"]).optional(), detail: z.string().nullable() }),
-  },
   getLatestActivity: {
     input: z.object({ threadId: z.string().startsWith("thr_") }).strict(),
     output: z.object({
@@ -171,10 +167,6 @@ export const rpcSchemas = {
       lastUser: z.object({ text: z.string(), kind: z.literal("user") }).nullable(),
       current: z.object({ text: z.string(), kind: z.enum(["assistant", "user", "command", "activity"]) }).nullable(),
     }),
-  },
-  getWorkingTreeFileDiff: {
-    input: z.object({ threadId: z.string().startsWith("thr_"), path: z.string().min(1) }).strict(),
-    output: z.object({ available: z.boolean(), patch: z.string().nullable(), message: z.string().nullable() }).strict(),
   },
   createWorkTask: {
     input: z.object({

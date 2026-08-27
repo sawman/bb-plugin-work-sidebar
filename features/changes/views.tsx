@@ -1,5 +1,10 @@
 import type { ReactElement } from "react";
-import type { Repository } from "./schemas.js";
+import type { GitHubStackBranch, GitHubStackSignal } from "../../contracts.js";
+import { Status } from "../../components/ui/status.js";
+import type { CurrentPullRequestView } from "../../work-model.js";
+import { normalizePullRequestSignal, pullRequestPresentation, pullRequestSignalPresentation, type PullRequestSignal } from "../pull-requests/presentation.js";
+import { HostWorkingTreeRenderer } from "./host-renderer.js";
+import type { Repository, WorkingTreeFileDiff } from "./schemas.js";
 import { repositoryPresentation } from "./model";
 
 export function ChangesError({
@@ -152,4 +157,67 @@ export function ChangesRepositoryCard({
       )}
     </article>
   );
+}
+
+type WorkingTreeFileDiffQuery = {
+  data: WorkingTreeFileDiff | undefined;
+  error: Error | null;
+  isError: boolean;
+  isPending: boolean;
+};
+
+export function ChangesWorkingTreePreview({
+  path,
+  query,
+  onClose,
+}: {
+  path: string;
+  query: WorkingTreeFileDiffQuery;
+  onClose(): void;
+}): ReactElement {
+  let content: ReactElement;
+  if (query.isPending) {
+    content = <p className="ws-card-note" role="status">Loading diff…</p>;
+  } else if (query.isError) {
+    content = <p className="ws-card-note" role="alert">{query.error?.message ?? "Could not load the file diff."}</p>;
+  } else if (query.data?.kind === "patch") {
+    content = <HostWorkingTreeRenderer file={query.data} />;
+  } else {
+    content = <p className="ws-card-note">{query.data?.message ?? "No diff is available for this file."}</p>;
+  }
+  return (
+    <article className="ws-card ws-working-tree-diff">
+      <div className="ws-card-heading">
+        <strong>{path}</strong>
+        <button type="button" className="ws-text-button" onClick={onClose} aria-label={`Close diff for ${path}`}>
+          Close
+        </button>
+      </div>
+      {content}
+    </article>
+  );
+}
+
+export type StackBranchSignals = Pick<GitHubStackSignal, "state" | "draft" | "checks" | "review" | "reviewCommentCount">;
+
+function readableStatus(status: string): string {
+  return status.replaceAll("-", " ").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+export function ChangesCurrentPullRequestCard({ pullRequest, expanded, onToggle }: { pullRequest: CurrentPullRequestView; expanded: boolean; onToggle(): void }) {
+  const signal = pullRequestSignalPresentation(pullRequest.signal);
+  const status = pullRequestPresentation({ state: pullRequest.state, draft: pullRequest.state === "draft", attention: pullRequest.attention });
+  return <article className="ws-current-pr-card"><div className="ws-current-pr-summary"><Status presentation={status} /><span><strong>#{pullRequest.number} {pullRequest.title}</strong><small>{pullRequest.head} · {readableStatus(pullRequest.review.state)} · {pullRequest.checks.passedCount}/{pullRequest.checks.totalCount} checks</small></span><span className="ws-current-pr-signals" aria-label="Pull request signals"><Status presentation={signal.checks} /><Status presentation={signal.review} /></span></div><a className="ws-current-pr-open ws-pr-tooltip" data-tooltip="Open on GitHub" href={pullRequest.url} target="_blank" rel="noreferrer" aria-label={`Open pull request #${pullRequest.number} on GitHub`}>↗</a><button type="button" className="ws-current-pr-expand ws-pr-tooltip" data-tooltip={expanded ? "Hide PR details" : "Show PR details"} onClick={onToggle} aria-expanded={expanded} aria-label={`${expanded ? "Hide" : "Show"} details for pull request #${pullRequest.number}`}>{expanded ? "⌄" : "›"}</button>{expanded && <div className="ws-current-pr-details"><span>Review: {signal.review.label}</span><span>Checks: {pullRequest.checks.passedCount} passed · {pullRequest.checks.pendingCount} pending · {pullRequest.checks.failedCount} failed</span><span>Merge: {readableStatus(pullRequest.mergeability.state)}</span></div>}</article>;
+}
+
+export function ChangesStackBranchRow({ branch, signals, expanded, checkingOut, onToggle, onCheckout }: { branch: GitHubStackBranch; signals?: StackBranchSignals; expanded: boolean; checkingOut: boolean; onToggle(): void; onCheckout(): void }) {
+  const pr = branch.pr;
+  const title = pr?.title ?? branch.name;
+  const fileCount = branch.diff?.files.length ?? 0;
+  const merged = branch.isMerged || (pr?.state ?? signals?.state ?? "").toLowerCase() === "merged";
+  const status = merged ? "merged" : (pr?.state ?? signals?.state) === "closed" ? "closed" : (pr?.isDraft ?? signals?.draft) ? "draft" : branch.needsRebase ? "blocked" : "open";
+  const signal: PullRequestSignal | null = signals ? normalizePullRequestSignal({ checks: signals.checks ?? "unknown", review: signals.review ?? "none", reviewCommentCount: signals.reviewCommentCount }) : null;
+  const presented = signal ? pullRequestSignalPresentation(signal) : null;
+  const statePresentation = pullRequestPresentation({ state: status === "blocked" ? "open" : status, draft: status === "draft", mergedLayer: merged, attention: branch.needsRebase ? "blocked" : undefined });
+  return <li className={`ws-stack-layer-item ${branch.isCurrent ? "ws-stack-current" : ""} ${merged ? "ws-stack-merged" : ""} ${expanded ? "ws-stack-expanded" : ""}`}><div className="ws-stack-layer"><Status presentation={statePresentation} className="ws-stack-state-icon" /><span className="ws-stack-layer-toggle"><strong>{pr ? `#${pr.number} ` : ""}{title}</strong><small><span className="ws-stack-subtitle-signals">{presented && <><Status presentation={presented.checks} /><Status presentation={presented.review} /></>}</span>{branch.name}{branch.diff ? <> · <b>+{branch.diff.additions}</b> <i>−{branch.diff.deletions}</i></> : null}</small></span><span className="ws-stack-actions">{pr && <a className="ws-pr-tooltip" data-tooltip="Open on GitHub" href={pr.url} target="_blank" rel="noreferrer" aria-label={`Open pull request #${pr.number} on GitHub`}>↗</a>}<button type="button" className="ws-stack-checkout ws-pr-tooltip" data-tooltip={merged ? "Merged branch" : branch.isCurrent ? "Current branch" : `Check out ${branch.name}`} onClick={onCheckout} disabled={merged || branch.isCurrent || checkingOut} aria-label={checkingOut ? `Checking out ${branch.name}` : merged ? "Merged branch" : branch.isCurrent ? "Current branch" : `Check out ${branch.name}`}>{checkingOut ? "…" : "⇥"}</button>{fileCount > 0 && <button type="button" className="ws-stack-expand ws-pr-tooltip" data-tooltip={expanded ? "Hide changed files" : "Show changed files"} onClick={onToggle} aria-expanded={expanded} aria-label={`${expanded ? "Hide" : "Show"} changed files for ${branch.name}`}>{expanded ? "⌄" : "›"}</button>}</span></div>{expanded && branch.diff && <div className="ws-stack-files">{branch.diff.files.map((file) => <span key={file.path}><b className={`ws-file-${file.status}`}>{file.status[0]?.toUpperCase()}</b><em>{file.path}</em><small>{file.additions !== null ? `+${file.additions}` : ""} {file.deletions !== null ? `−${file.deletions}` : ""}</small></span>)}{branch.diff.truncated && <small className="ws-stack-files-truncated">Only the first {branch.diff.files.length} files are shown.</small>}</div>}</li>;
 }
