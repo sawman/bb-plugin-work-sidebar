@@ -36,18 +36,18 @@ describe("R2 app registration and Query lifecycle", () => {
     });
     const right = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_test", params: null });
     expect(mount).toHaveBeenCalledTimes(2);
-    expect(client.getQueryCache().getAll()).toHaveLength(11);
+    expect(client.getQueryCache().getAll()).toHaveLength(19);
     expect(client.getQueryCache().find({ queryKey: ["work-sidebar", "sidebar", "threads", "order"] })?.getObserversCount()).toBe(1);
     expect(client.getQueryCache().find({ queryKey: ["work-sidebar", "sidebar", "threads", "list-mode"] })?.getObserversCount()).toBe(1);
     expect(client.getQueryCache().find({ queryKey: ["work-sidebar", "sidebar", "threads", "groups"] })?.getObserversCount()).toBe(1);
     expect(client.getQueryCache().findAll({ queryKey: ["work-sidebar", "pull-requests", "authored", "stacks"] })[0]?.getObserversCount()).toBe(1);
     expect(client.getQueryCache().findAll({ queryKey: ["work-sidebar", "pull-requests", "health"] })[0]?.getObserversCount()).toBe(2);
-    expect(client.getQueryCache().find({ queryKey: queryKeys.sidebar.tasks.list() })?.getObserversCount()).toBe(2);
+    expect(client.getQueryCache().find({ queryKey: queryKeys.sidebar.tasks.list() })?.getObserversCount()).toBe(3);
     expect(client.getQueryCache().find({ queryKey: queryKeys.sidebar.tasks.links() })?.getObserversCount()).toBe(1);
     left.unmount();
     right.unmount();
     expect(unmount).toHaveBeenCalledTimes(2);
-    expect(client.getQueryCache().getAll().every((query) => query.getObserversCount() === 0)).toBe(true);
+    await waitFor(() => expect(client.getQueryCache().getAll().every((query) => query.getObserversCount() === 0)).toBe(true));
     client.clear();
     expect(client.getQueryCache().getAll()).toEqual([]);
   });
@@ -70,7 +70,7 @@ describe("R6 mounted Tasks reads", () => {
     expect(left.inspection.rpcCalls.filter((call) => call.method === "sidebarTaskLinks")).toHaveLength(1);
     expect(right.inspection.rpcCalls.filter((call) => call.method === "sidebarTasks")).toHaveLength(0);
     left.lifecycle.unmount(); right.lifecycle.unmount();
-    expect(client.getQueryCache().getAll().every((query) => query.getObserversCount() === 0)).toBe(true);
+    await waitFor(() => expect(client.getQueryCache().getAll().every((query) => query.getObserversCount() === 0)).toBe(true));
     client.clear();
   });
 

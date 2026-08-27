@@ -9,6 +9,7 @@ import { rpcContract } from "./contracts.js";
 import { type SidebarStack } from "./work-model.js";
 import { createArchivedThreadService, createThreadPreferencesService } from "./features/threads/server.js";
 import { createServerLifecycle, type GitHubApiHealth, type ServerLifecycle } from "./server-lifecycle.js";
+import { createWorkContextReadService } from "./features/work-context/server-reads.js";
 
 const execFileAsync = promisify(execFile);
 const TASKS_PLUGIN_ID = "tasks";
@@ -1361,6 +1362,90 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     publish: (channel, payload) => bb.realtime.publish(channel, payload),
   });
 
+  async function readWorkContext(threadId: string) {
+    const [thread, available, timeline, children, root, bindings, latestOutput] = await Promise.all([
+      bb.sdk.threads.get({ threadId }), tasksAvailable(), bb.sdk.threads.timeline({ threadId }),
+      listDescendantThreads(threadId), rootThread(threadId), readBindings(), bb.sdk.threads.output({ threadId }),
+    ]);
+    const links = available ? await taskLinks() : {};
+    const outcomeBinding = bindings.outcomes.find((binding) => binding.rootThreadId === root.id) ?? null;
+    const [tasksById, projects] = available ? await Promise.all([allTasksById(), tasksProjects()]) : [new Map<string, Task>(), [] as z.infer<typeof projectSchema>[]];
+    const projectNames = new Map(projects.map((project) => [project.id, project.name]));
+    const outcomeTask = outcomeBinding ? tasksById.get(outcomeBinding.outcomeTaskId) ?? null : null;
+    const executionBindings = bindings.executions.filter((binding) => binding.rootThreadId === root.id);
+    const executionTasks = executionBindings.flatMap((binding) => {
+      const task = tasksById.get(binding.executionTaskId);
+      return task ? [summarizeTask(task, projectNames.get(task.projectId) ?? "Work")] : [];
+    });
+    return {
+      tasksAvailable: available,
+      currentThread: { title: thread.title ?? thread.titleFallback ?? "Untitled thread", status: thread.status, runtimeStatus: thread.runtime.displayStatus, providerId: thread.providerId },
+      tasks: outcomeTask ? [summarizeTask(outcomeTask, projectNames.get(outcomeTask.projectId) ?? "Work")] : [],
+      subtasks: executionTasks, outcome: outcomeTask ? summarizeTask(outcomeTask, projectNames.get(outcomeTask.projectId) ?? "Work") : null, executionTasks,
+      bindings: [...(outcomeBinding ? [bindingSummary(outcomeBinding)] : []), ...executionBindings.map(bindingSummary)],
+      legacy: { state: "none" as const, taskIds: [], message: null },
+      goal: timeline.goal ? { objective: timeline.goal.objective, status: timeline.goal.status, tokensUsed: timeline.goal.tokensUsed, tokenBudget: timeline.goal.tokenBudget, timeUsedSeconds: timeline.goal.timeUsedSeconds } : null,
+      todos: timeline.pendingTodos?.items ?? [],
+      activity: latestActivity(timeline.rows, latestOutput.output, thread.status === "active" || thread.status === "starting"),
+      children: children.map(({ thread: child, depth }) => ({ id: child.id, title: child.title ?? child.titleFallback ?? "Untitled agent", depth, status: child.status, runtimeStatus: child.runtime.displayStatus, providerId: child.providerId, isArchived: child.archivedAt !== null, task: links[child.id]?.[0] ? { key: links[child.id]![0].task.key, status: links[child.id]![0].task.status, liveStatus: links[child.id]![0].liveStatus } : null })),
+      currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null,
+      repository: { outcome: "absent" as const, message: null, branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFileCount: 0, changedInsertions: 0, changedDeletions: 0, changedFiles: [] },
+      tracker: { visible: false, available: false, message: null, suggestions: [], item: null, statusOptions: [] },
+    };
+  }
+
+  // Card endpoints deliberately read only the dependency set they render.
+  // The legacy aggregate remains a temporary seam for R11–R15 panels.
+  async function readWorkStatus(threadId: string) {
+    const [thread, children, timeline, output] = await Promise.all([
+      bb.sdk.threads.get({ threadId }),
+      listDescendantThreads(threadId),
+      bb.sdk.threads.timeline({ threadId }),
+      bb.sdk.threads.output({ threadId }),
+    ]);
+    return {
+      currentThread: { title: thread.title ?? thread.titleFallback ?? "Untitled thread", status: thread.status, runtimeStatus: thread.runtime.displayStatus, providerId: thread.providerId },
+      children: children.map(({ thread: child, depth }) => ({ id: child.id, title: child.title ?? child.titleFallback ?? "Untitled agent", depth, status: child.status, runtimeStatus: child.runtime.displayStatus, providerId: child.providerId, isArchived: child.archivedAt !== null, task: null })),
+      activity: latestActivity(timeline.rows, output.output, thread.status === "active" || thread.status === "starting"),
+    };
+  }
+
+  async function readWorkOutcome(threadId: string) {
+    const available = await tasksAvailable();
+    if (!available) return { tasksAvailable: false, outcome: null, executionTasks: [], bindings: [] };
+    const [root, bindings, tasksById, projects] = await Promise.all([rootThread(threadId), readBindings(), allTasksById(), tasksProjects()]);
+    const names = new Map(projects.map((project) => [project.id, project.name]));
+    const outcomeBinding = bindings.outcomes.find((binding) => binding.rootThreadId === root.id) ?? null;
+    const executionBindings = bindings.executions.filter((binding) => binding.rootThreadId === root.id);
+    const outcome = outcomeBinding ? tasksById.get(outcomeBinding.outcomeTaskId) ?? null : null;
+    return {
+      tasksAvailable: true,
+      outcome: outcome ? summarizeTask(outcome, names.get(outcome.projectId) ?? "Work") : null,
+      executionTasks: executionBindings.flatMap((binding) => {
+        const task = tasksById.get(binding.executionTaskId);
+        return task ? [summarizeTask(task, names.get(task.projectId) ?? "Work")] : [];
+      }),
+      bindings: [...(outcomeBinding ? [bindingSummary(outcomeBinding)] : []), ...executionBindings.map(bindingSummary)],
+    };
+  }
+
+  async function readWorkGoal(threadId: string) {
+    const timeline = await bb.sdk.threads.timeline({ threadId });
+    return timeline.goal ? { objective: timeline.goal.objective, status: timeline.goal.status, tokensUsed: timeline.goal.tokensUsed, tokenBudget: timeline.goal.tokenBudget, timeUsedSeconds: timeline.goal.timeUsedSeconds } : null;
+  }
+
+  async function readWorkPlan(threadId: string) {
+    const timeline = await bb.sdk.threads.timeline({ threadId });
+    return { items: timeline.pendingTodos?.items ?? [] };
+  }
+
+  const workContextReads = createWorkContextReadService({
+    readStatus: readWorkStatus,
+    readOutcome: readWorkOutcome,
+    readGoal: readWorkGoal,
+    readPlan: readWorkPlan,
+  });
+
   bb.rpc.register(rpcContract, {
     async getGitHubApiHealth() { return githubReadHealth(); },
     async getSidebarOrder() {
@@ -1466,67 +1551,12 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
       return { threadId };
     },
     async getWorkContext({ threadId }) {
-      // Keep this request to data required by every tab. Repository, GitHub
-      // Stack, and tracker queries are independently loaded by their cards.
-      const [thread, available, timeline, children, root, bindings, latestOutput] = await Promise.all([
-        bb.sdk.threads.get({ threadId }),
-        tasksAvailable(),
-        bb.sdk.threads.timeline({ threadId }),
-        listDescendantThreads(threadId),
-        rootThread(threadId),
-        readBindings(),
-        bb.sdk.threads.output({ threadId }),
-      ]);
-      const links = available ? await taskLinks() : {};
-      const outcomeBinding = bindings.outcomes.find((binding) => binding.rootThreadId === root.id) ?? null;
-      const [tasksById, projects] = available ? await Promise.all([allTasksById(), tasksProjects()]) : [new Map<string, Task>(), [] as z.infer<typeof projectSchema>[]];
-      const projectNames = new Map(projects.map((project) => [project.id, project.name]));
-      const outcomeTask = outcomeBinding ? tasksById.get(outcomeBinding.outcomeTaskId) ?? null : null;
-      const executionBindings = bindings.executions.filter((binding) => binding.rootThreadId === root.id);
-      const executionTasks = executionBindings.flatMap((binding) => {
-        const task = tasksById.get(binding.executionTaskId);
-        return task ? [summarizeTask(task, projectNames.get(task.projectId) ?? "Work")] : [];
-      });
-      return {
-        tasksAvailable: available,
-        currentThread: {
-          title: thread.title ?? thread.titleFallback ?? "Untitled thread",
-          status: thread.status,
-          runtimeStatus: thread.runtime.displayStatus,
-          providerId: thread.providerId,
-        },
-        tasks: outcomeTask ? [summarizeTask(outcomeTask, projectNames.get(outcomeTask.projectId) ?? "Work")] : [],
-        subtasks: executionTasks,
-        outcome: outcomeTask ? summarizeTask(outcomeTask, projectNames.get(outcomeTask.projectId) ?? "Work") : null,
-        executionTasks,
-        bindings: [
-          ...(outcomeBinding ? [bindingSummary(outcomeBinding)] : []),
-          ...executionBindings.map(bindingSummary),
-        ],
-        // Legacy adoption is handled only by its explicit command. Scanning
-        // every historical task attachment here made opening Work needlessly slow.
-        legacy: { state: "none" as const, taskIds: [], message: null },
-        goal: timeline.goal ? {
-          objective: timeline.goal.objective, status: timeline.goal.status,
-          tokensUsed: timeline.goal.tokensUsed, tokenBudget: timeline.goal.tokenBudget,
-          timeUsedSeconds: timeline.goal.timeUsedSeconds,
-        } : null,
-        todos: timeline.pendingTodos?.items ?? [],
-        activity: latestActivity(timeline.rows, latestOutput.output, thread.status === "active" || thread.status === "starting"),
-        children: children.map(({ thread: child, depth }) => ({
-          id: child.id, title: child.title ?? child.titleFallback ?? "Untitled agent", depth,
-          status: child.status, runtimeStatus: child.runtime.displayStatus, providerId: child.providerId, isArchived: child.archivedAt !== null,
-          task: links[child.id]?.[0] ? {
-            key: links[child.id]![0].task.key,
-            status: links[child.id]![0].task.status,
-            liveStatus: links[child.id]![0].liveStatus,
-          } : null,
-        })),
-        currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null,
-        repository: { outcome: "absent" as const, message: null, branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFileCount: 0, changedInsertions: 0, changedDeletions: 0, changedFiles: [] },
-        tracker: { visible: false, available: false, message: null, suggestions: [], item: null, statusOptions: [] },
-      };
+      return readWorkContext(threadId);
     },
+    async getWorkStatus({ threadId }) { return workContextReads.status(threadId); },
+    async getWorkOutcome({ threadId }) { return workContextReads.outcome(threadId); },
+    async getWorkGoal({ threadId }) { return workContextReads.goal(threadId); },
+    async getWorkPlan({ threadId }) { return workContextReads.plan(threadId); },
     async getWorkChanges({ threadId, force, pullRequests }) {
       if (force) clearGitHubReadCache();
       const thread = await bb.sdk.threads.get({ threadId });

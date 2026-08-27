@@ -26,6 +26,10 @@ function rpcFixtures(sidebarTasks: RpcHandlers["sidebarTasks"]): RpcHandlers {
     getWorkChanges: () => ({ currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null, repository: workContext.repository }),
     getWorkTracker: () => workContext.tracker,
     getWorkProviderStatus: () => ({ tone: "green", providerId: "codex", providerName: "Codex", statusUrl: null, status: "ready", message: null }),
+    getWorkStatus: () => ({ currentThread: workContext.currentThread, children: [], activity: workContext.activity }),
+    getWorkOutcome: () => ({ tasksAvailable: true, outcome: null, executionTasks: [], bindings: [] }),
+    getWorkGoal: () => null,
+    getWorkPlan: () => ({ items: [] }),
     getGitHubApiHealth: () => ({ state: "available", scope: "unknown", message: null, retryAt: null }),
   } as unknown as RpcHandlers;
 }
@@ -84,7 +88,7 @@ describe("Tasks read slots", () => {
     const retry = renderSlot(captured.threadPanelActions[0]!, { threadId: "thr_test", params: null }, { rpc: rpcFixtures(failing) });
     await waitFor(() => expect(retry.getByRole("alert").textContent).toContain("Tasks endpoint is down"), { timeout: 2_000 });
     expect(retry.getByText("Status")).toBeTruthy();
-    expect(retry.getByLabelText("Codex provider status: Ready")).toBeTruthy();
+    expect(retry.getByLabelText(/Codex provider status: Ready/)).toBeTruthy();
     expect(retry.queryByText("No tasks are attached to this thread.")).toBeNull();
     fireEvent.click(retry.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(retry.getByText("No tasks are attached to this thread.")).toBeTruthy());
