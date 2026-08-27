@@ -41,6 +41,7 @@ export function useTaskLinksRead() {
       return result;
     },
     ...queryPolicies.sidebarTaskLinks,
+    refetchInterval: 30_000,
   });
   useRealtime("work-sidebar:changed", () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.sidebar.tasks.links() });

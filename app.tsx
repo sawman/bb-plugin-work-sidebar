@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   definePluginApp,
   useBbNavigate,
@@ -68,7 +69,7 @@ import { useTaskLinksRead, useTasksRead } from "@/features/tasks/queries";
 import "./app.css";
 import "./scrollbar.css";
 import "./views.css";
-import { PluginProviders } from "./query-runtime";
+import { PluginProviders, queryKeys } from "./query-runtime";
 
 const SIDEBAR_ORDER_CHANNEL = "sidebar-order:changed";
 type SidebarThreadGroup = { id: string; name: string; threadIds: string[] };
@@ -484,10 +485,10 @@ function WorkThreadList(props: PluginThreadListProps) {
   const { status, threads, projects } = experimental_useSidebarThreads();
   const actions = experimental_useSidebarThreadActions();
   const rpc = useRpc<typeof rpcContract>();
-  const tasksRead = useTasksRead();
-  const taskLinksRead = useTaskLinksRead();
+  const { data: tasksData, isPending: tasksPending, isError: tasksFailed, error: tasksReadError, refetch: refetchTasks } = useTasksRead();
+  const { data: taskLinksData, refetch: refetchTaskLinks } = useTaskLinksRead();
   const { values: pluginSettings } = useSettings();
-  const [taskLinks, setTaskLinks] = useState<Record<string, ThreadTaskLink[]>>({});
+  const taskLinks = taskLinksData?.links ?? {};
   const [view, setView] = useState<SidebarView>("work");
   const [threadListMode, setThreadListMode] = useState<"enhanced" | "native">("enhanced");
   const [threadSettingsOpen, setThreadSettingsOpen] = useState(false);
@@ -636,10 +637,7 @@ function WorkThreadList(props: PluginThreadListProps) {
     }
   }, [applyOrder, rpc, threads]);
 
-  const refreshTaskLinks = useCallback(async () => { await taskLinksRead.refetch(); }, [taskLinksRead]);
-  useEffect(() => {
-    if (taskLinksRead.data) setTaskLinks(taskLinksRead.data.links);
-  }, [taskLinksRead.data]);
+  const refreshTaskLinks = useCallback(async () => { await refetchTaskLinks(); }, [refetchTaskLinks]);
   const refreshThreadDetails = useCallback(async () => {
     void refreshSidebarOrder();
     void refreshThreadGroups();
@@ -647,7 +645,6 @@ function WorkThreadList(props: PluginThreadListProps) {
     void refreshArchivedThreads(true);
     setSubtextRefreshKey((current) => current + 1);
   }, [refreshArchivedThreads, refreshThreadGroups, refreshSidebarOrder, refreshTaskLinks]);
-  useEffect(() => { void refreshTaskLinks(); }, [refreshTaskLinks]);
   useEffect(() => {
     let cancelled = false;
     const loadAuthoredPullRequests = async (foreground: boolean, force = false) => {
@@ -674,15 +671,15 @@ function WorkThreadList(props: PluginThreadListProps) {
     const refreshTimer = window.setInterval(() => { void loadAuthoredPullRequests(false); }, Number(pluginSettings?.githubLeftListRefreshSeconds ?? "300") * 1_000);
     return () => { cancelled = true; window.clearInterval(refreshTimer); };
   }, [authoredPullRequestRefreshKey, pluginSettings?.githubLeftListRefreshSeconds, refreshGitHubApiHealth, rpc]);
-  const refreshTasks = useCallback(async () => { await tasksRead.refetch(); }, [tasksRead]);
+  const refreshTasks = useCallback(async () => { await refetchTasks(); }, [refetchTasks]);
   useEffect(() => {
-    if (tasksRead.isPending) { setTaskState("loading"); return; }
-    if (tasksRead.isError) { setTaskError(tasksRead.error.message); setTaskState("error"); return; }
-    if (!tasksRead.data) return;
-    tasksRef.current = tasksRead.data.tasks; setTasks(tasksRead.data.tasks); setTaskProjects(tasksRead.data.projects);
-    setNewTaskProjectId((current) => current && tasksRead.data!.projects.some((project) => project.id === current) ? current : tasksRead.data!.projects[0]?.id ?? "");
+    if (tasksPending) { setTaskState("loading"); return; }
+    if (tasksFailed) { setTaskError(tasksReadError.message); setTaskState("error"); return; }
+    if (!tasksData) return;
+    tasksRef.current = tasksData.tasks; setTasks(tasksData.tasks); setTaskProjects(tasksData.projects);
+    setNewTaskProjectId((current) => current && tasksData.projects.some((project) => project.id === current) ? current : tasksData.projects[0]?.id ?? "");
     setTaskError(null); setTaskState("ready");
-  }, [tasksRead.data, tasksRead.error, tasksRead.isError, tasksRead.isPending]);
+  }, [tasksData, tasksFailed, tasksPending, tasksReadError]);
 
   const updateTaskStatus = useCallback(async (taskId: string, status: SidebarTask["status"]) => {
     const previous = tasksRef.current;
@@ -1092,7 +1089,8 @@ function WorkAgentRow({ child, bindings }: { child: WorkPanelChild; bindings: re
 
 function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const rpc = useRpc<typeof rpcContract>();
-  const tasksRead = useTasksRead();
+  const { data: tasksData, refetch: refetchTasks } = useTasksRead();
+  const queryClient = useQueryClient();
   const { values: pluginSettings } = useSettings();
   const navigate = useBbNavigate();
   const actions = experimental_useSidebarThreadActions();
@@ -1116,8 +1114,6 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const [taskTitle, setTaskTitle] = useState("");
   const [createTaskState, setCreateTaskState] = useState<"idle" | "working" | "error">("idle");
   const [createTaskError, setCreateTaskError] = useState<string | null>(null);
-  const [availableTasks, setAvailableTasks] = useState<SidebarTask[]>([]);
-  const [threadTasksLoading, setThreadTasksLoading] = useState(false);
   const [selectedAttachTaskId, setSelectedAttachTaskId] = useState("");
   const [threadTaskBusyId, setThreadTaskBusyId] = useState<string | null>(null);
   const [linearBusy, setLinearBusy] = useState(false);
@@ -1282,7 +1278,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
     setThreadTaskBusyId(taskId);
     try {
       await rpc.call(attached ? "attachTaskToThread" : "detachTaskFromThread", { taskId, threadId });
-      setAvailableTasks((current) => current.map((task) => task.id !== taskId ? task : { ...task, linkedThreadIds: attached ? [...new Set([...task.linkedThreadIds, threadId])] : task.linkedThreadIds.filter((id) => id !== threadId) }));
+      queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (current) => current ? { ...current, tasks: current.tasks.map((task) => task.id !== taskId ? task : { ...task, linkedThreadIds: attached ? [...new Set([...task.linkedThreadIds, threadId])] : task.linkedThreadIds.filter((id) => id !== threadId) }) } : current);
       setSelectedAttachTaskId("");
     } catch (error) { toast.error(error instanceof Error ? error.message : `Could not ${attached ? "attach" : "detach"} task`); }
     finally { setThreadTaskBusyId(null); }
@@ -1292,7 +1288,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
     setThreadTaskBusyId(taskId);
     try {
       await rpc.call("updateTaskAssignee", { taskId, assignee });
-      setAvailableTasks((current) => current.map((task) => task.id === taskId ? { ...task, assignee } : task));
+      queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (current) => current ? { ...current, tasks: current.tasks.map((task) => task.id === taskId ? { ...task, assignee } : task) } : current);
     } catch (error) { toast.error(error instanceof Error ? error.message : "Could not update task assignee"); }
     finally { setThreadTaskBusyId(null); }
   };
@@ -1315,15 +1311,8 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const tabPanelId = `ws-panel-${selectedTab.id}`;
   const outcomeTask = context?.outcome ?? context?.tasks[0] ?? null;
   const executionTasks = context?.executionTasks?.length ? context.executionTasks : (context?.subtasks ?? []);
-  const refreshThreadTasks = useCallback(async () => {
-    setThreadTasksLoading(true);
-    try {
-      const result = await tasksRead.refetch();
-      if (result.data) setAvailableTasks(result.data.tasks);
-    } catch { /* The main Work context keeps its own Tasks availability state. */ }
-    finally { setThreadTasksLoading(false); }
-  }, [tasksRead]);
-  useEffect(() => { void refreshThreadTasks(); }, [refreshThreadTasks, threadId]);
+  const availableTasks = tasksData?.tasks ?? [];
+  const threadTasksLoading = !tasksData;
   const threadTasks = availableTasks.filter((task) => task.linkedThreadIds.includes(threadId));
   const attachableTasks = availableTasks.filter((task) => !task.linkedThreadIds.includes(threadId));
   const bindings = context?.bindings ?? [];
