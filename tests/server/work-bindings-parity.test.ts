@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
-import plugin from "../../server";
+import plugin, { createServerLifecycle } from "../../server";
 import { WORK_BINDINGS_KEY } from "../../features/tasks/server-work-bindings";
 
 const TASK_PROJECT_ID = "01M12DCYYGDB0WT05RXEQ2K3XA";
@@ -55,7 +55,9 @@ function task(
   };
 }
 
-function createBindingsFixture() {
+function createBindingsFixture(options: {
+  listTaskThreads?: (taskId: string) => Promise<unknown>;
+} = {}) {
   const tasks = new Map([
     [OUTCOME_TASK_ID, task(OUTCOME_TASK_ID, "Durable outcome")],
     [DIRECT_TASK_ID, task(DIRECT_TASK_ID, "Direct execution", OUTCOME_TASK_ID)],
@@ -94,6 +96,7 @@ function createBindingsFixture() {
               archivedAt: null,
             },
         list: async () => [],
+        spawn: async () => ({ id: CHILD_THREAD_ID }),
         timeline: async () => ({ goal: null, pendingTodos: { items: [] } }),
       },
       plugins: {
@@ -129,6 +132,8 @@ function createBindingsFixture() {
           }
           if (method === "listTaskThreads") {
             const taskId = taskInput?.taskId as string;
+            if (options.listTaskThreads)
+              return options.listTaskThreads(taskId);
             return {
               taskThreads: [...(taskThreads.get(taskId) ?? [])].map((threadId) => ({
                 id: TASK_LINK_ID,
@@ -163,6 +168,155 @@ function createBindingsFixture() {
 }
 
 describe("durable Work/Tasks binding parity", () => {
+  it("bounds parallel legacy discovery, caches it per root/project, expires it, and clears it after adoption", async () => {
+    let open = false;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = () => { open = true; resolve(); }; });
+    const calls: string[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const { host, tasks } = createBindingsFixture({
+      listTaskThreads: async (taskId) => {
+        calls.push(taskId);
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        if (!open) await gate;
+        inFlight -= 1;
+        return {
+          taskThreads: taskId === OUTCOME_TASK_ID
+            ? [{
+              id: TASK_LINK_ID,
+              taskId,
+              threadId: ROOT_THREAD_ID,
+              presetName: "Attached",
+              title: "Recovered legacy outcome",
+              liveStatus: "working",
+              attachedAt: "2026-08-28T00:00:00.000Z",
+              updatedAt: "2026-08-28T00:00:00.000Z",
+            }]
+            : [],
+        };
+      },
+    });
+    tasks.clear();
+    for (const [id, title] of [
+      [OUTCOME_TASK_ID, "Recovered legacy outcome"],
+      [DIRECT_TASK_ID, "Other legacy candidate"],
+      [DELEGATED_TASK_ID, "Another legacy candidate"],
+    ] as const)
+      tasks.set(id, task(id, title));
+    const lifecycle = createServerLifecycle();
+    await plugin(host.bb, lifecycle);
+
+    const first = host.harness.behavior.callRpc("getWorkOutcome", { threadId: ROOT_THREAD_ID });
+    try {
+      await vi.waitFor(() => expect(calls.length).toBeGreaterThan(1));
+      expect(maxInFlight).toBeGreaterThan(1);
+      expect(maxInFlight).toBeLessThanOrEqual(8);
+    } finally {
+      release();
+      await first;
+    }
+    expect(calls).toHaveLength(3);
+
+    await host.harness.behavior.callRpc("getWorkOutcome", { threadId: CHILD_THREAD_ID });
+    expect(calls).toHaveLength(3);
+
+    vi.useFakeTimers();
+    try {
+      await vi.advanceTimersByTimeAsync(5_001);
+      await host.harness.behavior.callRpc("getWorkOutcome", { threadId: ROOT_THREAD_ID });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(calls).toHaveLength(6);
+
+    await host.harness.behavior.callRpc("adoptLegacyOutcome", {
+      rootThreadId: ROOT_THREAD_ID,
+      taskId: OUTCOME_TASK_ID,
+    });
+    expect(lifecycle.legacyWorkCache.size).toBe(0);
+    expect(lifecycle.legacyWorkPending.size).toBe(0);
+  });
+
+  it("keeps legacy classifications distinct and clears a cached probe when a binding is created", async () => {
+    const cases = [
+      { name: "none", attached: [], expected: "none" },
+      { name: "adoptable", attached: [OUTCOME_TASK_ID], expected: "adoptable" },
+      { name: "ambiguous", attached: [OUTCOME_TASK_ID, DIRECT_TASK_ID], expected: "ambiguous" },
+      { name: "project mismatch", attached: [DELEGATED_TASK_ID], expected: "project_mismatch" },
+    ] as const;
+    for (const testCase of cases) {
+      const { host, taskThreads, tasks } = createBindingsFixture();
+      tasks.clear();
+      tasks.set(OUTCOME_TASK_ID, task(OUTCOME_TASK_ID, "First legacy task"));
+      tasks.set(DIRECT_TASK_ID, task(DIRECT_TASK_ID, "Second legacy task"));
+      tasks.set(DELEGATED_TASK_ID, {
+        ...task(DELEGATED_TASK_ID, "Wrong-project legacy task"),
+        projectId: "01M12E0M3R28T1ZWNBEKBCE017",
+      });
+      for (const taskId of testCase.attached)
+        taskThreads.set(taskId, new Set([ROOT_THREAD_ID]));
+      const lifecycle = createServerLifecycle();
+      await plugin(host.bb, lifecycle);
+
+      await expect(
+        host.harness.behavior.callRpc("getWorkOutcome", { threadId: ROOT_THREAD_ID }),
+      ).resolves.toMatchObject({ legacy: { state: testCase.expected } });
+      expect(lifecycle.legacyWorkCache.size).toBe(1);
+      await host.harness.behavior.callRpc("createWorkTask", {
+        threadId: ROOT_THREAD_ID,
+        title: `Bind after ${testCase.name}`,
+        description: "",
+        parentTaskId: null,
+      });
+      expect(lifecycle.legacyWorkCache.size).toBe(0);
+    }
+  });
+
+  it("does not return a pending legacy adoption result after a durable outcome invalidates it", async () => {
+    let release!: () => void;
+    let started = false;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const { host, tasks } = createBindingsFixture({
+      listTaskThreads: async (taskId) => {
+        started = true;
+        await pending;
+        return {
+          taskThreads: taskId === OUTCOME_TASK_ID
+            ? [{
+              id: TASK_LINK_ID,
+              taskId,
+              threadId: ROOT_THREAD_ID,
+              presetName: "Attached",
+              title: "Recovered legacy outcome",
+              liveStatus: "working",
+              attachedAt: "2026-08-28T00:00:00.000Z",
+              updatedAt: "2026-08-28T00:00:00.000Z",
+            }]
+            : [],
+        };
+      },
+    });
+    tasks.clear();
+    tasks.set(OUTCOME_TASK_ID, task(OUTCOME_TASK_ID, "Recovered legacy outcome"));
+    await plugin(host.bb, createServerLifecycle());
+
+    const staleRead = host.harness.behavior.callRpc("getWorkOutcome", { threadId: ROOT_THREAD_ID });
+    await vi.waitFor(() => expect(started).toBe(true));
+    await host.harness.behavior.callRpc("createWorkTask", {
+      threadId: ROOT_THREAD_ID,
+      title: "Durable outcome",
+      description: "",
+      parentTaskId: null,
+    });
+    release();
+    await expect(staleRead).rejects.toThrow("Legacy work discovery was invalidated.");
+    await expect(
+      host.harness.behavior.callRpc("getWorkOutcome", { threadId: ROOT_THREAD_ID }),
+    ).resolves.toMatchObject({ legacy: { state: "none" } });
+  });
+
   it("rejects detaching outcome and execution targets from their bound owners while ordinary links remain mutable", async () => {
     const { host } = createBindingsFixture();
     await host.bb.storage.kv.set(WORK_BINDINGS_KEY, {
@@ -280,6 +434,41 @@ describe("durable Work/Tasks binding parity", () => {
       { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
     );
     expect(host.harness.inspection.realtimeSignals).toHaveLength(4);
+  });
+
+  it("publishes root and delegated-owner Work signals while Tasks remains root-scoped once", async () => {
+    const { host } = createBindingsFixture();
+    await plugin(host.bb);
+    await host.harness.behavior.callAgentTool(
+      "create_work_task",
+      { title: "Create the durable outcome", description: "" },
+      { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
+    );
+    await host.harness.behavior.callAgentTool(
+      "create_execution_task",
+      {
+        title: "Create delegated execution",
+        description: "",
+        idempotencyKey: "delegated-owner",
+      },
+      { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
+    );
+
+    await host.harness.behavior.callAgentTool(
+      "bind_execution_owner",
+      {
+        idempotencyKey: "delegated-owner",
+        mode: "delegated",
+        prompt: "Complete the bounded task.",
+      },
+      { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
+    );
+
+    expect(host.harness.inspection.realtimeSignals.slice(-3)).toEqual([
+      { channel: "work-sidebar:changed", payload: { family: "work", threadId: ROOT_THREAD_ID } },
+      { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: ROOT_THREAD_ID } },
+      { channel: "work-sidebar:changed", payload: { family: "work", threadId: CHILD_THREAD_ID } },
+    ]);
   });
 
   it("reads and safely adopts the one legacy outcome candidate through the typed Work surface", async () => {

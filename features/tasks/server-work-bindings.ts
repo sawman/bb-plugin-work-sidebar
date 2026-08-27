@@ -25,8 +25,11 @@ import {
   taskMutationSchema,
   taskThreadSchema,
 } from "./server-task-adapter.js";
+import type { LegacyWorkContext, ServerLifecycle } from "../../server-lifecycle.js";
 
 export const WORK_BINDINGS_KEY = "work-bindings:v2";
+export const LEGACY_DISCOVERY_TTL_MS = 5_000;
+export const LEGACY_DISCOVERY_CONCURRENCY = 8;
 type TasksPluginAdapter = ReturnType<typeof createTasksPluginAdapter>;
 export type WorkBindingsState = Pick<WorkBindings, "outcomes" | "executions">;
 export type BindingSummary = {
@@ -49,11 +52,7 @@ export type TaskLink = {
   idempotencyKey: string | null;
   dispatchState: DispatchState | null;
 };
-export type LegacyContext = {
-  state: "none" | "adoptable" | "ambiguous" | "project_mismatch";
-  taskIds: string[];
-  message: string | null;
-};
+export type LegacyContext = LegacyWorkContext;
 export type DescendantThread = {
   thread: Awaited<ReturnType<BbPluginApi["sdk"]["threads"]["list"]>>[number];
   depth: number;
@@ -64,10 +63,22 @@ type WorkBindingsRealtime = Pick<BbPluginApi["realtime"], "publish">;
 /** Announces a completed binding to exactly the affected right and left slices. */
 export function publishWorkBindingReady(
   realtime: WorkBindingsRealtime,
-  threadId: string,
+  rootThreadId: string,
+  ownerThreadId = rootThreadId,
 ) {
-  realtime.publish("work-sidebar:changed", { family: "work", threadId });
-  realtime.publish("work-sidebar:changed", { family: "tasks", threadId });
+  realtime.publish("work-sidebar:changed", {
+    family: "work",
+    threadId: rootThreadId,
+  });
+  realtime.publish("work-sidebar:changed", {
+    family: "tasks",
+    threadId: rootThreadId,
+  });
+  if (ownerThreadId !== rootThreadId)
+    realtime.publish("work-sidebar:changed", {
+      family: "work",
+      threadId: ownerThreadId,
+    });
 }
 
 type WorkBindingReadyFinalization = {
@@ -93,14 +104,41 @@ export async function finalizeWorkBindingOwner({
   const binding = await save(
     bindExecutionOwner(pending, mode, ownerThreadId, "ready", null),
   );
-  publishWorkBindingReady(realtime, rootThreadId);
+  publishWorkBindingReady(realtime, rootThreadId, ownerThreadId);
   return { binding, spawnedThreadId };
+}
+
+function legacyWorkKey(rootThreadId: string, projectId: string): string {
+  return `${rootThreadId}\u0000${projectId}`;
+}
+
+async function readBounded<T, Result>(
+  values: readonly T[],
+  read: (value: T) => Promise<Result>,
+): Promise<Result[]> {
+  const results = new Array<Result>(values.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < values.length) {
+      const index = next;
+      next += 1;
+      results[index] = await read(values[index]!);
+    }
+  };
+  await Promise.all(
+    Array.from(
+      { length: Math.min(LEGACY_DISCOVERY_CONCURRENCY, values.length) },
+      worker,
+    ),
+  );
+  return results;
 }
 
 /** Durable outcome/execution ownership, dispatch recovery, and legacy adoption. */
 export function createWorkBindingsService(
   bb: BbPluginApi,
   tasks: TasksPluginAdapter,
+  lifecycle: ServerLifecycle,
 ) {
   const read = async (): Promise<WorkBindings> =>
     normalizeBindings(await bb.storage.kv.get<unknown>(WORK_BINDINGS_KEY));
@@ -288,52 +326,63 @@ export function createWorkBindingsService(
     rootThreadId: string,
     projectId: string,
   ): Promise<LegacyContext> => {
-    const [all, projects] = await Promise.all([
-      tasks.listAll({ activeOnly: false, sort: "manual" }),
-      tasks.projects(),
-    ]);
-    const candidates: Task[] = [];
-    for (const task of all.filter(
-      (candidate) => candidate.parentTaskId === null,
-    )) {
-      const rows = await tasks.call(
-        "listTaskThreads",
-        { taskId: task.id },
-        z.object({ taskThreads: z.array(taskThreadSchema) }),
-      );
-      if (rows.taskThreads.some((row) => row.threadId === rootThreadId))
-        candidates.push(task);
-    }
-    if (!candidates.length)
-      return { state: "none", taskIds: [], message: null };
-    if (
-      candidates.some(
-        (task) =>
-          projects.find((project) => project.id === task.projectId)
-            ?.linkedBbProjectId !== projectId,
-      )
-    ) {
-      return {
-        state: "project_mismatch",
-        taskIds: candidates.map((task) => task.id),
-        message:
-          "Legacy attachment is linked to a different BB project and cannot be adopted.",
-      };
-    }
-    if (candidates.length !== 1) {
-      return {
-        state: "ambiguous",
-        taskIds: candidates.map((task) => task.id),
-        message:
-          "Several legacy top-level tasks are attached; select one explicitly to adopt.",
-      };
-    }
-    return {
-      state: "adoptable",
-      taskIds: [candidates[0].id],
-      message: "One legacy top-level attachment can be explicitly adopted.",
-    };
+    return lifecycle.readLegacyWork(
+      legacyWorkKey(rootThreadId, projectId),
+      LEGACY_DISCOVERY_TTL_MS,
+      async () => {
+        const [all, projects] = await Promise.all([
+          tasks.listAll({ activeOnly: false, sort: "manual" }),
+          tasks.projects(),
+        ]);
+        const candidates = (
+          await readBounded(
+            all.filter((candidate) => candidate.parentTaskId === null),
+            async (task) => {
+              const rows = await tasks.call(
+                "listTaskThreads",
+                { taskId: task.id },
+                z.object({ taskThreads: z.array(taskThreadSchema) }),
+              );
+              return rows.taskThreads.some((row) => row.threadId === rootThreadId)
+                ? task
+                : null;
+            },
+          )
+        ).flatMap((task) => task ? [task] : []);
+        if (!candidates.length)
+          return { state: "none", taskIds: [], message: null };
+        if (
+          candidates.some(
+            (task) =>
+              projects.find((project) => project.id === task.projectId)
+                ?.linkedBbProjectId !== projectId,
+          )
+        ) {
+          return {
+            state: "project_mismatch",
+            taskIds: candidates.map((task) => task.id),
+            message:
+              "Legacy attachment is linked to a different BB project and cannot be adopted.",
+          };
+        }
+        if (candidates.length !== 1) {
+          return {
+            state: "ambiguous",
+            taskIds: candidates.map((task) => task.id),
+            message:
+              "Several legacy top-level tasks are attached; select one explicitly to adopt.",
+          };
+        }
+        return {
+          state: "adoptable",
+          taskIds: [candidates[0].id],
+          message: "One legacy top-level attachment can be explicitly adopted.",
+        };
+      },
+    );
   };
+  const invalidateLegacy = (rootThreadId: string, projectId: string) =>
+    lifecycle.invalidateLegacyWork(legacyWorkKey(rootThreadId, projectId));
   const outcome = async (input: {
     rootThreadId: string;
     title: string;
@@ -400,6 +449,7 @@ export function createWorkBindingsService(
       updatedAt: now,
     };
     await write({ ...saved, outcomes: [...saved.outcomes, binding] });
+    invalidateLegacy(root.id, root.projectId);
     publishWorkBindingReady(bb.realtime, root.id);
     return { task: result.task, binding };
   };
@@ -481,6 +531,7 @@ export function createWorkBindingsService(
       updatedAt: now,
     };
     await write({ ...saved, executions: [...saved.executions, binding] });
+    invalidateLegacy(root.id, root.projectId);
     publishWorkBindingReady(bb.realtime, root.id);
     return { task: result.task, binding, reused: false };
   };
@@ -643,6 +694,7 @@ export function createWorkBindingsService(
     summarize,
     links,
     legacy,
+    invalidateLegacy,
     outcome,
     execution,
     owner,

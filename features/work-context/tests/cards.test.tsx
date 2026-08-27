@@ -205,6 +205,54 @@ describe("registered Work context cards", () => {
     getPluginQueryClient().clear();
   });
 
+  it("refreshes mounted root then delegated-owner Work cards around the root Tasks signal", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const rootOutcome = vi.fn(() => outcome);
+    const childOutcome = vi.fn(() => outcome);
+    const root = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_root", params: null },
+      { rpc: fixture({ getWorkOutcome: rootOutcome }) },
+    );
+    const child = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_child", params: null },
+      { rpc: fixture({ getWorkOutcome: childOutcome }) },
+    );
+    try {
+      await waitFor(() => expect(rootOutcome).toHaveBeenCalledExactlyOnceWith({ threadId: "thr_root" }));
+      await waitFor(() => expect(childOutcome).toHaveBeenCalledExactlyOnceWith({ threadId: "thr_child" }));
+
+      await root.behavior.emitRealtime("work-sidebar:changed", {
+        family: "work",
+        threadId: "thr_root",
+      });
+      await waitFor(() => expect(rootOutcome).toHaveBeenCalledTimes(2));
+      expect(rootOutcome).toHaveBeenLastCalledWith({ threadId: "thr_root" });
+      expect(childOutcome).toHaveBeenCalledExactlyOnceWith({ threadId: "thr_child" });
+
+      await root.behavior.emitRealtime("work-sidebar:changed", {
+        family: "tasks",
+        threadId: "thr_root",
+      });
+      expect(rootOutcome).toHaveBeenCalledTimes(2);
+      expect(childOutcome).toHaveBeenCalledExactlyOnceWith({ threadId: "thr_child" });
+
+      await child.behavior.emitRealtime("work-sidebar:changed", {
+        family: "work",
+        threadId: "thr_child",
+      });
+      await waitFor(() => expect(childOutcome).toHaveBeenCalledTimes(2));
+      expect(childOutcome).toHaveBeenLastCalledWith({ threadId: "thr_child" });
+      expect(rootOutcome).toHaveBeenCalledTimes(2);
+    } finally {
+      root.lifecycle.unmount();
+      child.lifecycle.unmount();
+      getPluginQueryClient().clear();
+    }
+  });
+
   it("renders registered loading, empty, and populated cards without duplicate headings", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));
