@@ -5,7 +5,6 @@ import {
   definePluginApp,
   useBbNavigate,
   experimental_useSidebarThreadActions,
-  experimental_useSidebarThreadSplit,
   experimental_useSidebarThreads,
   useComposer,
   useComposerView,
@@ -45,11 +44,8 @@ import {
   projectTaskQueue,
   taskMatchesSearch,
   type SidebarTask,
-  agentProjectionState,
   goalProgressPercent,
   orderStackLayers,
-  readableStatus,
-  runtimeStatusPresentation,
   type SidebarStack,
 } from "./work-model";
 import { Icon } from "@/components/ui/icon";
@@ -73,6 +69,7 @@ import { WorkContextCards } from "./features/work-context/views";
 import { invalidateWorkContextCards, useLegacyProviderHealth, useLegacyWorkContext } from "./features/work-context/queries";
 import { TrackerCard, TrackerHeaderBadge } from "./features/tracker/card";
 import { invalidateTracker } from "./features/tracker/queries";
+import { AgentsView } from "./features/agents/views";
 
 function withPluginProviders<Props extends object>(Component: ComponentType<Props>): ComponentType<Props> {
   return function PluginSlot(props: Props) {
@@ -496,35 +493,7 @@ const WORK_TABS: readonly { id: WorkTab; label: string; description: string }[] 
   { id: "agents", label: "Agents", description: "Delegated child threads" },
 ];
 
-type WorkPanelChild = {
-  id: string;
-  title: string;
-  depth: number;
-  status: string;
-  runtimeStatus: string;
-  task: { key: string; status: string; liveStatus: string | null } | null;
-};
-
-type WorkPanelBinding = { ownerThreadId: string | null; dispatchState: string; recoveryMessage: string | null };
 type WorkProviderHealth = { tone: "green" | "amber" | "red"; providerId: string; providerName: string; statusUrl: string | null; status: string; message: string | null };
-
-/** An agent row keeps ordinary open and deliberate split navigation separate. */
-function WorkAgentRow({ child, bindings }: { child: WorkPanelChild; bindings: readonly WorkPanelBinding[] }) {
-  const actions = experimental_useSidebarThreadActions();
-  const { isAvailable: splitAvailable } = experimental_useSidebarThreadSplit(child.id);
-  const state = agentProjectionState(child.status, child.task?.status ?? null);
-  const runtime = runtimeStatusPresentation(child);
-  const owned = bindings.find((binding) => binding.ownerThreadId === child.id);
-  return <article className={`ws-agent-card ws-agent-${state}`} style={{ marginLeft: `${Math.min(child.depth - 1, 4) * 0.65}rem` }}>
-    <Icon name="Bot" className={`ws-agent-state ws-agent-state-${runtime.tone}`} aria-label={runtime.label} />
-    <button type="button" className="ws-agent-target" onClick={() => actions.open(child.id)} aria-label={`Open ${child.title}`}>
-      <strong>{child.title}</strong>
-      <small>{runtime.label}{child.task ? ` · ${child.task.key}` : ""}{owned ? ` · ${readableStatus(owned.dispatchState)}` : ""}</small>
-      {owned?.recoveryMessage && <small>{owned.recoveryMessage}</small>}
-    </button>
-    {splitAvailable && <button type="button" className="ws-agent-split" onClick={() => actions.open(child.id, { split: true })} aria-label={`Open ${child.title} in split`} title="Open in split"><Icon name="Columns2" aria-hidden /></button>}
-  </article>;
-}
 
 function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const rpc = useRpc<typeof rpcContract>();
@@ -586,7 +555,6 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
     window.requestAnimationFrame(() => document.getElementById(`ws-tab-${next.id}`)?.focus());
   };
   const tabPanelId = `ws-panel-${selectedTab.id}`;
-  const bindings = context?.bindings ?? [];
   const toggleStackBranch = (branch: string) => changesInteractionStore.getState().toggleStackBranch(threadId, branch);
   const checkoutStackBranch = (branch: string) => {
     if (checkout.isPending) return;
@@ -623,8 +591,8 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
         ))}
       </nav>
       <div className="ws-panel-body" role="tabpanel" id={tabPanelId} aria-labelledby={`ws-tab-${selectedTab.id}`} tabIndex={0}>
-        {loading && <div className="ws-empty" role="status" aria-live="polite">Loading work context…</div>}
-        {!loading && error && <div className="ws-callout" role="alert"><span>{error}</span><button type="button" onClick={() => { void refresh(); void refreshChanges(); void refreshProviderHealth(); void githubHealthQuery.refetch(); }}>Try again</button></div>}
+        {tab !== "agents" && loading && <div className="ws-empty" role="status" aria-live="polite">Loading work context…</div>}
+        {tab !== "agents" && !loading && error && <div className="ws-callout" role="alert"><span>{error}</span><button type="button" onClick={() => { void refresh(); void refreshChanges(); void refreshProviderHealth(); void githubHealthQuery.refetch(); }}>Try again</button></div>}
         {tab === "work" && (
           <div className="ws-section-stack">
             <header><div><h2>Work</h2></div><span className="ws-work-header-badges"><TrackerHeaderBadge threadId={threadId} /></span></header>
@@ -643,13 +611,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
             </ol> : changesQuery.data?.currentPullRequest ? <ChangesCurrentPullRequestCard pullRequest={changesQuery.data.currentPullRequest} expanded={currentPrExpanded} onToggle={() => changesInteractionStore.getState().togglePullRequest(threadId)} /> : <div className="ws-empty">No pull request is linked to this thread.</div>)}
           </div>
         )}
-        {!loading && context && tab === "agents" && (
-          <div className="ws-section-stack">
-            <header><div><h2>Agents</h2></div><span className="ws-section-count">{context.children.filter((child) => !child.isArchived).length}</span></header>
-            {context.children.filter((child) => !child.isArchived).map((child) => <WorkAgentRow key={child.id} child={child} bindings={bindings} />)}
-            {context.children.filter((child) => !child.isArchived).length === 0 && <div className="ws-empty">No active delegated child threads are attached to this thread.</div>}
-          </div>
-        )}
+        {tab === "agents" && <AgentsView threadId={threadId} />}
       </div>
     </div>
   );

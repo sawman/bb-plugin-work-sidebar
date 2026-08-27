@@ -68,11 +68,6 @@ export function filterThreadsWithAncestors(threads: readonly PluginSidebarThread
   return threads.filter((thread) => included.has(thread.id));
 }
 
-export function agentProjectionState(status: string, taskStatus: string | null): string {
-  if (taskStatus === "in_review") return "review";
-  return status === "active" ? "running" : status;
-}
-
 export const MAX_THREAD_ORDER_ITEMS = 2_000;
 
 /**
