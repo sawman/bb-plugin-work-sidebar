@@ -36,7 +36,7 @@ describe("R2 app registration and Query lifecycle", () => {
     });
     const right = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_test", params: null });
     expect(mount).toHaveBeenCalledTimes(2);
-    expect(client.getQueryCache().getAll()).toHaveLength(20);
+    expect(client.getQueryCache().getAll()).toHaveLength(21);
     expect(client.getQueryCache().find({ queryKey: ["work-sidebar", "sidebar", "threads", "order"] })?.getObserversCount()).toBe(1);
     expect(client.getQueryCache().find({ queryKey: ["work-sidebar", "sidebar", "threads", "list-mode"] })?.getObserversCount()).toBe(1);
     expect(client.getQueryCache().find({ queryKey: ["work-sidebar", "sidebar", "threads", "groups"] })?.getObserversCount()).toBe(1);
@@ -62,13 +62,16 @@ describe("R6 mounted Tasks reads", () => {
       sidebarTasks: () => ({ available: true, tasks: [], projects: [], error: null }),
       sidebarTaskLinks: () => ({ available: true, links: {}, error: null }),
       getSidebarOrder: () => ({ threadIds: [] }), getThreadListMode: () => ({ mode: "enhanced" }), getThreadGroups: () => ({ groups: [] }),
-      sidebarArchivedThreads: () => ({ available: true, threads: [], error: null }),
+      sidebarArchivedThreads: () => ({ available: true, threads: [], error: null }), getWorkTracker: () => ({ visible: false, available: false, message: null, suggestions: [], item: null, statusOptions: [] }),
     } as never;
     const left = renderSlot(app.threadLists[0]!, { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => undefined, searchQuery: "", Original: () => null }, { rpc });
     const right = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_test", params: null }, { rpc });
     await waitFor(() => expect(left.inspection.rpcCalls.filter((call) => call.method === "sidebarTasks")).toHaveLength(1));
     expect(left.inspection.rpcCalls.filter((call) => call.method === "sidebarTaskLinks")).toHaveLength(1);
     expect(right.inspection.rpcCalls.filter((call) => call.method === "sidebarTasks")).toHaveLength(0);
+    // Header badge and body card are separate observers but share one tracker
+    // context request through the module QueryClient.
+    await waitFor(() => expect(right.inspection.rpcCalls.filter((call) => call.method === "getWorkTracker")).toHaveLength(1));
     left.lifecycle.unmount(); right.lifecycle.unmount();
     await waitFor(() => expect(client.getQueryCache().getAll().every((query) => query.getObserversCount() === 0)).toBe(true));
     client.clear();

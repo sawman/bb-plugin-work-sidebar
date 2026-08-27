@@ -10,13 +10,12 @@ import { type SidebarStack } from "./work-model.js";
 import { createArchivedThreadService, createThreadPreferencesService } from "./features/threads/server.js";
 import { createServerLifecycle, type GitHubApiHealth, type ServerLifecycle } from "./server-lifecycle.js";
 import { createWorkContextReadService } from "./features/work-context/server-reads.js";
+import { createTrackerService, TRACKER_LINKS_KEY } from "./features/tracker/server.js";
 
 const execFileAsync = promisify(execFile);
 const TASKS_PLUGIN_ID = "tasks";
 const WORK_BINDINGS_KEY = "work-bindings:v2";
 const TASK_ASSIGNEES_KEY = "sidebar-task-assignees:v1";
-const LINEAR_LINKS_KEY = "work-linear-links:v1";
-const TASKBOARD_PLUGIN_ID = "taskboard";
 const GITHUB_STACK_PLUGIN_ID = "gh-stack";
 // Plugin hosts do not inherit the interactive shell PATH. BB_CLI is injected
 // by BB specifically so plugins can invoke the same daemon-compatible binary.
@@ -66,15 +65,6 @@ type TaskSummary = ReturnType<typeof summarizeTask>;
 type DispatchState = "ready" | "pending_spawn" | "pending_attachment" | "recovery_required";
 type BindingMode = "direct" | "delegated";
 
-const trackerItemSchema = z.object({
-  bbProjectId: z.string(), source: z.literal("linear"), locator: z.string(), key: z.string(), title: z.string(),
-  description: z.string(), url: z.string().url(), status: z.string(),
-  stateCategory: z.enum(["backlog", "todo", "in_progress", "done", "canceled"]),
-  priority: z.string().nullable(), assignee: z.string().nullable(), project: z.string().nullable(),
-  labels: z.array(z.string()), updatedAt: z.string(),
-});
-const trackerDetailSchema = trackerItemSchema.extend({ comments: z.array(z.object({ author: z.string(), body: z.string(), createdAt: z.string() })) });
-const trackerStatusOptionSchema = z.object({ id: z.string(), name: z.string(), stateCategory: z.enum(["backlog", "todo", "in_progress", "done", "canceled"]), current: z.boolean() });
 // Mirrors gh-stack's public getStack payload. Keeping this boundary explicit
 // lets the Work panel reuse its authoritative per-layer diffs without taking a
 // build-time dependency on an optional plugin.
@@ -88,8 +78,6 @@ const ghStackPayloadSchema = z.object({
   }).nullable(), pending: stackChangeSchema.nullable(), error: z.object({ kind: z.string(), message: z.string() }).nullable(), fetchedAt: z.number(),
 });
 const ghStackActionSchema = z.object({ ok: z.boolean(), message: z.string(), tone: z.enum(["success", "warning", "error"]).optional(), detail: z.string().nullable() });
-type LinearLink = { projectId: string; locator: string; key: string };
-type LinearLinks = Record<string, LinearLink>;
 
 export interface OutcomeBinding {
   kind: "outcome";
@@ -735,8 +723,23 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
   }
 
   async function taskboardCall<T>(method: string, input: unknown, outputSchema: z.ZodType<T>): Promise<T> {
-    return callPluginRpc(TASKBOARD_PLUGIN_ID, method, input, outputSchema);
+    return callPluginRpc("taskboard", method, input, outputSchema);
   }
+
+  const trackerService = createTrackerService({
+    call: taskboardCall,
+    getStorage: () => bb.storage.kv.get<unknown>(TRACKER_LINKS_KEY),
+    setStorage: (value) => bb.storage.kv.set(TRACKER_LINKS_KEY, value),
+    rootThread: async (threadId) => {
+      const root = await rootThread(threadId);
+      return { id: root.id, projectId: root.projectId };
+    },
+    threadTitle: async (threadId) => {
+      const thread = await bb.sdk.threads.get({ threadId });
+      return thread.title ?? thread.titleFallback ?? "";
+    },
+    publish: (threadId) => bb.realtime.publish("work-sidebar:changed", { threadId }),
+  });
 
   async function githubStackCall<T>(method: string, input: unknown, outputSchema: z.ZodType<T>): Promise<T> {
     return callPluginRpc(GITHUB_STACK_PLUGIN_ID, method, input, outputSchema);
@@ -860,43 +863,6 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
       return { tone, providerId: thread.providerId, providerName: provider.displayName, statusUrl: PROVIDER_STATUS_URLS[thread.providerId] ?? null, status: provider.status, message: provider.statusMessage };
     } catch (error) {
       return { tone: "amber" as const, providerId: thread.providerId, providerName: thread.providerId, statusUrl: PROVIDER_STATUS_URLS[thread.providerId] ?? null, status: "unknown" as const, message: error instanceof Error ? error.message : "Provider health could not be checked." };
-    }
-  }
-
-  async function readLinearLinks(): Promise<LinearLinks> {
-    const value = await bb.storage.kv.get<unknown>(LINEAR_LINKS_KEY);
-    if (!isRecord(value)) return {};
-    return Object.fromEntries(Object.entries(value).flatMap(([threadId, link]) =>
-      threadId.startsWith("thr_") && isRecord(link) && typeof link.projectId === "string" && typeof link.locator === "string" && typeof link.key === "string"
-        ? [[threadId, { projectId: link.projectId, locator: link.locator, key: link.key }]] : [],
-    ));
-  }
-
-  async function trackerContext(rootThreadId: string, projectId: string, threadTitle: string): Promise<{ visible: boolean; available: boolean; message: string | null; suggestions: Array<{ key: string; title: string; url: string }>; item: z.infer<typeof trackerItemSchema> | null; statusOptions: z.infer<typeof trackerStatusOptionSchema>[] }> {
-    const link = (await readLinearLinks())[rootThreadId];
-    try {
-      const suggestionsForThread = async () => {
-        const matching = await taskboardCall("listItems", { projectId, source: "linear", query: threadTitle, limit: 8 }, z.object({ items: z.array(trackerItemSchema) }));
-        if (matching.items.length > 0 || !threadTitle.trim()) return matching;
-        // Keep the picker useful when no title words match: Taskboard's
-        // unfiltered project list is its current/recent issue set.
-        return taskboardCall("listItems", { projectId, source: "linear", query: "", limit: 8 }, z.object({ items: z.array(trackerItemSchema) }));
-      };
-      const suggestionRequest = suggestionsForThread();
-      if (!link) {
-        const { items } = await suggestionRequest;
-        return { visible: true, available: true, message: null, suggestions: items.map(({ key, title, url }) => ({ key, title, url })), item: null, statusOptions: [] };
-      }
-      const [{ item }, { options }, { items }] = await Promise.all([
-        taskboardCall("getItem", { projectId: link.projectId, source: "linear", locator: link.locator }, z.object({ item: trackerDetailSchema })),
-        taskboardCall("statusOptions", { projectId: link.projectId, source: "linear", locator: link.locator }, z.object({ options: z.array(trackerStatusOptionSchema) })),
-        suggestionRequest,
-      ]);
-      return { visible: true, available: true, message: null, suggestions: items.map(({ key, title, url }) => ({ key, title, url })), item, statusOptions: options };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Linear is unavailable.";
-      const selectedElsewhere = /Linear is not the selected tracker/i.test(message);
-      return { visible: !selectedElsewhere, available: false, message, suggestions: [], item: null, statusOptions: [] };
     }
   }
 
@@ -1389,7 +1355,6 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
       children: children.map(({ thread: child, depth }) => ({ id: child.id, title: child.title ?? child.titleFallback ?? "Untitled agent", depth, status: child.status, runtimeStatus: child.runtime.displayStatus, providerId: child.providerId, isArchived: child.archivedAt !== null, task: links[child.id]?.[0] ? { key: links[child.id]![0].task.key, status: links[child.id]![0].task.status, liveStatus: links[child.id]![0].liveStatus } : null })),
       currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null,
       repository: { outcome: "absent" as const, message: null, branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFileCount: 0, changedInsertions: 0, changedDeletions: 0, changedFiles: [] },
-      tracker: { visible: false, available: false, message: null, suggestions: [], item: null, statusOptions: [] },
     };
   }
 
@@ -1562,8 +1527,7 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     async getPullRequestFingerprint({ url }) { return pullRequestFingerprint(url); },
     async getGitHubPollingPolicy() { return githubPollingPolicy(); },
     async getWorkTracker({ threadId }) {
-      const [thread, root] = await Promise.all([bb.sdk.threads.get({ threadId }), rootThread(threadId)]);
-      return trackerContext(root.id, root.projectId, thread.title ?? thread.titleFallback ?? "");
+      return trackerService.context(threadId);
     },
     async getWorkProviderStatus({ threadId }) {
       return workProviderStatus(threadId);
@@ -1572,23 +1536,10 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
       return githubStackCall("checkoutBranch", { threadId, branch }, ghStackActionSchema);
     },
     async linkLinearIssue({ threadId, key }) {
-      const root = await rootThread(threadId);
-      const normalizedKey = key.trim().toUpperCase();
-      const projectId = root.projectId;
-      const { items } = await taskboardCall("listItems", { projectId, source: "linear", query: normalizedKey, limit: 30 }, z.object({ items: z.array(trackerItemSchema) }));
-      const item = items.find((candidate) => candidate.key.toUpperCase() === normalizedKey);
-      if (!item) throw new Error(`No Linear issue matching ${normalizedKey} was found in this BB project.`);
-      const links = await readLinearLinks();
-      await bb.storage.kv.set(LINEAR_LINKS_KEY, { ...links, [root.id]: { projectId, locator: item.locator, key: item.key } });
-      bb.realtime.publish("work-sidebar:changed", { threadId: root.id });
-      return { key: item.key, title: item.title };
+      return trackerService.link(threadId, key);
     },
     async searchLinearIssues({ threadId, query }) {
-      const root = await rootThread(threadId);
-      const normalizedQuery = query.trim();
-      if (!normalizedQuery) return { items: [] };
-      const { items } = await taskboardCall("listItems", { projectId: root.projectId, source: "linear", query: normalizedQuery, limit: 20 }, z.object({ items: z.array(trackerItemSchema) }));
-      return { items: items.map(({ key, title, url }) => ({ key, title, url })) };
+      return trackerService.search(threadId, query);
     },
     async getLatestActivity({ threadId }) {
       const [thread, timeline, output] = await Promise.all([
@@ -1609,20 +1560,10 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
       return { available: true, patch: result.patches[0]?.patch ?? null, message: result.patches[0] ? null : "No diff is available for this file." };
     },
     async unlinkLinearIssue({ threadId }) {
-      const root = await rootThread(threadId);
-      const links = await readLinearLinks();
-      delete links[root.id];
-      await bb.storage.kv.set(LINEAR_LINKS_KEY, links);
-      bb.realtime.publish("work-sidebar:changed", { threadId: root.id });
-      return { ok: true as const };
+      return trackerService.unlink(threadId);
     },
     async updateLinearIssueStatus({ threadId, statusId }) {
-      const root = await rootThread(threadId);
-      const link = (await readLinearLinks())[root.id];
-      if (!link) throw new Error("Link a Linear issue before changing its status.");
-      const { item } = await taskboardCall("updateItemStatus", { projectId: link.projectId, source: "linear", locator: link.locator, statusId }, z.object({ item: trackerItemSchema }));
-      bb.realtime.publish("work-sidebar:changed", { threadId: root.id });
-      return { key: item.key, status: item.status };
+      return trackerService.updateStatus(threadId, statusId);
     },
     async createWorkTask(input) {
       if (input.parentTaskId) throw new Error("Work Sidebar outcomes must be top-level; create execution tasks through createExecutionTask instead");

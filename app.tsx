@@ -26,7 +26,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
 import { ArchivedThreadRow, type ArchivedThread } from "@/components/threads/archived-thread-row";
-import { LinearCard } from "@/components/work/linear-card";
 import { WorkCard, WorkCardHeading } from "@/components/work/card";
 import { AssigneePicker } from "@/components/tasks/assignee-picker";
 import { AuthoredPullRequestRow as AuthoredPrRow, AuthoredPullRequestStack as AuthoredPrStack, type AuthoredPullRequest } from "@/components/threads/authored-pull-requests";
@@ -70,7 +69,9 @@ import { threadInteractionStore, type ThreadDropTarget, type WorkTab } from "./f
 import { useArchivedThreads, useThreadPreferences } from "./features/threads/queries";
 import { WorkThreadTree, threadIsWorking, visibleThreadTreeIds } from "./features/threads/thread-row";
 import { WorkContextCards } from "./features/work-context/views";
-import { invalidateWorkContextCards, useLegacyProviderHealth, useLegacyWorkChanges, useLegacyWorkContext, useLegacyWorkTracker } from "./features/work-context/queries";
+import { invalidateWorkContextCards, useLegacyProviderHealth, useLegacyWorkChanges, useLegacyWorkContext } from "./features/work-context/queries";
+import { TrackerCard, TrackerHeaderBadge } from "./features/tracker/card";
+import { invalidateTracker } from "./features/tracker/queries";
 
 function withPluginProviders<Props extends object>(Component: ComponentType<Props>): ComponentType<Props> {
   return function PluginSlot(props: Props) {
@@ -542,15 +543,12 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   }, [threadId]);
   const legacyContext = useLegacyWorkContext(threadId);
   const legacyChanges = useLegacyWorkChanges(threadId);
-  const legacyTracker = useLegacyWorkTracker(threadId);
   const legacyProviderHealth = useLegacyProviderHealth(threadId);
-  const context = legacyContext.data ? { ...legacyContext.data, repository: legacyChanges.data?.repository ?? legacyContext.data.repository, tracker: legacyTracker.data ?? legacyContext.data.tracker } : null;
+  const context = legacyContext.data ? { ...legacyContext.data, repository: legacyChanges.data?.repository ?? legacyContext.data.repository } : null;
   const loading = legacyContext.isPending;
   const changesLoading = legacyChanges.isPending;
-  const trackerLoading = legacyTracker.isPending;
   const providerHealth: WorkProviderHealth = legacyProviderHealth.data ?? { tone: "amber", providerId: "", providerName: "Provider", statusUrl: null, status: "unknown", message: "Checking provider health…" };
   const error = legacyContext.error?.message ?? null;
-  const [linearBusy, setLinearBusy] = useState(false);
   const [pendingChangesExpanded, setPendingChangesExpanded] = useState(false);
   const [currentPrExpanded, setCurrentPrExpanded] = useState(false);
   const [expandedStackBranches, setExpandedStackBranches] = useState<Set<string>>(() => new Set());
@@ -559,9 +557,8 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
 
   const refresh = () => legacyContext.refetch();
   const refreshChanges = () => legacyChanges.refetch();
-  const refreshTracker = () => legacyTracker.refetch();
   const refreshProviderHealth = () => legacyProviderHealth.refetch();
-  const refreshWorkPanel = () => { void invalidateWorkContextCards(queryClient, threadId); void refresh(); void refreshChanges(); void refreshTracker(); void refreshProviderHealth(); };
+  const refreshWorkPanel = () => { void invalidateWorkContextCards(queryClient, threadId); void invalidateTracker(queryClient, threadId); void refresh(); void refreshChanges(); void refreshProviderHealth(); };
   useRealtime("work-sidebar:changed", () => { refreshWorkPanel(); void invalidateThreadPullRequestChanges(queryClient, threadId); });
 
   const openWorkingTreeDiff = async (path: string) => {
@@ -591,10 +588,6 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   };
   const tabPanelId = `ws-panel-${selectedTab.id}`;
   const bindings = context?.bindings ?? [];
-  const linkLinear = async (key: string) => { setLinearBusy(true); try { const item = await rpc.call("linkLinearIssue", { threadId, key }); toast.success(`${item.key} linked`); await Promise.all([refresh(), refreshTracker()]); } catch (caught) { toast.error(caught instanceof Error ? caught.message : "Could not link Linear issue"); } finally { setLinearBusy(false); } };
-  const searchLinear = useCallback(async (query: string) => (await rpc.call("searchLinearIssues", { threadId, query })).items, [rpc, threadId]);
-  const unlinkLinear = async () => { setLinearBusy(true); try { await rpc.call("unlinkLinearIssue", { threadId }); await Promise.all([refresh(), refreshTracker()]); } catch (caught) { toast.error(caught instanceof Error ? caught.message : "Could not unlink Linear issue"); } finally { setLinearBusy(false); } };
-  const moveLinear = async (statusId: string) => { if (!statusId) return; setLinearBusy(true); try { const item = await rpc.call("updateLinearIssueStatus", { threadId, statusId }); toast.success(`${item.key} moved to ${item.status}`); await Promise.all([refresh(), refreshTracker()]); } catch (caught) { toast.error(caught instanceof Error ? caught.message : "Could not update Linear issue"); } finally { setLinearBusy(false); } };
   const toggleStackBranch = (branch: string) => setExpandedStackBranches((current) => { const next = new Set(current); next.has(branch) ? next.delete(branch) : next.add(branch); return next; });
   const checkoutStackBranch = async (branch: string) => {
     if (checkingOutBranch) return;
@@ -632,12 +625,12 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
       </nav>
       <div className="ws-panel-body" role="tabpanel" id={tabPanelId} aria-labelledby={`ws-tab-${selectedTab.id}`} tabIndex={0}>
         {loading && <div className="ws-empty" role="status" aria-live="polite">Loading work context…</div>}
-        {!loading && error && <div className="ws-callout" role="alert"><span>{error}</span><button type="button" onClick={() => { void refresh(); void refreshChanges(); void refreshTracker(); void refreshProviderHealth(); void pullRequestChanges.refetch(); void githubHealthQuery.refetch(); }}>Try again</button></div>}
+        {!loading && error && <div className="ws-callout" role="alert"><span>{error}</span><button type="button" onClick={() => { void refresh(); void refreshChanges(); void refreshProviderHealth(); void pullRequestChanges.refetch(); void githubHealthQuery.refetch(); }}>Try again</button></div>}
         {tab === "work" && (
           <div className="ws-section-stack">
-            <header><div><h2>Work</h2></div><span className="ws-work-header-badges">{!trackerLoading && context?.tracker.item && <a className="ws-work-header-badge ws-linear-header-badge" href={context.tracker.item.url} target="_blank" rel="noreferrer" title={`${context.tracker.item.key} · ${context.tracker.item.title}`}>{context.tracker.item.key}</a>}</span></header>
+            <header><div><h2>Work</h2></div><span className="ws-work-header-badges"><TrackerHeaderBadge threadId={threadId} /></span></header>
             <WorkContextCards threadId={threadId} />
-            {trackerLoading || !context ? <article className="ws-card ws-empty-state-card" aria-busy="true"><div className="ws-card-heading"><strong>Linear</strong></div><p className="ws-card-note">Loading linked work…</p></article> : <LinearCard context={context} linking={linearBusy} onLink={(key) => void linkLinear(key)} onUnlink={() => void unlinkLinear()} onMove={(statusId) => void moveLinear(statusId)} onSearch={searchLinear} />}
+            <TrackerCard threadId={threadId} />
           </div>
         )}
         {!loading && context && tab === "changes" && (
