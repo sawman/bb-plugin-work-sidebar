@@ -62,4 +62,36 @@ describe("R2 server registration and disposal", () => {
     expect(lifecycle.githubReadCache.size).toBe(0);
     expect(replacement.githubReadCache.size).toBe(0);
   });
+
+  it("rejects surplus RPC JSON and replaces complete factory generations without retaining their state", async () => {
+    const host = createFakePluginHost();
+    const first = createServerLifecycle();
+    await plugin(host.bb, first);
+
+    await expect(host.harness.behavior.callRpc("sidebarAuthoredPullRequests", {
+      force: false,
+      unexpected: true,
+    } as never)).rejects.toMatchObject({ code: "invalid_input", message: "rpc input validation failed" });
+
+    first.githubReadCache.set("first", { expiresAt: Infinity, value: "cached" });
+    first.githubReadPending.set("first", Promise.resolve("pending"));
+    const second = createServerLifecycle();
+    const replacement = await host.harness.lifecycle.reload((bb) => plugin(bb, second));
+
+    expect(first.inspect()).toEqual({ disposed: true, caches: 0, archived: false, backoffUntil: 0 });
+    expect(second.inspect()).toEqual({ disposed: false, caches: 0, archived: false, backoffUntil: 0 });
+    await expect(host.harness.behavior.callRpc("getGitHubApiHealth", null)).resolves.toEqual({
+      state: "available", scope: "unknown", message: null, retryAt: null,
+    });
+
+    const third = createServerLifecycle();
+    const finalGeneration = await replacement.harness.lifecycle.reload((bb) => plugin(bb, third));
+    expect(second.inspect()).toEqual({ disposed: true, caches: 0, archived: false, backoffUntil: 0 });
+    await expect(finalGeneration.harness.behavior.callRpc("getGitHubApiHealth", null)).resolves.toEqual({
+      state: "available", scope: "unknown", message: null, retryAt: null,
+    });
+
+    await finalGeneration.harness.lifecycle.dispose();
+    expect(third.inspect()).toEqual({ disposed: true, caches: 0, archived: false, backoffUntil: 0 });
+  });
 });

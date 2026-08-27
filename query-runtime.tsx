@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider, type QueryKey } from "@tanstack/react-query";
-import type { PropsWithChildren, ReactElement } from "react";
+import type { ComponentType, PropsWithChildren, ReactElement } from "react";
 
 export type QueryPolicy = Readonly<{
   staleTime: number;
@@ -58,4 +58,11 @@ export function getPluginQueryClient(): QueryClient {
 
 export function PluginProviders({ children }: PropsWithChildren): ReactElement {
   return <QueryClientProvider client={pluginQueryClient}>{children}</QueryClientProvider>;
+}
+
+/** The provider boundary belongs to the shared client generation, not a slot. */
+export function withPluginProviders<Props extends object>(Component: ComponentType<Props>): ComponentType<Props> {
+  return function PluginSlot(props: Props) {
+    return <PluginProviders><Component {...props} /></PluginProviders>;
+  };
 }

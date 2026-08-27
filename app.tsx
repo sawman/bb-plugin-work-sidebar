@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStore } from "zustand";
 import {
@@ -60,8 +60,8 @@ import { useTasksMutations } from "@/features/tasks/mutations";
 import "./app.css";
 import "./scrollbar.css";
 import "./views.css";
-import { PluginProviders, getPluginQueryClient, queryKeys } from "./query-runtime";
-import { selectThreadIds, type SidebarThreadGroup } from "./features/threads/model";
+import { getPluginQueryClient, queryKeys, withPluginProviders } from "./query-runtime";
+import { selectThreadIds, sidebarViewLabel, type SidebarThreadGroup, type SidebarView } from "./features/threads/model";
 import { threadInteractionStore, type ThreadDropTarget, type WorkTab } from "./features/threads/store";
 import { useArchivedThreads, useThreadPreferences } from "./features/threads/queries";
 import { WorkThreadTree, threadIsWorking, visibleThreadTreeIds } from "./features/threads/thread-row";
@@ -71,23 +71,7 @@ import { TrackerCard, TrackerHeaderBadge } from "./features/tracker/card";
 import { invalidateTracker } from "./features/tracker/queries";
 import { AgentsView } from "./features/agents/views";
 
-function withPluginProviders<Props extends object>(Component: ComponentType<Props>): ComponentType<Props> {
-  return function PluginSlot(props: Props) {
-    return <PluginProviders><Component {...props} /></PluginProviders>;
-  };
-}
-
-
-type SidebarView = "work" | "queue" | "prs";
 type SidebarTaskProject = { id: string; name: string };
-
-function sidebarViewLabel(id: SidebarView): string {
-  switch (id) {
-    case "queue": return "Tasks";
-    case "prs": return "PRs";
-    default: return "Threads";
-  }
-}
 
 function WorkThreadList(props: PluginThreadListProps) {
   const Original = props.experimental_Original ?? (() => null);

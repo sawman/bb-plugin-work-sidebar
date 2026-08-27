@@ -52,6 +52,34 @@ describe("R2 app registration and Query lifecycle", () => {
     client.clear();
     expect(client.getQueryCache().getAll()).toEqual([]);
   });
+
+  it("keeps exact slot composition through repeated independent slot lifecycles", async () => {
+    const app = await loadPluginApp(() => import("../../app"));
+    const client = getPluginQueryClient();
+    client.clear();
+    const mount = vi.spyOn(client, "mount");
+    const unmount = vi.spyOn(client, "unmount");
+    const priorMounts = mount.mock.calls.length;
+    const priorUnmounts = unmount.mock.calls.length;
+
+    for (let generation = 0; generation < 2; generation += 1) {
+      const left = renderSlot(app.threadLists[0]!, {
+        activeThreadId: null, activeProjectId: null, isCompactViewport: false,
+        onNavigate: () => undefined, searchQuery: "", Original: () => null,
+      });
+      const right = renderSlot(app.threadPanelActions[0]!, { threadId: `thr_generation_${generation}`, params: null });
+      expect(app.threadLists).toHaveLength(1);
+      expect(app.threadPanelActions).toHaveLength(1);
+      expect(app.threadHeaderActions).toHaveLength(1);
+      left.lifecycle.unmount();
+      right.lifecycle.unmount();
+      await waitFor(() => expect(client.getQueryCache().getAll().every((query) => query.getObserversCount() === 0)).toBe(true));
+      client.clear();
+    }
+
+    expect(mount.mock.calls).toHaveLength(priorMounts + 4);
+    expect(unmount.mock.calls).toHaveLength(priorUnmounts + 4);
+  });
 });
 
 describe("R6 mounted Tasks reads", () => {
