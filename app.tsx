@@ -72,7 +72,7 @@ import { useTasksMutations } from "@/features/tasks/mutations";
 import "./app.css";
 import "./scrollbar.css";
 import "./views.css";
-import { PluginProviders, queryKeys } from "./query-runtime";
+import { PluginProviders } from "./query-runtime";
 
 const SIDEBAR_ORDER_CHANNEL = "sidebar-order:changed";
 type SidebarThreadGroup = { id: string; name: string; threadIds: string[] };
@@ -664,8 +664,7 @@ function WorkThreadList(props: PluginThreadListProps) {
   const deleteSidebarTask = useCallback(async (task: SidebarTask) => {
     if (!window.confirm(`Delete ${task.key}: ${task.title}? This cannot be undone.`)) return;
     try {
-      const { deleted } = await taskMutations.remove.mutateAsync({ taskId: task.id }) as { deleted: boolean };
-      if (!deleted) throw new Error("Task was not found.");
+      await taskMutations.remove.mutateAsync({ taskId: task.id });
       setSelectedTaskIds((current) => { const next = new Set(current); next.delete(task.id); return next; });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not delete task");
