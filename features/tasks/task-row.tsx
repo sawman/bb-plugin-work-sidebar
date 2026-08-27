@@ -8,7 +8,11 @@ import {
   ContextMenuTrigger,
 } from "../../components/ui/context-menu";
 import { Icon, type IconName } from "../../components/ui/icon";
-import type { SidebarTask, TaskQueueNode } from "../../work-model";
+import type {
+  SidebarTask,
+  TaskQueueNode,
+  ThreadTaskLink,
+} from "../../work-model";
 import { taskStatusPresentation } from "./model";
 
 const TASK_STATUSES: readonly SidebarTask["status"][] = [
@@ -67,12 +71,21 @@ export type TaskRowProps = {
   onDelete(task: SidebarTask): Promise<void>;
   activeThreadId: string | null;
   activeThreadTitle: string | null;
+  bindingLinks: ReadonlyMap<string, ThreadTaskLink>;
+  bindingOwnerLinks: ReadonlyMap<string, ThreadTaskLink>;
   onAttachToThread(taskId: string, threadId: string): Promise<void>;
   onDetachFromThread(taskId: string, threadId: string): Promise<void>;
   updatingTaskId: string | null;
   selectedTaskIds: ReadonlySet<string>;
   onSelect(taskId: string, event: ReactMouseEvent<HTMLButtonElement>): boolean;
 };
+
+function bindingLabel(link: ThreadTaskLink): string {
+  if (link.role === "outcome") return "Bound outcome task";
+  return link.mode === "delegated"
+    ? "Bound delegated execution task"
+    : "Bound direct execution task";
+}
 
 export function TaskRow(props: TaskRowProps) {
   const {
@@ -91,6 +104,8 @@ export function TaskRow(props: TaskRowProps) {
     onDelete,
     activeThreadId,
     activeThreadTitle,
+    bindingLinks,
+    bindingOwnerLinks,
     onAttachToThread,
     onDetachFromThread,
     updatingTaskId,
@@ -98,8 +113,13 @@ export function TaskRow(props: TaskRowProps) {
     onSelect,
   } = props;
   const { task } = node;
+  const bindingLink = bindingLinks.get(task.id) ?? null;
+  const bindingOwnerLink = bindingOwnerLinks.get(task.id) ?? null;
+  const bindingOwned = Boolean(bindingOwnerLink);
+  const bindingDescriptionId = `ws-task-binding-${task.id}`;
+  const bindingState = bindingOwnerLink ? bindingLabel(bindingOwnerLink) : null;
   const assigned = Boolean(
-    activeThreadId && task.linkedThreadIds.includes(activeThreadId),
+    bindingLink || (activeThreadId && task.linkedThreadIds.includes(activeThreadId)),
   );
   const status = taskStatus(task.status);
   const peers = siblings.filter(
@@ -121,6 +141,7 @@ export function TaskRow(props: TaskRowProps) {
   };
   const assign = () =>
     activeThreadId &&
+    !bindingLink &&
     (assigned
       ? onDetachFromThread(task.id, activeThreadId)
       : onAttachToThread(task.id, activeThreadId));
@@ -180,11 +201,14 @@ export function TaskRow(props: TaskRowProps) {
               className={`ws-task-assign ${assigned ? "ws-task-assigned" : ""}`}
               type="button"
               disabled={!activeThreadId}
+              aria-describedby={bindingState ? bindingDescriptionId : undefined}
               onClick={(event) => {
                 if (!onSelect(task.id, event)) void assign();
               }}
               title={
-                activeThreadId
+                bindingLink
+                  ? `${bindingLabel(bindingLink)}. This attachment cannot be detached.`
+                  : activeThreadId
                   ? assigned
                     ? `Assigned to ${activeThreadTitle ?? "current thread"}`
                     : `Assign to ${activeThreadTitle ?? "current thread"}`
@@ -210,6 +234,15 @@ export function TaskRow(props: TaskRowProps) {
               )}
               {showProject && (
                 <span className="ws-task-badge">{task.projectName}</span>
+              )}
+              {bindingState && (
+                <span
+                  id={bindingDescriptionId}
+                  className="ws-task-badge"
+                  role="status"
+                >
+                  {bindingState}
+                </span>
               )}
             </div>
           </div>
@@ -286,7 +319,10 @@ export function TaskRow(props: TaskRowProps) {
           Move down
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem onSelect={() => void onDelete(task)}>
+        <ContextMenuItem
+          disabled={bindingOwned}
+          onSelect={() => void onDelete(task)}
+        >
           Delete task
         </ContextMenuItem>
       </ContextMenuContent>

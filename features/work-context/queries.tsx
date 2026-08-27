@@ -131,5 +131,11 @@ export function useWorkOutcomeMutation(threadId: string) {
         }),
       onSuccess: invalidate,
     }),
+    adopt: useMutation({
+      mutationKey: [...queryKeys.work.outcome(threadId), "adopt-legacy"],
+      mutationFn: ({ taskId }: { taskId: string }) =>
+        rpc.call("adoptLegacyOutcome", { rootThreadId: threadId, taskId }),
+      onSuccess: invalidate,
+    }),
   };
 }

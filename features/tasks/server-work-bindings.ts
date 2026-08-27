@@ -28,6 +28,7 @@ import {
 
 export const WORK_BINDINGS_KEY = "work-bindings:v2";
 type TasksPluginAdapter = ReturnType<typeof createTasksPluginAdapter>;
+export type WorkBindingsState = Pick<WorkBindings, "outcomes" | "executions">;
 export type BindingSummary = {
   rootThreadId: string;
   outcomeTaskId: string;
@@ -399,6 +400,7 @@ export function createWorkBindingsService(
       updatedAt: now,
     };
     await write({ ...saved, outcomes: [...saved.outcomes, binding] });
+    publishWorkBindingReady(bb.realtime, root.id);
     return { task: result.task, binding };
   };
   const execution = async (input: {
@@ -479,6 +481,7 @@ export function createWorkBindingsService(
       updatedAt: now,
     };
     await write({ ...saved, executions: [...saved.executions, binding] });
+    publishWorkBindingReady(bb.realtime, root.id);
     return { task: result.task, binding, reused: false };
   };
   const owner = async (input: {

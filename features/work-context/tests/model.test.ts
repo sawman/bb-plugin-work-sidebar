@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { queryKeys, queryPolicies } from "../../../query-runtime";
-import { shouldPollWorkActivity } from "../model";
+import {
+  projectWorkTaskBindingOwnership,
+  shouldPollWorkActivity,
+} from "../model";
 
 describe("work-context card model", () => {
   it("gives Status, Outcome, Goal, and Plan independently cacheable keys", () => {
@@ -46,5 +49,40 @@ describe("work-context card model", () => {
       retry: false,
       refetchOnWindowFocus: false,
     });
+  });
+
+  it("projects root, direct, and delegated binding ownership from owner fields", () => {
+    const bindings = [
+      {
+        rootThreadId: "thr_root",
+        outcomeTaskId: "task_outcome",
+        executionTaskId: null,
+        ownerThreadId: null,
+      },
+      {
+        rootThreadId: "thr_root",
+        outcomeTaskId: "task_outcome",
+        executionTaskId: "task_direct",
+        ownerThreadId: "thr_root",
+      },
+      {
+        rootThreadId: "thr_root",
+        outcomeTaskId: "task_outcome",
+        executionTaskId: "task_delegated",
+        ownerThreadId: "thr_child",
+      },
+    ];
+    expect(projectWorkTaskBindingOwnership("thr_root", bindings)).toEqual({
+      bindingOwnedTaskIds: new Set([
+        "task_outcome",
+        "task_direct",
+        "task_delegated",
+      ]),
+      currentThreadBindingTaskIds: new Set(["task_outcome", "task_direct"]),
+    });
+    expect(
+      projectWorkTaskBindingOwnership("thr_child", bindings)
+        .currentThreadBindingTaskIds,
+    ).toEqual(new Set(["task_delegated"]));
   });
 });

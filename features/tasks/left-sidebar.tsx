@@ -19,6 +19,7 @@ import {
   taskMatchesSearch,
   taskReorderNeighbors,
   type SidebarTask,
+  type ThreadTaskLink,
 } from "../../work-model";
 import { tasksSidebarStore } from "./store";
 import { useTasksMutations } from "./mutations";
@@ -30,6 +31,7 @@ export interface TasksLeftSidebarProps {
   active: boolean;
   activeThreadId: string | null;
   activeThreadTitle: string | null;
+  taskLinks: Readonly<Record<string, readonly ThreadTaskLink[]>>;
   onOpenThread: (threadId: string, split?: boolean) => void;
   searchQuery: string;
 }
@@ -39,6 +41,7 @@ export function TasksLeftSidebar({
   active,
   activeThreadId,
   activeThreadTitle,
+  taskLinks,
   onOpenThread,
   searchQuery,
 }: TasksLeftSidebarProps) {
@@ -83,6 +86,25 @@ export function TasksLeftSidebar({
       counts.set(task.key, (counts.get(task.key) ?? 0) + 1);
     return counts;
   }, [filtered]);
+  const bindingLinks = useMemo(
+    () =>
+      new Map(
+        (activeThreadId ? taskLinks[activeThreadId] ?? [] : []).map((link) => [
+          link.task.id,
+          link,
+        ]),
+      ),
+    [activeThreadId, taskLinks],
+  );
+  const bindingOwnerLinks = useMemo(
+    () =>
+      new Map(
+        Object.values(taskLinks).flatMap((links) =>
+          links.map((link) => [link.task.id, link] as const),
+        ),
+      ),
+    [taskLinks],
+  );
   const visibleIds = useMemo(
     () =>
       queue.flatMap((node) => [
@@ -386,6 +408,8 @@ export function TasksLeftSidebar({
               onDelete={remove}
               activeThreadId={activeThreadId}
               activeThreadTitle={activeThreadTitle}
+              bindingLinks={bindingLinks}
+              bindingOwnerLinks={bindingOwnerLinks}
               onAttachToThread={(taskId, threadId) =>
                 updateAttachment(taskId, threadId, true)
               }
