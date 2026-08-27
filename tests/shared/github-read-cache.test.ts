@@ -25,6 +25,60 @@ describe("shared GitHub read-cache lifecycle", () => {
     expect(lifecycle.githubRestHealth).toEqual({ state: "available", scope: "rest", message: null, retryAt: null });
   });
 
+  it("serves a fresh GraphQL cache hit during an unrelated active rate-limit backoff", async () => {
+    const lifecycle = createServerLifecycle();
+    const args = ["api", "graphql", "-f", "query=stack"];
+    const command = vi.fn(async () => "unexpected command");
+    const classifier = vi.fn(() => ({
+      state: "rate_limited" as const,
+      scope: "graphql" as const,
+      message: "unexpected classifier",
+      retryAt: Date.now() + 60_000,
+    }));
+
+    lifecycle.cacheGitHubRead(args.join("\u0000"), "fresh cached GraphQL value", Date.now() + 60_000);
+    lifecycle.githubGraphqlHealth = {
+      state: "rate_limited",
+      scope: "graphql",
+      message: "GraphQL is rate limited by an unrelated read",
+      retryAt: Date.now() + 60_000,
+    };
+
+    await expect(readGitHub(lifecycle, command, classifier, args, 1_000_000, 60_000))
+      .resolves.toBe("fresh cached GraphQL value");
+    expect(command).not.toHaveBeenCalled();
+    expect(classifier).not.toHaveBeenCalled();
+  });
+
+  it("still gates cache misses and expired entries during active rate-limit backoff", async () => {
+    const lifecycle = createServerLifecycle();
+    const command = vi.fn(async () => "unexpected command");
+    const classifier = vi.fn(() => ({
+      state: "unavailable" as const,
+      scope: "graphql" as const,
+      message: "unexpected classifier",
+      retryAt: null,
+    }));
+    const retryAt = Date.now() + 60_000;
+    lifecycle.githubGraphqlHealth = {
+      state: "rate_limited",
+      scope: "graphql",
+      message: "GraphQL is rate limited",
+      retryAt,
+    };
+
+    await expect(readGitHub(lifecycle, command, classifier, ["api", "graphql", "-f", "query=miss"], 1_000_000, 60_000))
+      .rejects.toThrow("GraphQL is rate limited");
+
+    const expiredArgs = ["api", "graphql", "-f", "query=expired"];
+    lifecycle.cacheGitHubRead(expiredArgs.join("\u0000"), "expired value", retryAt - 60_001);
+    await expect(readGitHub(lifecycle, command, classifier, expiredArgs, 1_000_000, 60_000))
+      .rejects.toThrow("GraphQL is rate limited");
+
+    expect(command).not.toHaveBeenCalled();
+    expect(classifier).not.toHaveBeenCalled();
+  });
+
   it("does not let a disposed generation write caches, health, or replacement pending work", async () => {
     let resolveFirst!: (value: string) => void;
     const firstCommand = new Promise<string>((resolve) => { resolveFirst = resolve; });
