@@ -55,7 +55,7 @@ export function useArchivedThreads(enabled: boolean, rosterFingerprint: string) 
     enabled,
   });
   const previousRoster = useRef(rosterFingerprint);
-  useEffect(() => { if (enabled && previousRoster.current !== rosterFingerprint) void client.invalidateQueries({ queryKey: threadQueryKeys.archived() }); previousRoster.current = rosterFingerprint; }, [client, enabled, rosterFingerprint]);
+  useEffect(() => { if (previousRoster.current !== rosterFingerprint) void client.invalidateQueries({ queryKey: threadQueryKeys.archived() }); previousRoster.current = rosterFingerprint; }, [client, rosterFingerprint]);
   const unarchive = useMutation({ mutationFn: async (threadId: string) => {
     const result = await rpc.call("unarchiveSidebarThread", { threadId });
     await client.invalidateQueries({ queryKey: threadQueryKeys.archived() });

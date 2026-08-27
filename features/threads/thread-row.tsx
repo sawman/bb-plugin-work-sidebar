@@ -7,8 +7,8 @@ import { Icon } from "@/components/ui/icon";
 import { normalizeIndicator, orderTaskLinksByRelevance, threadTitle, type ThreadTaskLink } from "@/work-model";
 import { pullRequestPresentation } from "@/features/pull-requests/presentation";
 import { threadInteractionStore } from "./store";
+import type { SidebarThreadGroup } from "./model";
 
-export type SidebarThreadGroup = { id: string; name: string; threadIds: string[] };
 type DropTarget = { threadId: string; placement: "before" | "after" } | null;
 function indicatorGlyph(value: string): string { switch (normalizeIndicator(value)) { case "runtime": case "workflow": case "background-agent": case "background-command": return "●"; case "unread-error": return "!"; case "unread-success": return "•"; case "waiting-for-input": return "?"; default: return ""; } }
 export function threadIsWorking(thread: PluginSidebarThread): boolean { const indicator = normalizeIndicator(String(thread.indicator)); return indicator === "runtime" || indicator === "workflow" || indicator === "background-agent" || indicator === "background-command" || indicator === "goal" || indicator === "plan-mode" || indicator === "working-draft"; }

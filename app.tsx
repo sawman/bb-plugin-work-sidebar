@@ -65,10 +65,10 @@ import "./app.css";
 import "./scrollbar.css";
 import "./views.css";
 import { PluginProviders } from "./query-runtime";
-import { selectThreadIds } from "./features/threads/model";
+import { selectThreadIds, type SidebarThreadGroup } from "./features/threads/model";
 import { threadInteractionStore, type ThreadDropTarget, type WorkTab } from "./features/threads/store";
 import { useArchivedThreads, useThreadPreferences } from "./features/threads/queries";
-import { WorkThreadTree, threadIsWorking, visibleThreadTreeIds, type SidebarThreadGroup } from "./features/threads/thread-row";
+import { WorkThreadTree, threadIsWorking, visibleThreadTreeIds } from "./features/threads/thread-row";
 
 function withPluginProviders<Props extends object>(Component: ComponentType<Props>): ComponentType<Props> {
   return function PluginSlot(props: Props) {
