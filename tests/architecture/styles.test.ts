@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { readdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
+import * as ts from "typescript";
 import { describe, expect, test } from "vitest";
 
 const root = join(import.meta.dirname, "../..");
@@ -16,29 +17,165 @@ function stripComments(source: string) {
   return source.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
-function findStyleDebt(source: string) {
-  const debt: string[] = [];
-  const sourceWithoutComments = stripComments(source);
-  const rulePattern = /([^{}]+)\{([^{}]*)\}/g;
-  for (const match of sourceWithoutComments.matchAll(rulePattern)) {
-    const selector = match[1].trim().replace(/\s+/g, " ");
-    const declarations = match[2];
-    if (/all\s*:\s*unset\b/.test(declarations)) {
-      debt.push(`${selector}: all: unset`);
+function productionSourcePaths(directory = root): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      if (["node_modules", "dist", "tests"].includes(entry.name)) return [];
+      return productionSourcePaths(path);
     }
-    for (const palette of declarations.matchAll(/#[0-9a-f]{3,8}\b/gi)) {
-      debt.push(`${selector}: hardcoded palette ${palette[0]}`);
+    return /\.(?:ts|tsx)$/.test(entry.name) ? [path] : [];
+  });
+}
+
+function stylesheetSelectors(source: string) {
+  return stylesheetRules(source).map(({ selector }) => selector);
+}
+
+function stylesheetRules(source: string) {
+  return [...stripComments(source).matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .map((match) => ({ selector: match[1].trim().replace(/\s+/g, " "), declarations: match[2] }));
+}
+
+const dynamicClassFamilies = [
+  { prefix: "ws-agent-state-", file: "features/agents/views.tsx", suffixes: ["working", "waiting", "blocked", "complete", "idle"] },
+  { prefix: "ws-file-", file: "features/changes/views.tsx", suffixes: ["added", "deleted", "modified", "renamed", "untracked"] },
+  { prefix: "ws-github-api-", file: "app.tsx", suffixes: ["available", "rate_limited", "unavailable"] },
+  { prefix: "ws-plan-", file: "features/work-context/views.tsx", suffixes: ["completed", "in_progress", "pending"] },
+  { prefix: "ws-provider-health-", file: "features/work-context/views.tsx", suffixes: ["green", "amber", "red"] },
+  { prefix: "ws-status-dot-", file: "features/work-context/views.tsx", suffixes: ["in_progress", "running", "done"] },
+  { prefix: "ws-task-priority-", file: "components/threads/task-row.tsx", suffixes: ["urgent", "high", "medium", "low"] },
+  { prefix: "ws-task-row-", file: "components/threads/task-row.tsx", suffixes: ["outcome", "execution"] },
+  { prefix: "ws-task-status-", file: "components/threads/task-row.tsx", suffixes: ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] },
+  { prefix: "ws-thread-child-depth-", file: "features/threads/thread-row.tsx", suffixes: ["1", "2", "3", "4"] },
+] as const;
+
+function scriptKind(path: string) {
+  return path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+}
+
+function classAttributeTokens(path: string, source: string) {
+  const tokens = new Set<string>();
+  const templatePrefixes = new Set<string>();
+  const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, scriptKind(path));
+  const collectText = (text: string) => {
+    for (const token of text.match(/ws-[A-Za-z0-9_-]+/g) ?? []) tokens.add(token);
+  };
+  const visitClassValue = (node: ts.Node) => {
+    if (ts.isStringLiteralLike(node)) collectText(node.text);
+    if (ts.isTemplateExpression(node)) {
+      const literalParts = [node.head.text, ...node.templateSpans.map((span) => span.literal.text)];
+      for (const part of literalParts) {
+        collectText(part);
+        for (const { prefix } of dynamicClassFamilies) {
+          if (part.includes(prefix)) templatePrefixes.add(prefix);
+        }
+      }
     }
-    if (declarations.includes("!important")) {
-      debt.push(`${selector}: undocumented !important`);
+    ts.forEachChild(node, visitClassValue);
+  };
+  const visit = (node: ts.Node) => {
+    if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name) && (node.name.text === "className" || node.name.text === "class") && node.initializer) {
+      visitClassValue(node.initializer);
     }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return { tokens, templatePrefixes };
+}
+
+function sourceClassConsumers() {
+  const sourceByPath = new Map(productionSourcePaths().map((file) => [relative(root, file), readFileSync(file, "utf8")]));
+  const staticClasses = new Set(
+    [...sourceByPath.entries()].flatMap(([path, source]) => [...classAttributeTokens(path, source).tokens]),
+  );
+  const dynamicFamilies = dynamicClassFamilies.filter(({ prefix, file }) => {
+    const source = sourceByPath.get(file);
+    return source ? classAttributeTokens(file, source).templatePrefixes.has(prefix) : false;
+  });
+  return { staticClasses, dynamicFamilies };
+}
+
+function selectorClassNames(selector: string) {
+  return [...selector.matchAll(/\.((?:ws-[A-Za-z0-9_-]+))/g)].map((match) => match[1]);
+}
+
+function hasProductionConsumer(className: string, consumers: ReturnType<typeof sourceClassConsumers>) {
+  return consumers.staticClasses.has(className) || consumers.dynamicFamilies.some(({ prefix, suffixes }) =>
+    suffixes.some((suffix) => className === `${prefix}${suffix}`),
+  );
+}
+
+function directSurfacePrimitivePaths() {
+  const violations: string[] = [];
+  for (const file of productionSourcePaths().filter((path) => path.endsWith(".tsx") && relative(root, path) !== "components/ui/surface-card.tsx")) {
+    const sourceFile = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const visit = (node: ts.Node) => {
+      if (ts.isJsxOpeningElement(node) && ["article", "div"].includes(node.tagName.getText())) {
+        const className = node.attributes.properties.find((attribute): attribute is ts.JsxAttribute =>
+          ts.isJsxAttribute(attribute) && attribute.name.getText() === "className",
+        );
+        const tokens = new Set(className?.initializer?.getText().match(/ws-[A-Za-z0-9_-]+/g) ?? []);
+        if ((node.tagName.getText() === "article" && tokens.has("ws-card")) || (node.tagName.getText() === "div" && tokens.has("ws-card-heading"))) {
+          violations.push(relative(root, file) + ":" + (sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1));
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
   }
-  return debt;
+  return violations;
+}
+
+function jsxAttributeNames(attributes: ts.JsxAttributes) {
+  return new Set(attributes.properties.filter(ts.isJsxAttribute).map((attribute) => attribute.name.getText()));
+}
+
+function buttonHasVisibleText(children: ts.NodeArray<ts.JsxChild>) {
+  let visibleText = false;
+  const visit = (child: ts.Node) => {
+    if (ts.isJsxText(child) && /[A-Za-z0-9]/.test(child.text)) visibleText = true;
+    if (ts.isStringLiteralLike(child) && /[A-Za-z0-9]/.test(child.text)) visibleText = true;
+    if (ts.isJsxElement(child) || ts.isJsxFragment(child)) child.children.forEach(visit);
+    if (ts.isJsxExpression(child) && child.expression) ts.forEachChild(child.expression, visit);
+  };
+  children.forEach(visit);
+  return visibleText;
+}
+
+function buttonHasIconOrGlyph(node: ts.JsxElement) {
+  let iconOrGlyph = false;
+  const visit = (child: ts.Node) => {
+    if (ts.isJsxText(child) && /[^\sA-Za-z0-9]/.test(child.text)) iconOrGlyph = true;
+    if (ts.isJsxSelfClosingElement(child) && /^(?:Icon|svg)$/.test(child.tagName.getText())) iconOrGlyph = true;
+    if (ts.isJsxElement(child)) {
+      if (/^(?:Icon|svg)$/.test(child.openingElement.tagName.getText())) iconOrGlyph = true;
+      child.children.forEach(visit);
+    }
+    if (ts.isJsxFragment(child)) child.children.forEach(visit);
+    if (ts.isJsxExpression(child) && child.expression) ts.forEachChild(child.expression, visit);
+  };
+  node.children.forEach(visit);
+  return iconOrGlyph;
+}
+
+function undocumentedIconButtons(sourceFile: ts.SourceFile) {
+  const undocumented: string[] = [];
+  const visit = (node: ts.Node) => {
+    if (ts.isJsxElement(node) && node.openingElement.tagName.getText() === "button") {
+      const attributes = jsxAttributeNames(node.openingElement.attributes);
+      if (buttonHasIconOrGlyph(node) && !buttonHasVisibleText(node.children) && !attributes.has("aria-label") && !attributes.has("aria-labelledby")) {
+        undocumented.push(`${sourceFile.fileName}:${sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1}`);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return undocumented;
 }
 
 describe("stylesheet architecture baseline", () => {
-  test("every plugin stylesheet parses, stays diffable, and has recorded debt", () => {
-    const debt: string[] = [];
+  test("every plugin stylesheet parses and stays diffable", () => {
     const parseErrors: string[] = [];
     const longLines: string[] = [];
 
@@ -91,11 +228,102 @@ describe("stylesheet architecture baseline", () => {
       if (parentheses !== 0) parseErrors.push(`${relative}: unbalanced parentheses (${parentheses})`);
       if (inComment) parseErrors.push(`${relative}: unterminated comment`);
       if (quote) parseErrors.push(`${relative}: unterminated string`);
-      debt.push(...findStyleDebt(source).map((entry) => `${relative}: ${entry}`));
     }
 
     expect(parseErrors, `CSS parse errors:\n${parseErrors.join("\n")}`).toEqual([]);
     expect(longLines, `CSS physical lines over 240 chars:\n${longLines.join("\n")}`).toEqual([]);
-    expect(debt).toMatchSnapshot("existing selector debt");
+  });
+});
+
+describe("shared surface and list-row architecture", () => {
+  test("finds every static class in multi-class and template JSX attributes", () => {
+    const fixture = classAttributeTokens("fixture.tsx", `
+      const fixture = <article className="ws-card ws-empty-state-card">
+        <span className={\`ws-card-note \${busy ? "ws-card-note-busy" : ""}\`} />
+      </article>;
+    `);
+
+    expect(fixture.tokens).toEqual(new Set(["ws-card", "ws-empty-state-card", "ws-card-note", "ws-card-note-busy"]));
+  });
+
+  test("limits dynamic template consumers to their evidenced class families", () => {
+    const consumers = sourceClassConsumers();
+
+    expect(hasProductionConsumer("ws-file-modified", consumers)).toBe(true);
+    expect(hasProductionConsumer("ws-file-list", consumers)).toBe(consumers.staticClasses.has("ws-file-list"));
+    expect(hasProductionConsumer("ws-file-legacy", consumers)).toBe(false);
+  });
+
+  test("keeps one consumed surface contract and no broad primitive typography overrides", () => {
+    const rules = stylesheetPaths().flatMap((file) => stylesheetRules(readFileSync(file, "utf8")));
+    const competingContracts = rules
+      .filter(({ selector }) => /\.ws-(?:surface|work-card)(?:[.:#\s,{]|$)/.test(selector))
+      .map(({ selector }) => selector);
+    const cardContractDefinitions = rules.filter(({ selector }) => selector === ".ws-card").map(({ selector }) => selector);
+    const cardHeadingDefinitions = rules.filter(({ selector }) => selector === ".ws-card-heading").map(({ selector }) => selector);
+    const cardHeadingStrongDefinitions = rules.filter(({ selector }) => selector === ".ws-card-heading strong").map(({ selector }) => selector);
+    const cardControlFocus = rules.find(({ selector }) => selector === ".ws-card :is(button, input, select):focus-visible");
+    const broadTypography = rules
+      .filter(({ selector, declarations }) =>
+        /\.ws-(?:card|surface|work-card)\s+(?:h[1-6]|p|small|strong|\*\b)/.test(selector)
+        || (selector.includes(".ws-card-heading") && ![".ws-card-heading", ".ws-card-heading strong"].includes(selector) && /\b(?:font(?:-size|-weight)?|line-height|letter-spacing)\s*:/.test(declarations)),
+      )
+      .map(({ selector }) => selector);
+
+    expect(competingContracts, "only the shared .ws-card surface contract may own card layout").toEqual([]);
+    expect(cardContractDefinitions, "the shared card contract is defined once across plugin stylesheets").toEqual([".ws-card"]);
+    expect(cardHeadingDefinitions, "the shared card heading contract is defined once across plugin stylesheets").toEqual([".ws-card-heading"]);
+    expect(cardHeadingStrongDefinitions, "only the heading primitive owns its strong typography").toEqual([".ws-card-heading strong"]);
+    expect(cardControlFocus?.declarations, "shared card controls retain an explicit visible focus treatment").toContain("outline: 2px solid var(--ring)");
+    expect(broadTypography, "surface selectors must not override descendant typography").toEqual([]);
+  });
+
+  test("constructs card roots and headings only through the shared primitive", () => {
+    expect(directSurfacePrimitivePaths()).toEqual([]);
+  });
+
+  test("removes unsupported style debt rather than snapshotting it", () => {
+    const selectors = stylesheetPaths().flatMap((file) => stylesheetSelectors(readFileSync(file, "utf8")));
+    const source = stylesheetPaths().map((file) => readFileSync(file, "utf8")).join("\n");
+    const consumers = sourceClassConsumers();
+    const obsolete = [...new Set(selectors.flatMap(selector => selectorClassNames(selector)))]
+      .filter((className) => !hasProductionConsumer(className, consumers));
+
+    expect(source).not.toMatch(/\ball\s*:\s*unset\b/);
+    expect(source).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    const importantRules = stylesheetPaths().flatMap((file) => {
+      const source = readFileSync(file, "utf8");
+      return [...source.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+        .filter((match) => match[2]?.includes("!important"))
+        .map((match) => ({
+          selector: stripComments(match[1]!).trim().replace(/\s+/g, " "),
+          declarations: match[2]!,
+          file,
+          documented: /\/\* R17 important: [\s\S]+\*\/\s*[^{}]+$/.test(match[1]!),
+        }));
+    });
+
+    const undocumentedImportant = importantRules
+      .filter(({ documented }) => !documented)
+      .map(({ file, selector }) => `${relative(root, file)}: ${selector}`);
+
+    expect(undocumentedImportant, "every host override documents its reason at the CSS declaration").toEqual([]);
+    expect(importantRules.every(({ selector }) => selectorClassNames(selector).every((className) => hasProductionConsumer(className, consumers))), "important overrides must retain production consumers").toBe(true);
+    expect(obsolete, "every ws-* selector must retain a production consumer").toEqual([]);
+  });
+
+  test("keeps icon-only controls accessible", () => {
+    const fixture = ts.createSourceFile("fixture.tsx", `
+      const controls = <>
+        <button><Icon name="X" /></button>
+        <button>Close</button>
+        <button aria-label="Close"><Icon name="X" /></button>
+      </>;
+    `, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    expect(undocumentedIconButtons(fixture)).toEqual(["fixture.tsx:3"]);
+    const undocumented = productionSourcePaths().flatMap((file) => undocumentedIconButtons(
+      ts.createSourceFile(relative(root, file), readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true, scriptKind(file)),
+    ));
+    expect(undocumented).toEqual([]);
   });
 });
