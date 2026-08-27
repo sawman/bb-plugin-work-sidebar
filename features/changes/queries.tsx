@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PluginRpcClient } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
 import { changesKeys, changesPolicies } from "./model";
@@ -38,7 +38,7 @@ export function useChanges(
     identity: "",
     fingerprint: null,
   });
-  useQuery({
+  const fingerprint = useQuery({
     queryKey: changesKeys.fingerprint(threadId, url ?? "none"),
     queryFn: async () => {
       const result = await rpc.call("getChangesFingerprint", {
@@ -62,7 +62,7 @@ export function useChanges(
     ...changesPolicies.fingerprint,
     refetchInterval: visible ? polling.visiblePollMs : polling.backgroundPollMs,
   });
-  return projection;
+  return { ...projection, fingerprint };
 }
 export function invalidateChanges(
   client: {
@@ -74,5 +74,27 @@ export function invalidateChanges(
 ) {
   return client.invalidateQueries({
     queryKey: changesKeys.projection(threadId),
+  });
+}
+
+export function useWorkingTreeFileDiff(
+  rpc: ChangesRpc,
+  threadId: string,
+  fingerprint: string | null,
+  path: string | null,
+) {
+  return useQuery({
+    queryKey: changesKeys.fileDiff(threadId, fingerprint, path ?? "none"),
+    queryFn: () => rpc.call("getWorkingTreeFileDiff", { threadId, path: path! }),
+    enabled: Boolean(path),
+    ...changesPolicies.fileDiff,
+  });
+}
+
+export function useCheckoutStackBranch(rpc: ChangesRpc, threadId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (branch: string) => rpc.call("checkoutStackBranch", { threadId, branch }),
+    onSuccess: () => invalidateChanges(client, threadId),
   });
 }

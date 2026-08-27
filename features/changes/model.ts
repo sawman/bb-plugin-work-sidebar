@@ -5,6 +5,8 @@ export const changesKeys = {
     ["work-sidebar", "changes", threadId] as const,
   fingerprint: (threadId: string, url: string) =>
     ["work-sidebar", "changes", threadId, "fingerprint", url] as const,
+  fileDiff: (threadId: string, fingerprint: string | null, path: string) =>
+    ["work-sidebar", "changes", threadId, "file-diff", fingerprint ?? "unknown", path] as const,
 };
 export const changesPolicies = {
   projection: {
@@ -19,6 +21,12 @@ export const changesPolicies = {
     retry: false,
     refetchOnWindowFocus: false,
     refetchIntervalInBackground: true,
+  },
+  fileDiff: {
+    staleTime: Infinity,
+    gcTime: 5 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
   },
 } as const;
 

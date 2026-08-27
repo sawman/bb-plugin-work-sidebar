@@ -24,9 +24,28 @@ export const changesSchema = z.object({
   githubStack: z.object({ stack: githubStackSchema.nullable(), pending: stackChange.nullable(), error: z.string().nullable() }).nullable(), repository: repositorySchema,
 });
 const threadInput = z.object({ threadId: z.string().startsWith("thr_") }).strict();
+export const checkoutStackBranchResultSchema = z.object({
+  ok: z.boolean(), message: z.string(), tone: z.enum(["success", "warning", "error"]).optional(), detail: z.string().nullable(),
+}).strict();
+export const workingTreeFileDiffSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("patch"), path: z.string().min(1), patch: z.string().min(1), message: z.null() }).strict(),
+  z.object({ kind: z.literal("binary"), path: z.string().min(1), patch: z.null(), message: z.string() }).strict(),
+  z.object({ kind: z.literal("absent"), path: z.string().min(1), patch: z.null(), message: z.string() }).strict(),
+  z.object({ kind: z.literal("unavailable"), path: z.string().min(1), patch: z.null(), message: z.string() }).strict(),
+]);
 export const changesRpcSchemas = {
   getChanges: { input: threadInput, output: changesSchema },
   getChangesFingerprint: { input: z.object({ threadId: z.string().startsWith("thr_"), url: z.string().url() }).strict(), output: z.object({ fingerprint: z.string().nullable() }) },
+  checkoutStackBranch: {
+    input: z.object({ threadId: z.string().startsWith("thr_"), branch: z.string().min(1).max(255) }).strict(),
+    output: checkoutStackBranchResultSchema,
+  },
+  getWorkingTreeFileDiff: {
+    input: z.object({ threadId: z.string().startsWith("thr_"), path: z.string().min(1) }).strict(),
+    output: workingTreeFileDiffSchema,
+  },
 };
 export type Changes = z.infer<typeof changesSchema>;
 export type Repository = z.infer<typeof repositorySchema>;
+export type CheckoutStackBranchResult = z.infer<typeof checkoutStackBranchResultSchema>;
+export type WorkingTreeFileDiff = z.infer<typeof workingTreeFileDiffSchema>;

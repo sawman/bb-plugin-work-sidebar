@@ -34,5 +34,7 @@ describe("R1 app bundle ownership", () => {
     // by the minifier with its set/get/subscribe implementation. It is a
     // stronger ownership marker than application state literals alone.
     expect(bundle).toContain("getInitialState");
+    expect(bundle).not.toContain("react-diff-view");
+    expect(readFileSync(resolve(repositoryRoot, "dist/app.css"), "utf8")).not.toMatch(/ws-(review-diff|diff-toolbar|split-diff|working-tree-patch)/);
   });
 });

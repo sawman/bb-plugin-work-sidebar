@@ -11,7 +11,7 @@ import { createArchivedThreadService, createThreadPreferencesService } from "./f
 import { createServerLifecycle, type GitHubApiHealth, type ServerLifecycle } from "./server-lifecycle.js";
 import { createWorkContextReadService } from "./features/work-context/server-reads.js";
 import { createTrackerService, TRACKER_LINKS_KEY } from "./features/tracker/server.js";
-import { createChangesService } from "./features/changes/server.js";
+import { createChangesService, createWorkingTreeFileDiffReader } from "./features/changes/server.js";
 
 const execFileAsync = promisify(execFile);
 const TASKS_PLUGIN_ID = "tasks";
@@ -1400,10 +1400,17 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     readGoal: readWorkGoal,
     readPlan: readWorkPlan,
   });
+  const workingTreeFileDiff = createWorkingTreeFileDiffReader({
+    getThread: async (threadId) => bb.sdk.threads.get({ threadId }),
+    diffPatch: ({ environmentId, target, paths }) => bb.sdk.environments.diffPatch({ environmentId, target, paths }),
+    diffFiles: ({ environmentId, target }) => bb.sdk.environments.diffFiles({ environmentId, target }),
+  });
   const changesService = createChangesService({
     repository: async (threadId) => repositorySummary(await bb.sdk.threads.get({ threadId })),
     projection: pullRequestChanges,
     fingerprint: (_threadId, url) => pullRequestFingerprint(url),
+    checkout: (threadId, branch) => githubStackCall("checkoutBranch", { threadId, branch }, ghStackActionSchema),
+    fileDiff: workingTreeFileDiff,
   });
 
   bb.rpc.register(rpcContract, {
@@ -1519,15 +1526,14 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     async getWorkPlan({ threadId }) { return workContextReads.plan(threadId); },
     async getChanges({ threadId }) { return changesService.get(threadId); },
     async getChangesFingerprint({ threadId, url }) { return changesService.fingerprint(threadId, url); },
+    async checkoutStackBranch({ threadId, branch }) { return changesService.checkout(threadId, branch); },
+    async getWorkingTreeFileDiff({ threadId, path }) { return changesService.fileDiff(threadId, path); },
     async getGitHubPollingPolicy() { return githubPollingPolicy(); },
     async getWorkTracker({ threadId }) {
       return trackerService.context(threadId);
     },
     async getWorkProviderStatus({ threadId }) {
       return workProviderStatus(threadId);
-    },
-    async checkoutStackBranch({ threadId, branch }) {
-      return githubStackCall("checkoutBranch", { threadId, branch }, ghStackActionSchema);
     },
     async linkLinearIssue({ threadId, key }) {
       return trackerService.link(threadId, key);
@@ -1545,13 +1551,6 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
         currentThread: { status: thread.status, runtimeStatus: thread.runtime.displayStatus },
         ...latestActivity(timeline.rows, output.output, thread.status === "active" || thread.status === "starting"),
       };
-    },
-    async getWorkingTreeFileDiff({ threadId, path }) {
-      const thread = await bb.sdk.threads.get({ threadId });
-      if (!thread.environmentId) return { available: false, patch: null, message: "This thread has no workspace." };
-      const result = await bb.sdk.environments.diffPatch({ environmentId: thread.environmentId, target: { type: "uncommitted" }, paths: [path] });
-      if (result.outcome !== "available") return { available: false, patch: null, message: "message" in result ? result.message : result.failure.message };
-      return { available: true, patch: result.patches[0]?.patch ?? null, message: result.patches[0] ? null : "No diff is available for this file." };
     },
     async unlinkLinearIssue({ threadId }) {
       return trackerService.unlink(threadId);
