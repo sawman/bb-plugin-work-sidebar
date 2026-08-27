@@ -26,4 +26,15 @@ describe("Tasks mutations", () => {
     await hook.result.current.create.mutateAsync({ projectId: "project_1", title: "New", assignee: "human" }); await hook.result.current.attachment.mutateAsync({ taskId: task.id, threadId: "thr_1", attached: true }); await hook.result.current.status.mutateAsync({ taskId: task.id, status: "done" }); await expect(hook.result.current.remove.mutateAsync({ taskId: task.id })).rejects.toThrow("Task was not found.");
     expect(client.getQueryData(queryKeys.sidebar.tasks.list())).toEqual(before);
   });
+
+  it("defers one realtime list+links flush until overlapping assignment and reorder settle", async () => {
+    const assign = deferred<unknown>(); const reorder = deferred<unknown>();
+    const rpc = { call: vi.fn((method: string) => method === "updateTaskAssignee" ? assign.promise : method === "reorderTask" ? reorder.promise : Promise.resolve({})) };
+    const { client, hook } = setup(rpc); client.setQueryData(queryKeys.sidebar.tasks.list(), { tasks: [task, { ...task, id: "task_2", position: 2 }] });
+    const invalidations: string[] = []; vi.spyOn(client, "invalidateQueries").mockImplementation(async ({ queryKey }) => { invalidations.push((queryKey as string[]).at(-1)!); });
+    const a = hook.result.current.assignment.mutateAsync({ taskId: task.id, assignee: "agent" }); const r = hook.result.current.reorder.mutateAsync({ taskId: task.id, beforeTaskId: "task_2", afterTaskId: null });
+    await waitFor(() => expect(rpc.call).toHaveBeenCalledTimes(2)); await invalidateTaskQueries(client, ["list", "links"]); expect(invalidations).toEqual([]);
+    assign.resolve({}); await a; expect(invalidations).toEqual([]);
+    reorder.resolve({}); await r; expect(invalidations.sort()).toEqual(["links", "list"]);
+  });
 });
