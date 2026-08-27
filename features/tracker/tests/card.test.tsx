@@ -6,6 +6,9 @@ import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
 import type { rpcContract } from "../../../contracts";
 import { getPluginQueryClient } from "../../../query-runtime";
 
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock("sonner", () => ({ toast }));
+
 type Rpc = NonNullable<RenderSlotOptions<typeof rpcContract>["rpc"]>;
 const unlinked = { visible: true, available: true, message: null, suggestions: [{ key: "LIN-1", title: "Suggested", url: "https://linear.app/issue/LIN-1" }], item: null, statusOptions: [] };
 const linked = { ...unlinked, item: { key: "LIN-1", title: "Suggested", url: "https://linear.app/issue/LIN-1", status: "Todo", stateCategory: "todo" as const, priority: null, assignee: null, project: null }, statusOptions: [{ id: "todo", name: "Todo", current: true }, { id: "done", name: "Done", current: false }] };
@@ -13,7 +16,7 @@ const context = { tasksAvailable: true, currentThread: { title: "Fixture", statu
 
 function fixture(overrides: Partial<Rpc> = {}): Rpc { return { getWorkContext: () => context, getWorkChanges: () => ({ currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null, repository: context.repository }), sidebarTasks: () => ({ available: true, tasks: [], projects: [], error: null }), sidebarTaskLinks: () => ({ available: true, links: {}, error: null }), getWorkStatus: () => ({ currentThread: context.currentThread, children: [] }), getLatestActivity: () => ({ currentThread: { status: "idle", runtimeStatus: "idle" }, latest: null, lastUser: null, current: null }), getWorkOutcome: () => ({ tasksAvailable: true, outcome: null, executionTasks: [], bindings: [] }), getWorkGoal: () => null, getWorkPlan: () => ({ items: [] }), getWorkProviderStatus: () => ({ tone: "green", providerId: "codex", providerName: "Codex", statusUrl: null, status: "ready", message: null }), getGitHubApiHealth: () => ({ state: "available", scope: "unknown", message: null, retryAt: null }), getWorkTracker: () => unlinked, searchLinearIssues: () => ({ items: [] }), ...overrides } as Rpc; }
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (error: Error) => void; const promise = new Promise<T>((ok, bad) => { resolve = ok; reject = bad; }); return { promise, resolve, reject }; }
-afterEach(() => { cleanup(); getPluginQueryClient().clear(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); getPluginQueryClient().clear(); vi.clearAllMocks(); vi.useRealTimers(); });
 
 describe("registered tracker card", () => {
   it("dedupes header/card context and debounces search through actual Query hooks", async () => {
@@ -38,7 +41,7 @@ describe("registered tracker card", () => {
     const app = await loadPluginApp(() => import("../../../app")); const link = deferred<{ key: string; title: string }>(); const linkLinearIssue = vi.fn(() => link.promise); const getWorkTracker = vi.fn(() => unlinked);
     const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_mutate", params: null }, { rpc: fixture({ getWorkTracker, linkLinearIssue }) });
     await waitFor(() => expect(slot.getByText("Suggested")).toBeTruthy()); fireEvent.click(slot.getByText("Suggested")); await waitFor(() => expect(slot.inspection.rpcCalls.filter((call) => call.method === "linkLinearIssue")).toHaveLength(1)); expect(slot.inspection.rpcCalls.find((call) => call.method === "linkLinearIssue")?.input).toEqual({ threadId: "thr_mutate", key: "LIN-1" }); expect((slot.getByRole("option") as HTMLButtonElement).disabled).toBe(true);
-    link.reject(new Error("link failed")); await waitFor(() => expect((slot.getByRole("option") as HTMLButtonElement).disabled).toBe(false)); slot.lifecycle.unmount();
+    link.reject(new Error("link failed")); await waitFor(() => expect((slot.getByRole("option") as HTMLButtonElement).disabled).toBe(false)); expect(toast.error).toHaveBeenCalledWith("link failed"); slot.lifecycle.unmount();
   });
 
   it("issues exact linked status and unlink RPCs with disabled controls and targeted refreshes", async () => {
@@ -47,13 +50,21 @@ describe("registered tracker card", () => {
     const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_linked", params: null }, { rpc: fixture({ getWorkTracker, updateLinearIssueStatus, unlinkLinearIssue: () => unlink.promise }) });
     await waitFor(() => expect(slot.getByLabelText("Linear issue status")).toBeTruthy()); fireEvent.change(slot.getByLabelText("Linear issue status"), { target: { value: "done" } });
     await waitFor(() => expect(slot.inspection.rpcCalls.filter((call) => call.method === "updateLinearIssueStatus")).toHaveLength(1)); expect(slot.inspection.rpcCalls.find((call) => call.method === "updateLinearIssueStatus")?.input).toEqual({ threadId: "thr_linked", statusId: "done" }); expect((slot.getByLabelText("Linear issue status") as HTMLSelectElement).disabled).toBe(true);
-    status.resolve({ key: "LIN-1", status: "Done" }); await waitFor(() => expect((slot.getByLabelText("Linear issue status") as HTMLSelectElement).disabled).toBe(false));
-    fireEvent.click(slot.getByRole("button", { name: "Unlink" })); await waitFor(() => expect(slot.inspection.rpcCalls.filter((call) => call.method === "unlinkLinearIssue")).toHaveLength(1)); expect(slot.inspection.rpcCalls.find((call) => call.method === "unlinkLinearIssue")?.input).toEqual({ threadId: "thr_linked" }); expect((slot.getByRole("button", { name: "Unlink" }) as HTMLButtonElement).disabled).toBe(true); unlink.reject(new Error("unlink failed")); await waitFor(() => expect((slot.getByRole("button", { name: "Unlink" }) as HTMLButtonElement).disabled).toBe(false)); slot.lifecycle.unmount();
+    status.resolve({ key: "LIN-1", status: "Done" }); await waitFor(() => expect((slot.getByLabelText("Linear issue status") as HTMLSelectElement).disabled).toBe(false)); expect(toast.success).toHaveBeenCalledWith("LIN-1 moved to Done");
+    fireEvent.click(slot.getByRole("button", { name: "Unlink" })); await waitFor(() => expect(slot.inspection.rpcCalls.filter((call) => call.method === "unlinkLinearIssue")).toHaveLength(1)); expect(slot.inspection.rpcCalls.find((call) => call.method === "unlinkLinearIssue")?.input).toEqual({ threadId: "thr_linked" }); expect((slot.getByRole("button", { name: "Unlink" }) as HTMLButtonElement).disabled).toBe(true); unlink.reject(new Error("unlink failed")); await waitFor(() => expect((slot.getByRole("button", { name: "Unlink" }) as HTMLButtonElement).disabled).toBe(false)); expect(toast.error).toHaveBeenCalledWith("unlink failed"); slot.lifecycle.unmount();
   });
 
   it("refetches the actual tracker query exactly once for one realtime event", async () => {
     const app = await loadPluginApp(() => import("../../../app")); const getWorkTracker = vi.fn(() => unlinked);
     const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_realtime", params: null }, { rpc: fixture({ getWorkTracker }) });
     await waitFor(() => expect(getWorkTracker).toHaveBeenCalledTimes(1)); await slot.behavior.emitRealtime("work-sidebar:changed", { threadId: "thr_realtime" }); await waitFor(() => expect(getWorkTracker).toHaveBeenCalledTimes(2)); slot.lifecycle.unmount();
+  });
+
+  it("uses BB navigation for both the header badge and linked issue", async () => {
+    const app = await loadPluginApp(() => import("../../../app"));
+    const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_nav", params: null }, { rpc: fixture({ getWorkTracker: () => linked }) });
+    await waitFor(() => expect(slot.getByLabelText("Linear issue status")).toBeTruthy());
+    fireEvent.click(slot.getAllByText("LIN-1")[0]!); fireEvent.click(slot.container.querySelector(".ws-linear-issue")!);
+    expect(slot.inspection.navigateCalls).toEqual([{ method: "openUrl", url: linked.item.url }, { method: "openUrl", url: linked.item.url }]); slot.lifecycle.unmount();
   });
 });
