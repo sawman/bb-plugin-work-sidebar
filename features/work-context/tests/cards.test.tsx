@@ -24,7 +24,7 @@ describe("registered Work context cards", () => {
     const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_one", params: null }, { rpc: fixture({ getWorkOutcome: failedOutcome }) });
     await waitFor(() => expect(slot.getByText("outcome unavailable")).toBeTruthy(), { timeout: 3_000 });
     for (const name of ["Status", "Tasks", "Goal", "Plan"]) expect(slot.getAllByText(name).length).toBeGreaterThan(0);
-    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(4);
+    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(5);
     slot.lifecycle.unmount(); getPluginQueryClient().clear();
   });
 

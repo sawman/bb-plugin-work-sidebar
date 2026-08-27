@@ -70,6 +70,7 @@ import { threadInteractionStore, type ThreadDropTarget, type WorkTab } from "./f
 import { useArchivedThreads, useThreadPreferences } from "./features/threads/queries";
 import { WorkThreadTree, threadIsWorking, visibleThreadTreeIds } from "./features/threads/thread-row";
 import { WorkContextCards } from "./features/work-context/views";
+import { useLegacyProviderHealth, useLegacyWorkChanges, useLegacyWorkContext, useLegacyWorkTracker } from "./features/work-context/queries";
 
 function withPluginProviders<Props extends object>(Component: ComponentType<Props>): ComponentType<Props> {
   return function PluginSlot(props: Props) {
@@ -501,22 +502,7 @@ type WorkPanelChild = {
 };
 
 type WorkPanelBinding = { ownerThreadId: string | null; dispatchState: string; recoveryMessage: string | null };
-type WorkPanelContext = Extract<Awaited<ReturnType<ReturnType<typeof useRpc<typeof rpcContract>>["call"]>>, { repository: unknown; tasks: unknown }>;
-type WorkPanelChanges = Pick<WorkPanelContext, "repository">;
-type WorkPanelTracker = Pick<WorkPanelContext, "tracker">;
 type WorkProviderHealth = { tone: "green" | "amber" | "red"; providerId: string; providerName: string; statusUrl: string | null; status: string; message: string | null };
-
-function cachedWorkPanelContext(threadId: string) {
-  return getPluginQueryClient().getQueryData<WorkPanelContext>(queryKeys.work.context(threadId));
-}
-function cacheWorkPanelContext(threadId: string, context: WorkPanelContext) {
-  getPluginQueryClient().setQueryData(queryKeys.work.context(threadId), context);
-}
-function cacheWorkPanelDetails(threadId: string, details: Partial<WorkPanelChanges & WorkPanelTracker>) {
-  const merged = { ...cachedWorkPanelContext(threadId), ...details };
-  if (cachedWorkPanelContext(threadId)) cacheWorkPanelContext(threadId, merged as WorkPanelContext);
-  return merged;
-}
 
 /** An agent row keeps ordinary open and deliberate split navigation separate. */
 function WorkAgentRow({ child, bindings }: { child: WorkPanelChild; bindings: readonly WorkPanelBinding[] }) {
@@ -554,20 +540,18 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   useEffect(() => {
     threadInteractionStore.getState().touchWorkTab(threadId);
   }, [threadId]);
-  const [context, setContext] = useState<WorkPanelContext | null>(() => cachedWorkPanelContext(threadId) ?? null);
-  const [loading, setLoading] = useState(() => !cachedWorkPanelContext(threadId));
-  const [changesLoading, setChangesLoading] = useState(() => !cachedWorkPanelContext(threadId)?.repository);
-  const [trackerLoading, setTrackerLoading] = useState(() => !cachedWorkPanelContext(threadId)?.tracker);
-  const [providerHealth, setProviderHealth] = useState<WorkProviderHealth>({ tone: "amber", providerId: "", providerName: "Provider", statusUrl: null, status: "unknown", message: "Checking provider health…" });
-  const [error, setError] = useState<string | null>(null);
-  const [updatingTask, setUpdatingTask] = useState<string | null>(null);
-  const activityRefreshInFlight = useRef(false);
-  const [activity, setActivity] = useState<{ latest: { text: string; kind: "assistant" | "user" | "command" | "activity" } | null; lastUser: { text: string; kind: "user" } | null; current: { text: string; kind: "assistant" | "user" | "command" | "activity" } | null } | null>(null);
+  const legacyContext = useLegacyWorkContext(threadId);
+  const legacyChanges = useLegacyWorkChanges(threadId);
+  const legacyTracker = useLegacyWorkTracker(threadId);
+  const legacyProviderHealth = useLegacyProviderHealth(threadId);
+  const context = legacyContext.data ? { ...legacyContext.data, repository: legacyChanges.data?.repository ?? legacyContext.data.repository, tracker: legacyTracker.data ?? legacyContext.data.tracker } : null;
+  const loading = legacyContext.isPending;
+  const changesLoading = legacyChanges.isPending;
+  const trackerLoading = legacyTracker.isPending;
+  const providerHealth: WorkProviderHealth = legacyProviderHealth.data ?? { tone: "amber", providerId: "", providerName: "Provider", statusUrl: null, status: "unknown", message: "Checking provider health…" };
+  const error = legacyContext.error?.message ?? null;
+  const activity = context?.activity ?? null;
   const [expandedActivity, setExpandedActivity] = useState<Set<string>>(() => new Set());
-  const [taskTitle, setTaskTitle] = useState("");
-  const [createTaskState, setCreateTaskState] = useState<"idle" | "working" | "error">("idle");
-  const [createTaskError, setCreateTaskError] = useState<string | null>(null);
-  const [selectedAttachTaskId, setSelectedAttachTaskId] = useState("");
   const [linearBusy, setLinearBusy] = useState(false);
   const [pendingChangesExpanded, setPendingChangesExpanded] = useState(false);
   const [currentPrExpanded, setCurrentPrExpanded] = useState(false);
@@ -575,90 +559,11 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const [checkingOutBranch, setCheckingOutBranch] = useState<string | null>(null);
   const [workingTreeDiff, setWorkingTreeDiff] = useState<{ path: string; patch: string | null; loading: boolean; message: string | null } | null>(null);
 
-  const refresh = useCallback(async (background = false) => {
-    if (!background && !cachedWorkPanelContext(threadId)) setLoading(true);
-    setError(null);
-    try {
-      const next = await rpc.call("getWorkContext", { threadId });
-      const hydrated = { ...next, ...cachedWorkPanelContext(threadId) };
-      cacheWorkPanelContext(threadId, hydrated);
-      setContext(hydrated);
-      setActivity(hydrated.activity);
-      setTaskTitle((current) => current || hydrated.currentThread.title);
-      setCreateTaskState("idle");
-      setCreateTaskError(null);
-    } catch (caught) {
-      setContext(null);
-      setError(caught instanceof Error ? caught.message : "Could not load work context");
-    } finally {
-      setLoading(false);
-    }
-  }, [rpc, threadId]);
-  const refreshChanges = useCallback(async (background = false, force = false) => {
-    if (!background || !cachedWorkPanelContext(threadId)?.repository) setChangesLoading(true);
-    try {
-      const details = await rpc.call("getWorkChanges", { threadId, pullRequests: false, ...(force ? { force: true } : {}) });
-      const merged = cacheWorkPanelDetails(threadId, { repository: details.repository });
-      setContext((current) => current ? { ...current, ...merged } : current);
-    } catch (caught) {
-      toast.error(caught instanceof Error ? caught.message : "Could not load changes");
-    } finally {
-      setChangesLoading(false);
-    }
-  }, [rpc, threadId]);
-  const refreshTracker = useCallback(async (background = false) => {
-    if (!background || !cachedWorkPanelContext(threadId)?.tracker) setTrackerLoading(true);
-    try {
-      const tracker = await rpc.call("getWorkTracker", { threadId });
-      const merged = cacheWorkPanelDetails(threadId, { tracker });
-      setContext((current) => current ? { ...current, ...merged } : current);
-    } catch (caught) {
-      toast.error(caught instanceof Error ? caught.message : "Could not load tracker");
-    } finally {
-      setTrackerLoading(false);
-    }
-  }, [rpc, threadId]);
-  const refreshProviderHealth = useCallback(async () => {
-    try {
-      const next = await rpc.call("getWorkProviderStatus", { threadId });
-      setProviderHealth(next);
-    } catch {
-      setProviderHealth({ tone: "amber", providerId: "", providerName: "Provider", statusUrl: null, status: "unknown", message: "Provider health could not be checked." });
-    }
-  }, [rpc, threadId]);
-  useEffect(() => {
-    const cached = cachedWorkPanelContext(threadId);
-    const details = cached;
-    if (cached) { setContext(cached); setActivity(cached.activity); setLoading(false); setError(null); }
-    else { setContext(null); setActivity(null); setLoading(true); }
-    setChangesLoading(!details?.repository);
-    setTrackerLoading(!details?.tracker);
-    void refresh(Boolean(cached));
-    void refreshChanges(Boolean(details?.repository));
-    void refreshTracker(Boolean(details?.tracker));
-    void refreshProviderHealth();
-    return undefined;
-  }, [refresh, refreshChanges, refreshProviderHealth, refreshTracker, threadId]);
-  useRealtime("work-sidebar:changed", () => { void refresh(true); void refreshChanges(true); void refreshTracker(true); void refreshProviderHealth(); void invalidateThreadPullRequestChanges(queryClient, threadId); });
-  useEffect(() => {
-    const interval = window.setInterval(() => { void refreshProviderHealth(); }, 30_000);
-    return () => window.clearInterval(interval);
-  }, [refreshProviderHealth]);
-  useEffect(() => {
-    if (context?.currentThread.status !== "active" && context?.currentThread.status !== "starting") return;
-    const refreshActivity = async () => {
-      if (activityRefreshInFlight.current) return;
-      activityRefreshInFlight.current = true;
-      try {
-        const nextActivity = await rpc.call("getLatestActivity", { threadId });
-        setActivity(nextActivity);
-        setContext((current) => current ? { ...current, currentThread: { ...current.currentThread, ...nextActivity.currentThread } } : current);
-      } catch { /* Retain the last good activity during a transient poll failure. */ } finally { activityRefreshInFlight.current = false; }
-    };
-    void refreshActivity();
-    const interval = window.setInterval(() => { void refreshActivity(); }, 2_000);
-    return () => window.clearInterval(interval);
-  }, [context?.currentThread.status, rpc, threadId]);
+  const refresh = () => legacyContext.refetch();
+  const refreshChanges = () => legacyChanges.refetch();
+  const refreshTracker = () => legacyTracker.refetch();
+  const refreshProviderHealth = () => legacyProviderHealth.refetch();
+  useRealtime("work-sidebar:changed", () => { void refresh(); void refreshChanges(); void refreshTracker(); void refreshProviderHealth(); void invalidateThreadPullRequestChanges(queryClient, threadId); });
 
   const openWorkingTreeDiff = async (path: string) => {
     setWorkingTreeDiff({ path, patch: null, loading: true, message: null });
@@ -668,32 +573,6 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
     } catch (error) {
       setWorkingTreeDiff({ path, patch: null, loading: false, message: error instanceof Error ? error.message : "Could not load the file diff." });
     }
-  };
-
-  const createTask = async () => {
-    if (!context?.tasksAvailable || !taskTitle.trim() || createTaskState === "working") return;
-    setCreateTaskState("working");
-    setCreateTaskError(null);
-    try {
-      await rpc.call("createWorkTask", { threadId, title: taskTitle.trim(), description: "Created from the Work sidebar.", parentTaskId: null });
-      setTaskTitle(""); toast.success("Task created and attached"); await refresh();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Could not create task";
-      setCreateTaskState("error");
-      setCreateTaskError(message);
-      toast.error(message);
-    }
-  };
-  const updateThreadTaskAttachment = async (taskId: string, attached: boolean) => {
-    try {
-      await taskMutations.attachment.mutateAsync({ taskId, threadId, attached });
-      setSelectedAttachTaskId("");
-    } catch (error) { toast.error(error instanceof Error ? error.message : `Could not ${attached ? "attach" : "detach"} task`); }
-  };
-  const updateThreadTaskAssignee = async (taskId: string, assignee: SidebarTask["assignee"]) => {
-    try {
-      await taskMutations.assignment.mutateAsync({ taskId, assignee });
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Could not update task assignee"); }
   };
 
   const selectedTab = WORK_TABS.find((candidate) => candidate.id === tab) ?? WORK_TABS[0]!;
@@ -712,30 +591,15 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
     window.requestAnimationFrame(() => document.getElementById(`ws-tab-${next.id}`)?.focus());
   };
   const tabPanelId = `ws-panel-${selectedTab.id}`;
-  const outcomeTask = context?.outcome ?? context?.tasks[0] ?? null;
-  const executionTasks = context?.executionTasks?.length ? context.executionTasks : (context?.subtasks ?? []);
-  const availableTasks = tasksData?.tasks ?? [];
-  const threadTasksLoading = !tasksData;
-  const threadTasks = availableTasks.filter((task) => task.linkedThreadIds.includes(threadId));
-  const attachableTasks = availableTasks.filter((task) => !task.linkedThreadIds.includes(threadId));
-  const bindings = context?.bindings ?? [];
   const activityItems = context && activity ? [
     { label: "Agent", entry: activity.latest },
     { label: "User", entry: activity.lastUser },
   ].filter((item, index, items) => item.entry && items.findIndex((candidate) => candidate.entry?.text === item.entry?.text) === index) : [];
+  const bindings = context?.bindings ?? [];
   const linkLinear = async (key: string) => { setLinearBusy(true); try { const item = await rpc.call("linkLinearIssue", { threadId, key }); toast.success(`${item.key} linked`); await Promise.all([refresh(), refreshTracker()]); } catch (caught) { toast.error(caught instanceof Error ? caught.message : "Could not link Linear issue"); } finally { setLinearBusy(false); } };
   const searchLinear = useCallback(async (query: string) => (await rpc.call("searchLinearIssues", { threadId, query })).items, [rpc, threadId]);
   const unlinkLinear = async () => { setLinearBusy(true); try { await rpc.call("unlinkLinearIssue", { threadId }); await Promise.all([refresh(), refreshTracker()]); } catch (caught) { toast.error(caught instanceof Error ? caught.message : "Could not unlink Linear issue"); } finally { setLinearBusy(false); } };
   const moveLinear = async (statusId: string) => { if (!statusId) return; setLinearBusy(true); try { const item = await rpc.call("updateLinearIssueStatus", { threadId, statusId }); toast.success(`${item.key} moved to ${item.status}`); await Promise.all([refresh(), refreshTracker()]); } catch (caught) { toast.error(caught instanceof Error ? caught.message : "Could not update Linear issue"); } finally { setLinearBusy(false); } };
-  const advanceOutcome = async () => {
-    if (!outcomeTask || updatingTask === outcomeTask.id) return;
-    const nextStatus = ({ backlog: "todo", todo: "in_progress", in_progress: "in_review", in_review: "done", done: undefined, canceled: undefined } as const)[outcomeTask.status];
-    if (!nextStatus) return;
-    setUpdatingTask(outcomeTask.id);
-    try { await rpc.call("updateWorkTask", { taskId: outcomeTask.id, status: nextStatus }); await refresh(); }
-    catch (caught) { toast.error(caught instanceof Error ? caught.message : "Could not update task"); }
-    finally { setUpdatingTask(null); }
-  };
   const toggleStackBranch = (branch: string) => setExpandedStackBranches((current) => { const next = new Set(current); next.has(branch) ? next.delete(branch) : next.add(branch); return next; });
   const checkoutStackBranch = async (branch: string) => {
     if (checkingOutBranch) return;
@@ -774,40 +638,11 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
       <div className="ws-panel-body" role="tabpanel" id={tabPanelId} aria-labelledby={`ws-tab-${selectedTab.id}`} tabIndex={0}>
         {loading && <div className="ws-empty" role="status" aria-live="polite">Loading work context…</div>}
         {!loading && error && <div className="ws-callout" role="alert"><span>{error}</span><button type="button" onClick={() => { void refresh(); void refreshChanges(); void refreshTracker(); void refreshProviderHealth(); void pullRequestChanges.refetch(); void githubHealthQuery.refetch(); }}>Try again</button></div>}
-        {!loading && context && tab === "work" && (
+        {tab === "work" && (
           <div className="ws-section-stack">
-            <header><div><h2>Work</h2></div><span className="ws-work-header-badges">{outcomeTask && <span className="ws-work-header-badge" title={`${outcomeTask.key} · ${outcomeTask.title}`}>{outcomeTask.key}</span>}{!trackerLoading && context.tracker.item && <a className="ws-work-header-badge ws-linear-header-badge" href={context.tracker.item.url} target="_blank" rel="noreferrer" title={`${context.tracker.item.key} · ${context.tracker.item.title}`}>{context.tracker.item.key}</a>}</span></header>
+            <header><div><h2>Work</h2></div><span className="ws-work-header-badges">{!trackerLoading && context?.tracker.item && <a className="ws-work-header-badge ws-linear-header-badge" href={context.tracker.item.url} target="_blank" rel="noreferrer" title={`${context.tracker.item.key} · ${context.tracker.item.title}`}>{context.tracker.item.key}</a>}</span></header>
             <WorkContextCards threadId={threadId} />
-            {trackerLoading ? <article className="ws-card ws-empty-state-card" aria-busy="true"><div className="ws-card-heading"><strong>Linear</strong></div><p className="ws-card-note">Loading linked work…</p></article> : <LinearCard context={context} linking={linearBusy} onLink={(key) => void linkLinear(key)} onUnlink={() => void unlinkLinear()} onMove={(statusId) => void moveLinear(statusId)} onSearch={searchLinear} />}
-            {!context.tasksAvailable && <article className="ws-card ws-empty-state-card"><div className="ws-card-heading"><strong>Tasks</strong></div><p className="ws-card-note">Tasks are unavailable right now.</p><button type="button" className="ws-compact-action" onClick={() => void refresh()}>Check again</button></article>}
-            {context.tasksAvailable && tasksReadPending && <article className="ws-card ws-empty-state-card" role="status" aria-live="polite" aria-busy="true"><div className="ws-card-heading"><strong>Tasks</strong></div><p className="ws-card-note">Loading tasks…</p></article>}
-            {context.tasksAvailable && tasksReadFailed && <article className="ws-card ws-empty-state-card" role="alert"><div className="ws-card-heading"><strong>Tasks</strong></div><p className="ws-card-note">{tasksReadError.message}</p><button type="button" className="ws-compact-action" onClick={() => void refetchTasks()}>Try again</button></article>}
-            {context.tasksAvailable && !tasksReadPending && !tasksReadFailed && <WorkCard className="ws-thread-task-card"><WorkCardHeading title="Tasks" trailing={<span className="ws-section-count">{threadTasks.length + executionTasks.length}</span>} />{threadTasks.length > 0 ? <div className="ws-work-card-list">{threadTasks.map((task) => <div key={task.id} className="ws-work-card-row"><span className="ws-work-card-key">{task.key}</span><span className="ws-work-card-copy">{task.title}</span><AssigneePicker value={task.assignee} disabled={taskMutations.assignment.isPending} onChange={(assignee) => void updateThreadTaskAssignee(task.id, assignee)} /><button type="button" disabled={taskMutations.attachment.isPending} onClick={() => void updateThreadTaskAttachment(task.id, false)} aria-label={`Detach ${task.key} from this thread`} title="Detach from this thread"><Icon name="X" aria-hidden /></button></div>)}</div> : <p className="ws-card-note">No tasks are attached to this thread.</p>}<div className="ws-work-card-control"><Combobox value={selectedAttachTaskId} disabled={threadTasksLoading || taskMutations.attachment.isPending} options={attachableTasks.map((task) => ({ value: task.id, label: task.key, detail: task.title }))} onChange={setSelectedAttachTaskId} placeholder="Add an existing task…" ariaLabel="Add task to this thread" /><button type="button" disabled={!selectedAttachTaskId || taskMutations.attachment.isPending} onClick={() => void updateThreadTaskAttachment(selectedAttachTaskId, true)}>{taskMutations.attachment.isPending ? "…" : "Add"}</button></div>{executionTasks.length > 0 && <div className="ws-work-card-list ws-work-card-list-separated" aria-label="Execution tasks">{executionTasks.map((task) => { const binding = bindings.find((candidate) => candidate.executionTaskId === task.id); return <div key={task.id} className="ws-work-card-row"><span className={`ws-status-dot ws-status-dot-${task.status}`}>{task.status === "done" ? "✓" : "•"}</span><span className="ws-work-card-copy"><strong>{task.title}</strong><small>{task.key} · {readableStatus(task.status)}{binding?.mode ? ` · ${readableStatus(binding.mode)}` : ""}</small></span></div>; })}</div>}</WorkCard>}
-            {outcomeTask && (
-              <article key={outcomeTask.id} className="ws-card ws-outcome-card">
-                <div className="ws-card-heading"><strong>Outcome</strong><span className="ws-task-card-icons">{outcomeTask.priority !== "none" && <span className="ws-pr-tooltip" data-tooltip={`${readableStatus(outcomeTask.priority)} priority`}><Icon name="AlertCircle" className={`ws-priority-icon ws-priority-${outcomeTask.priority}`} aria-label={`${readableStatus(outcomeTask.priority)} priority`} /></span>}</span></div>
-                <div className="ws-outcome-body"><div><p className="ws-card-note ws-outcome-key">{outcomeTask.key}</p><h3>{outcomeTask.title}</h3></div>{outcomeTask.status !== "done" && outcomeTask.status !== "canceled" && context.tasksAvailable && <button type="button" className={`ws-work-status-button ws-work-status-${outcomeTask.status} ws-pr-tooltip`} data-tooltip={`Move ${readableStatus(outcomeTask.status)} to the next state`} disabled={updatingTask === outcomeTask.id} onClick={() => void advanceOutcome()} aria-label={`Current task status: ${readableStatus(outcomeTask.status)}. Move to the next state.`}><Icon name={updatingTask === outcomeTask.id ? "LoaderCircle" : outcomeTask.status === "in_review" ? "Check" : "ArrowRight"} aria-hidden /></button>}</div>
-                {outcomeTask.dueDate && <div className="ws-card-meta"><span>Due {outcomeTask.dueDate}</span></div>}
-              </article>
-            )}
-            {!outcomeTask && (
-              <article className="ws-card ws-outcome-empty">
-                <div className="ws-card-heading"><strong>Outcome</strong></div>
-                <p className="ws-card-note">No current outcome.</p>
-                <div className="ws-outcome-form">
-                  <Input disabled={!context.tasksAvailable || createTaskState === "working"} aria-label="Outcome-oriented task title" placeholder="Outcome-oriented task title" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void createTask(); }} />
-                  <button type="button" className="ws-outcome-create-button" title="Create and attach outcome task" aria-label="Create and attach outcome task" disabled={!context.tasksAvailable || createTaskState === "working" || !taskTitle.trim()} onClick={() => void createTask()}>{createTaskState === "working" ? "…" : "Create"}</button>
-                </div>
-                {createTaskError && <div className="ws-inline-error" role="alert">{createTaskError}</div>}
-              </article>
-            )}
-            <section className="ws-agent-context" aria-label="Agent context">
-            <article className="ws-card ws-goal"><div className="ws-card-heading"><strong>Goal</strong>{context.goal && <span>{readableStatus(context.goal.status)}</span>}</div>{context.goal ? <><h3>{context.goal.objective}</h3>{goalProgressPercent(context.goal) !== null && <div className="ws-progress" role="progressbar" aria-label="Goal token usage" aria-valuemin={0} aria-valuemax={100} aria-valuenow={goalProgressPercent(context.goal)!}><span style={{ width: `${goalProgressPercent(context.goal)}%` }} /></div>}</> : <p className="ws-card-note">No goal supplied by this harness.</p>}</article>
-            <article className="ws-card ws-plan-card"><div className="ws-card-heading"><strong>Plan</strong>{context.todos.length > 0 && <span className="ws-section-count">{context.todos.filter((item) => item.status === "completed").length} / {context.todos.length}</span>}</div><div className="ws-plan">
-              {context.todos.map((item) => <div key={item.id} className={`ws-plan-item ws-plan-${item.status}`}><span aria-hidden="true">{item.status === "completed" ? "✓" : item.status === "in_progress" ? "●" : "○"}</span><span>{item.text}</span><span className="sr-only">{readableStatus(item.status)}</span></div>)}
-              {context.todos.length === 0 && <p className="ws-card-note">No plan supplied by this harness.</p>}
-            </div></article>
-            </section>
+            {trackerLoading || !context ? <article className="ws-card ws-empty-state-card" aria-busy="true"><div className="ws-card-heading"><strong>Linear</strong></div><p className="ws-card-note">Loading linked work…</p></article> : <LinearCard context={context} linking={linearBusy} onLink={(key) => void linkLinear(key)} onUnlink={() => void unlinkLinear()} onMove={(statusId) => void moveLinear(statusId)} onSearch={searchLinear} />}
           </div>
         )}
         {!loading && context && tab === "changes" && (

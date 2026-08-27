@@ -1,12 +1,11 @@
 import type { QueryPolicy } from "../../query-runtime";
 
-export type WorkContextCard = "status" | "tasks" | "outcome" | "goal" | "plan";
+export type WorkContextCard = "status" | "outcome" | "goal" | "plan";
 
 const root = ["work-sidebar", "work-context"] as const;
 
 export const workContextCardKeys = {
   status: (threadId: string) => [...root, "status", threadId] as const,
-  tasks: (threadId: string) => [...root, "tasks", threadId] as const,
   outcome: (threadId: string) => [...root, "outcome", threadId] as const,
   goal: (threadId: string) => [...root, "goal", threadId] as const,
   plan: (threadId: string) => [...root, "plan", threadId] as const,
