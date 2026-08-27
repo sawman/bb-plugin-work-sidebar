@@ -1026,6 +1026,9 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const navigate = useBbNavigate();
   const actions = experimental_useSidebarThreadActions();
   const tab = useStore(threadInteractionStore, (state) => state.workTabsByThread.get(threadId) ?? "work");
+  useEffect(() => {
+    threadInteractionStore.getState().touchWorkTab(threadId);
+  }, [threadId]);
   const [context, setContext] = useState<WorkPanelContext | null>(() => workPanelCache.get(threadId) ?? null);
   const [loading, setLoading] = useState(() => !workPanelCache.has(threadId));
   const [changesLoading, setChangesLoading] = useState(() => !workPanelDetailsCache.get(threadId)?.repository);

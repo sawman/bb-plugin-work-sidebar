@@ -16,6 +16,7 @@ export type ThreadInteractionState = {
   toggleChildren(threadId: string): void;
   setDrag(threadId: string | null, target: ThreadDropTarget): void;
   setWorkTab(threadId: string, tab: WorkTab): void;
+  touchWorkTab(threadId: string): void;
   workTabFor(threadId: string): WorkTab;
   reconcileRoster(threadIds: Iterable<string>): void;
 };
@@ -47,6 +48,16 @@ export function createThreadInteractionStore() {
       workTabsByThread.delete(threadId);
       workTabsByThread.set(threadId, tab);
       return { workTabsByThread: cappedWorkTabs(workTabsByThread) };
+    }),
+    // Access is intentionally explicit so React renders stay pure. Consumers
+    // touch an existing entry in an effect after mount or thread switching.
+    touchWorkTab: (threadId) => set((current) => {
+      const tab = current.workTabsByThread.get(threadId);
+      if (!tab) return current;
+      const workTabsByThread = new Map(current.workTabsByThread);
+      workTabsByThread.delete(threadId);
+      workTabsByThread.set(threadId, tab);
+      return { workTabsByThread };
     }),
     workTabFor: (threadId) => get().workTabsByThread.get(threadId) ?? "work",
     reconcileRoster: (threadIds) => set((current) => {
