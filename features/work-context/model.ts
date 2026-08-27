@@ -1,4 +1,5 @@
 import type { QueryPolicy } from "../../query-runtime";
+import type { TaskStatus } from "../tasks/model";
 
 export type WorkContextCard = "status" | "outcome" | "goal" | "plan";
 
@@ -19,6 +20,6 @@ export const workContextCardPolicy: QueryPolicy = {
   refetchOnWindowFocus: false,
 };
 
-export function nextOutcomeStatus(status: string): string | null {
-  return ({ backlog: "todo", todo: "in_progress", in_progress: "in_review", in_review: "done" } as Record<string, string | undefined>)[status] ?? null;
+export function nextOutcomeStatus(status: TaskStatus): TaskStatus | null {
+  return ({ backlog: "todo", todo: "in_progress", in_progress: "in_review", in_review: "done" } as Partial<Record<TaskStatus, TaskStatus>>)[status] ?? null;
 }

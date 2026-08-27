@@ -1,4 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import type { TaskStatus } from "../tasks/model";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
 import type { rpcSchemas } from "../../contracts.schemas";
@@ -36,6 +37,10 @@ export function useWorkStatus(threadId: string) {
 export const useWorkOutcome = (threadId: string) => useWorkContextCard<WorkOutcome>(threadId, "outcome", "getWorkOutcome");
 export const useWorkGoal = (threadId: string) => useWorkContextCard<WorkGoal>(threadId, "goal", "getWorkGoal");
 export const useWorkPlan = (threadId: string) => useWorkContextCard<WorkPlan>(threadId, "plan", "getWorkPlan");
+
+export function invalidateWorkContextCards(queryClient: QueryClient, threadId: string) {
+  return Promise.all(Object.values(workContextCardKeys).map((key) => queryClient.invalidateQueries({ queryKey: key(threadId) })));
+}
 
 export function useLegacyWorkContext(threadId: string) {
   const rpc = useRpc<typeof rpcContract>();
@@ -81,12 +86,12 @@ export function useWorkOutcomeMutation(threadId: string) {
   return {
     update: useMutation({
       mutationKey: [...workContextCardKeys.outcome(threadId), "update"],
-      mutationFn: ({ taskId, status }: { taskId: string; status: string }) => rpc.call("updateWorkTask", { taskId, status: status as never }),
+      mutationFn: ({ taskId, status }: { taskId: string; status: TaskStatus }) => rpc.call("updateWorkTask", { taskId, status }),
       onSuccess: invalidate,
     }),
     create: useMutation({
       mutationKey: [...workContextCardKeys.outcome(threadId), "create"],
-      mutationFn: ({ title }: { threadId: string; title: string }) => rpc.call("createWorkTask", { threadId, title, description: "Created from the Work sidebar.", parentTaskId: null }),
+      mutationFn: ({ title }: { title: string }) => rpc.call("createWorkTask", { threadId, title, description: "Created from the Work sidebar.", parentTaskId: null }),
       onSuccess: invalidate,
     }),
   };

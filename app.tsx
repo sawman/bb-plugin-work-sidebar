@@ -70,7 +70,7 @@ import { threadInteractionStore, type ThreadDropTarget, type WorkTab } from "./f
 import { useArchivedThreads, useThreadPreferences } from "./features/threads/queries";
 import { WorkThreadTree, threadIsWorking, visibleThreadTreeIds } from "./features/threads/thread-row";
 import { WorkContextCards } from "./features/work-context/views";
-import { useLegacyProviderHealth, useLegacyWorkChanges, useLegacyWorkContext, useLegacyWorkTracker } from "./features/work-context/queries";
+import { invalidateWorkContextCards, useLegacyProviderHealth, useLegacyWorkChanges, useLegacyWorkContext, useLegacyWorkTracker } from "./features/work-context/queries";
 
 function withPluginProviders<Props extends object>(Component: ComponentType<Props>): ComponentType<Props> {
   return function PluginSlot(props: Props) {
@@ -563,7 +563,8 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const refreshChanges = () => legacyChanges.refetch();
   const refreshTracker = () => legacyTracker.refetch();
   const refreshProviderHealth = () => legacyProviderHealth.refetch();
-  useRealtime("work-sidebar:changed", () => { void refresh(); void refreshChanges(); void refreshTracker(); void refreshProviderHealth(); void invalidateThreadPullRequestChanges(queryClient, threadId); });
+  const refreshWorkPanel = () => { void invalidateWorkContextCards(queryClient, threadId); void refresh(); void refreshChanges(); void refreshTracker(); void refreshProviderHealth(); };
+  useRealtime("work-sidebar:changed", () => { refreshWorkPanel(); void invalidateThreadPullRequestChanges(queryClient, threadId); });
 
   const openWorkingTreeDiff = async (path: string) => {
     setWorkingTreeDiff({ path, patch: null, loading: true, message: null });
@@ -616,7 +617,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
           <Icon name="ListTodo" className="ws-panel-icon" aria-hidden />
           <div><strong>Work</strong><span>{context?.currentThread.title ?? "Active thread"}</span></div>
         </div>
-        <button type="button" className="ws-icon-button" aria-label="Refresh work context" title="Refresh work context" onClick={() => { void refresh(); void refreshChanges(); void refreshTracker(); void refreshProviderHealth(); void pullRequestChanges.refetch(); void githubHealthQuery.refetch(); }} disabled={loading}>↻</button>
+        <button type="button" className="ws-icon-button" aria-label="Refresh work context" title="Refresh work context" onClick={() => { refreshWorkPanel(); void pullRequestChanges.refetch(); void githubHealthQuery.refetch(); }} disabled={loading}>↻</button>
       </header>
       <nav className="ws-tabs" role="tablist" aria-label="Work context views">
         {WORK_TABS.map((candidate) => (

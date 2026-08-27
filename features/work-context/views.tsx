@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { useRpc } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Icon } from "../../components/ui/icon";
 import { WorkCard, WorkCardHeading } from "../../components/work/card";
@@ -12,11 +12,11 @@ import { useTasksRead } from "../tasks/queries";
 import { nextOutcomeStatus } from "./model";
 import { useLegacyProviderHealth, useWorkGoal, useWorkOutcome, useWorkOutcomeMutation, useWorkPlan, useWorkStatus } from "./queries";
 
-type CardStateProps = { title: string; pending: boolean; error: Error | null; onRetry: () => void; children: ReactNode };
+type CardStateProps = { title: string; className?: string; pending: boolean; error: Error | null; onRetry: () => void; children: ReactNode };
 
-function CardState({ title, pending, error, onRetry, children }: CardStateProps) {
+function CardState({ title, className = "", pending, error, onRetry, children }: CardStateProps) {
   return (
-    <WorkCard className="ws-work-context-card" data-card={title.toLowerCase()}>
+    <WorkCard className={`ws-work-context-card ${className}`} data-card={title.toLowerCase()}>
       <WorkCardHeading title={title} />
       {pending ? <p className="ws-card-note" role="status" aria-busy="true">Loading {title.toLowerCase()}…</p> : null}
       {error ? <div className="ws-card-note" role="alert"><span>{error.message}</span><button type="button" onClick={onRetry}>Try again</button></div> : null}
@@ -34,10 +34,9 @@ function StatusCard({ threadId }: { threadId: string }) {
   const total = data?.children.filter((child) => !child.isArchived).length ?? 0;
   const active = data?.children.filter((child) => !child.isArchived && ["active", "starting"].includes(child.status)).length ?? 0;
   return (
-    <CardState title="Status" pending={query.isPending} error={query.error} onRetry={() => void query.refetch()}>
-      <h3>{runtime?.label ?? "Unknown"}</h3>
-      <p className="ws-card-note">{total} child agents · {active} active</p>
-      {data?.activity.latest || data?.activity.lastUser ? <ul className="ws-activity-list">{data?.activity.latest ? <ActivityRow label="Agent" entry={data.activity.latest} expanded={expanded.has("agent")} onToggle={() => setExpanded((current) => { const next = new Set(current); next.has("agent") ? next.delete("agent") : next.add("agent"); return next; })} /> : null}{data?.activity.lastUser ? <ActivityRow label="User" entry={data.activity.lastUser} expanded={expanded.has("user")} onToggle={() => setExpanded((current) => { const next = new Set(current); next.has("user") ? next.delete("user") : next.add("user"); return next; })} /> : null}</ul> : null}
+    <CardState title="Status" className="ws-status-card" pending={query.isPending} error={query.error} onRetry={() => void query.refetch()}>
+      <div className="ws-status-summary"><h3>{runtime?.label ?? "Unknown"}</h3><p className="ws-working-state"><span title={`${total} child agents`}><Icon name="Bot" aria-hidden />{total}</span><span title={`${active} active child agents`}><Icon name="Wrench" aria-hidden />{active}</span></p></div>
+      {data?.activity.latest || data?.activity.lastUser ? <div className="ws-activity-list">{data?.activity.latest ? <ActivityRow label="Agent" entry={data.activity.latest} expanded={expanded.has("agent")} onToggle={() => setExpanded((current) => { const next = new Set(current); next.has("agent") ? next.delete("agent") : next.add("agent"); return next; })} /> : null}{data?.activity.lastUser ? <ActivityRow label="User" entry={data.activity.lastUser} expanded={expanded.has("user")} onToggle={() => setExpanded((current) => { const next = new Set(current); next.has("user") ? next.delete("user") : next.add("user"); return next; })} /> : null}</div> : null}
       {provider.data ? <ProviderHealth provider={provider.data} /> : null}
     </CardState>
   );
@@ -45,13 +44,13 @@ function StatusCard({ threadId }: { threadId: string }) {
 
 function ActivityRow({ label, entry, expanded, onToggle }: { label: string; entry: { text: string; kind: string }; expanded: boolean; onToggle: () => void }) {
   const text = expanded ? entry.text : entry.text.slice(0, 120);
-  return <li className={`ws-activity-item${entry.kind === "command" ? " ws-activity-item-command" : ""}${expanded ? " ws-activity-item-expanded" : ""}`}><button type="button" className="ws-activity-copy" aria-expanded={expanded} onClick={onToggle}><span className="ws-activity-label">{label}</span>{entry.kind === "command" ? <code className="ws-activity-command">{text}</code> : <span>{text}</span>}</button></li>;
+  return <button type="button" className={`ws-activity-item${entry.kind === "command" ? " ws-activity-item-command" : ""}${expanded ? " ws-activity-item-expanded" : ""}`} aria-expanded={expanded} onClick={onToggle}><span className="ws-activity-label">{label}</span>{entry.kind === "command" ? <code className="ws-activity-command">{text}</code> : <span className="ws-activity-copy">{text}</span>}</button>;
 }
 
 function ProviderHealth({ provider }: { provider: { tone: string; providerName: string; status: string; statusUrl: string | null; message: string | null } }) {
+  const navigate = useBbNavigate();
   const label = `${provider.providerName} provider status: ${readableStatus(provider.status)}. ${provider.message ?? "No provider message."}`;
-  const content = provider.message ?? provider.status;
-  return provider.statusUrl ? <a className={`ws-provider-health ws-provider-health-${provider.tone}`} aria-label={label} title={label} href={provider.statusUrl} target="_blank" rel="noreferrer">{content}</a> : <span className={`ws-provider-health ws-provider-health-${provider.tone}`} aria-label={label} title={label}>{content}</span>;
+  return provider.statusUrl ? <button type="button" className={`ws-provider-health ws-provider-health-${provider.tone}`} aria-label={label} title={label} onClick={() => navigate.openUrl(provider.statusUrl!)} /> : <span className={`ws-provider-health ws-provider-health-${provider.tone}`} aria-label={label} title={label} />;
 }
 
 function OutcomeCard({ threadId }: { threadId: string }) {
@@ -75,7 +74,7 @@ function OutcomeCard({ threadId }: { threadId: string }) {
         <p className="ws-card-note">No current outcome.</p>
         <div className="ws-outcome-form">
           <input aria-label="Outcome-oriented task title" value={title} disabled={!query.data?.tasksAvailable || mutation.create.isPending} onChange={(event) => setTitle(event.target.value)} />
-          <button type="button" disabled={!title.trim() || !query.data?.tasksAvailable || mutation.create.isPending} aria-label="Create and attach outcome task" onClick={() => void report(mutation.create.mutateAsync({ threadId, title: title.trim() }).then(() => setTitle("")), "Outcome created and attached", "Could not create outcome")}>{mutation.create.isPending ? "Creating…" : "Create"}</button>
+          <button type="button" disabled={!title.trim() || !query.data?.tasksAvailable || mutation.create.isPending} aria-label="Create and attach outcome task" onClick={() => void report(mutation.create.mutateAsync({ title: title.trim() }).then(() => setTitle("")), "Outcome created and attached", "Could not create outcome")}>{mutation.create.isPending ? "Creating…" : "Create"}</button>
         </div>
       </>}
     </CardState>

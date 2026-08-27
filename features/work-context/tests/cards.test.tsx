@@ -39,6 +39,23 @@ describe("registered Work context cards", () => {
     slot.lifecycle.unmount(); getPluginQueryClient().clear();
   });
 
+  it("invalidates every card on realtime and manual Work refresh", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const getWorkStatus = vi.fn(() => status);
+    const getWorkOutcome = vi.fn(() => outcome);
+    const getWorkGoal = vi.fn(() => null);
+    const getWorkPlan = vi.fn(() => ({ items: [] }));
+    const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_one", params: null }, { rpc: fixture({ getWorkStatus, getWorkOutcome, getWorkGoal, getWorkPlan }) });
+    await waitFor(() => expect(getWorkPlan).toHaveBeenCalledTimes(1));
+    await slot.behavior.emitRealtime("work-sidebar:changed", { changed: "work" });
+    await waitFor(() => expect(getWorkPlan).toHaveBeenCalledTimes(2));
+    fireEvent.click(slot.getByRole("button", { name: "Refresh work context" }));
+    await waitFor(() => expect(getWorkPlan).toHaveBeenCalledTimes(3));
+    for (const method of [getWorkStatus, getWorkOutcome, getWorkGoal, getWorkPlan]) expect(method).toHaveBeenCalledTimes(3);
+    slot.lifecycle.unmount(); getPluginQueryClient().clear();
+  });
+
   it("renders registered loading, empty, and populated cards without duplicate headings", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));
