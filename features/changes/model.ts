@@ -42,7 +42,7 @@ export function mergeStackBranchSignals(
 
 export const changesKeys = {
   projection: (threadId: string) =>
-    ["work-sidebar", "changes", threadId] as const,
+    ["work-sidebar", "changes", threadId, "projection"] as const,
   fingerprint: (threadId: string, url: string) =>
     ["work-sidebar", "changes", threadId, "fingerprint", url] as const,
   fileDiff: (threadId: string, fingerprint: string | null, path: string) =>

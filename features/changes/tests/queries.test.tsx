@@ -4,7 +4,11 @@ import { renderHook, act } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { changesKeys, changesPolicies } from "../model";
-import { useChanges } from "../queries";
+import {
+  invalidateChanges,
+  useChanges,
+  useWorkingTreeFileDiff,
+} from "../queries";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -12,6 +16,118 @@ afterEach(() => {
 });
 
 describe("R13 Changes queries", () => {
+  it("invalidates only the Changes projection, leaving fingerprint and file diff caches fresh", async () => {
+    const client = new QueryClient();
+    const threadId = "thr_projection";
+    const fingerprintKey = changesKeys.fingerprint(
+      threadId,
+      "https://github.com/acme/repo/pull/1",
+    );
+    const fileDiffKey = changesKeys.fileDiff(threadId, "same", "src/file.ts");
+    client.setQueryData(changesKeys.projection(threadId), { currentPullRequest: null });
+    client.setQueryData(fingerprintKey, { fingerprint: "same" });
+    client.setQueryData(fileDiffKey, {
+      kind: "patch",
+      path: "src/file.ts",
+      patch: "@@ -1 +1 @@",
+      message: null,
+    });
+
+    await invalidateChanges(client, threadId);
+
+    expect(
+      client.getQueryCache().find({ queryKey: changesKeys.projection(threadId) })
+        ?.state.isInvalidated,
+    ).toBe(true);
+    expect(client.getQueryCache().find({ queryKey: fingerprintKey })?.state.isInvalidated).toBe(false);
+    expect(client.getQueryCache().find({ queryKey: fileDiffKey })?.state.isInvalidated).toBe(false);
+  });
+
+  it("moves a changed fingerprint to one new diff key without refetching the old key", async () => {
+    vi.useFakeTimers();
+    const previousVisibility = Object.getOwnPropertyDescriptor(
+      document,
+      "visibilityState",
+    );
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+    const threadId = "thr_transition";
+    const url = "https://github.com/acme/repo/pull/1";
+    let currentFingerprint = "one";
+    const fileDiffCalls: string[] = [];
+    const rpc = {
+      call: vi.fn(async (method: string) => {
+        if (method === "getChangesFingerprint")
+          return { fingerprint: currentFingerprint };
+        if (method === "getWorkingTreeFileDiff") {
+          fileDiffCalls.push(currentFingerprint);
+          return {
+            kind: "patch" as const,
+            path: "src/file.ts",
+            patch: `fingerprint:${currentFingerprint}`,
+            message: null,
+          };
+        }
+        throw new Error(`Unexpected RPC method: ${method}`);
+      }),
+    };
+    const client = new QueryClient();
+    client.setQueryData(changesKeys.projection(threadId), {
+      currentPullRequest: { url },
+    });
+    client.setQueryData(changesKeys.fingerprint(threadId, url), {
+      fingerprint: "one",
+    });
+    client.setQueryData(changesKeys.fileDiff(threadId, "one", "src/file.ts"), {
+      kind: "patch",
+      path: "src/file.ts",
+      patch: "fingerprint:one",
+      message: null,
+    });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const view = renderHook(() => {
+      const changes = useChanges(rpc as never, threadId, {
+        visiblePollMs: 1_000,
+        backgroundPollMs: 9_000,
+      });
+      const diff = useWorkingTreeFileDiff(
+        rpc as never,
+        threadId,
+        changes.fingerprint.data?.fingerprint ?? null,
+        "src/file.ts",
+      );
+      return { changes, diff };
+    }, { wrapper });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+      await Promise.resolve();
+    });
+    currentFingerprint = "two";
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_001);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    view.unmount();
+    if (previousVisibility)
+      Object.defineProperty(document, "visibilityState", previousVisibility);
+    else delete (document as { visibilityState?: string }).visibilityState;
+    expect(view.result.current.changes.fingerprint.data?.fingerprint).toBe("two");
+    expect(fileDiffCalls).toEqual(["two"]);
+    expect(client.getQueryCache().find({
+      queryKey: changesKeys.fileDiff(threadId, "one", "src/file.ts"),
+    })?.state.isInvalidated).toBe(false);
+    expect(client.getQueryCache().find({
+      queryKey: changesKeys.fileDiff(threadId, "two", "src/file.ts"),
+    })?.state.data).toMatchObject({ patch: "fingerprint:two" });
+  });
+
   it("uses 1s visible/9s background fingerprint polling, isolates thread switches, and cleans listeners, observers, and timers", async () => {
     vi.useFakeTimers();
     const previousVisibility = Object.getOwnPropertyDescriptor(
