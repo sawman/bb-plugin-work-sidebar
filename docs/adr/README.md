@@ -7,8 +7,9 @@ explicitly supersede.
 | --- | --- | --- |
 | [0001](0001-vertical-slice-architecture.md) | Accepted | Organize product code and migration as vertical feature slices |
 | [0002](0002-state-ownership.md) | Accepted | Divide BB host, server, shared UI, and local state by semantics |
-| [0003](0003-atomic-ui-and-styling.md) | Accepted | Use atomic primitives and host theme contracts |
+| [0003](0003-atomic-ui-and-styling.md) | Superseded by 0005 | Historical atomic UI and styling direction |
 | [0004](0004-incremental-migration-and-verification.md) | Accepted | Migrate and verify one complete slice at a time |
+| [0005](0005-plugin-local-atomic-css.md) | Accepted | Use plugin-local atomic CSS over host theme tokens |
 
 New records use the next zero-padded number. Clarifications that leave a
 decision intact may amend its consequences or guardrails in place. To reverse

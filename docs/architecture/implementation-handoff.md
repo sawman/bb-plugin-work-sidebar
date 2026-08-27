@@ -1,7 +1,7 @@
 # Work sidebar implementation handoff
 
-Status: Active implementation baseline preparation
-Date: 2026-08-27
+Status: Integrated implementation baseline; current task workflow
+Date: 2026-08-28
 Repository: `/Users/matthewsaw/dev/bb-plugin-work-sidebar`
 
 This document transfers the recoverable implementation state and the product
@@ -15,7 +15,8 @@ changing the worktree.
   project is also named `bbplug`; its historical `BBPLUGINWO` key prefix is
   intentionally stable.
 - Implementation root thread: `thr_6bn73wstdm` (`Refactor work sidebar architecture`).
-- Environment: `env_kx2zih2swg`, using this exact unmanaged checkout on `main`.
+- Environments are managed BB worktrees selected per execution task; this
+  handoff intentionally does not pin one environment ID.
 - The user resumed the implementation thread and explicitly authorized local
   baseline, child, integration, and checkpoint commits. Nothing may be pushed
   without separate authorization.
@@ -42,9 +43,24 @@ changing the worktree.
 Use BB Tasks as the source of truth. Do not replace the task queue with this
 document or a repository TODO file.
 
-## Git and recovery boundary
+## Current integrated baseline
 
-The last committed checkpoint is:
+At the R22 review snapshot, the recovered implementation and architecture
+package had been integrated into canonical `main` at commit
+`f09c031f131b93b707c32a452b95ea2ab7a2414c`. The annotated recovery checkpoint
+tag `checkpoint/work-sidebar-recovered-2026-08-27` exists. This hash records
+the reviewed integration point; later task commits may advance the branch and
+must be verified through BB Tasks and the normal validation commands.
+
+The snapshot was clean and had 52 test files with 248 tests passing, a passing
+typecheck, a successful production build, a passing SDK compatibility check at
+SDK/host version 0.4.21, and a passing `git diff --check`. The R22 report is
+the source for the review findings; BB Tasks is the current source of truth
+for active work, ownership, status, and evidence.
+
+## Historical recovery boundary (pre-G0, 2026-08-27)
+
+The pre-G0 last committed checkpoint was:
 
 ```text
 8ee5356 (HEAD -> main, origin/main) style: use amber for requested reviews
@@ -61,11 +77,12 @@ BB environment PR discovery reports that GitHub cannot resolve
 account before pushing. Do not rewrite the remote based only on the configured
 URL.
 
-All changes after `8ee5356` are uncommitted recovered work or the new
-architecture package. They are valuable and must not be reset, checked out,
-or replaced wholesale.
+At that time, all changes after `8ee5356` were uncommitted recovered work or
+the new architecture package. That inventory is retained as historical
+recovery context; it is not the current Git state or a standing prohibition on
+worktree use.
 
-Current tracked delta:
+Pre-G0 tracked delta:
 
 ```text
  app.tsx                         | 298 lines changed
@@ -80,7 +97,7 @@ Current tracked delta:
  total: 700 insertions, 92 deletions
 ```
 
-Untracked files:
+Pre-G0 untracked files:
 
 ```text
 .bb/AGENTS.md
@@ -96,12 +113,12 @@ docs/architecture/refactor-plan.md
 docs/architecture/implementation-handoff.md
 ```
 
-Managed worktrees branch from committed Git state and will not inherit these
-changes. Before delegating code edits to worktree children, establish a
-reviewed baseline commit or another explicit, reproducible snapshot approved
-by the user. Never ask a child to reconstruct this dirty state from memory.
+Managed worktrees branch from committed Git state and did not inherit these
+pre-G0 changes. This historical note is retained to explain why the recovery
+checkpoint was created; it is not a current gate on delegating worktree
+children.
 
-## What the uncommitted implementation contains
+## What the pre-G0 recovered implementation contained
 
 ### Tasks
 
@@ -168,19 +185,20 @@ architecture review determines that bundling and lifecycle are safe.
   formatting-only baseline change before semantic CSS cleanup if it can be
   reviewed independently.
 
-## Current validation evidence
+## Historical pre-G0 validation evidence (2026-08-27)
 
-Validated against the dirty tree on 2026-08-27:
+Validated against the pre-G0 dirty tree on 2026-08-27:
 
-- `npm test`: passes, 1 test file and 7 tests.
+- `npm test`: passed with 1 test file and 7 tests at that historical point.
 - `npm run typecheck`: passes. Root imports cause many nested components to be
   checked transitively, but the current root-only `tsconfig.json` include can
   miss nested tests and unreferenced modules.
 - `npm run build`: succeeds and writes the ignored `dist/` artifacts.
-- The build emits two CSS optimizer warnings, including an unexpected closing
-  curly bracket. Treat a warning-free CSS build as an acceptance condition.
+- The build emitted two CSS optimizer warnings, including an unexpected
+  closing curly bracket. A warning-free CSS build remained an acceptance
+  condition.
 - `git diff --check`: passes.
-- `bb plugin types --check .`: fails.
+- `bb plugin types --check .`: failed at that historical point.
 
 The SDK compatibility failure says:
 
@@ -194,64 +212,38 @@ The SDK compatibility failure says:
 Do not mechanically run the mutating `bb plugin types` command until the
 dependency/bundling decision is understood and captured in the ADRs.
 
-## Architecture review that must be reconciled first
+## Architecture review status at the R22 integrated snapshot
 
-The completed Fable review found two critical gaps:
+The architecture review findings that blocked the recovered implementation
+were addressed through the integrated R1–R22 work. The current package and
+runtime decisions are documented in the ADR set, including the plugin-local
+atomic CSS and host-token decision in [ADR 0005](../adr/0005-plugin-local-atomic-css.md).
+The implementation snapshot reviewed by R22 has:
 
-1. TanStack Query and Zustand are mandated but absent from `package.json`.
-   The docs do not state whether React, Query, Zustand, Zod, and SDK app
-   modules are host externals or plugin-bundled dependencies, whether both
-   slots share one module instance, or what survives plugin reload.
-2. There is no committed baseline or real rollback artifact. A worktree-based
-   migration is unsafe until the recovered dirty implementation and docs have
-   a reviewed checkpoint.
+- centralized Query keys/policies and Zustand presentation-only stores with
+  bounded per-thread retention;
+- explicit app/server import boundaries and factory-owned lifecycle disposal;
+- server-side GitHub caching/backoff and family-scoped realtime invalidation;
+- host Diff/SourceCode rendering rather than a second diff system; and
+- integrated architecture, accessibility, bundling, and parity evidence
+  recorded in BB Tasks and the R22 report.
 
-High-priority corrections:
+R22 left documentation follow-ups M8 and M9. This handoff refresh closes those
+follow-ups; subsequent implementation work must use the current BB Task,
+verified checkout, and fresh command output rather than copying a historical
+snapshot into a new task.
 
-- Resolve the contradiction between requiring two consumers before a shared
-  primitive and creating all shared primitives before any slice migrates.
-- Define PR presentation changes as a deliberate cross-surface adoption step,
-  not an isolated PR slice that pretends not to touch Threads and Changes.
-- Move each feature's server adapter with its slice; reserve the later server
-  stage for truly cross-slice services and registration cleanup.
-- Widen `tsconfig` coverage for nested source and test files.
-- Resolve SDK drift before trusting host-API type checks.
-- State exactly how vendored shadcn primitives are styled and bundled.
-- Reconcile the already-started Tasks/Work/Combobox extraction with migration
-  order.
-- Define or remove the tracker slice and define the agents-versus-threads
-  boundary.
+### Current integrated validation snapshot (R22, 2026-08-28)
 
-Additional required decisions from the report:
+At the reviewed integration point, `npm test -- --no-file-parallelism` passed
+52 test files and 248 tests, `npm run typecheck` passed, and `npm run build`
+completed with no plugin compiler or CSS optimizer warnings. The BB CLI still
+emitted Node's `DEP0205` deprecation warning. `bb plugin types --check .`
+passed with SDK/host 0.4.21, and `git diff --check` passed. These are dated
+review evidence, not permanent claims about every later commit; rerun the
+relevant gates for each task.
 
-- Explicit Query defaults per key: retry, stale/gc time, focus behavior,
-  polling, and realtime invalidation. GitHub queries must not retry in a way
-  that defeats server rate-limit backoff.
-- Prevent realtime invalidation from snapping optimistic reorder state back
-  during an in-flight drag mutation.
-- Do not use Zustand persistence for transient state; define per-thread state
-  eviction on archive/delete or bounded LRU.
-- Define client and server teardown behavior on plugin reload.
-- Resolve BB settings ownership versus plugin server preferences, and BB
-  navigation versus plugin-local tab selection.
-- Permit browser-safe runtime contract imports when typed RPC needs them while
-  still forbidding Node dependencies in the app bundle.
-- Reconcile ADR supersession rules: preserve old ADR bodies, mark status as
-  superseded, and add a new ADR.
-- Name the frontend harness dependencies and the visual baseline artifact
-  matrix.
-
-Read the full reviewer output rather than relying only on this summary.
-
-The second Fable pass accepted the architecture direction and identified G0
-evidence gaps. The root resolved them by regenerating recovery artifacts after
-the final documentation amendments, capturing every reachable populated tab in
-light mode at wide and narrow widths, and making uncaptured dark and synthetic
-states explicit owning-slice gates. R2 separates runtime contract schemas from
-server SDK composition, R3 verifies the shadcn utility-compilation claim live,
-and R1 treats the SDK 0.4.21 pin as work to perform rather than current fact.
-
-### G0 recovery record
+### Historical G0 recovery record (completed 2026-08-27)
 
 - Parent commit: `8ee53560438f21b9bbc4317bd7f651444f8240db`.
 - Baseline commit: resolve annotated local tag
@@ -419,9 +411,8 @@ and R1 treats the SDK 0.4.21 pin as work to perform rather than current fact.
 
 ## Required implementation workflow
 
-Before code changes, amend the plan and ADRs using the reviewer findings and
-produce a concrete sequence of strict red-green-refactor loops. Every loop must
-name:
+For each new code change, use the owning BB Task and produce a concrete
+sequence of strict red-green-refactor loops. Every loop must name:
 
 1. the characterization or failing test added first;
 2. the minimum implementation that makes it pass;
@@ -429,12 +420,14 @@ name:
 4. focused and full validation evidence;
 5. the rollback/checkpoint boundary.
 
-Use multiple bounded BB children only after a reproducible baseline exists:
+Use bounded BB children when the owning task calls for independent work:
 
 - Provider `codex`, model `gpt-5.6-luna` for mechanical tests/extractions.
 - Provider `codex`, model `gpt-5.6-terra` for feature-slice implementation.
 - Every code-editing child uses `--parent-self`,
-  `--new-environment worktree`, and the verified base branch.
+  `--new-environment worktree`, and a verified canonical base selected for the
+  task. The recovered-tree pre-G0 restriction is historical and no longer
+  blocks worktree children.
 - Give every child one direct execution task, a non-overlapping slice, and its
   own task-memory directory.
 - Integrate and inspect each diff; never accept a child because it merely says
@@ -449,16 +442,17 @@ parity, architecture boundaries, BB SDK lifecycle/bundling, CSS collisions,
 accessibility, test gaps, and visual regressions. Address every valid finding
 before asking the user to accept the work.
 
-## First actions when the implementation thread resumes
+## First actions when a new implementation task starts
 
 1. Read `.bb/AGENTS.md`, this handoff, the refactor plan, all ADRs, and the
    complete Fable output.
 2. Re-run `git status --short`; do not assume the inventory above is unchanged.
-3. Reconcile the Fable amendments into the docs using small reviewed edits.
-4. Resolve the bundling/dependency and SDK version facts empirically with BB's
+3. Read the current ADR status and use ADR 0005 for the styling boundary.
+4. Resolve any changed bundling/dependency or SDK facts empirically with BB's
    build/type tooling.
-5. Present the baseline/checkpoint choice to the user before creating worktree
-   children if no approved commit exists.
+5. Verify the task's base revision and create worktree children only when the
+   task scope and ownership are explicit; no new baseline approval gate is
+   implied by this historical handoff.
 6. Write the red-green-refactor implementation plan into the architecture plan
    and mirror executable work in BB Tasks.
 7. Begin with characterization coverage around the highest-risk preserved

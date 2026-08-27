@@ -14,6 +14,7 @@ Before structural or state-management work, read:
 - `docs/adr/0002-state-ownership.md`
 - `docs/adr/0003-atomic-ui-and-styling.md`
 - `docs/adr/0004-incremental-migration-and-verification.md`
+- `docs/adr/0005-plugin-local-atomic-css.md`
 
 Clarify an accepted ADR in place only when its decision is unchanged. When a
 decision is reversed or materially narrowed, preserve the old body, mark its
@@ -68,10 +69,10 @@ decision appear different.
 
 ## UI and styling
 
-- Build primitives from BB-vendored shadcn components and host theme tokens.
-  R3 must verify whether the plugin build compiles utility classes absent from
-  host CSS; if it does not, use plain plugin CSS over host tokens and supersede
-  ADR 0003 before feature migration. Host-shimmed singleton
+- Build primitives from plugin-local atomic CSS over host theme tokens, as
+  recorded in ADR 0005. The plugin does not rely on host utility-class
+  compilation or vendored shadcn source as a styling prerequisite.
+  Host-shimmed singleton
   packages belong in exact/version-aligned `devDependencies`; ordinary state
   libraries that BB does not shim are bundled plugin runtime dependencies.
 - Use the host `experimental_Diff` and `experimental_SourceCode` components
@@ -102,13 +103,14 @@ decision appear different.
 
 ## Change discipline
 
-- The dirty tree inventoried in `docs/architecture/implementation-handoff.md`
-  is recovered user work. Until a reviewed checkpoint exists, every tracked
-  and untracked path in that inventory is protected; "unrelated" means any
-  pre-checkpoint hunk outside the current loop's explicit ownership.
-- Do not create code-editing worktree children until the user approves the
-  reproducible baseline checkpoint. Managed worktrees branch from committed
-  state and do not inherit this recovered snapshot.
+- The pre-G0 dirty-tree inventory in `docs/architecture/implementation-handoff.md`
+  is historical recovery context, not a current protection boundary. The
+  recovered implementation has a reviewed committed baseline; preserve
+  unrelated changes in the checkout being worked on.
+- New code-editing worktree children may be created when explicitly assigned
+  in BB Tasks. Branch them from the verified canonical base for that task and
+  inspect their diffs before integration; there is no active pre-checkpoint
+  prohibition.
 - Migrate one vertical slice at a time and remove that slice's legacy code in
   the same change. Do not leave parallel old/new styling systems behind.
 - Preserve unrelated dirty worktree changes.
@@ -133,8 +135,9 @@ git diff --check
 standalone artifact builder must resolve the ordinary PATH entrypoint rather
 than re-exec through the CLI injected into the agent process. Reload is a
 server operation and intentionally keeps the thread's BB connection. Before
-reloading, verify `bb plugin source work-sidebar --json`; it must resolve to
-`path:/Users/matthewsaw/dev/bb-plugin-work-sidebar`.
+reloading, verify `bb plugin source work-sidebar --json` resolves to the
+checkout under test; do not encode a machine-specific source path in the
+workflow.
 
 For frontend changes, also exercise every affected tab in its loading, empty,
 error, populated, selected, expanded, and mutation-busy states. Verify both
