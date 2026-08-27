@@ -14,6 +14,25 @@ type Options<T extends AuthoredPullRequestRecord> = {
 
 const AUTHORED_TTL = 5 * 60_000;
 
+export function classifyPullRequestError(error: unknown, scope: PullRequestHealth["scope"], now: () => number = Date.now): PullRequestHealth {
+  const message = error instanceof Error ? error.message : String(error);
+  const rateLimited = /graphql_rate_limit|API rate limit already exceeded|secondary rate limit|rate limit/i.test(message);
+  if (rateLimited) {
+    return {
+      state: "rate_limited",
+      scope,
+      message: scope === "graphql" ? "GitHub GraphQL is rate limited; using REST where possible." : "GitHub REST API is rate limited.",
+      retryAt: now() + 60 * 60_000,
+    };
+  }
+  return {
+    state: "unavailable",
+    scope,
+    message: `GitHub ${scope === "graphql" ? "GraphQL" : "REST"} request failed.`,
+    retryAt: null,
+  };
+}
+
 export class PullRequestService<T extends AuthoredPullRequestRecord> {
   private authoredCache: CacheEntry<T[]> | null = null;
   private stacksCache: CacheEntry<T[]> | null = null;
@@ -62,11 +81,7 @@ export class PullRequestService<T extends AuthoredPullRequestRecord> {
   clear(): void { this.authoredCache = null; this.stacksCache = null; }
   dispose(): void { this.disposed = true; this.clear(); this.authoredPending = null; this.stacksPending = null; }
   classifyError(error: unknown, scope: PullRequestHealth["scope"]): PullRequestHealth {
-    const message = error instanceof Error ? error.message : String(error);
-    const rateLimited = /graphql_rate_limit|API rate limit already exceeded|secondary rate limit|rate limit/i.test(message);
-    return rateLimited
-      ? { state: "rate_limited", scope, message, retryAt: this.options.now() + 60 * 60_000 }
-      : { state: "unavailable", scope, message, retryAt: null };
+    return classifyPullRequestError(error, scope, this.options.now);
   }
   clientRetryAllowed(error: unknown): boolean { return this.classifyError(error, "unknown").state !== "rate_limited"; }
   inspect() { return { disposed: this.disposed, authoredCached: this.authoredCache !== null, stacksCached: this.stacksCache !== null, pending: Number(this.authoredPending !== null) + Number(this.stacksPending !== null) }; }

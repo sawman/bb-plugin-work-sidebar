@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { normalizePullRequestSignal } from "./features/pull-requests/presentation.js";
-import { createPullRequestService } from "./features/pull-requests/server.js";
+import { classifyPullRequestError, createPullRequestService } from "./features/pull-requests/server.js";
 import { rpcContract } from "./contracts.js";
 import { sanitizeThreadOrder, type SidebarStack } from "./work-model.js";
 import { createServerLifecycle, type GitHubApiHealth, type ServerLifecycle } from "./server-lifecycle.js";
@@ -241,10 +241,7 @@ function clearGitHubReadCache() {
 }
 function githubReadError(owner: ServerLifecycle, scope: "graphql" | "rest", error: unknown): Error {
   const message = error instanceof Error ? error.message : String(error);
-  const rateLimited = /graphql_rate_limit|API rate limit already exceeded|secondary rate limit|rate limit/i.test(message);
-  const health: GitHubApiHealth = rateLimited
-    ? { state: "rate_limited", scope, message: scope === "graphql" ? "GitHub GraphQL is rate limited; using REST where possible." : "GitHub REST API is rate limited.", retryAt: Date.now() + 60 * 60_000 }
-    : { state: "unavailable", scope, message: `GitHub ${scope === "graphql" ? "GraphQL" : "REST"} request failed.`, retryAt: null };
+  const health: GitHubApiHealth = classifyPullRequestError(error, scope);
   if (owner.isDisposed) return new Error(message);
   if (scope === "graphql") {
     owner.githubGraphqlHealth = health;
