@@ -52,5 +52,15 @@ describe("R2 server registration and disposal", () => {
     replacement.githubReadPending.set("same-key", Promise.resolve("new"));
     lifecycle.releasePending("githubRead", "same-key");
     expect(replacement.githubReadPending.has("same-key")).toBe(true);
+
+    let resolveLate!: (value: string) => void;
+    const late = new Promise<string>((resolve) => { resolveLate = resolve; });
+    void late.then((value) => lifecycle.cacheGitHubRead("late", value, Infinity));
+    lifecycle.dispose();
+    resolveLate("late value");
+    await late;
+    await Promise.resolve();
+    expect(lifecycle.githubReadCache.size).toBe(0);
+    expect(replacement.githubReadCache.size).toBe(0);
   });
 });

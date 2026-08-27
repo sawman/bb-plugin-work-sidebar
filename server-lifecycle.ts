@@ -12,6 +12,12 @@ export class ServerLifecycle {
   githubGraphqlBackoffUntil = 0;
   private disposed = false;
 
+  get isDisposed(): boolean { return this.disposed; }
+
+  cacheGitHubRead(key: string, value: string, expiresAt: number): void {
+    if (!this.disposed) this.githubReadCache.set(key, { value, expiresAt });
+  }
+
   releasePending(kind: "githubRead" | "pullRequestSignal", key: string): void {
     (kind === "githubRead" ? this.githubReadPending : this.githubPullRequestSignalPending).delete(key);
   }

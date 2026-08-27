@@ -15,13 +15,16 @@ describe("R2 app registration and Query lifecycle", () => {
 
     expect(getPluginQueryClient()).toBe(getPluginQueryClient());
     expect(queryKeys.sidebar.order()).toEqual(["work-sidebar", "sidebar", "order"]);
+    expect(queryKeys.sidebar.tasks.list()).toEqual(["work-sidebar", "sidebar", "tasks", "list"]);
+    expect(queryKeys.sidebar.tasks.links()).toEqual(["work-sidebar", "sidebar", "tasks", "links"]);
     expect(queryKeys.work.context("thr_test")).toEqual(["work-sidebar", "work", "context", "thr_test"]);
     expect(queryKeys.github.health()).toEqual(["work-sidebar", "github", "health"]);
     expect(queryPolicies.sidebarOrderPreferences).toMatchObject({ staleTime: Infinity, gcTime: 30 * 60_000, retry: false });
-    expect(queryPolicies.sidebarTasks).toMatchObject({ staleTime: 30_000, gcTime: 5 * 60_000, retry: false });
-    expect(queryPolicies.workContext).toMatchObject({ staleTime: 15_000, gcTime: 5 * 60_000, retry: false });
-    expect(queryPolicies.workChanges).toMatchObject({ staleTime: 30_000, gcTime: 5 * 60_000, retry: false });
-    expect(queryPolicies.githubHealth).toMatchObject({ staleTime: 30_000, gcTime: 5 * 60_000, retry: false });
+    expect(queryPolicies.sidebarTasksList).toMatchObject({ staleTime: 15_000, gcTime: 10 * 60_000, retry: 1 });
+    expect(queryPolicies.sidebarTaskLinks).toMatchObject({ staleTime: 15_000, gcTime: 10 * 60_000, retry: 1 });
+    expect(queryPolicies.workContext).toMatchObject({ staleTime: 5_000, gcTime: 10 * 60_000, retry: 1 });
+    expect(queryPolicies.workChanges).toMatchObject({ staleTime: 30_000, gcTime: 10 * 60_000, retry: false });
+    expect(queryPolicies.githubHealth).toMatchObject({ staleTime: 15_000, gcTime: 2 * 60_000, retry: false });
     expect(pluginInteractionStore.getState().selectedWorkTab).toBe("work");
     pluginInteractionStore.getState().setSelectedWorkTab("changes");
     expect(pluginInteractionStore.getState().selectedWorkTab).toBe("changes");

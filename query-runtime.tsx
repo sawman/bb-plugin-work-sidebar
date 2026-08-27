@@ -5,7 +5,7 @@ import type { PropsWithChildren, ReactElement } from "react";
 export type QueryPolicy = Readonly<{
   staleTime: number;
   gcTime: number;
-  retry: false;
+  retry: false | 1;
   refetchOnWindowFocus: false;
 }>;
 
@@ -14,7 +14,10 @@ const queryRoot = ["work-sidebar"] as const;
 export const queryKeys = {
   sidebar: {
     order: (): QueryKey => [...queryRoot, "sidebar", "order"],
-    tasks: (): QueryKey => [...queryRoot, "sidebar", "tasks"],
+    tasks: {
+      list: (): QueryKey => [...queryRoot, "sidebar", "tasks", "list"],
+      links: (): QueryKey => [...queryRoot, "sidebar", "tasks", "links"],
+    },
   },
   work: {
     context: (threadId: string): QueryKey => [...queryRoot, "work", "context", threadId],
@@ -32,27 +35,23 @@ export const queryPolicies = {
     retry: false,
     refetchOnWindowFocus: false,
   },
-  sidebarTasks: {
-    staleTime: 30_000,
-    gcTime: 5 * 60_000,
-    retry: false,
-    refetchOnWindowFocus: false,
-  },
+  sidebarTasksList: { staleTime: 15_000, gcTime: 10 * 60_000, retry: 1, refetchOnWindowFocus: false },
+  sidebarTaskLinks: { staleTime: 15_000, gcTime: 10 * 60_000, retry: 1, refetchOnWindowFocus: false },
   workContext: {
-    staleTime: 15_000,
-    gcTime: 5 * 60_000,
-    retry: false,
+    staleTime: 5_000,
+    gcTime: 10 * 60_000,
+    retry: 1,
     refetchOnWindowFocus: false,
   },
   workChanges: {
     staleTime: 30_000,
-    gcTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
   },
   githubHealth: {
-    staleTime: 30_000,
-    gcTime: 5 * 60_000,
+    staleTime: 15_000,
+    gcTime: 2 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
   },
@@ -63,7 +62,9 @@ export const queryPolicies = {
 // reload naturally creates a fresh generation and client.
 const pluginQueryClient = new QueryClient({
   defaultOptions: {
-    queries: queryPolicies.sidebarOrderPreferences,
+    // New query families must opt into one of the named policies above.
+    // This conservative fallback cannot accidentally freeze remote records.
+    queries: { staleTime: 0, gcTime: 5 * 60_000, retry: false, refetchOnWindowFocus: false },
   },
 });
 

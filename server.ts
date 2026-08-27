@@ -242,6 +242,7 @@ function githubReadError(owner: ServerLifecycle, scope: "graphql" | "rest", erro
   const health: GitHubApiHealth = rateLimited
     ? { state: "rate_limited", scope, message: scope === "graphql" ? "GitHub GraphQL is rate limited; using REST where possible." : "GitHub REST API is rate limited.", retryAt: Date.now() + 60 * 60_000 }
     : { state: "unavailable", scope, message: `GitHub ${scope === "graphql" ? "GraphQL" : "REST"} request failed.`, retryAt: null };
+  if (owner.isDisposed) return new Error(message);
   if (scope === "graphql") {
     owner.githubGraphqlHealth = health;
     if (health.state === "rate_limited") owner.githubGraphqlBackoffUntil = health.retryAt ?? Date.now() + GITHUB_GRAPHQL_BACKOFF_MS;
@@ -258,10 +259,11 @@ async function runCachedGitHubRead(args: readonly string[], maxBuffer: number, t
   const pending = owner.githubReadPending.get(key);
   if (pending) return pending;
   const request = execFileAsync("gh", [...args], { maxBuffer }).then(({ stdout }) => {
+    if (owner.isDisposed) return stdout;
     if (scope === "graphql") owner.githubGraphqlHealth = { state: "available", scope, message: null, retryAt: null };
     else owner.githubRestHealth = { state: "available", scope, message: null, retryAt: null };
     if (owner.githubReadCache.size >= 300) owner.githubReadCache.delete(owner.githubReadCache.keys().next().value!);
-    owner.githubReadCache.set(key, { value: stdout, expiresAt: Date.now() + ttlMs });
+    owner.cacheGitHubRead(key, stdout, Date.now() + ttlMs);
     return stdout;
   }).catch((error) => { throw githubReadError(owner, scope, error); }).finally(() => { owner.releasePending("githubRead", key); });
   owner.githubReadPending.set(key, request);
@@ -532,7 +534,7 @@ function cachedRestPullRequestSignal(owner: string, repo: string, number: number
   const pending = lifecycle.githubPullRequestSignalPending.get(key) as Promise<AuthoredPullRequestSignal | null> | undefined;
   if (pending) return pending;
   const request = restPullRequestSignal(owner, repo, number, lifecycle).then((signal) => {
-    if (signal && !(signal.checks === "unknown" && signal.review === "none")) {
+    if (!lifecycle.isDisposed && signal && !(signal.checks === "unknown" && signal.review === "none")) {
       lifecycle.githubPullRequestSignalCache.set(key, { value: signal, expiresAt: Date.now() + GITHUB_SIGNAL_CACHE_MS });
     }
     return signal;
@@ -749,7 +751,7 @@ async function sidebarArchivedThreads() {
   const cached = lifecycle.archivedThreadsCache as { expiresAt: number; value: Awaited<ReturnType<typeof loadSidebarArchivedThreads>> } | null;
   if (cached && cached.expiresAt > Date.now()) return cached.value;
   if (!lifecycle.archivedThreadsPending) lifecycle.archivedThreadsPending = loadSidebarArchivedThreads().then((value) => {
-    lifecycle.archivedThreadsCache = { value, expiresAt: Date.now() + 5 * 60_000 };
+    if (!lifecycle.isDisposed) lifecycle.archivedThreadsCache = { value, expiresAt: Date.now() + 5 * 60_000 };
     return value;
   }).finally(() => { lifecycle.archivedThreadsPending = null; });
   return lifecycle.archivedThreadsPending as Promise<Awaited<ReturnType<typeof loadSidebarArchivedThreads>>>;
