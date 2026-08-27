@@ -6,9 +6,9 @@ export const taskboardItemSchema = z.object({
   description: z.string(), url: z.string().url(), status: z.string(),
   stateCategory: z.enum(["backlog", "todo", "in_progress", "done", "canceled"]),
   priority: z.string().nullable(), assignee: z.string().nullable(), project: z.string().nullable(), labels: z.array(z.string()), updatedAt: z.string(),
-});
-export const taskboardDetailSchema = taskboardItemSchema.extend({ comments: z.array(z.object({ author: z.string(), body: z.string(), createdAt: z.string() })) });
-export const taskboardStatusOptionSchema = z.object({ id: z.string(), name: z.string(), stateCategory: z.enum(["backlog", "todo", "in_progress", "done", "canceled"]), current: z.boolean() });
+}).strict();
+export const taskboardDetailSchema = taskboardItemSchema.extend({ comments: z.array(z.object({ author: z.string(), body: z.string(), createdAt: z.string() }).strict()) }).strict();
+export const taskboardStatusOptionSchema = z.object({ id: z.string(), name: z.string(), stateCategory: z.enum(["backlog", "todo", "in_progress", "done", "canceled"]), current: z.boolean() }).strict();
 export const trackerItemSchema = z.object({ key: z.string(), title: z.string(), url: z.string().url(), status: z.string(), stateCategory: z.enum(["backlog", "todo", "in_progress", "done", "canceled"]), priority: z.string().nullable(), assignee: z.string().nullable(), project: z.string().nullable() });
 export const trackerStatusOptionSchema = z.object({ id: z.string(), name: z.string(), current: z.boolean() });
 export const trackerContextSchema = z.object({

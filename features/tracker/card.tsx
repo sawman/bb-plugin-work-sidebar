@@ -8,37 +8,57 @@ import { useTracker, useTrackerMutations, useTrackerSearch } from "./queries";
 
 function useDebouncedValue(value: string, delay = 180) {
   const [debounced, setDebounced] = useState(value);
-  useEffect(() => { const timeout = window.setTimeout(() => setDebounced(value), delay); return () => window.clearTimeout(timeout); }, [value, delay]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(timer);
+  }, [value, delay]);
   return debounced;
 }
-function report(operation: Promise<unknown>, fallback: string) { void operation.catch((error) => toast.error(error instanceof Error ? error.message : fallback)); }
+
+function report(operation: Promise<unknown>, fallback: string) {
+  void operation.catch((error) => toast.error(error instanceof Error ? error.message : fallback));
+}
+
+function TrackerLoading() {
+  return <article className="ws-card ws-empty-state-card" aria-busy="true"><div className="ws-card-heading"><strong>Linear</strong></div><p className="ws-card-note">Loading linked work…</p></article>;
+}
+
+function TrackerError({ message, retry }: { message: string; retry(): void }) {
+  return <article className="ws-card ws-linear-card" role="alert"><div className="ws-card-heading"><strong>Linear</strong></div><small className="ws-linear-error">{message}</small><button type="button" className="ws-text-button" onClick={retry}>Try again</button></article>;
+}
 
 export function TrackerHeaderBadge({ threadId }: { threadId: string }) {
-  const tracker = useTracker(threadId); const navigate = useBbNavigate(); const item = tracker.data?.item;
+  const tracker = useTracker(threadId);
+  const navigate = useBbNavigate();
+  const item = tracker.data?.item;
   if (!item) return null;
   return <button type="button" className="ws-work-header-badge ws-linear-header-badge" title={`${item.key} · ${item.title}`} onClick={() => navigate.openUrl(item.url)}>{item.key}</button>;
 }
 
-function TrackerLoading() { return <article className="ws-card ws-empty-state-card" aria-busy="true"><div className="ws-card-heading"><strong>Linear</strong></div><p className="ws-card-note">Loading linked work…</p></article>; }
-function TrackerError({ message, retry }: { message: string; retry(): void }) { return <article className="ws-card ws-linear-card" role="alert"><div className="ws-card-heading"><strong>Linear</strong></div><small className="ws-linear-error">{message}</small><button type="button" className="ws-text-button" onClick={retry}>Try again</button></article>; }
-
 function LinkedTrackerCard({ data, busy, onStatus, onUnlink }: { data: NonNullable<ReturnType<typeof useTracker>["data"]>; busy: boolean; onStatus(statusId: string): void; onUnlink(): void }) {
-  const navigate = useBbNavigate(); const item = data.item!;
-  return <WorkCard className="ws-linear-card"><WorkCardHeading title="Linear" trailing={<div className="ws-linear-controls"><select aria-label="Linear issue status" value={data.statusOptions.find((option) => option.current)?.id ?? ""} onChange={(event) => onStatus(event.target.value)} disabled={busy}>{data.statusOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</select><button type="button" className="ws-text-button" onClick={onUnlink} disabled={busy}>Unlink</button></div>} /><button type="button" className="ws-linear-issue" onClick={() => navigate.openUrl(item.url)}><b>{item.key}</b><span>{item.title}</span></button></WorkCard>;
+  const navigate = useBbNavigate();
+  const item = data.item!;
+  const currentStatus = data.statusOptions.find((option) => option.current)?.id ?? "";
+  const controls = <div className="ws-linear-controls"><select aria-label="Linear issue status" value={currentStatus} onChange={(event) => onStatus(event.target.value)} disabled={busy}>{data.statusOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}</select><button type="button" className="ws-text-button" onClick={onUnlink} disabled={busy}>Unlink</button></div>;
+  return <WorkCard className="ws-linear-card"><WorkCardHeading title="Linear" trailing={controls} /><button type="button" className="ws-linear-issue" onClick={() => navigate.openUrl(item.url)}><b>{item.key}</b><span>{item.title}</span></button></WorkCard>;
 }
 
-function SuggestedTrackerCard({ data, query, setQuery, busy, onLink, search }: { data: NonNullable<ReturnType<typeof useTracker>["data"]>; query: string; setQuery(value: string): void; busy: boolean; onLink(key: string): void; search: ReturnType<typeof useTrackerSearch> }) {
+function SuggestedTrackerCard({ data, query, busy, onChange, onLink, search }: { data: NonNullable<ReturnType<typeof useTracker>["data"]>; query: string; busy: boolean; onChange(value: string): void; onLink(key: string): void; search: ReturnType<typeof useTrackerSearch> }) {
   const suggestions = query.trim() ? (search.data?.items ?? []) : data.suggestions;
-  return <WorkCard className="ws-linear-card"><WorkCardHeading title="Linear" />{data.available ? <div className="ws-linear-options" aria-label="Suggested Linear issues"><div className="ws-linear-search-row"><Input id="ws-linear-key" aria-label="Search Linear issues" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search issues by key or title" disabled={busy} /></div>{search.isFetching && <small>Searching…</small>}{search.isError && <div className="ws-linear-error" role="alert"><small>{search.error.message}</small><button type="button" className="ws-text-button" onClick={() => void search.refetch()}>Try again</button></div>}{!search.isFetching && !search.isError && suggestions.length === 0 && <small>{query ? "No matching issues." : "No related issues found."}</small>}{suggestions.map((item) => <button key={item.key} type="button" onClick={() => onLink(item.key)} disabled={busy}><b>{item.key}</b><span>{item.title}</span></button>)}</div> : <small className="ws-linear-error">{data.message ?? "Taskboard’s Linear connection is unavailable for this project."}</small>}</WorkCard>;
+  if (!data.available) return <WorkCard className="ws-linear-card"><WorkCardHeading title="Linear" /><small className="ws-linear-error">{data.message ?? "Taskboard’s Linear connection is unavailable for this project."}</small></WorkCard>;
+  return <WorkCard className="ws-linear-card"><WorkCardHeading title="Linear" /><div className="ws-linear-options" role="listbox" aria-label="Suggested Linear issues"><div className="ws-linear-search-row"><Input id="ws-linear-key" aria-label="Search Linear issues" value={query} onChange={(event) => onChange(event.target.value)} placeholder="Search issues by key or title" disabled={busy} /></div>{search.isFetching && <small>Searching…</small>}{search.isError && <div className="ws-linear-error" role="alert"><small>{search.error.message}</small><button type="button" className="ws-text-button" onClick={() => void search.refetch()}>Try again</button></div>}{!search.isFetching && !search.isError && suggestions.length === 0 && <small>{query ? "No matching issues." : "No related issues found."}</small>}{suggestions.map((item) => <button key={item.key} type="button" role="option" aria-selected="false" onClick={() => onLink(item.key)} disabled={busy}><b>{item.key}</b><span>{item.title}</span></button>)}</div></WorkCard>;
 }
 
-/** Optional integration card. Its failure is deliberately bounded to this card. */
 export function TrackerCard({ threadId }: { threadId: string }) {
-  const rpc = useRpc<typeof rpcContract>(); const tracker = useTracker(threadId); const [query, setQuery] = useState(""); const debounced = useDebouncedValue(query);
-  const search = useTrackerSearch(threadId, debounced); const mutations = useTrackerMutations(rpc, threadId); const busy = mutations.link.isPending || mutations.unlink.isPending || mutations.status.isPending;
+  const rpc = useRpc<typeof rpcContract>();
+  const tracker = useTracker(threadId);
+  const [query, setQuery] = useState("");
+  const search = useTrackerSearch(threadId, useDebouncedValue(query));
+  const mutations = useTrackerMutations(rpc, threadId);
+  const busy = mutations.link.isPending || mutations.unlink.isPending || mutations.status.isPending;
   if (tracker.isPending) return <TrackerLoading />;
   if (tracker.isError) return <TrackerError message={tracker.error.message} retry={() => void tracker.refetch()} />;
-  const data = tracker.data; if (!data?.visible) return null;
-  if (data.item) return <LinkedTrackerCard data={data} busy={busy} onStatus={(statusId) => report(mutations.status.mutateAsync(statusId), "Could not update Linear issue")} onUnlink={() => report(mutations.unlink.mutateAsync(), "Could not unlink Linear issue")} />;
-  return <SuggestedTrackerCard data={data} query={query} setQuery={setQuery} busy={busy} search={search} onLink={(key) => { setQuery(""); report(mutations.link.mutateAsync(key), "Could not link Linear issue"); }} />;
+  if (!tracker.data?.visible) return null;
+  if (tracker.data.item) return <LinkedTrackerCard data={tracker.data} busy={busy} onStatus={(statusId) => report(mutations.status.mutateAsync(statusId).then((item) => toast.success(`${item.key} moved to ${item.status}`)), "Could not update Linear issue")} onUnlink={() => report(mutations.unlink.mutateAsync(), "Could not unlink Linear issue")} />;
+  return <SuggestedTrackerCard data={tracker.data} query={query} busy={busy} search={search} onChange={setQuery} onLink={(key) => { setQuery(""); report(mutations.link.mutateAsync(key).then((item) => toast.success(`${item.key} linked`)), "Could not link Linear issue"); }} />;
 }
