@@ -608,6 +608,25 @@ describe("protected stylesheet duplicate ownership", () => {
     });
   });
 
+  test("allows an expected disjoint repeat in a separate at-rule cascade", () => {
+    const selector = ".ws-pr-stack-disclosure";
+    const rules = parseRules(`
+      .ws-pr-stack-disclosure { display: grid; }
+      .ws-pr-stack-disclosure { gap: 0.25rem; }
+      @media (max-width: 320px) {
+        .ws-pr-stack-disclosure { scroll-margin-top: 2px; }
+      }
+    `);
+
+    expect(EXPECTED_DISJOINT_REPEATED_SELECTORS).toContain(selector);
+    expect(repeatedExactSelectors(rules), "media-only rules must not enter the top-level repeated-selector inventory").toEqual([selector]);
+    expect(overlappingProperties(rules), "a media-only declaration must not create a top-level duplicate-property overlap").toEqual([]);
+    expect(effectiveDeclarations(rules, selector), "top-level effective declarations must exclude media-only properties").toEqual({
+      display: "grid",
+      gap: "0.25rem",
+    });
+  });
+
   test("preserves the exact RED inventory and effective declarations", () => {
     const rules = parseRules(readFileSync(stylesheetPath, "utf8"));
     const inventory = overlappingProperties(rules);
@@ -616,7 +635,6 @@ describe("protected stylesheet duplicate ownership", () => {
     expect(STATE_SHAPED_RED_SELECTORS.every((selector) => RED_DEAD_SELECTORS.includes(selector))).toBe(true);
     expect(inventory, "all RED same-cascade overlaps must be consolidated").toEqual([]);
     expect(emptyRules(rules), "empty CSS rules must be removed").toEqual([]);
-    expect(inventory.every(({ selector }) => rules.filter((rule) => rule.selector === selector).every(({ atRules }) => atRules.length === 0))).toBe(true);
 
     for (const selector of RED_DEAD_SELECTORS) {
       expect(effectiveDeclarations(rules, selector), selector).toEqual(EXPECTED_EFFECTIVE_STYLES[selector]);
@@ -624,7 +642,6 @@ describe("protected stylesheet duplicate ownership", () => {
 
     const repeated = repeatedExactSelectors(rules);
     expect(repeated).toEqual([...EXPECTED_DISJOINT_REPEATED_SELECTORS]);
-    expect(repeated.every((selector) => rules.filter((rule) => rule.selector === selector).every(({ atRules }) => atRules.length === 0))).toBe(true);
   });
 
   test("requires zero overlapping properties across repeated exact selectors", () => {
