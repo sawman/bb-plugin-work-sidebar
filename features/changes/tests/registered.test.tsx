@@ -202,7 +202,7 @@ describe("R13 registered Changes Work slot", () => {
     expect(getChanges).toHaveBeenCalledTimes(2);
     slot.lifecycle.unmount();
   });
-  it("renders the non-stack Current PR and discloses stack branch files through Changes", async () => {
+  it("renders the non-stack Current PR and discloses stack branch files through the PR row", async () => {
     const currentPullRequest = {
       number: 42,
       title: "Current PR",
@@ -297,11 +297,7 @@ describe("R13 registered Changes Work slot", () => {
         stack.getByRole("list", { name: "GitHub Stack based on main" }),
       ).toBeTruthy(),
     );
-    fireEvent.click(
-      stack.getByRole("button", {
-        name: "Show changed files for feature/stack",
-      }),
-    );
+    fireEvent.click(stack.getByText(/#43 Stack branch/));
     expect(stack.getByText("renamed.ts")).toBeTruthy();
     stack.lifecycle.unmount();
   });
