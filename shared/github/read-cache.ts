@@ -82,13 +82,13 @@ export async function readGitHub(
 ): Promise<string> {
   if (lifecycle.isDisposed) throw new Error("GitHub read lifecycle is disposed.");
   const scope = scopeFor(args);
+  const key = args.join("\u0000");
+  const cached = lifecycle.githubReadCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
   const health = scope === "graphql" ? lifecycle.githubGraphqlHealth : lifecycle.githubRestHealth;
   if (health.state === "rate_limited" && health.retryAt && health.retryAt > Date.now()) {
     throw new Error(health.message ?? "GitHub API is rate limited.");
   }
-  const key = args.join("\u0000");
-  const cached = lifecycle.githubReadCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return cached.value;
   const pending = lifecycle.githubReadPending.get(key);
   if (pending) return pending;
 
