@@ -305,20 +305,35 @@ describe("R19D registered slot accessibility", () => {
     slot.lifecycle.unmount();
   });
 
-  it("fails closed for the exact missing-role and malformed-menu controls", async () => {
-    const container = document.createElement("div");
-    const provider = document.createElement("span");
-    provider.setAttribute("aria-label", "Codex provider status: ready");
-    const executionTasks = document.createElement("div");
-    executionTasks.setAttribute("aria-label", "Execution tasks");
+  it("fails closed for both axe violations and incomplete generic ARIA labels", async () => {
+    const malformedMenu = document.createElement("div");
     const menu = document.createElement("span");
     menu.setAttribute("role", "menu");
     const groupControl = document.createElement("button");
     groupControl.textContent = "Custom group";
     menu.append(groupControl);
-    container.append(provider, executionTasks, menu);
-    document.body.append(container);
-    await expect(expectNoAriaViolations(container)).rejects.toThrow();
-    container.remove();
+    malformedMenu.append(menu);
+    document.body.append(malformedMenu);
+    const malformedResults = await axe(malformedMenu);
+    expect(malformedResults.violations.map(({ id }) => id)).toContain(
+      "aria-required-children",
+    );
+    expect(malformedResults.incomplete).toEqual([]);
+    await expect(expectNoAriaViolations(malformedMenu)).rejects.toThrow();
+    malformedMenu.remove();
+
+    const genericContainer = document.createElement("div");
+    const executionTasks = document.createElement("div");
+    executionTasks.setAttribute("aria-label", "Execution tasks");
+    executionTasks.textContent = "Accessible execution task";
+    genericContainer.append(executionTasks);
+    document.body.append(genericContainer);
+    const genericResults = await axe(genericContainer);
+    expect(genericResults.violations).toEqual([]);
+    expect(genericResults.incomplete.map(({ id }) => id)).toContain(
+      "aria-prohibited-attr",
+    );
+    await expect(expectNoAriaViolations(genericContainer)).rejects.toThrow();
+    genericContainer.remove();
   });
 });

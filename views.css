@@ -1512,12 +1512,12 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.ws-thread-group-settings > span {
+.ws-thread-group-settings > div {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 1.55rem;
   align-items: center;
 }
-.ws-thread-group-settings > span > button:first-child {
+.ws-thread-group-settings > div > button:first-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

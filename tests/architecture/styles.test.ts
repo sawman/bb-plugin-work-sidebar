@@ -301,6 +301,15 @@ describe("shared surface and list-row architecture", () => {
     expect(broadTypography, "surface selectors must not override descendant typography").toEqual([]);
   });
 
+  test("keeps settings group row selectors aligned with the semantic dialog markup", () => {
+    const rules = stylesheetPaths().flatMap((file) => stylesheetRules(readFileSync(file, "utf8")));
+    const row = rules.find(({ selector }) => selector === ".ws-thread-group-settings > div");
+    const title = rules.find(({ selector }) => selector === ".ws-thread-group-settings > div > button:first-child");
+
+    expect(row?.declarations).toContain("grid-template-columns: minmax(0, 1fr) 1.55rem");
+    expect(title?.declarations).toContain("text-overflow: ellipsis");
+  });
+
   test("constructs card roots and headings only through the shared primitive", () => {
     expect(directSurfacePrimitivePaths()).toEqual([]);
   });
