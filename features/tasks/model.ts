@@ -26,12 +26,16 @@ const priorityPresentation: Record<TaskPriority, { label: string; tone: TaskPrio
   urgent: { label: "Urgent", tone: "urgent" }, high: { label: "High", tone: "high" }, medium: { label: "Medium", tone: "medium" }, low: { label: "Low", tone: "low" }, none: { label: "No priority", tone: "none" },
 };
 
+export function taskStatusPresentation(status: TaskStatus) { return statusPresentation[status]; }
+export function taskPriorityPresentation(priority: TaskPriority) { return priorityPresentation[priority]; }
+export function taskAssigneePresentation(assignee: TaskAssignee) { return assignee === "agent" ? { label: "Agent", icon: "Bot" as const } : { label: "Human", icon: "User" as const }; }
+
 export function presentTask(task: TaskRecord) {
   return {
     ...task,
-    status: statusPresentation[task.status],
-    priority: priorityPresentation[task.priority],
-    assignee: task.assignee === "agent" ? { label: "Agent", icon: "Bot" as const } : { label: "Human", icon: "User" as const },
+    status: taskStatusPresentation(task.status),
+    priority: taskPriorityPresentation(task.priority),
+    assignee: taskAssigneePresentation(task.assignee),
   };
 }
 

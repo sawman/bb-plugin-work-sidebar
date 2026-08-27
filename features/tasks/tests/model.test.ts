@@ -3,6 +3,9 @@ import {
   filterTasksForProject,
   orderTasksForPresentation,
   presentTask,
+  taskAssigneePresentation,
+  taskPriorityPresentation,
+  taskStatusPresentation,
   tasksForThread,
   type TaskRecord,
 } from "../model";
@@ -28,6 +31,12 @@ describe("Tasks read presentation", () => {
       assignee: { label: "Agent", icon: "Bot" },
       linkedThreadIds: ["thr_one"],
     });
+  });
+
+  it("covers every persisted status, priority, and assignee exactly", () => {
+    expect(["backlog", "todo", "in_progress", "in_review", "done", "canceled"].map((status) => taskStatusPresentation(status as TaskRecord["status"]).label)).toEqual(["Backlog", "To do", "In Progress", "In Review", "Done", "Canceled"]);
+    expect(["urgent", "high", "medium", "low", "none"].map((priority) => taskPriorityPresentation(priority as TaskRecord["priority"]).label)).toEqual(["Urgent", "High", "Medium", "Low", "No priority"]);
+    expect(["human", "agent"].map((assignee) => taskAssigneePresentation(assignee as TaskRecord["assignee"]))).toEqual([{ label: "Human", icon: "User" }, { label: "Agent", icon: "Bot" }]);
   });
 
   it("orders manual siblings deterministically and projects only a thread's links", () => {

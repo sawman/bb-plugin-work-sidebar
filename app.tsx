@@ -485,6 +485,7 @@ function WorkThreadList(props: PluginThreadListProps) {
   const { status, threads, projects } = experimental_useSidebarThreads();
   const actions = experimental_useSidebarThreadActions();
   const rpc = useRpc<typeof rpcContract>();
+  const queryClient = useQueryClient();
   const { data: tasksData, isPending: tasksPending, isError: tasksFailed, error: tasksReadError, refetch: refetchTasks } = useTasksRead();
   const { data: taskLinksData, refetch: refetchTaskLinks } = useTaskLinksRead();
   const { values: pluginSettings } = useSettings();
@@ -497,16 +498,15 @@ function WorkThreadList(props: PluginThreadListProps) {
   const [archivedThreads, setArchivedThreads] = useState<ArchivedThread[]>([]);
   const [archivedThreadState, setArchivedThreadState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [archivedThreadError, setArchivedThreadError] = useState<string | null>(null);
-  const [tasks, setTasks] = useState<SidebarTask[]>([]);
-  const [taskProjects, setTaskProjects] = useState<SidebarTaskProject[]>([]);
-  const [taskState, setTaskState] = useState<"loading" | "ready" | "error">("loading");
-  const [taskError, setTaskError] = useState<string | null>(null);
+  const tasks = tasksData?.tasks ?? [];
+  const taskProjects = tasksData?.projects ?? [];
+  const taskState = tasksPending ? "loading" : tasksFailed ? "error" : "ready";
+  const taskError = tasksFailed ? tasksReadError.message : null;
   const [taskComposerOpen, setTaskComposerOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskProjectId, setNewTaskProjectId] = useState("");
   const [newTaskAssignee, setNewTaskAssignee] = useState<SidebarTask["assignee"]>("human");
   const [creatingTask, setCreatingTask] = useState(false);
-  const tasksRef = useRef<SidebarTask[]>([]);
   const taskMutation = useRef(0);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
@@ -672,90 +672,83 @@ function WorkThreadList(props: PluginThreadListProps) {
     return () => { cancelled = true; window.clearInterval(refreshTimer); };
   }, [authoredPullRequestRefreshKey, pluginSettings?.githubLeftListRefreshSeconds, refreshGitHubApiHealth, rpc]);
   const refreshTasks = useCallback(async () => { await refetchTasks(); }, [refetchTasks]);
-  useEffect(() => {
-    if (tasksPending) { setTaskState("loading"); return; }
-    if (tasksFailed) { setTaskError(tasksReadError.message); setTaskState("error"); return; }
-    if (!tasksData) return;
-    tasksRef.current = tasksData.tasks; setTasks(tasksData.tasks); setTaskProjects(tasksData.projects);
-    setNewTaskProjectId((current) => current && tasksData.projects.some((project) => project.id === current) ? current : tasksData.projects[0]?.id ?? "");
-    setTaskError(null); setTaskState("ready");
-  }, [tasksData, tasksFailed, tasksPending, tasksReadError]);
+  useEffect(() => { if (tasksData) setNewTaskProjectId((current) => current && tasksData.projects.some((project) => project.id === current) ? current : tasksData.projects[0]?.id ?? ""); }, [tasksData]);
 
   const updateTaskStatus = useCallback(async (taskId: string, status: SidebarTask["status"]) => {
-    const previous = tasksRef.current;
+    const previous = tasks;
     const current = previous.find((task) => task.id === taskId);
     if (!current || current.status === status) return;
     const mutation = ++taskMutation.current;
     const optimistic = previous.map((task) => task.id === taskId ? { ...task, status } : task);
-    tasksRef.current = optimistic; setTasks(optimistic); setUpdatingTaskId(taskId);
+    queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: optimistic } : data); setUpdatingTaskId(taskId);
     try { await rpc.call("updateTaskStatus", { taskId, status }); if (mutation === taskMutation.current) await refreshTasks(); }
-    catch (error) { if (mutation === taskMutation.current) { tasksRef.current = previous; setTasks(previous); toast.error(error instanceof Error ? error.message : "Could not update task"); } }
+    catch (error) { if (mutation === taskMutation.current) { queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: previous } : data); toast.error(error instanceof Error ? error.message : "Could not update task"); } }
     finally { if (mutation === taskMutation.current) setUpdatingTaskId(null); }
-  }, [refreshTasks, rpc]);
+  }, [queryClient, refreshTasks, rpc, tasks]);
   const updateTaskAssignee = useCallback(async (taskId: string, assignee: SidebarTask["assignee"]) => {
-    const previous = tasksRef.current;
+    const previous = tasks;
     const optimistic = previous.map((task) => task.id === taskId ? { ...task, assignee } : task);
-    tasksRef.current = optimistic; setTasks(optimistic);
+    queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: optimistic } : data);
     try { await rpc.call("updateTaskAssignee", { taskId, assignee }); }
-    catch (error) { tasksRef.current = previous; setTasks(previous); toast.error(error instanceof Error ? error.message : "Could not update task assignee"); }
-  }, [rpc]);
+    catch (error) { queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: previous } : data); toast.error(error instanceof Error ? error.message : "Could not update task assignee"); }
+  }, [queryClient, rpc, tasks]);
   const createSidebarTask = useCallback(async () => {
     const title = newTaskTitle.trim();
     if (!title || !newTaskProjectId || creatingTask) return;
     setCreatingTask(true);
     try {
       const { task } = await rpc.call("createSidebarTask", { projectId: newTaskProjectId, title, assignee: newTaskAssignee });
-      tasksRef.current = [...tasksRef.current, task]; setTasks(tasksRef.current);
+      queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: [...data.tasks, task] } : data);
       setNewTaskTitle(""); setTaskComposerOpen(false);
       void refreshTasks();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not create task");
     } finally { setCreatingTask(false); }
-  }, [creatingTask, newTaskAssignee, newTaskProjectId, newTaskTitle, refreshTasks, rpc]);
+  }, [creatingTask, newTaskAssignee, newTaskProjectId, newTaskTitle, queryClient, refreshTasks, rpc]);
   const deleteSidebarTask = useCallback(async (task: SidebarTask) => {
     if (!window.confirm(`Delete ${task.key}: ${task.title}? This cannot be undone.`)) return;
-    const previous = tasksRef.current;
-    tasksRef.current = previous.filter((candidate) => candidate.id !== task.id); setTasks(tasksRef.current);
+    const previous = tasks;
+    queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: previous.filter((candidate) => candidate.id !== task.id) } : data);
     try {
       const { deleted } = await rpc.call("deleteSidebarTask", { taskId: task.id });
       if (!deleted) throw new Error("Task was not found.");
       setSelectedTaskIds((current) => { const next = new Set(current); next.delete(task.id); return next; });
     } catch (error) {
-      tasksRef.current = previous; setTasks(previous);
+      queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: previous } : data);
       toast.error(error instanceof Error ? error.message : "Could not delete task");
     }
-  }, [rpc]);
+  }, [queryClient, rpc, tasks]);
   const updateTaskThreadAttachment = useCallback(async (taskId: string, threadId: string, attached: boolean) => {
-    const previous = tasksRef.current;
+    const previous = tasks;
     const optimistic = previous.map((task) => task.id !== taskId ? task : { ...task, linkedThreadIds: attached ? [...new Set([...task.linkedThreadIds, threadId])] : task.linkedThreadIds.filter((id) => id !== threadId) });
-    tasksRef.current = optimistic; setTasks(optimistic);
+    queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: optimistic } : data);
     try {
       await rpc.call(attached ? "attachTaskToThread" : "detachTaskFromThread", { taskId, threadId });
     } catch (error) {
-      tasksRef.current = previous; setTasks(previous);
+      queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: previous } : data);
       toast.error(error instanceof Error ? error.message : `Could not ${attached ? "attach" : "detach"} task`);
     }
-  }, [rpc]);
+  }, [queryClient, rpc, tasks]);
 
   const persistTaskReorder = useCallback(async (sourceId: string, targetId: string, placement: "before" | "after") => {
     if (props.searchQuery.trim()) return;
-    const previous = tasksRef.current;
+    const previous = tasks;
     const neighbors = taskReorderNeighbors(previous, sourceId, targetId, placement);
     if (!neighbors) return;
     const optimistic = reorderTaskSiblings(previous, sourceId, targetId, placement);
     const mutation = ++taskMutation.current;
-    tasksRef.current = optimistic; setTasks(optimistic); setTaskDropTarget(null); setDragTaskId(null);
+    queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: optimistic } : data); setTaskDropTarget(null); setDragTaskId(null);
     try { await rpc.call("reorderTask", { taskId: sourceId, ...neighbors }); if (mutation === taskMutation.current) await refreshTasks(); }
-    catch (error) { if (mutation === taskMutation.current) { tasksRef.current = previous; setTasks(previous); toast.error(error instanceof Error ? error.message : "Could not save task order"); } }
-  }, [props.searchQuery, refreshTasks, rpc]);
+    catch (error) { if (mutation === taskMutation.current) { queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: previous } : data); toast.error(error instanceof Error ? error.message : "Could not save task order"); } }
+  }, [props.searchQuery, queryClient, refreshTasks, rpc, tasks]);
 
   const moveTask = useCallback((taskId: string, direction: -1 | 1) => {
-    const task = tasksRef.current.find((candidate) => candidate.id === taskId);
+    const task = tasks.find((candidate) => candidate.id === taskId);
     if (!task) return;
-    const peers = tasksRef.current.filter((candidate) => candidate.projectId === task.projectId && candidate.status === task.status && candidate.parentTaskId === task.parentTaskId).sort((left, right) => (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER));
+    const peers = tasks.filter((candidate) => candidate.projectId === task.projectId && candidate.status === task.status && candidate.parentTaskId === task.parentTaskId).sort((left, right) => (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER));
     const target = peers[peers.findIndex((candidate) => candidate.id === taskId) + direction];
     if (target) void persistTaskReorder(taskId, target.id, direction < 0 ? "before" : "after");
-  }, [persistTaskReorder]);
+  }, [persistTaskReorder, tasks]);
 
   const projectNames = useMemo(() => Object.fromEntries(projects.map((project) => [project.id, project.name])), [projects]);
   const effectiveOrder = useMemo(() => reconcileThreadOrder(threadOrder, threads), [threadOrder, threads]);
