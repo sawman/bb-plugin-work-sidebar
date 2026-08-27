@@ -9,7 +9,7 @@ import {
   runtimeStatusPresentation,
   type SidebarTask,
 } from "./work-model";
-import { normalizeThreadGroups } from "./server";
+import { normalizeThreadGroups } from "./features/threads/model";
 
 function task(overrides: Partial<SidebarTask> = {}): SidebarTask {
   return {

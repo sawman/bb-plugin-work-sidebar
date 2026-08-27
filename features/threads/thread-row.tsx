@@ -1,0 +1,721 @@
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+import { useStore } from "zustand";
+import {
+  experimental_useSidebarThreadActions,
+  experimental_useSidebarThreadPullRequest,
+  experimental_useSidebarThreadSplit,
+  useComposerView,
+  type PluginSidebarThread,
+} from "@get-bb/plugin-sdk/app";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { Input } from "@/components/ui/input";
+import { Icon } from "@/components/ui/icon";
+import {
+  normalizeIndicator,
+  orderTaskLinksByRelevance,
+  threadTitle,
+  type ThreadTaskLink,
+} from "@/work-model";
+import { pullRequestPresentation } from "@/features/pull-requests/presentation";
+import { threadInteractionStore } from "./store";
+import type { SidebarThreadGroup } from "./model";
+
+type DropTarget = { threadId: string; placement: "before" | "after" } | null;
+type ThreadProject = { name: string; isPersonal: boolean };
+type ThreadRowProps = {
+  thread: PluginSidebarThread;
+  active: boolean;
+  taskLinks?: readonly ThreadTaskLink[];
+  children: number;
+  activeChildren: number;
+  childrenExpanded: boolean;
+  selected: boolean;
+  groupId: string | null;
+  groups: readonly SidebarThreadGroup[];
+  onToggleChildren(): void;
+  onSelect(
+    thread: PluginSidebarThread,
+    event: ReactMouseEvent<HTMLAnchorElement>,
+  ): boolean;
+  onMoveToGroup(threadId: string, groupId: string | null): void;
+  project?: ThreadProject;
+  onNavigate(): void;
+  reorderDisabled: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  dragThreadId: string | null;
+  onDragThreadChange(threadId: string | null): void;
+  dropTarget: DropTarget;
+  onDropTargetChange(target: DropTarget): void;
+  canDropThread(sourceId: string): boolean;
+  onDropThread(
+    sourceId: string,
+    targetId: string,
+    placement: "before" | "after",
+  ): void;
+  onMoveThread(threadId: string, direction: -1 | 1): void;
+};
+type WorkThreadTreeProps = Omit<
+  ThreadRowProps,
+  | "active"
+  | "taskLinks"
+  | "children"
+  | "activeChildren"
+  | "childrenExpanded"
+  | "selected"
+  | "groupId"
+  | "canMoveUp"
+  | "canMoveDown"
+  | "canDropThread"
+  | "onToggleChildren"
+> & {
+  childrenByThread: ReadonlyMap<string, PluginSidebarThread[]>;
+  taskLinks: Readonly<Record<string, readonly ThreadTaskLink[]>>;
+  activeThreadId: string | null;
+  selectedThreadIds: ReadonlySet<string>;
+  groupIds: ReadonlyMap<string, string>;
+  projectsById: ReadonlyMap<string, ThreadProject>;
+  orderedSiblings: readonly PluginSidebarThread[];
+  subtextRefreshKey: number;
+  depth?: number;
+};
+
+function indicatorGlyph(value: string): string {
+  switch (normalizeIndicator(value)) {
+    case "runtime":
+    case "workflow":
+    case "background-agent":
+    case "background-command":
+      return "●";
+    case "unread-error":
+      return "!";
+    case "unread-success":
+      return "•";
+    case "waiting-for-input":
+      return "?";
+    default:
+      return "";
+  }
+}
+export function threadIsWorking(thread: PluginSidebarThread): boolean {
+  const indicator = normalizeIndicator(String(thread.indicator));
+  return (
+    indicator === "runtime" ||
+    indicator === "workflow" ||
+    indicator === "background-agent" ||
+    indicator === "background-command" ||
+    indicator === "goal" ||
+    indicator === "plan-mode" ||
+    indicator === "working-draft"
+  );
+}
+export function visibleThreadTreeIds(
+  roots: readonly PluginSidebarThread[],
+  childrenByThread: ReadonlyMap<string, readonly PluginSidebarThread[]>,
+): string[] {
+  const ids: string[] = [];
+  const visit = (thread: PluginSidebarThread) => {
+    ids.push(thread.id);
+    for (const child of childrenByThread.get(thread.id) ?? []) visit(child);
+  };
+  for (const root of roots) visit(root);
+  return ids;
+}
+
+type ThreadPullRequest = ReturnType<
+  typeof experimental_useSidebarThreadPullRequest
+>["pullRequest"];
+type ThreadPullRequestStatus = ReturnType<typeof pullRequestPresentation>;
+
+function ThreadMetadata({
+  thread,
+  project,
+  projectLabel,
+  taskLinks,
+  pullRequest,
+  pullRequestStatus,
+  pullRequestLoading,
+}: {
+  thread: PluginSidebarThread;
+  project?: ThreadProject;
+  projectLabel: string;
+  taskLinks?: readonly ThreadTaskLink[];
+  pullRequest: ThreadPullRequest;
+  pullRequestStatus: ThreadPullRequestStatus | null;
+  pullRequestLoading: boolean;
+}) {
+  return (
+    <span className="ws-thread-meta">
+      {pullRequest && pullRequestStatus && (
+        <span
+          className="ws-pr-meta ws-thread-token ws-thread-pr-token"
+          data-tone={pullRequestStatus.tone}
+          title={`PR #${pullRequest.number} · ${pullRequestStatus.label}`}
+        >
+          <Icon name={pullRequestStatus.icon} aria-hidden />
+          <span>#{pullRequest.number}</span>
+        </span>
+      )}
+      <span
+        className="ws-thread-worktree"
+        title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${thread.environment?.branchName || (project?.isPersonal ? "Personal" : projectLabel)}`}
+      >
+        <Icon name={project?.isPersonal ? "Laptop" : "FolderGit"} aria-hidden />
+        <span>
+          {thread.environment?.branchName ||
+            (project?.isPersonal ? "Personal" : projectLabel)}
+        </span>
+      </span>
+      {orderTaskLinksByRelevance(taskLinks ?? []).map((taskLink) => (
+        <span
+          className="ws-task-link"
+          key={`${taskLink.task.id}:${taskLink.role}`}
+          title={`${taskLink.task.title} · ${taskLink.task.key}`}
+        >
+          <Icon name="ListTodo" aria-hidden />
+          <small className="ws-task-key">{taskLink.task.key}</small>
+        </span>
+      ))}
+      {pullRequestLoading && (
+        <span className="ws-pr-meta" aria-label="Pull request loading">
+          PR loading…
+        </span>
+      )}
+    </span>
+  );
+}
+
+function ThreadStatus({
+  thread,
+  indicator,
+  working,
+  hasComposerDraft,
+}: {
+  thread: PluginSidebarThread;
+  indicator: string;
+  working: boolean;
+  hasComposerDraft: boolean;
+}) {
+  return (
+    <span className="ws-thread-trailing">
+      {hasComposerDraft && (
+        <Icon
+          name="Pencil"
+          className="ws-composer-draft"
+          aria-label="Unsent draft"
+        />
+      )}
+      <span
+        className={`ws-status ws-status-${indicator} ${working ? "ws-status-working" : ""}`}
+        aria-label={thread.indicatorLabel ?? undefined}
+      >
+        {working ? (
+          <span className="ws-status-dots" aria-hidden>
+            <i />
+            <i />
+            <i />
+          </span>
+        ) : (
+          indicatorGlyph(String(thread.indicator))
+        )}
+      </span>
+      {thread.isPinned && (
+        <Icon name="Pin" className="ws-thread-pin" aria-label="Pinned" />
+      )}
+      {thread.isUnread && !working && indicator !== "unread-success" && (
+        <span className="ws-unread-dot" title="Unread" />
+      )}
+    </span>
+  );
+}
+
+export function ThreadRow({
+  thread,
+  active,
+  taskLinks,
+  children,
+  activeChildren,
+  childrenExpanded,
+  selected,
+  groupId,
+  groups,
+  onToggleChildren,
+  onSelect,
+  onMoveToGroup,
+  project,
+  onNavigate,
+  reorderDisabled,
+  canMoveUp,
+  canMoveDown,
+  dragThreadId,
+  onDragThreadChange,
+  dropTarget,
+  onDropTargetChange,
+  canDropThread,
+  onDropThread,
+  onMoveThread,
+}: ThreadRowProps) {
+  const actions = experimental_useSidebarThreadActions();
+  const { splitProps, isAvailable } = experimental_useSidebarThreadSplit(
+    thread.id,
+  );
+  // Per-row opt-in: never turn this into a list-wide PR metadata read.
+  const { pullRequest, isLoading: pullRequestLoading } =
+    experimental_useSidebarThreadPullRequest(thread.id);
+  const composerView = useComposerView();
+  const controlClick = useRef(false);
+  const [renaming, setRenaming] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(threadTitle(thread));
+  const projectLabel = project?.isPersonal
+    ? "Personal"
+    : (project?.name ?? "Project");
+  const title = threadTitle(thread);
+  const indicator = normalizeIndicator(String(thread.indicator));
+  const working = threadIsWorking(thread);
+  const hasComposerDraft =
+    composerView.scope.kind === "thread" &&
+    composerView.scope.threadId === thread.id &&
+    !composerView.draft.isEmpty;
+  const pullRequestStatus = pullRequest
+    ? pullRequestPresentation({
+        state: pullRequest.state,
+        draft: pullRequest.state === "draft",
+        attention: pullRequest.attention,
+      })
+    : null;
+  const open = (split = false) => {
+    actions.open(thread.id, { split });
+    onNavigate();
+  };
+  const commitRename = async () => {
+    const next = draftTitle.trim();
+    if (next && next !== threadTitle(thread))
+      await actions.rename(thread.id, next);
+    setRenaming(false);
+  };
+  // BB owns recursive archive and destructive delete confirmation.
+  const archiveTree = () => {
+    if (groupId) onMoveToGroup(thread.id, null);
+    actions.archive(thread.id);
+  };
+  const requestDeleteTree = () => actions.requestDelete(thread.id);
+  const cleanupRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => cleanupRef.current?.(), []);
+  const startUnifiedDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    // Native split is deliberately called first; BB takes the gesture when it exits the sidebar.
+    splitProps.onPointerDown?.(event);
+    if (
+      reorderDisabled ||
+      event.button !== 0 ||
+      (event.target as HTMLElement).closest("button,input,textarea")
+    )
+      return;
+    const pointerId = event.pointerId;
+    let active = false;
+    const targetAt = (x: number, y: number) =>
+      document
+        .elementFromPoint(x, y)
+        ?.closest<HTMLElement>("[data-ws-thread-id]") ?? null;
+    const zoneAt = (x: number, y: number) =>
+      document
+        .elementFromPoint(x, y)
+        ?.closest<HTMLElement>("[data-ws-thread-drop-zone]")?.dataset
+        .wsThreadDropZone ?? null;
+    const clear = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", finish);
+      cleanupRef.current = null;
+      onDragThreadChange(null);
+      onDropTargetChange(null);
+    };
+    const move = (moveEvent: PointerEvent) => {
+      if (moveEvent.pointerId !== pointerId) return;
+      if (
+        !active &&
+        Math.hypot(
+          moveEvent.clientX - event.clientX,
+          moveEvent.clientY - event.clientY,
+        ) < 5
+      )
+        return;
+      const target = targetAt(moveEvent.clientX, moveEvent.clientY);
+      const targetId = target?.dataset.wsThreadId ?? null;
+      const targetGroup = target?.dataset.wsThreadGroup ?? null;
+      const zone = zoneAt(moveEvent.clientX, moveEvent.clientY);
+      if (
+        (targetGroup && targetGroup !== (groupId ?? "active")) ||
+        (!targetId && zone && zone !== groupId)
+      ) {
+        active = true;
+        onDragThreadChange(thread.id);
+        onDropTargetChange({
+          threadId: targetGroup ?? zone!,
+          placement: "after",
+        });
+        moveEvent.preventDefault();
+        return;
+      }
+      if (!targetId || targetId === thread.id || !canDropThread(thread.id)) {
+        if (active) {
+          onDragThreadChange(null);
+          onDropTargetChange(null);
+        }
+        return;
+      }
+      const targetElement = document.querySelector<HTMLElement>(
+        `[data-ws-thread-id="${CSS.escape(targetId)}"]`,
+      );
+      if (!targetElement) return;
+      active = true;
+      const bounds = targetElement.getBoundingClientRect();
+      onDragThreadChange(thread.id);
+      onDropTargetChange({
+        threadId: targetId,
+        placement:
+          moveEvent.clientY > bounds.top + bounds.height / 2
+            ? "after"
+            : "before",
+      });
+      moveEvent.preventDefault();
+    };
+    const finish = (finishEvent: PointerEvent) => {
+      if (finishEvent.pointerId === pointerId && active) {
+        const zone = zoneAt(finishEvent.clientX, finishEvent.clientY);
+        const target = targetAt(finishEvent.clientX, finishEvent.clientY);
+        const targetId = target?.dataset.wsThreadId ?? null;
+        const targetGroup = target?.dataset.wsThreadGroup ?? null;
+        if (!targetId && zone === "archive") archiveTree();
+        else if (!targetId && zone && zone !== groupId)
+          onMoveToGroup(thread.id, zone === "active" ? null : zone);
+        else if (targetGroup && targetGroup !== (groupId ?? "active"))
+          onMoveToGroup(
+            thread.id,
+            targetGroup === "active" ? null : targetGroup,
+          );
+        else if (
+          targetId &&
+          targetId !== thread.id &&
+          canDropThread(thread.id)
+        ) {
+          const bounds = target!.getBoundingClientRect();
+          onDropThread(
+            thread.id,
+            targetId,
+            finishEvent.clientY > bounds.top + bounds.height / 2
+              ? "after"
+              : "before",
+          );
+        }
+      }
+      clear();
+    };
+    cleanupRef.current?.();
+    cleanupRef.current = clear;
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", finish);
+  };
+  return (
+    <div
+      className={`ws-thread ${active ? "ws-thread-active" : ""} ${selected ? "ws-thread-selected" : ""} ${dragThreadId === thread.id ? "ws-thread-dragging" : ""}`}
+      data-ws-thread-id={thread.id}
+      data-ws-thread-group={groupId ?? "active"}
+      data-depth={thread.parentThreadId ? "child" : "root"}
+      data-drop-placement={
+        dropTarget?.threadId === thread.id ? dropTarget.placement : undefined
+      }
+      onPointerDown={startUnifiedDrag}
+    >
+      {renaming ? (
+        <div className="ws-rename">
+          <Input
+            autoFocus
+            value={draftTitle}
+            aria-label="Thread title"
+            draggable={false}
+            onDragStart={(event) => event.preventDefault()}
+            onChange={(event) => setDraftTitle(event.target.value)}
+            onBlur={() => void commitRename()}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") void commitRename();
+              if (event.key === "Escape") setRenaming(false);
+            }}
+          />
+        </div>
+      ) : (
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <a
+              href="#"
+              data-sidebar-thread-shortcut-target=""
+              data-sidebar-thread-id={thread.id}
+              data-sidebar-thread-parent-id={thread.parentThreadId ?? ""}
+              className={`ws-thread-anchor ${children > 0 ? "ws-thread-has-children" : ""}`}
+              title={
+                isAvailable
+                  ? "Drag into the main area to open; drop at an edge to split"
+                  : undefined
+              }
+              aria-selected={selected}
+              onMouseDown={(event) => {
+                controlClick.current = event.ctrlKey && event.button === 0;
+              }}
+              onClick={(event) => {
+                event.preventDefault();
+                if (!onSelect(thread, event)) open(false);
+              }}
+              onContextMenu={(event) => {
+                if (!controlClick.current && !event.ctrlKey) return;
+                controlClick.current = false;
+                event.preventDefault();
+                onSelect(thread, event);
+              }}
+              onKeyDown={(event) => {
+                if (
+                  event.key !== "ContextMenu" &&
+                  !(event.key === "F10" && event.shiftKey)
+                )
+                  return;
+                event.preventDefault();
+                const bounds = event.currentTarget.getBoundingClientRect();
+                event.currentTarget.dispatchEvent(
+                  new MouseEvent("contextmenu", {
+                    bubbles: true,
+                    clientX: bounds.left + Math.min(bounds.width, 12),
+                    clientY: bounds.bottom,
+                  }),
+                );
+              }}
+            >
+              <span className="ws-thread-leading">
+                {children > 0 ? (
+                  <button
+                    type="button"
+                    className={`ws-thread-agent-badge ${childrenExpanded ? "ws-thread-agent-badge-expanded" : ""}`}
+                    aria-label={`${children} child agent${children === 1 ? "" : "s"}${childrenExpanded ? ", expanded" : ", collapsed"}`}
+                    aria-expanded={childrenExpanded}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onToggleChildren();
+                    }}
+                  >
+                    <Icon
+                      name="Bot"
+                      className={
+                        activeChildren ? "ws-child-agent-working" : undefined
+                      }
+                      aria-hidden
+                    />
+                    <small>{children}</small>
+                  </button>
+                ) : (
+                  <span className="ws-thread-agent-placeholder" aria-hidden />
+                )}
+              </span>
+              <span className="ws-thread-main">
+                <span
+                  className={`ws-thread-title ${thread.isUnread ? "ws-unread" : ""}`}
+                >
+                  {title}
+                </span>
+                <ThreadMetadata
+                  thread={thread}
+                  project={project}
+                  projectLabel={projectLabel}
+                  taskLinks={taskLinks}
+                  pullRequest={pullRequest}
+                  pullRequestStatus={pullRequestStatus}
+                  pullRequestLoading={pullRequestLoading}
+                />
+              </span>
+              <ThreadStatus
+                thread={thread}
+                indicator={indicator}
+                working={working}
+                hasComposerDraft={hasComposerDraft}
+              />
+            </a>
+          </ContextMenuTrigger>
+          <ContextMenuContent aria-label={`Actions for ${title}`}>
+            <ContextMenuLabel>{title}</ContextMenuLabel>
+            <ContextMenuItem onSelect={() => open(false)}>Open</ContextMenuItem>
+            {isAvailable && (
+              <ContextMenuItem onSelect={() => open(true)}>
+                Open in split
+              </ContextMenuItem>
+            )}
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              disabled={reorderDisabled || !canMoveUp}
+              onSelect={() => onMoveThread(thread.id, -1)}
+            >
+              Move up
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={reorderDisabled || !canMoveDown}
+              onSelect={() => onMoveThread(thread.id, 1)}
+            >
+              Move down
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              onSelect={() =>
+                void actions.setPinned(thread.id, !thread.isPinned)
+              }
+            >
+              {thread.isPinned ? "Unpin" : "Pin"}
+            </ContextMenuItem>
+            <ContextMenuItem
+              onSelect={() => void actions.setRead(thread.id, thread.isUnread)}
+            >
+              {thread.isUnread ? "Mark read" : "Mark unread"}
+            </ContextMenuItem>
+            <ContextMenuItem onSelect={() => setRenaming(true)}>
+              Rename
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={groupId === null}
+              onSelect={() => onMoveToGroup(thread.id, null)}
+            >
+              Active
+            </ContextMenuItem>
+            {groups.map((group) => (
+              <ContextMenuItem
+                key={group.id}
+                disabled={group.id === groupId}
+                onSelect={() => onMoveToGroup(thread.id, group.id)}
+              >
+                {group.name}
+              </ContextMenuItem>
+            ))}
+            <ContextMenuItem onSelect={archiveTree}>Archive</ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={requestDeleteTree}
+            >
+              Delete
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+      )}
+    </div>
+  );
+}
+
+export function WorkThreadTree({
+  thread,
+  childrenByThread,
+  taskLinks,
+  activeThreadId,
+  selectedThreadIds,
+  groupIds,
+  groups,
+  projectsById,
+  onNavigate,
+  onSelect,
+  onMoveToGroup,
+  orderedSiblings,
+  reorderDisabled,
+  dragThreadId,
+  onDragThreadChange,
+  dropTarget,
+  onDropTargetChange,
+  onDropThread,
+  onMoveThread,
+  subtextRefreshKey,
+  depth = 0,
+}: WorkThreadTreeProps) {
+  const children = childrenByThread.get(thread.id) ?? [];
+  const activeChildren = children.filter(threadIsWorking).length;
+  const childrenExpanded = useStore(threadInteractionStore, (state) =>
+    state.expandedThreadIds.has(thread.id),
+  );
+  const siblingIndex = orderedSiblings.findIndex(
+    (sibling) => sibling.id === thread.id,
+  );
+  return (
+    <>
+      <ThreadRow
+        key={`${thread.id}:${subtextRefreshKey}`}
+        thread={thread}
+        active={thread.id === activeThreadId}
+        taskLinks={taskLinks[thread.id]}
+        children={children.length}
+        activeChildren={activeChildren}
+        childrenExpanded={childrenExpanded}
+        selected={selectedThreadIds.has(thread.id)}
+        groupId={groupIds.get(thread.id) ?? null}
+        groups={groups}
+        onToggleChildren={() =>
+          threadInteractionStore.getState().toggleChildren(thread.id)
+        }
+        onSelect={onSelect}
+        onMoveToGroup={onMoveToGroup}
+        project={projectsById.get(thread.projectId)}
+        onNavigate={onNavigate}
+        reorderDisabled={reorderDisabled}
+        canMoveUp={siblingIndex > 0}
+        canMoveDown={
+          siblingIndex >= 0 && siblingIndex < orderedSiblings.length - 1
+        }
+        dragThreadId={dragThreadId}
+        onDragThreadChange={onDragThreadChange}
+        dropTarget={dropTarget}
+        onDropTargetChange={onDropTargetChange}
+        canDropThread={(sourceId) =>
+          orderedSiblings.some((sibling) => sibling.id === sourceId)
+        }
+        onDropThread={onDropThread}
+        onMoveThread={onMoveThread}
+      />
+      {childrenExpanded &&
+        children.map((child) => (
+          <div
+            key={child.id}
+            className={`ws-thread-child-depth-${Math.min(depth + 1, 4)}`}
+          >
+            <WorkThreadTree
+              thread={child}
+              childrenByThread={childrenByThread}
+              taskLinks={taskLinks}
+              activeThreadId={activeThreadId}
+              selectedThreadIds={selectedThreadIds}
+              groupIds={groupIds}
+              groups={groups}
+              projectsById={projectsById}
+              onNavigate={onNavigate}
+              onSelect={onSelect}
+              onMoveToGroup={onMoveToGroup}
+              orderedSiblings={children}
+              reorderDisabled={reorderDisabled}
+              dragThreadId={dragThreadId}
+              onDragThreadChange={onDragThreadChange}
+              dropTarget={dropTarget}
+              onDropTargetChange={onDropTargetChange}
+              onDropThread={onDropThread}
+              onMoveThread={onMoveThread}
+              subtextRefreshKey={subtextRefreshKey}
+              depth={depth + 1}
+            />
+          </div>
+        ))}
+    </>
+  );
+}

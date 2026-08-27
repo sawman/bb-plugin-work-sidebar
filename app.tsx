@@ -5,7 +5,6 @@ import {
   definePluginApp,
   useBbNavigate,
   experimental_useSidebarThreadActions,
-  experimental_useSidebarThreadPullRequest,
   experimental_useSidebarThreadSplit,
   experimental_useSidebarThreads,
   useComposer,
@@ -24,14 +23,6 @@ import { toast } from "sonner";
 import "react-diff-view/style/index.css";
 import { CurrentPullRequestCard as ChangesPullRequestCard, StackBranchRow as ChangesStackBranchRow, WorkingTreeDiff as ChangesWorkingTreeDiff, type StackBranchSignals } from "@/components/work/changes";
 import { Button } from "@/components/ui/button";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuLabel,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
 import { Input } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
 import { ArchivedThreadRow, type ArchivedThread } from "@/components/threads/archived-thread-row";
@@ -74,11 +65,10 @@ import "./app.css";
 import "./scrollbar.css";
 import "./views.css";
 import { PluginProviders } from "./query-runtime";
-import { selectThreadIds } from "./features/threads/model";
+import { selectThreadIds, type SidebarThreadGroup } from "./features/threads/model";
 import { threadInteractionStore, type ThreadDropTarget, type WorkTab } from "./features/threads/store";
-
-const SIDEBAR_ORDER_CHANNEL = "sidebar-order:changed";
-type SidebarThreadGroup = { id: string; name: string; threadIds: string[] };
+import { useArchivedThreads, useThreadPreferences } from "./features/threads/queries";
+import { WorkThreadTree, threadIsWorking, visibleThreadTreeIds } from "./features/threads/thread-row";
 
 function withPluginProviders<Props extends object>(Component: ComponentType<Props>): ComponentType<Props> {
   return function PluginSlot(props: Props) {
@@ -86,394 +76,6 @@ function withPluginProviders<Props extends object>(Component: ComponentType<Prop
   };
 }
 
-function indicatorGlyph(value: string): string {
-  switch (normalizeIndicator(value)) {
-    case "runtime": case "workflow": case "background-agent": case "background-command": return "●";
-    case "unread-error": return "!";
-    case "unread-success": return "•";
-    case "waiting-for-input": return "?";
-    case "goal": case "plan-mode": return "";
-    default: return "";
-  }
-}
-
-function threadIsWorking(thread: PluginSidebarThread): boolean {
-  const indicator = normalizeIndicator(String(thread.indicator));
-  return indicator === "runtime" || indicator === "workflow" || indicator === "background-agent" || indicator === "background-command" || indicator === "goal" || indicator === "plan-mode" || indicator === "working-draft";
-}
-
-function visibleThreadTreeIds(roots: readonly PluginSidebarThread[], childrenByThread: ReadonlyMap<string, readonly PluginSidebarThread[]>): string[] {
-  const ids: string[] = [];
-  const visit = (thread: PluginSidebarThread) => {
-    ids.push(thread.id);
-    for (const child of childrenByThread.get(thread.id) ?? []) visit(child);
-  };
-  for (const root of roots) visit(root);
-  return ids;
-}
-
-function ThreadRow({
-  thread,
-  active,
-  taskLinks,
-  children,
-  activeChildren,
-  childrenExpanded,
-  selected,
-  groupId,
-  groups,
-  onToggleChildren,
-  onSelect,
-  onMoveToGroup,
-  project,
-  onNavigate,
-  reorderDisabled,
-  canMoveUp,
-  canMoveDown,
-  dragThreadId,
-  onDragThreadChange,
-  dropTarget,
-  onDropTargetChange,
-  canDropThread,
-  onDropThread,
-  onMoveThread,
-}: {
-  thread: PluginSidebarThread;
-  active: boolean;
-  taskLinks?: readonly ThreadTaskLink[];
-  children: number;
-  activeChildren: number;
-  childrenExpanded: boolean;
-  selected: boolean;
-  groupId: string | null;
-  groups: readonly SidebarThreadGroup[];
-  onToggleChildren(): void;
-  onSelect(thread: PluginSidebarThread, event: ReactMouseEvent<HTMLAnchorElement>): boolean;
-  onMoveToGroup(threadId: string, groupId: string | null): void;
-  project?: { name: string; isPersonal: boolean };
-  onNavigate(): void;
-  reorderDisabled: boolean;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
-  dragThreadId: string | null;
-  onDragThreadChange(threadId: string | null): void;
-  dropTarget: { threadId: string; placement: "before" | "after" } | null;
-  onDropTargetChange(target: { threadId: string; placement: "before" | "after" } | null): void;
-  canDropThread(sourceId: string): boolean;
-  onDropThread(sourceId: string, targetId: string, placement: "before" | "after"): void;
-  onMoveThread(threadId: string, direction: -1 | 1): void;
-}) {
-  const actions = experimental_useSidebarThreadActions();
-  const { splitProps, isAvailable } = experimental_useSidebarThreadSplit(thread.id);
-  const { pullRequest, isLoading: pullRequestLoading } = experimental_useSidebarThreadPullRequest(thread.id);
-  const composerView = useComposerView();
-  const controlClick = useRef(false);
-  const [renaming, setRenaming] = useState(false);
-  const [draftTitle, setDraftTitle] = useState(threadTitle(thread));
-  const projectLabel = project?.isPersonal ? "Personal" : project?.name ?? "Project";
-  const title = threadTitle(thread);
-  const indicator = normalizeIndicator(String(thread.indicator));
-  const working = threadIsWorking(thread);
-  // The plugin SDK exposes the active composer scope and its structured draft.
-  // Match the native row's precedence: running work wins; otherwise an
-  // unsent draft owns the one trailing status slot.
-  const hasComposerDraft = composerView.scope.kind === "thread" && composerView.scope.threadId === thread.id && !composerView.draft.isEmpty;
-  const pullRequestStatus = pullRequest ? pullRequestPresentation({ state: pullRequest.state, draft: pullRequest.state === "draft", attention: pullRequest.attention }) : null;
-
-  const open = (split = false) => {
-    actions.open(thread.id, { split });
-    onNavigate();
-  };
-  const commitRename = async () => {
-    const next = draftTitle.trim();
-    if (next && next !== threadTitle(thread)) await actions.rename(thread.id, next);
-    setRenaming(false);
-  };
-  // These sidebar action APIs own the recursive tree mutation: archive closes
-  // the parent and every descendant, and delete opens BB's child-counting
-  // recursive confirmation. Never fan out child actions here.
-  const archiveTree = () => { if (groupId) onMoveToGroup(thread.id, null); actions.archive(thread.id); };
-  const requestDeleteTree = () => actions.requestDelete(thread.id);
-  const unifiedDragCleanup = useRef<(() => void) | null>(null);
-  useEffect(() => () => unifiedDragCleanup.current?.(), []);
-  // One row-wide pointer gesture: while it remains in the sidebar it reorders;
-  // once it leaves, BB's native handler (called first) owns open/split.
-  const startUnifiedDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
-    splitProps.onPointerDown?.(event);
-    if (reorderDisabled || event.button !== 0 || (event.target as HTMLElement).closest("button,input,textarea")) return;
-    const pointerId = event.pointerId;
-    let active = false;
-    const clear = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", finish); window.removeEventListener("pointercancel", finish); unifiedDragCleanup.current = null; onDragThreadChange(null); onDropTargetChange(null); };
-    const targetElementAt = (x: number, y: number) => document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-ws-thread-id]") ?? null;
-    const targetAt = (x: number, y: number) => targetElementAt(x, y)?.dataset.wsThreadId ?? null;
-    const zoneAt = (x: number, y: number) => document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-ws-thread-drop-zone]")?.dataset.wsThreadDropZone ?? null;
-    const move = (moveEvent: PointerEvent) => {
-      if (moveEvent.pointerId !== pointerId) return;
-      if (!active && Math.hypot(moveEvent.clientX - event.clientX, moveEvent.clientY - event.clientY) < 5) return;
-      const sourceId = thread.id;
-      const targetElement = targetElementAt(moveEvent.clientX, moveEvent.clientY);
-      const targetId = targetElement?.dataset.wsThreadId ?? null;
-      const targetGroup = targetElement?.dataset.wsThreadGroup ?? null;
-      const zone = zoneAt(moveEvent.clientX, moveEvent.clientY);
-      if ((targetGroup && targetGroup !== (groupId ?? "active")) || (!targetId && zone && zone !== groupId)) {
-        active = true;
-        onDragThreadChange(sourceId);
-        onDropTargetChange({ threadId: targetGroup ?? zone!, placement: "after" });
-        moveEvent.preventDefault();
-        return;
-      }
-      if (!targetId || targetId === sourceId || !canDropThread(sourceId)) { if (active) { onDragThreadChange(null); onDropTargetChange(null); } return; }
-      const target = document.querySelector<HTMLElement>(`[data-ws-thread-id="${CSS.escape(targetId)}"]`);
-      if (!target) return;
-      active = true;
-      const bounds = target.getBoundingClientRect();
-      onDragThreadChange(sourceId);
-      onDropTargetChange({ threadId: targetId, placement: moveEvent.clientY > bounds.top + bounds.height / 2 ? "after" : "before" });
-      moveEvent.preventDefault();
-    };
-    const finish = (finishEvent: PointerEvent) => {
-      if (finishEvent.pointerId === pointerId && active) {
-        const zone = zoneAt(finishEvent.clientX, finishEvent.clientY);
-        const targetElement = targetElementAt(finishEvent.clientX, finishEvent.clientY);
-        const targetId = targetElement?.dataset.wsThreadId ?? null;
-        const targetGroup = targetElement?.dataset.wsThreadGroup ?? null;
-        if (!targetId && zone === "archive") archiveTree();
-        else if (!targetId && zone && zone !== groupId) onMoveToGroup(thread.id, zone === "active" ? null : zone);
-        else if (targetGroup && targetGroup !== (groupId ?? "active")) onMoveToGroup(thread.id, targetGroup === "active" ? null : targetGroup);
-        else {
-        const target = targetId ? document.querySelector<HTMLElement>(`[data-ws-thread-id="${CSS.escape(targetId)}"]`) : null;
-        if (targetId && target && targetId !== thread.id && canDropThread(thread.id)) {
-          const bounds = target.getBoundingClientRect();
-          onDropThread(thread.id, targetId, finishEvent.clientY > bounds.top + bounds.height / 2 ? "after" : "before");
-        }
-        }
-      }
-      clear();
-    };
-    unifiedDragCleanup.current?.();
-    unifiedDragCleanup.current = clear;
-    window.addEventListener("pointermove", move, { passive: false });
-    window.addEventListener("pointerup", finish);
-    window.addEventListener("pointercancel", finish);
-  };
-
-  return (
-    <div
-      className={`ws-thread ${active ? "ws-thread-active" : ""} ${selected ? "ws-thread-selected" : ""} ${dragThreadId === thread.id ? "ws-thread-dragging" : ""}`}
-      data-ws-thread-id={thread.id}
-      data-ws-thread-group={groupId ?? "active"}
-      data-depth={thread.parentThreadId ? "child" : "root"}
-      data-drop-placement={dropTarget?.threadId === thread.id ? dropTarget.placement : undefined}
-      onPointerDown={startUnifiedDrag}
-    >
-      {renaming ? (
-        <div className="ws-rename">
-          <Input
-            autoFocus value={draftTitle} aria-label="Thread title"
-            draggable={false}
-            onDragStart={(event) => event.preventDefault()}
-            onChange={(event) => setDraftTitle(event.target.value)}
-            onBlur={() => void commitRename()}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") void commitRename();
-              if (event.key === "Escape") setRenaming(false);
-            }}
-          />
-        </div>
-      ) : (
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <a
-
-              href="#"
-              data-sidebar-thread-shortcut-target=""
-              data-sidebar-thread-id={thread.id}
-              data-sidebar-thread-parent-id={thread.parentThreadId ?? ""}
-              className={`ws-thread-anchor ${children > 0 ? "ws-thread-has-children" : ""}`}
-              title={isAvailable ? "Drag into the main area to open; drop at an edge to split" : undefined}
-              aria-selected={selected}
-              onMouseDown={(event) => { controlClick.current = event.ctrlKey && event.button === 0; }}
-              onClick={(event) => {
-                event.preventDefault();
-                if (!onSelect(thread, event)) open(false);
-              }}
-              onContextMenu={(event) => { if (!controlClick.current && !event.ctrlKey) return; controlClick.current = false; event.preventDefault(); onSelect(thread, event); }}
-              onKeyDown={(event) => {
-                if (event.key !== "ContextMenu" && !(event.key === "F10" && event.shiftKey)) return;
-                event.preventDefault();
-                const target = event.currentTarget;
-                const bounds = target.getBoundingClientRect();
-                target.dispatchEvent(new MouseEvent("contextmenu", {
-                  bubbles: true,
-                  clientX: bounds.left + Math.min(bounds.width, 12),
-                  clientY: bounds.bottom,
-                }));
-              }}
-            >
-              <span className="ws-thread-leading">
-                {children > 0 ? <button type="button" className={`ws-thread-agent-badge ${childrenExpanded ? "ws-thread-agent-badge-expanded" : ""}`} aria-label={`${children} child agent${children === 1 ? "" : "s"}${childrenExpanded ? ", expanded" : ", collapsed"}`} aria-expanded={childrenExpanded} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.preventDefault(); event.stopPropagation(); onToggleChildren(); }}><Icon name="Bot" className={activeChildren ? "ws-child-agent-working" : undefined} aria-hidden /><small>{children}</small></button> : <span className="ws-thread-agent-placeholder" aria-hidden />}
-              </span>
-              <span className="ws-thread-main">
-                <span className={`ws-thread-title ${thread.isUnread ? "ws-unread" : ""}`}>{title}</span>
-                <span className="ws-thread-meta">
-                  {pullRequest && pullRequestStatus && <span className="ws-pr-meta ws-thread-token ws-thread-pr-token" data-tone={pullRequestStatus.tone} title={`PR #${pullRequest.number} · ${pullRequestStatus.label}`}><Icon name={pullRequestStatus.icon} aria-hidden /><span>#{pullRequest.number}</span></span>}
-                  <span className="ws-thread-worktree" title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${thread.environment?.branchName || (project?.isPersonal ? "Personal" : projectLabel)}`}><Icon name={project?.isPersonal ? "Laptop" : "FolderGit"} aria-hidden /><span>{thread.environment?.branchName || (project?.isPersonal ? "Personal" : projectLabel)}</span></span>
-                  {orderTaskLinksByRelevance(taskLinks ?? []).map((taskLink) => <span className="ws-task-link" key={`${taskLink.task.id}:${taskLink.role}`} title={`${taskLink.task.title} · ${taskLink.task.key}`}><Icon name="ListTodo" aria-hidden /><small className="ws-task-key">{taskLink.task.key}</small></span>)}
-                  {pullRequestLoading && <span className="ws-pr-meta" aria-label="Pull request loading">PR loading…</span>}
-                </span>
-              </span>
-              <span className="ws-thread-trailing">
-                {hasComposerDraft && <Icon name="Pencil" className="ws-composer-draft" aria-label="Unsent draft" />}
-                <span className={`ws-status ws-status-${indicator} ${working ? "ws-status-working" : ""}`} aria-label={thread.indicatorLabel ?? undefined}>
-                  {working ? <span className="ws-status-dots" aria-hidden><i /><i /><i /></span> : indicatorGlyph(String(thread.indicator))}
-                </span>
-                {thread.isPinned && <Icon name="Pin" className="ws-thread-pin" aria-label="Pinned" />}
-                {thread.isUnread && !working && indicator !== "unread-success" && <span className="ws-unread-dot" title="Unread" />}
-              </span>
-            </a>
-          </ContextMenuTrigger>
-          <ContextMenuContent aria-label={`Actions for ${title}`}>
-            <ContextMenuLabel>{title}</ContextMenuLabel>
-            <ContextMenuItem onSelect={() => open(false)}>Open</ContextMenuItem>
-            {isAvailable && <ContextMenuItem onSelect={() => open(true)}>Open in split</ContextMenuItem>}
-            <ContextMenuSeparator />
-            <ContextMenuItem disabled={reorderDisabled || !canMoveUp} onSelect={() => onMoveThread(thread.id, -1)}>
-              Move up
-            </ContextMenuItem>
-            <ContextMenuItem disabled={reorderDisabled || !canMoveDown} onSelect={() => onMoveThread(thread.id, 1)}>
-              Move down
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem onSelect={() => void actions.setPinned(thread.id, !thread.isPinned)}>
-              {thread.isPinned ? "Unpin" : "Pin"}
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={() => void actions.setRead(thread.id, thread.isUnread)}>
-              {thread.isUnread ? "Mark read" : "Mark unread"}
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={() => setRenaming(true)}>Rename</ContextMenuItem>
-            <ContextMenuItem disabled={groupId === null} onSelect={() => onMoveToGroup(thread.id, null)}>Active</ContextMenuItem>
-            {groups.map((group) => <ContextMenuItem key={group.id} disabled={group.id === groupId} onSelect={() => onMoveToGroup(thread.id, group.id)}>{group.name}</ContextMenuItem>)}
-            <ContextMenuItem onSelect={archiveTree}>Archive</ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem className="text-destructive focus:text-destructive" onSelect={requestDeleteTree}>
-              Delete
-            </ContextMenuItem>
-          </ContextMenuContent>
-        </ContextMenu>
-      )}
-    </div>
-  );
-}
-
-function WorkThreadTree({
-  thread,
-  childrenByThread,
-  taskLinks,
-  activeThreadId,
-  selectedThreadIds,
-  groupIds,
-  groups,
-  projectsById,
-  onNavigate,
-  onSelect,
-  onMoveToGroup,
-  orderedSiblings,
-  reorderDisabled,
-  dragThreadId,
-  onDragThreadChange,
-  dropTarget,
-  onDropTargetChange,
-  onDropThread,
-  onMoveThread,
-  subtextRefreshKey,
-  depth = 0,
-}: {
-  thread: PluginSidebarThread;
-  childrenByThread: ReadonlyMap<string, PluginSidebarThread[]>;
-  taskLinks: Readonly<Record<string, readonly ThreadTaskLink[]>>;
-  activeThreadId: string | null;
-  selectedThreadIds: ReadonlySet<string>;
-  groupIds: ReadonlyMap<string, string>;
-  groups: readonly SidebarThreadGroup[];
-  projectsById: ReadonlyMap<string, { name: string; isPersonal: boolean }>;
-  onNavigate(): void;
-  onSelect(thread: PluginSidebarThread, event: ReactMouseEvent<HTMLAnchorElement>): boolean;
-  onMoveToGroup(threadId: string, groupId: string | null): void;
-  orderedSiblings: readonly PluginSidebarThread[];
-  reorderDisabled: boolean;
-  dragThreadId: string | null;
-  onDragThreadChange(threadId: string | null): void;
-  dropTarget: { threadId: string; placement: "before" | "after" } | null;
-  onDropTargetChange(target: { threadId: string; placement: "before" | "after" } | null): void;
-  onDropThread(sourceId: string, targetId: string, placement: "before" | "after"): void;
-  onMoveThread(threadId: string, direction: -1 | 1): void;
-  subtextRefreshKey: number;
-  depth?: number;
-}) {
-  const children = childrenByThread.get(thread.id) ?? [];
-  const activeChildren = children.filter(threadIsWorking).length;
-  // New child agents should not take over the sidebar; reveal each subtree
-  // only when the user deliberately opens its disclosure.
-  const childrenExpanded = useStore(threadInteractionStore, (state) => state.expandedThreadIds.has(thread.id));
-  const siblingIndex = orderedSiblings.findIndex((sibling) => sibling.id === thread.id);
-  return (
-    <>
-      <ThreadRow key={`${thread.id}:${subtextRefreshKey}`}
-        thread={thread}
-        active={thread.id === activeThreadId}
-        taskLinks={taskLinks[thread.id]}
-        children={children.length}
-        activeChildren={activeChildren}
-        childrenExpanded={childrenExpanded}
-        selected={selectedThreadIds.has(thread.id)}
-        groupId={groupIds.get(thread.id) ?? null}
-        groups={groups}
-        onToggleChildren={() => threadInteractionStore.getState().toggleChildren(thread.id)}
-        onSelect={onSelect}
-        onMoveToGroup={onMoveToGroup}
-        project={projectsById.get(thread.projectId)}
-        onNavigate={onNavigate}
-        reorderDisabled={reorderDisabled}
-        canMoveUp={siblingIndex > 0}
-        canMoveDown={siblingIndex >= 0 && siblingIndex < orderedSiblings.length - 1}
-        dragThreadId={dragThreadId}
-        onDragThreadChange={onDragThreadChange}
-        dropTarget={dropTarget}
-        onDropTargetChange={onDropTargetChange}
-        canDropThread={(sourceId) => orderedSiblings.some((sibling) => sibling.id === sourceId)}
-        onDropThread={onDropThread}
-        onMoveThread={onMoveThread}
-      />
-      {childrenExpanded && children.map((child) => (
-        <div key={child.id} className={`ws-thread-child-depth-${Math.min(depth + 1, 4)}`}>
-          <WorkThreadTree
-            thread={child}
-            childrenByThread={childrenByThread}
-            taskLinks={taskLinks}
-            activeThreadId={activeThreadId}
-            selectedThreadIds={selectedThreadIds}
-            groupIds={groupIds}
-            groups={groups}
-            projectsById={projectsById}
-            onNavigate={onNavigate}
-            onSelect={onSelect}
-            onMoveToGroup={onMoveToGroup}
-            orderedSiblings={children}
-            reorderDisabled={reorderDisabled}
-            dragThreadId={dragThreadId}
-            onDragThreadChange={onDragThreadChange}
-            dropTarget={dropTarget}
-            onDropTargetChange={onDropTargetChange}
-            onDropThread={onDropThread}
-            onMoveThread={onMoveThread}
-            subtextRefreshKey={subtextRefreshKey}
-            depth={depth + 1}
-          />
-        </div>
-      ))}
-    </>
-  );
-}
 
 type SidebarView = "work" | "queue" | "prs";
 type SidebarTaskProject = { id: string; name: string };
@@ -496,14 +98,17 @@ function WorkThreadList(props: PluginThreadListProps) {
   useTasksRealtimeInvalidation();
   const { values: pluginSettings } = useSettings();
   const taskLinks = taskLinksData?.links ?? {};
+  const threadPreferences = useThreadPreferences();
+  const [archivedOpen, setArchivedOpen] = useState(false);
+  const archivedRosterFingerprint = useMemo(() => threads.map((thread) => `${thread.id}:${thread.isArchived}`).sort().join("|"), [threads]);
+  const archivedThreadQuery = useArchivedThreads(archivedOpen, archivedRosterFingerprint);
   const [view, setView] = useState<SidebarView>("work");
-  const [threadListMode, setThreadListMode] = useState<"enhanced" | "native">("enhanced");
+  const threadListMode = threadPreferences.listMode.data ?? "enhanced";
   const [threadSettingsOpen, setThreadSettingsOpen] = useState(false);
   const [activeThreadsOpen, setActiveThreadsOpen] = useState(true);
-  const [archivedOpen, setArchivedOpen] = useState(false);
-  const [archivedThreads, setArchivedThreads] = useState<ArchivedThread[]>([]);
-  const [archivedThreadState, setArchivedThreadState] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [archivedThreadError, setArchivedThreadError] = useState<string | null>(null);
+  const archivedThreads = (archivedThreadQuery.archive.data ?? []) as ArchivedThread[];
+  const archivedThreadState = archivedThreadQuery.archive.isPending ? "loading" : archivedThreadQuery.archive.isError ? "error" : archivedThreadQuery.archive.isSuccess ? "ready" : "idle";
+  const archivedThreadError = archivedThreadQuery.archive.error?.message ?? null;
   const tasks = tasksData?.tasks ?? [];
   const taskMutations = useTasksMutations(rpc);
   const taskProjects = tasksData?.projects ?? [];
@@ -515,11 +120,8 @@ function WorkThreadList(props: PluginThreadListProps) {
   const [newTaskAssignee, setNewTaskAssignee] = useState<SidebarTask["assignee"]>("human");
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
   const [taskDropTarget, setTaskDropTarget] = useState<{ taskId: string; placement: "before" | "after" } | null>(null);
-  const orderRequest = useRef(0);
-  const orderMutation = useRef(0);
-  const orderRef = useRef<string[]>([]);
-  const [threadOrder, setThreadOrder] = useState<string[]>([]);
-  const [threadGroups, setThreadGroups] = useState<SidebarThreadGroup[]>([]);
+  const threadOrder = threadPreferences.order.data ?? [];
+  const threadGroups = threadPreferences.groups.data ?? [];
   const dragThreadId = useStore(threadInteractionStore, (state) => state.dragThreadId);
   const threadDropTarget = useStore(threadInteractionStore, (state) => state.dropTarget);
   const selectedThreadIds = useStore(threadInteractionStore, (state) => state.selectedThreadIds);
@@ -549,106 +151,41 @@ function WorkThreadList(props: PluginThreadListProps) {
     threadInteractionStore.getState().reconcileRoster(threads.map((thread) => thread.id));
   }, [threads]);
 
-  useEffect(() => {
-    void rpc.call("getThreadListMode", null).then((result) => setThreadListMode(result.mode)).catch(() => undefined);
-  }, [rpc]);
   const setSavedThreadListMode = (mode: "enhanced" | "native") => {
-    setThreadListMode(mode); setThreadSettingsOpen(false);
-    void rpc.call("saveThreadListMode", { mode }).catch(() => toast.error("Could not save thread-list preference."));
+    setThreadSettingsOpen(false);
+    void threadPreferences.saveListMode.mutateAsync(mode).catch(() => toast.error("Could not save thread-list preference."));
   };
 
-  const applyOrder = useCallback((next: string[]) => {
-    orderRef.current = next;
-    setThreadOrder(next);
-  }, []);
-  const refreshSidebarOrder = useCallback(async () => {
-    const request = ++orderRequest.current;
-    try {
-      const result = await rpc.call("getSidebarOrder", null);
-      if (request === orderRequest.current) applyOrder(reconcileThreadOrder(result.threadIds, threads));
-    } catch {
-      // Older/temporarily rolled-back backends have no ordering RPC. Keep the
-      // host order and all native behavior available.
-      if (request === orderRequest.current && orderRef.current.length === 0) {
-        applyOrder(reconcileThreadOrder([], threads));
-      }
-    }
-  }, [applyOrder, rpc, threads]);
-  useEffect(() => {
-    void refreshSidebarOrder();
-    return () => { orderRequest.current += 1; orderMutation.current += 1; };
-  }, [refreshSidebarOrder]);
-  const refreshThreadGroups = useCallback(async () => {
-    try {
-      const result = await rpc.call("getThreadGroups", null);
-      setThreadGroups(result.groups);
-    } catch {
-      // Keep the last known custom groups while the plugin backend reloads.
-    }
-  }, [rpc]);
-  useEffect(() => {
-    void refreshThreadGroups();
-  }, [refreshThreadGroups]);
-  const refreshArchivedThreads = useCallback(async (force = false) => {
-    setArchivedThreadState("loading"); setArchivedThreadError(null);
-    try {
-      const result = await rpc.call("sidebarArchivedThreads", { force });
-      if (!result.available) throw new Error(result.error ?? "Archive threads are unavailable.");
-      setArchivedThreads(result.threads); setArchivedThreadState("ready");
-    } catch (error) {
-      setArchivedThreads([]); setArchivedThreadError(error instanceof Error ? error.message : String(error)); setArchivedThreadState("error");
-    }
-  }, [rpc]);
-  useEffect(() => {
-    // Warm this slow native query after the visible sidebar is responsive, so
-    // expanding Archived normally renders from the plugin/server cache.
-    const timer = window.setTimeout(() => void refreshArchivedThreads(), 350);
-    return () => window.clearTimeout(timer);
-  }, [refreshArchivedThreads]);
+  const refreshSidebarOrder = useCallback(async () => { await threadPreferences.order.refetch(); }, [threadPreferences.order]);
+  const refreshThreadGroups = useCallback(async () => { await threadPreferences.groups.refetch(); }, [threadPreferences.groups]);
+  const refreshArchivedThreads = useCallback(async () => {
+    await archivedThreadQuery.archive.refetch();
+  }, [archivedThreadQuery.archive]);
   const saveThreadGroups = useCallback((next: SidebarThreadGroup[], previous = threadGroups) => {
-    setThreadGroups(next);
-    void rpc.call("saveThreadGroups", { groups: next }).then((result) => {
-      setThreadGroups(result.groups);
-    }).catch((error: unknown) => {
-      setThreadGroups(previous);
+    void threadPreferences.saveGroups.mutateAsync(next).catch((error: unknown) => {
       toast.error(error instanceof Error ? error.message : "Could not save thread groups");
     });
-  }, [rpc, threadGroups]);
+  }, [threadPreferences.saveGroups, threadGroups]);
   const unarchiveThread = useCallback((threadId: string, destination: string | null) => {
-    void rpc.call("unarchiveSidebarThread", { threadId }).then(async () => {
+    void archivedThreadQuery.unarchive.mutateAsync(threadId).then(async () => {
       if (destination) saveThreadGroups(threadGroups.map((group) => group.id === destination ? { ...group, threadIds: [...new Set([...group.threadIds, threadId])] } : group));
-      setArchivedThreads((current) => current.filter((thread) => thread.id !== threadId));
       toast.success(`Moved to ${destination ? threadGroups.find((group) => group.id === destination)?.name ?? "group" : "Active"}`);
     }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not unarchive thread"));
-  }, [rpc, saveThreadGroups, threadGroups]);
-  useRealtime(SIDEBAR_ORDER_CHANNEL, () => {
-    void refreshSidebarOrder();
-    void refreshThreadGroups();
-  });
-
+  }, [archivedThreadQuery.unarchive, saveThreadGroups, threadGroups]);
   const persistSidebarOrder = useCallback(async (next: string[]) => {
-    const previous = orderRef.current;
-    const mutation = ++orderMutation.current;
-    applyOrder(next);
     try {
-      const result = await rpc.call("saveSiblingOrder", { threadIds: next });
-      if (mutation === orderMutation.current) {
-        applyOrder(reconcileThreadOrder(result.threadIds, threads));
-      }
+      await threadPreferences.saveOrder.mutateAsync(next);
     } catch (error) {
-      if (mutation === orderMutation.current) {
-        applyOrder(previous);
-        toast.error(error instanceof Error ? error.message : "Could not save sidebar order");
-      }
+      toast.error(error instanceof Error ? error.message : "Could not save sidebar order");
     }
-  }, [applyOrder, rpc, threads]);
+  }, [threadPreferences.saveOrder]);
 
   const refreshTaskLinks = useCallback(async () => { await refetchTaskLinks(); }, [refetchTaskLinks]);
   const refreshThreadDetails = useCallback(async () => {
     void refreshSidebarOrder();
     void refreshThreadGroups();
     void refreshTaskLinks();
-    void refreshArchivedThreads(true);
+    void refreshArchivedThreads();
     setSubtextRefreshKey((current) => current + 1);
   }, [refreshArchivedThreads, refreshThreadGroups, refreshSidebarOrder, refreshTaskLinks]);
   const refreshTasks = useCallback(async () => { await refetchTasks(); }, [refetchTasks]);
@@ -711,8 +248,6 @@ function WorkThreadList(props: PluginThreadListProps) {
   const projectNames = useMemo(() => Object.fromEntries(projects.map((project) => [project.id, project.name])), [projects]);
   const effectiveOrder = useMemo(() => reconcileThreadOrder(threadOrder, threads), [threadOrder, threads]);
   const allChildrenByThread = useMemo(() => childrenByParent(threads, effectiveOrder), [effectiveOrder, threads]);
-  // A group follows the whole thread subtree, just as archive does. This
-  // keeps child agents from being stranded in a different status section.
   const threadGroupIds = useMemo(() => {
     const result = new Map<string, string>();
     const includeDescendants = (threadId: string, groupId: string) => {
@@ -940,7 +475,7 @@ function WorkThreadList(props: PluginThreadListProps) {
       </section>
       </details>
       {threadGroups.map((group) => { const tree = groupedThreadTrees.get(group.id); const roots = tree?.roots ?? []; return <details key={group.id} className="ws-later" data-ws-thread-drop-zone={group.id} data-drop-target={threadDropTarget?.threadId === group.id || undefined} open onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || threadGroupIds.get(sourceId) === group.id) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: group.id, placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || threadGroupIds.get(sourceId) === group.id) return; event.preventDefault(); if (archivedThreadIds.has(sourceId)) unarchiveThread(sourceId, group.id); else moveThreadToGroup(sourceId, group.id); setDragThreadId(null); setThreadDropTarget(null); }}><summary>{group.name} <span>{roots.length}</span></summary>{roots.length > 0 ? <section className="ws-hierarchy" aria-label={`${group.name} threads`}>{roots.map((thread) => <WorkThreadTree key={thread.id} thread={thread} childrenByThread={tree?.children ?? new Map()} taskLinks={taskLinks} activeThreadId={props.activeThreadId} selectedThreadIds={selectedThreadIds} groupIds={threadGroupIds} groups={threadGroups} projectsById={projectsById} onNavigate={props.onNavigate} onSelect={selectThread} onMoveToGroup={moveThreadToGroup} orderedSiblings={roots} reorderDisabled={reorderDisabled} dragThreadId={dragThreadId} onDragThreadChange={setDragThreadId} dropTarget={threadDropTarget} onDropTargetChange={setThreadDropTarget} onDropThread={reorder} onMoveThread={move} subtextRefreshKey={subtextRefreshKey} />)}</section> : <div className="ws-later-empty">Right-click a thread to move it here.</div>}</details>; })}
-      <details className="ws-later ws-archived" data-ws-thread-drop-zone="archive" data-drop-target={threadDropTarget?.threadId === "archive" || undefined} open={archivedOpen} onToggle={(event) => setArchivedOpen(event.currentTarget.open)} onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || archivedThreadIds.has(sourceId)) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: "archive", placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || archivedThreadIds.has(sourceId)) return; event.preventDefault(); if (threadGroupIds.has(sourceId)) moveThreadToGroup(sourceId, null); actions.archive(sourceId); window.setTimeout(() => void refreshArchivedThreads(true), 250); setDragThreadId(null); setThreadDropTarget(null); }}><summary>Archive <span>{archivedThreadState === "ready" ? archivedThreads.length : ""}</span></summary>{archivedThreadState === "idle" || archivedThreadState === "loading" ? <div className="ws-later-empty">Loading archive threads…</div> : archivedThreadState === "error" ? <div className="ws-callout">{archivedThreadError ?? "Could not load archive threads."}<button onClick={() => void refreshArchivedThreads(true)}>Try again</button></div> : archivedThreads.length > 0 ? <section className="ws-hierarchy" aria-label="Archive threads">{archivedThreads.map((thread) => <ArchivedThreadRow key={thread.id} thread={thread} project={projectsById.get(thread.projectId)} groups={threadGroups} onUnarchive={unarchiveThread} onNavigate={props.onNavigate} onDragThreadChange={setDragThreadId} onDropTargetChange={() => setThreadDropTarget(null)} />)}</section> : <div className="ws-later-empty">No archive threads.</div>}</details>
+      <details className="ws-later ws-archived" data-ws-thread-drop-zone="archive" data-drop-target={threadDropTarget?.threadId === "archive" || undefined} open={archivedOpen} onToggle={(event) => setArchivedOpen(event.currentTarget.open)} onDragOver={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || archivedThreadIds.has(sourceId)) return; event.preventDefault(); event.dataTransfer.dropEffect = "move"; setThreadDropTarget({ threadId: "archive", placement: "after" }); }} onDrop={(event) => { const sourceId = dragThreadId ?? event.dataTransfer.getData("text/plain"); if (!sourceId || archivedThreadIds.has(sourceId)) return; event.preventDefault(); if (threadGroupIds.has(sourceId)) moveThreadToGroup(sourceId, null); actions.archive(sourceId); setDragThreadId(null); setThreadDropTarget(null); }}><summary>Archive <span>{archivedThreadState === "ready" ? archivedThreads.length : ""}</span></summary>{archivedThreadState === "idle" || archivedThreadState === "loading" ? <div className="ws-later-empty">Loading archive threads…</div> : archivedThreadState === "error" ? <div className="ws-callout">{archivedThreadError ?? "Could not load archive threads."}<button onClick={() => void refreshArchivedThreads()}>Try again</button></div> : archivedThreads.length > 0 ? <section className="ws-hierarchy" aria-label="Archive threads">{archivedThreads.map((thread) => <ArchivedThreadRow key={thread.id} thread={thread} project={projectsById.get(thread.projectId)} groups={threadGroups} onUnarchive={unarchiveThread} onNavigate={props.onNavigate} onDragThreadChange={setDragThreadId} onDropTargetChange={() => setThreadDropTarget(null)} />)}</section> : <div className="ws-later-empty">No archive threads.</div>}</details>
       </section>
       {filtered.length === 0 && <div className="ws-empty">{props.searchQuery ? `No threads match “${props.searchQuery}”.` : "No active threads."}</div>}
       </>}

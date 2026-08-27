@@ -36,7 +36,10 @@ describe("R2 app registration and Query lifecycle", () => {
     });
     const right = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_test", params: null });
     expect(mount).toHaveBeenCalledTimes(2);
-    expect(client.getQueryCache().getAll()).toHaveLength(7);
+    expect(client.getQueryCache().getAll()).toHaveLength(11);
+    expect(client.getQueryCache().find({ queryKey: ["work-sidebar", "sidebar", "threads", "order"] })?.getObserversCount()).toBe(1);
+    expect(client.getQueryCache().find({ queryKey: ["work-sidebar", "sidebar", "threads", "list-mode"] })?.getObserversCount()).toBe(1);
+    expect(client.getQueryCache().find({ queryKey: ["work-sidebar", "sidebar", "threads", "groups"] })?.getObserversCount()).toBe(1);
     expect(client.getQueryCache().findAll({ queryKey: ["work-sidebar", "pull-requests", "authored", "stacks"] })[0]?.getObserversCount()).toBe(1);
     expect(client.getQueryCache().findAll({ queryKey: ["work-sidebar", "pull-requests", "health"] })[0]?.getObserversCount()).toBe(2);
     expect(client.getQueryCache().find({ queryKey: queryKeys.sidebar.tasks.list() })?.getObserversCount()).toBe(2);
@@ -58,6 +61,8 @@ describe("R6 mounted Tasks reads", () => {
     const rpc = {
       sidebarTasks: () => ({ available: true, tasks: [], projects: [], error: null }),
       sidebarTaskLinks: () => ({ available: true, links: {}, error: null }),
+      getSidebarOrder: () => ({ threadIds: [] }), getThreadListMode: () => ({ mode: "enhanced" }), getThreadGroups: () => ({ groups: [] }),
+      sidebarArchivedThreads: () => ({ available: true, threads: [], error: null }),
     } as never;
     const left = renderSlot(app.threadLists[0]!, { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => undefined, searchQuery: "", Original: () => null }, { rpc });
     const right = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_test", params: null }, { rpc });
@@ -73,7 +78,7 @@ describe("R6 mounted Tasks reads", () => {
     vi.useFakeTimers();
     const app = await loadPluginApp(() => import("../../app"));
     const client = getPluginQueryClient(); client.clear();
-    const slot = renderSlot(app.threadLists[0]!, { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => undefined, searchQuery: "", Original: () => null }, { rpc: { sidebarTasks: () => ({ available: true, tasks: [], projects: [], error: null }), sidebarTaskLinks: () => ({ available: true, links: {}, error: null }) } as never });
+    const slot = renderSlot(app.threadLists[0]!, { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => undefined, searchQuery: "", Original: () => null }, { rpc: { sidebarTasks: () => ({ available: true, tasks: [], projects: [], error: null }), sidebarTaskLinks: () => ({ available: true, links: {}, error: null }), getSidebarOrder: () => ({ threadIds: [] }), getThreadListMode: () => ({ mode: "enhanced" }), getThreadGroups: () => ({ groups: [] }), sidebarArchivedThreads: () => ({ available: true, threads: [], error: null }) } as never });
     await vi.advanceTimersByTimeAsync(0);
     expect(slot.inspection.rpcCalls.filter((call) => call.method === "sidebarTaskLinks")).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(30_000);
