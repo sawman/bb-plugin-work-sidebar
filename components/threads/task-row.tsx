@@ -1,24 +1,294 @@
 import type { DragEvent, MouseEvent as ReactMouseEvent } from "react";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuTrigger } from "../ui/context-menu";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "../ui/context-menu";
 import { Icon, type IconName } from "../ui/icon";
 import type { SidebarTask, TaskQueueNode } from "../../work-model";
 import { taskStatusPresentation } from "../../features/tasks/model";
 
-const TASK_STATUSES: readonly SidebarTask["status"][] = ["backlog", "todo", "in_progress", "in_review", "done", "canceled"];
-const taskStatus = (status: SidebarTask["status"]): { label: string; icon: IconName } => ({ backlog: { label: taskStatusPresentation("backlog").label, icon: "ListTodo" }, todo: { label: taskStatusPresentation("todo").label, icon: "Circle" }, in_progress: { label: taskStatusPresentation("in_progress").label, icon: "LoaderCircle" }, in_review: { label: taskStatusPresentation("in_review").label, icon: "Eye" }, done: { label: taskStatusPresentation("done").label, icon: "Check" }, canceled: { label: taskStatusPresentation("canceled").label, icon: "X" } })[status];
+const TASK_STATUSES: readonly SidebarTask["status"][] = [
+  "backlog",
+  "todo",
+  "in_progress",
+  "in_review",
+  "done",
+  "canceled",
+];
+const taskStatus = (
+  status: SidebarTask["status"],
+): { label: string; icon: IconName } =>
+  ({
+    backlog: {
+      label: taskStatusPresentation("backlog").label,
+      icon: "ListTodo",
+    },
+    todo: { label: taskStatusPresentation("todo").label, icon: "Circle" },
+    in_progress: {
+      label: taskStatusPresentation("in_progress").label,
+      icon: "LoaderCircle",
+    },
+    in_review: {
+      label: taskStatusPresentation("in_review").label,
+      icon: "Eye",
+    },
+    done: { label: taskStatusPresentation("done").label, icon: "Check" },
+    canceled: { label: taskStatusPresentation("canceled").label, icon: "X" },
+  })[status];
 
-export type TaskRowProps = { node: TaskQueueNode; siblings: readonly TaskQueueNode[]; showProject: boolean; reorderDisabled: boolean; dragTaskId: string | null; dropTarget: { taskId: string; placement: "before" | "after" } | null; onDragTaskChange(taskId: string | null): void; onDragTargetChange(taskId: string | null, placement?: "before" | "after"): void; onDropTask(sourceId: string, targetId: string, placement: "before" | "after"): void; onMoveTask(taskId: string, direction: -1 | 1): void; onOpenThread(threadId: string, split?: boolean): void; onUpdateStatus(taskId: string, status: SidebarTask["status"]): Promise<void>; onUpdateAssignee(taskId: string, assignee: SidebarTask["assignee"]): Promise<void>; onDelete(task: SidebarTask): Promise<void>; activeThreadId: string | null; activeThreadTitle: string | null; onAttachToThread(taskId: string, threadId: string): Promise<void>; onDetachFromThread(taskId: string, threadId: string): Promise<void>; updatingTaskId: string | null; selectedTaskIds: ReadonlySet<string>; onSelect(taskId: string, event: ReactMouseEvent<HTMLButtonElement>): boolean; };
+export type TaskRowProps = {
+  node: TaskQueueNode;
+  siblings: readonly TaskQueueNode[];
+  showProject: boolean;
+  reorderDisabled: boolean;
+  dragTaskId: string | null;
+  dropTarget: { taskId: string; placement: "before" | "after" } | null;
+  onDragTaskChange(taskId: string | null): void;
+  onDragTargetChange(
+    taskId: string | null,
+    placement?: "before" | "after",
+  ): void;
+  onDropTask(
+    sourceId: string,
+    targetId: string,
+    placement: "before" | "after",
+  ): void;
+  onMoveTask(taskId: string, direction: -1 | 1): void;
+  onOpenThread(threadId: string, split?: boolean): void;
+  onUpdateStatus(taskId: string, status: SidebarTask["status"]): Promise<void>;
+  onUpdateAssignee(
+    taskId: string,
+    assignee: SidebarTask["assignee"],
+  ): Promise<void>;
+  onDelete(task: SidebarTask): Promise<void>;
+  activeThreadId: string | null;
+  activeThreadTitle: string | null;
+  onAttachToThread(taskId: string, threadId: string): Promise<void>;
+  onDetachFromThread(taskId: string, threadId: string): Promise<void>;
+  updatingTaskId: string | null;
+  selectedTaskIds: ReadonlySet<string>;
+  onSelect(taskId: string, event: ReactMouseEvent<HTMLButtonElement>): boolean;
+};
 
 export function TaskRow(props: TaskRowProps) {
-  const { node, siblings, showProject, reorderDisabled, dragTaskId, dropTarget, onDragTaskChange, onDragTargetChange, onDropTask, onMoveTask, onOpenThread, onUpdateStatus, onDelete, activeThreadId, activeThreadTitle, onAttachToThread, onDetachFromThread, updatingTaskId, selectedTaskIds, onSelect } = props;
+  const {
+    node,
+    siblings,
+    showProject,
+    reorderDisabled,
+    dragTaskId,
+    dropTarget,
+    onDragTaskChange,
+    onDragTargetChange,
+    onDropTask,
+    onMoveTask,
+    onOpenThread,
+    onUpdateStatus,
+    onDelete,
+    activeThreadId,
+    activeThreadTitle,
+    onAttachToThread,
+    onDetachFromThread,
+    updatingTaskId,
+    selectedTaskIds,
+    onSelect,
+  } = props;
   const { task } = node;
-  const assigned = Boolean(activeThreadId && task.linkedThreadIds.includes(activeThreadId));
+  const assigned = Boolean(
+    activeThreadId && task.linkedThreadIds.includes(activeThreadId),
+  );
   const status = taskStatus(task.status);
-  const peers = siblings.filter((candidate) => candidate.task.projectId === task.projectId && candidate.task.status === task.status && candidate.task.parentTaskId === task.parentTaskId);
+  const peers = siblings.filter(
+    (candidate) =>
+      candidate.task.projectId === task.projectId &&
+      candidate.task.status === task.status &&
+      candidate.task.parentTaskId === task.parentTaskId,
+  );
   const index = peers.findIndex((candidate) => candidate.task.id === task.id);
-  const interactive = (event: DragEvent<HTMLElement>) => Boolean((event.target as HTMLElement).closest("button,a,select,summary,[role=menu],[role=menuitem]"));
-  const placement = (event: DragEvent<HTMLElement>): "before" | "after" => { const bounds = event.currentTarget.getBoundingClientRect(); return event.clientY > bounds.top + bounds.height / 2 ? "after" : "before"; };
-  const assign = () => activeThreadId && (assigned ? onDetachFromThread(task.id, activeThreadId) : onAttachToThread(task.id, activeThreadId));
-  const openAssignedThread = () => task.linkedThreadIds[0] && onOpenThread(task.linkedThreadIds[0], task.linkedThreadIds.length === 1);
-  return <ContextMenu><ContextMenuTrigger asChild><article className={`ws-task-row ws-task-row-${node.role} ${selectedTaskIds.has(task.id) ? "ws-task-row-selected" : ""} ${dragTaskId === task.id ? "ws-task-dragging" : ""}`} data-selected={selectedTaskIds.has(task.id) || undefined} data-task-role={node.role} data-task-id={task.id} data-drop-placement={dropTarget?.taskId === task.id ? dropTarget.placement : undefined} draggable={!reorderDisabled} onDragStart={(event) => { if (reorderDisabled || interactive(event)) { event.preventDefault(); return; } event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", task.id); onDragTaskChange(task.id); }} onDragOver={(event) => { if (reorderDisabled || !dragTaskId || dragTaskId === task.id || !peers.some((candidate) => candidate.task.id === dragTaskId)) return; event.preventDefault(); onDragTargetChange(task.id, placement(event)); }} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) onDragTargetChange(null); }} onDrop={(event) => { if (!dragTaskId || dragTaskId === task.id) return; event.preventDefault(); onDropTask(dragTaskId, task.id, placement(event)); onDragTaskChange(null); onDragTargetChange(null); }} onDragEnd={() => { onDragTaskChange(null); onDragTargetChange(null); }}><div className="ws-task-row-main"><button className={`ws-task-assign ${assigned ? "ws-task-assigned" : ""}`} type="button" disabled={!activeThreadId} onClick={(event) => { if (!onSelect(task.id, event)) void assign(); }} title={activeThreadId ? assigned ? `Assigned to ${activeThreadTitle ?? "current thread"}` : `Assign to ${activeThreadTitle ?? "current thread"}` : "Select a thread to assign this task"}><strong className="ws-task-title" title={task.title}>{task.title}</strong></button><div className="ws-task-meta"><span className="ws-task-key-badge">{task.key}</span>{task.priority !== "none" && <span className={`ws-task-priority-icon ws-task-priority-${task.priority}`} title={`${task.priority} priority`}><Icon name="AlertCircle" aria-hidden /></span>}{task.dueDate && <span className="ws-task-badge">Due {task.dueDate}</span>}{showProject && <span className="ws-task-badge">{task.projectName}</span>}</div></div><label className={`ws-task-status-picker ws-task-status-${task.status}`} title={status.label}><Icon name={status.icon} aria-hidden /><span className="sr-only">Change status for {task.key}</span><select value={task.status} disabled={updatingTaskId === task.id} aria-label={`Change status for ${task.key}: ${status.label}`} onChange={(event) => void onUpdateStatus(task.id, event.target.value as SidebarTask["status"])}>{TASK_STATUSES.map((next) => <option key={next} value={next}>{taskStatus(next).label}</option>)}</select></label>{node.children.length > 0 && <div className="ws-task-children" aria-label={`Execution tasks for ${task.title}`}>{node.children.map((child) => <TaskRow key={child.id} {...props} node={{ task: child, role: "execution", children: [], hasVisibleOutcomeParent: true }} siblings={node.children.map((childTask) => ({ task: childTask, role: "execution" as const, children: [], hasVisibleOutcomeParent: true }))} />)}</div>}</article></ContextMenuTrigger><ContextMenuContent aria-label={`Actions for ${task.key}`}><ContextMenuLabel>{task.title}</ContextMenuLabel>{task.linkedThreadIds[0] && <ContextMenuItem onSelect={openAssignedThread}>Open assigned thread</ContextMenuItem>}<ContextMenuSeparator /><ContextMenuItem disabled={reorderDisabled || index <= 0} onSelect={() => onMoveTask(task.id, -1)}>Move up</ContextMenuItem><ContextMenuItem disabled={reorderDisabled || index < 0 || index >= peers.length - 1} onSelect={() => onMoveTask(task.id, 1)}>Move down</ContextMenuItem><ContextMenuSeparator /><ContextMenuItem onSelect={() => void onDelete(task)}>Delete task</ContextMenuItem></ContextMenuContent></ContextMenu>;
+  const interactive = (event: DragEvent<HTMLElement>) =>
+    Boolean(
+      (event.target as HTMLElement).closest(
+        "button,a,select,summary,[role=menu],[role=menuitem]",
+      ),
+    );
+  const placement = (event: DragEvent<HTMLElement>): "before" | "after" => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return event.clientY > bounds.top + bounds.height / 2 ? "after" : "before";
+  };
+  const assign = () =>
+    activeThreadId &&
+    (assigned
+      ? onDetachFromThread(task.id, activeThreadId)
+      : onAttachToThread(task.id, activeThreadId));
+  const openAssignedThread = () =>
+    task.linkedThreadIds[0] &&
+    onOpenThread(task.linkedThreadIds[0], task.linkedThreadIds.length === 1);
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <article
+          className={`ws-task-row ws-task-row-${node.role} ${selectedTaskIds.has(task.id) ? "ws-task-row-selected" : ""} ${dragTaskId === task.id ? "ws-task-dragging" : ""}`}
+          data-selected={selectedTaskIds.has(task.id) || undefined}
+          data-task-role={node.role}
+          data-task-id={task.id}
+          data-drop-placement={
+            dropTarget?.taskId === task.id ? dropTarget.placement : undefined
+          }
+          draggable={!reorderDisabled}
+          onDragStart={(event) => {
+            if (reorderDisabled || interactive(event)) {
+              event.preventDefault();
+              return;
+            }
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", task.id);
+            onDragTaskChange(task.id);
+          }}
+          onDragOver={(event) => {
+            if (
+              reorderDisabled ||
+              !dragTaskId ||
+              dragTaskId === task.id ||
+              !peers.some((candidate) => candidate.task.id === dragTaskId)
+            )
+              return;
+            event.preventDefault();
+            onDragTargetChange(task.id, placement(event));
+          }}
+          onDragLeave={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node))
+              onDragTargetChange(null);
+          }}
+          onDrop={(event) => {
+            if (!dragTaskId || dragTaskId === task.id) return;
+            event.preventDefault();
+            onDropTask(dragTaskId, task.id, placement(event));
+            onDragTaskChange(null);
+            onDragTargetChange(null);
+          }}
+          onDragEnd={() => {
+            onDragTaskChange(null);
+            onDragTargetChange(null);
+          }}
+        >
+          <div className="ws-task-row-main">
+            <button
+              className={`ws-task-assign ${assigned ? "ws-task-assigned" : ""}`}
+              type="button"
+              disabled={!activeThreadId}
+              onClick={(event) => {
+                if (!onSelect(task.id, event)) void assign();
+              }}
+              title={
+                activeThreadId
+                  ? assigned
+                    ? `Assigned to ${activeThreadTitle ?? "current thread"}`
+                    : `Assign to ${activeThreadTitle ?? "current thread"}`
+                  : "Select a thread to assign this task"
+              }
+            >
+              <strong className="ws-task-title" title={task.title}>
+                {task.title}
+              </strong>
+            </button>
+            <div className="ws-task-meta">
+              <span className="ws-task-key-badge">{task.key}</span>
+              {task.priority !== "none" && (
+                <span
+                  className={`ws-task-priority-icon ws-task-priority-${task.priority}`}
+                  title={`${task.priority} priority`}
+                >
+                  <Icon name="AlertCircle" aria-hidden />
+                </span>
+              )}
+              {task.dueDate && (
+                <span className="ws-task-badge">Due {task.dueDate}</span>
+              )}
+              {showProject && (
+                <span className="ws-task-badge">{task.projectName}</span>
+              )}
+            </div>
+          </div>
+          <label
+            className={`ws-task-status-picker ws-task-status-${task.status}`}
+            title={status.label}
+          >
+            <Icon name={status.icon} aria-hidden />
+            <span className="sr-only">Change status for {task.key}</span>
+            <select
+              value={task.status}
+              disabled={updatingTaskId === task.id}
+              aria-label={`Change status for ${task.key}: ${status.label}`}
+              onChange={(event) =>
+                void onUpdateStatus(
+                  task.id,
+                  event.target.value as SidebarTask["status"],
+                )
+              }
+            >
+              {TASK_STATUSES.map((next) => (
+                <option key={next} value={next}>
+                  {taskStatus(next).label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {node.children.length > 0 && (
+            <div
+              className="ws-task-children"
+              aria-label={`Execution tasks for ${task.title}`}
+            >
+              {node.children.map((child) => (
+                <TaskRow
+                  key={child.id}
+                  {...props}
+                  node={{
+                    task: child,
+                    role: "execution",
+                    children: [],
+                    hasVisibleOutcomeParent: true,
+                  }}
+                  siblings={node.children.map((childTask) => ({
+                    task: childTask,
+                    role: "execution" as const,
+                    children: [],
+                    hasVisibleOutcomeParent: true,
+                  }))}
+                />
+              ))}
+            </div>
+          )}
+        </article>
+      </ContextMenuTrigger>
+      <ContextMenuContent aria-label={`Actions for ${task.key}`}>
+        <ContextMenuLabel>{task.title}</ContextMenuLabel>
+        {task.linkedThreadIds[0] && (
+          <ContextMenuItem onSelect={openAssignedThread}>
+            Open assigned thread
+          </ContextMenuItem>
+        )}
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          disabled={reorderDisabled || index <= 0}
+          onSelect={() => onMoveTask(task.id, -1)}
+        >
+          Move up
+        </ContextMenuItem>
+        <ContextMenuItem
+          disabled={reorderDisabled || index < 0 || index >= peers.length - 1}
+          onSelect={() => onMoveTask(task.id, 1)}
+        >
+          Move down
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={() => void onDelete(task)}>
+          Delete task
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
 }

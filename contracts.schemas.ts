@@ -43,7 +43,14 @@ const workProviderStatus = z.object({
 const workCardInput = z.object({ threadId: z.string() }).strict();
 const workStatus = z.object({
   currentThread: z.object({ title: z.string(), status: z.enum(["active", "error", "idle", "starting", "stopping"]), runtimeStatus: z.string(), providerId: z.string() }),
-  children: z.array(z.object({ id: z.string(), title: z.string(), depth: z.number().int().nonnegative(), status: z.string(), runtimeStatus: z.string(), providerId: z.string(), isArchived: z.boolean(), task: z.object({ key: z.string(), status: taskStatus, liveStatus: z.enum(["starting", "working", "idle", "completed", "failed"]) }).nullable() })),
+  children: z.array(z.object({
+    id: z.string(), title: z.string(), depth: z.number().int().nonnegative(),
+    status: z.string(), runtimeStatus: z.string(), providerId: z.string(),
+    isArchived: z.boolean(), task: z.object({
+      key: z.string(), status: taskStatus,
+      liveStatus: z.enum(["starting", "working", "idle", "completed", "failed"]),
+    }).nullable(),
+  })),
 });
 const workOutcome = z.object({ tasksAvailable: z.boolean(), outcome: taskSummary.nullable(), executionTasks: z.array(taskSummary), bindings: z.array(binding) });
 const workGoal = z.object({ objective: z.string(), status: z.enum(["active", "budgetLimited", "complete", "paused"]), tokensUsed: z.number(), tokenBudget: z.number().nullable(), timeUsedSeconds: z.number() }).nullable();

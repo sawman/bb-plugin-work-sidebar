@@ -27,6 +27,27 @@ function stylesheetRules(source: string) {
     .map((match) => ({ selector: match[1].trim().replace(/\s+/g, " "), declarations: match[2] }));
 }
 
+function undocumentedImportantDeclarations(source: string): string[] {
+  const violations: string[] = [];
+  let hasDeclarationComment = false;
+  for (const [index, line] of source.split("\n").entries()) {
+    const trimmed = line.trim();
+    if (/^\/\* R17 important: .+ \*\/$/.test(trimmed)) {
+      hasDeclarationComment = true;
+      continue;
+    }
+    if (!trimmed || /^\/\*.*\*\/$/.test(trimmed)) continue;
+    if (line.includes("!important")) {
+      if (!hasDeclarationComment)
+        violations.push(`${index + 1}: ${trimmed}`);
+      hasDeclarationComment = false;
+      continue;
+    }
+    hasDeclarationComment = false;
+  }
+  return violations;
+}
+
 const dynamicClassFamilies = [
   { prefix: "ws-agent-state-", file: "features/agents/views.tsx", suffixes: ["working", "waiting", "blocked", "complete", "idle"] },
   { prefix: "ws-file-", file: "features/changes/views.tsx", suffixes: ["added", "deleted", "modified", "renamed", "untracked"] },
@@ -226,6 +247,18 @@ describe("stylesheet architecture baseline", () => {
 });
 
 describe("shared surface and list-row architecture", () => {
+  test("associates each important declaration with its immediately preceding R17 comment", () => {
+    expect(undocumentedImportantDeclarations(`
+      /* R17 important: a former blanket comment. */
+      color: inherit;
+      background: var(--accent) !important;
+    `)).toEqual(["4: background: var(--accent) !important;"]);
+    expect(undocumentedImportantDeclarations(`
+      /* R17 important: host styling overrides this background. */
+      background: var(--accent) !important;
+    `)).toEqual([]);
+  });
+
   test("finds every static class in multi-class and template JSX attributes", () => {
     const fixture = classAttributeTokens("fixture.tsx", `
       const fixture = <article className="ws-card ws-empty-state-card">
@@ -289,15 +322,15 @@ describe("shared surface and list-row architecture", () => {
           selector: stripComments(match[1]!).trim().replace(/\s+/g, " "),
           declarations: match[2]!,
           file,
-          documented: /\/\* R17 important: [\s\S]+\*\/\s*[^{}]+$/.test(match[1]!),
         }));
     });
 
-    const undocumentedImportant = importantRules
-      .filter(({ documented }) => !documented)
-      .map(({ file, selector }) => `${relative(root, file)}: ${selector}`);
+    const undocumentedImportant = stylesheetPaths().flatMap((file) =>
+      undocumentedImportantDeclarations(readFileSync(file, "utf8"))
+        .map((violation) => `${relative(root, file)}: ${violation}`),
+    );
 
-    expect(undocumentedImportant, "every host override documents its reason at the CSS declaration").toEqual([]);
+    expect(undocumentedImportant, "every important declaration directly documents its host override reason").toEqual([]);
     expect(importantRules.every(({ selector }) => selectorClassNames(selector).every((className) => hasProductionConsumer(className, consumers))), "important overrides must retain production consumers").toBe(true);
     expect(obsolete, "every ws-* selector must retain a production consumer").toEqual([]);
   });

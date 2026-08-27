@@ -104,6 +104,18 @@ function topLevelImplementationDeclarations(path: string): number {
 }
 
 describe("R16 composition boundaries", () => {
+  it("caps every production TypeScript physical line at 240 characters", () => {
+    const violations = productionSourcePaths(repositoryRoot)
+      .map((path) => ({
+        path: path.slice(`${repositoryRoot}/`.length),
+        length: longestPhysicalLine(path.slice(`${repositoryRoot}/`.length)),
+      }))
+      .filter(({ length }) => length > 240)
+      .map(({ path, length }) => `${path} (${length} chars)`);
+
+    expect(violations, "production TypeScript physical lines must stay reviewable").toEqual([]);
+  });
+
   it("keeps browser runtime imports out of server-owned feature adapters", () => {
     assertBrowserRuntimeBoundary(resolve(repositoryRoot, "app.tsx"));
   });

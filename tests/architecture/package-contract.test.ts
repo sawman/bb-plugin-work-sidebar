@@ -55,6 +55,8 @@ describe("R1 package and compile boundary", () => {
     expect(packageJson.devDependencies?.["@testing-library/react"]).toBeDefined();
     expect(packageJson.devDependencies?.["better-sqlite3"]).toBeDefined();
     expect(packageJson.devDependencies?.["jsdom"]).toBeDefined();
+    expect(packageJson.devDependencies?.["axe-core"]).toBe("^4.13.0");
+    expect(packageJson.devDependencies?.["vitest-axe"]).toBe("^0.1.0");
     expect(packageJson.dependencies?.["@tanstack/react-query"]).toBeDefined();
     expect(packageJson.dependencies?.zustand).toBeDefined();
     expect(packageJson.devDependencies?.["@tanstack/react-query"]).toBeUndefined();
@@ -109,6 +111,10 @@ describe("R1 package and compile boundary", () => {
     expect(() => assertBrowserRuntimeBoundary(resolve(repositoryRoot, "tests/fixtures/nested/browser-mixed-server.ts")))
       .toThrow("server module");
     expect(() => assertBrowserRuntimeBoundary(resolve(repositoryRoot, "tests/fixtures/nested/browser-server-lifecycle.ts")))
+      .toThrow("server module");
+    expect(() => assertBrowserRuntimeBoundary(resolve(repositoryRoot, "tests/fixtures/nested/browser-server-feature.ts")))
+      .toThrow("server module");
+    expect(() => assertBrowserRuntimeBoundary(resolve(repositoryRoot, "tests/fixtures/nested/browser-feature-server.ts")))
       .toThrow("server module");
   });
 

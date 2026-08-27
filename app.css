@@ -115,9 +115,10 @@
   flex-direction: column;
   height: 100%;
 }
-/* R17 important: host tab button styles otherwise override the active state. */
 .ws-tab-active {
+  /* R17 important: host tab button styles otherwise override the active background. */
   background: var(--accent) !important;
+  /* R17 important: host tab button styles otherwise override the active foreground. */
   color: var(--accent-foreground) !important;
 }
 .ws-panel-body {
