@@ -18,6 +18,7 @@ const activity = (threadId: string, state: ThreadState = "active") => ({
 });
 
 const baseStatus = (state: ThreadState = "active") => ({
+  rootThreadId: "thr_root",
   currentThread: {
     title: "Thread",
     status: state,
@@ -40,6 +41,7 @@ function fixture(overrides: Partial<Rpc> = {}): Rpc {
     getLatestActivity: ({ threadId }: { threadId: string }) =>
       activity(threadId),
     getWorkOutcome: () => ({
+      rootThreadId: "thr_root",
       tasksAvailable: true,
       outcome: null,
       executionTasks: [],
@@ -84,6 +86,7 @@ describe("registered Status activity lifecycle", () => {
       activity(threadId, activityState),
     );
     const getWorkOutcome = vi.fn(() => ({
+      rootThreadId: "thr_root",
       tasksAvailable: true,
       outcome: null,
       executionTasks: [],
@@ -168,6 +171,7 @@ describe("registered Status activity lifecycle", () => {
       activity(threadId, "idle"),
     );
     const getWorkOutcome = vi.fn(() => ({
+      rootThreadId: "thr_root",
       tasksAvailable: true,
       outcome: null,
       executionTasks: [],

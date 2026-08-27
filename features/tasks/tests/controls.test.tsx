@@ -23,7 +23,7 @@ const task = { id: "task_1", projectId: "project_1", projectName: "Work", key: "
 const taskTwo = { ...task, id: "task_2", key: "WORK-2", title: "Second task", position: 2048 };
 const tasks = (items = [task]): TasksResult => ({ available: true, tasks: items, projects: [{ id: "project_1", name: "Work" }], error: null });
 const workContext = {
-  tasksAvailable: true, currentThread: { title: "Fixture thread", status: "idle" as const, runtimeStatus: "idle", providerId: "codex" }, tasks: [], subtasks: [], outcome: null, executionTasks: [], bindings: [], legacy: { state: "none" as const, taskIds: [], message: null }, goal: null, todos: [], children: [],
+  rootThreadId: "thr_test", tasksAvailable: true, currentThread: { title: "Fixture thread", status: "idle" as const, runtimeStatus: "idle", providerId: "codex" }, tasks: [], subtasks: [], outcome: null, executionTasks: [], bindings: [], legacy: { state: "none" as const, taskIds: [], message: null }, goal: null, todos: [], children: [],
 } satisfies Awaited<ReturnType<RpcHandlers["getWorkContext"]>>;
 
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (error: Error) => void; const promise = new Promise<T>((ok, bad) => { resolve = ok; reject = bad; }); return { promise, resolve, reject }; }

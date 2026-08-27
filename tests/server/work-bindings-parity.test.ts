@@ -57,6 +57,8 @@ function task(
 
 function createBindingsFixture(options: {
   listTaskThreads?: (taskId: string) => Promise<unknown>;
+  taskThreadsAttach?: (taskId: string, threadId: string) => Promise<unknown>;
+  taskThreadsDetach?: (taskId: string, threadId: string) => Promise<unknown>;
   failRootResolution?: boolean;
 } = {}) {
   const tasks = new Map([
@@ -154,12 +156,16 @@ function createBindingsFixture(options: {
           if (method === "taskThreadsAttach") {
             const taskId = taskInput?.taskId as string;
             const threadId = taskInput?.threadId as string;
+            if (options.taskThreadsAttach)
+              return options.taskThreadsAttach(taskId, threadId);
             (taskThreads.get(taskId) ?? taskThreads.set(taskId, new Set()).get(taskId)!).add(threadId);
             return { threadId };
           }
           if (method === "taskThreadsDetach") {
             const taskId = taskInput?.taskId as string;
             const threadId = taskInput?.threadId as string;
+            if (options.taskThreadsDetach)
+              return options.taskThreadsDetach(taskId, threadId);
             taskThreads.get(taskId)?.delete(threadId);
             return { threadId };
           }
@@ -222,6 +228,10 @@ describe("durable Work/Tasks binding parity", () => {
       }),
     ).resolves.toEqual({ threadId: ROOT_THREAD_ID });
     expect(taskThreads.get(GENERIC_TASK_ID)).toEqual(new Set([ROOT_THREAD_ID]));
+    expect(host.harness.inspection.realtimeSignals).toEqual([
+      { channel: "work-sidebar:changed", payload: { family: "work", rootThreadId: ROOT_THREAD_ID } },
+      { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: ROOT_THREAD_ID } },
+    ]);
     await expect(
       host.harness.behavior.callRpc("getWorkOutcome", { threadId: ROOT_THREAD_ID }),
     ).resolves.toMatchObject({ legacy: { state: "adoptable", taskIds: [GENERIC_TASK_ID] } });
@@ -233,9 +243,148 @@ describe("durable Work/Tasks binding parity", () => {
       }),
     ).resolves.toEqual({ threadId: ROOT_THREAD_ID });
     expect(taskThreads.get(GENERIC_TASK_ID)).toEqual(new Set());
+    expect(host.harness.inspection.realtimeSignals).toEqual([
+      { channel: "work-sidebar:changed", payload: { family: "work", rootThreadId: ROOT_THREAD_ID } },
+      { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: ROOT_THREAD_ID } },
+      { channel: "work-sidebar:changed", payload: { family: "work", rootThreadId: ROOT_THREAD_ID } },
+      { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: ROOT_THREAD_ID } },
+    ]);
     await expect(
       host.harness.behavior.callRpc("getWorkOutcome", { threadId: ROOT_THREAD_ID }),
     ).resolves.toMatchObject({ legacy: { state: "none" } });
+  });
+
+  it("recomputes the complete legacy decision after a concurrent generic attach", async () => {
+    let releaseStaleProbe!: (value: unknown) => void;
+    let beginStaleProbe!: () => void;
+    const staleProbeStarted = new Promise<void>((resolve) => {
+      beginStaleProbe = resolve;
+    });
+    let discoveryCalls = 0;
+    let links!: Map<string, Set<string>>;
+    const { host, taskThreads, tasks } = createBindingsFixture({
+      listTaskThreads: async (taskId) => {
+        discoveryCalls += 1;
+        if (discoveryCalls === 1) {
+          beginStaleProbe();
+          return new Promise((resolve) => {
+            releaseStaleProbe = resolve;
+          });
+        }
+        return {
+          taskThreads: [...(links.get(taskId) ?? [])].map((threadId) => ({
+            id: TASK_LINK_ID,
+            taskId,
+            threadId,
+            presetName: "Attached",
+            title: "Ordinary legacy task",
+            liveStatus: "working",
+            attachedAt: "2026-08-28T00:00:00.000Z",
+            updatedAt: "2026-08-28T00:00:00.000Z",
+          })),
+        };
+      },
+    });
+    links = taskThreads;
+    tasks.clear();
+    tasks.set(GENERIC_TASK_ID, task(GENERIC_TASK_ID, "Ordinary legacy task"));
+    await plugin(host.bb, createServerLifecycle());
+
+    const pendingOutcome = host.harness.behavior.callRpc("getWorkOutcome", {
+      threadId: ROOT_THREAD_ID,
+    });
+    await staleProbeStarted;
+    await expect(
+      host.harness.behavior.callRpc("attachTaskToThread", {
+        taskId: GENERIC_TASK_ID,
+        threadId: ROOT_THREAD_ID,
+      }),
+    ).resolves.toEqual({ threadId: ROOT_THREAD_ID });
+    releaseStaleProbe({ taskThreads: [] });
+
+    await expect(pendingOutcome).resolves.toMatchObject({
+      legacy: { state: "adoptable", taskIds: [GENERIC_TASK_ID] },
+    });
+    expect(discoveryCalls).toBe(2);
+  });
+
+  it("publishes generic attach and detach only after success, never for failed or bound mutations", async () => {
+    let releaseAttach!: (value: unknown) => void;
+    let beginAttach!: () => void;
+    const attachStarted = new Promise<void>((resolve) => { beginAttach = resolve; });
+    const { host } = createBindingsFixture({
+      taskThreadsAttach: async (_taskId, threadId) => {
+        beginAttach();
+        return new Promise((resolve) => { releaseAttach = resolve; }).then(() => ({ threadId }));
+      },
+    });
+    await plugin(host.bb);
+    const attach = host.harness.behavior.callRpc("attachTaskToThread", {
+      taskId: GENERIC_TASK_ID,
+      threadId: ROOT_THREAD_ID,
+    });
+    await attachStarted;
+    expect(host.harness.inspection.realtimeSignals).toEqual([]);
+    releaseAttach({});
+    await expect(attach).resolves.toEqual({ threadId: ROOT_THREAD_ID });
+    expect(host.harness.inspection.realtimeSignals).toEqual([
+      { channel: "work-sidebar:changed", payload: { family: "work", rootThreadId: ROOT_THREAD_ID } },
+      { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: ROOT_THREAD_ID } },
+    ]);
+    await expect(
+      host.harness.behavior.callRpc("detachTaskFromThread", {
+        taskId: GENERIC_TASK_ID,
+        threadId: ROOT_THREAD_ID,
+      }),
+    ).resolves.toEqual({ threadId: ROOT_THREAD_ID });
+    expect(host.harness.inspection.realtimeSignals).toEqual([
+      { channel: "work-sidebar:changed", payload: { family: "work", rootThreadId: ROOT_THREAD_ID } },
+      { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: ROOT_THREAD_ID } },
+      { channel: "work-sidebar:changed", payload: { family: "work", rootThreadId: ROOT_THREAD_ID } },
+      { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: ROOT_THREAD_ID } },
+    ]);
+
+    const { host: failed } = createBindingsFixture({
+      taskThreadsAttach: async () => { throw new Error("attach unavailable"); },
+      taskThreadsDetach: async () => { throw new Error("detach unavailable"); },
+    });
+    await plugin(failed.bb);
+    await expect(
+      failed.harness.behavior.callRpc("attachTaskToThread", {
+        taskId: GENERIC_TASK_ID,
+        threadId: ROOT_THREAD_ID,
+      }),
+    ).rejects.toThrow("attach unavailable");
+    await expect(
+      failed.harness.behavior.callRpc("detachTaskFromThread", {
+        taskId: GENERIC_TASK_ID,
+        threadId: ROOT_THREAD_ID,
+      }),
+    ).rejects.toThrow("detach unavailable");
+    expect(failed.harness.inspection.realtimeSignals).toEqual([]);
+
+    const { host: bound } = createBindingsFixture();
+    await bound.bb.storage.kv.set(WORK_BINDINGS_KEY, {
+      outcomes: [{
+        kind: "outcome",
+        rootThreadId: ROOT_THREAD_ID,
+        outcomeTaskId: OUTCOME_TASK_ID,
+        taskProjectId: TASK_PROJECT_ID,
+        createdAt: "2026-08-28T00:00:00.000Z",
+        updatedAt: "2026-08-28T00:00:00.000Z",
+      }],
+      executions: [],
+    });
+    await plugin(bound.bb);
+    await expect(
+      bound.harness.behavior.callRpc("detachTaskFromThread", {
+        taskId: OUTCOME_TASK_ID,
+        threadId: ROOT_THREAD_ID,
+      }),
+    ).rejects.toThrow(
+      "This task is part of a durable work binding and cannot be detached from its bound owner.",
+    );
+    expect(bound.harness.inspection.realtimeSignals).toEqual([]);
   });
 
   it("bounds parallel legacy discovery, caches it per root/project, expires it, and clears it after adoption", async () => {
@@ -381,7 +530,10 @@ describe("durable Work/Tasks binding parity", () => {
       parentTaskId: null,
     });
     release();
-    await expect(staleRead).rejects.toThrow("Legacy work discovery was invalidated.");
+    await expect(staleRead).resolves.toMatchObject({
+      outcome: { title: "Durable outcome" },
+      legacy: { state: "none", taskIds: [], message: null },
+    });
     await expect(
       host.harness.behavior.callRpc("getWorkOutcome", { threadId: ROOT_THREAD_ID }),
     ).resolves.toMatchObject({ legacy: { state: "none" } });
@@ -474,7 +626,7 @@ describe("durable Work/Tasks binding parity", () => {
       { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
     );
     expect(host.harness.inspection.realtimeSignals).toEqual([
-      { channel: "work-sidebar:changed", payload: { family: "work", threadId: ROOT_THREAD_ID } },
+      { channel: "work-sidebar:changed", payload: { family: "work", rootThreadId: ROOT_THREAD_ID } },
       { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: ROOT_THREAD_ID } },
     ]);
 
@@ -495,9 +647,9 @@ describe("durable Work/Tasks binding parity", () => {
       { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
     );
     expect(host.harness.inspection.realtimeSignals).toEqual([
-      { channel: "work-sidebar:changed", payload: { family: "work", threadId: ROOT_THREAD_ID } },
+      { channel: "work-sidebar:changed", payload: { family: "work", rootThreadId: ROOT_THREAD_ID } },
       { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: ROOT_THREAD_ID } },
-      { channel: "work-sidebar:changed", payload: { family: "work", threadId: ROOT_THREAD_ID } },
+      { channel: "work-sidebar:changed", payload: { family: "work", rootThreadId: ROOT_THREAD_ID } },
       { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: ROOT_THREAD_ID } },
     ]);
 
@@ -513,7 +665,7 @@ describe("durable Work/Tasks binding parity", () => {
     expect(host.harness.inspection.realtimeSignals).toHaveLength(4);
   });
 
-  it("publishes root and delegated-owner Work signals while Tasks remains root-scoped once", async () => {
+  it("publishes one root-scoped Work signal while Tasks remains root-scoped once", async () => {
     const { host } = createBindingsFixture();
     await plugin(host.bb);
     await host.harness.behavior.callAgentTool(
@@ -541,10 +693,9 @@ describe("durable Work/Tasks binding parity", () => {
       { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
     );
 
-    expect(host.harness.inspection.realtimeSignals.slice(-3)).toEqual([
-      { channel: "work-sidebar:changed", payload: { family: "work", threadId: ROOT_THREAD_ID } },
+    expect(host.harness.inspection.realtimeSignals.slice(-2)).toEqual([
+      { channel: "work-sidebar:changed", payload: { family: "work", rootThreadId: ROOT_THREAD_ID } },
       { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: ROOT_THREAD_ID } },
-      { channel: "work-sidebar:changed", payload: { family: "work", threadId: CHILD_THREAD_ID } },
     ]);
   });
 
@@ -580,7 +731,7 @@ describe("durable Work/Tasks binding parity", () => {
       }),
     ).resolves.toMatchObject({ task: { id: OUTCOME_TASK_ID } });
     expect(host.harness.inspection.realtimeSignals).toEqual([
-      { channel: "work-sidebar:changed", payload: { family: "work", threadId: ROOT_THREAD_ID } },
+      { channel: "work-sidebar:changed", payload: { family: "work", rootThreadId: ROOT_THREAD_ID } },
       { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: ROOT_THREAD_ID } },
     ]);
     await expect(

@@ -32,6 +32,10 @@ export const LEGACY_DISCOVERY_TTL_MS = 5_000;
 export const LEGACY_DISCOVERY_CONCURRENCY = 8;
 type TasksPluginAdapter = ReturnType<typeof createTasksPluginAdapter>;
 export type WorkBindingsState = Pick<WorkBindings, "outcomes" | "executions">;
+export type StableLegacyContext = {
+  bindings: WorkBindings;
+  legacy: LegacyContext;
+};
 export type BindingSummary = {
   rootThreadId: string;
   outcomeTaskId: string;
@@ -60,25 +64,19 @@ export type DescendantThread = {
 
 type WorkBindingsRealtime = Pick<BbPluginApi["realtime"], "publish">;
 
-/** Announces a completed binding to exactly the affected right and left slices. */
+/** Announces root-scoped Work data before the matching root Tasks projection. */
 export function publishWorkBindingReady(
   realtime: WorkBindingsRealtime,
   rootThreadId: string,
-  ownerThreadId = rootThreadId,
 ) {
   realtime.publish("work-sidebar:changed", {
     family: "work",
-    threadId: rootThreadId,
+    rootThreadId,
   });
   realtime.publish("work-sidebar:changed", {
     family: "tasks",
     threadId: rootThreadId,
   });
-  if (ownerThreadId !== rootThreadId)
-    realtime.publish("work-sidebar:changed", {
-      family: "work",
-      threadId: ownerThreadId,
-    });
 }
 
 type WorkBindingReadyFinalization = {
@@ -104,7 +102,7 @@ export async function finalizeWorkBindingOwner({
   const binding = await save(
     bindExecutionOwner(pending, mode, ownerThreadId, "ready", null),
   );
-  publishWorkBindingReady(realtime, rootThreadId, ownerThreadId);
+  publishWorkBindingReady(realtime, rootThreadId);
   return { binding, spawnedThreadId };
 }
 
@@ -383,6 +381,51 @@ export function createWorkBindingsService(
   };
   const invalidateLegacy = (rootThreadId: string, projectId: string) =>
     lifecycle.invalidateLegacyWork(legacyWorkKey(rootThreadId, projectId));
+  const sameRootBindings = (
+    first: WorkBindings,
+    second: WorkBindings,
+    rootThreadId: string,
+  ) =>
+    JSON.stringify({
+      outcomes: first.outcomes.filter(
+        (binding) => binding.rootThreadId === rootThreadId,
+      ),
+      executions: first.executions.filter(
+        (binding) => binding.rootThreadId === rootThreadId,
+      ),
+    }) ===
+    JSON.stringify({
+      outcomes: second.outcomes.filter(
+        (binding) => binding.rootThreadId === rootThreadId,
+      ),
+      executions: second.executions.filter(
+        (binding) => binding.rootThreadId === rootThreadId,
+      ),
+    });
+  const context = async (
+    rootThreadId: string,
+    projectId: string,
+    retriesRemaining = 1,
+  ): Promise<StableLegacyContext> => {
+    const saved = await read();
+    const outcome = saved.outcomes.some(
+      (binding) => binding.rootThreadId === rootThreadId,
+    );
+    if (outcome)
+      return {
+        bindings: saved,
+        legacy: { state: "none", taskIds: [], message: null },
+      };
+    const candidate = await legacy(rootThreadId, projectId);
+    const current = await read();
+    if (sameRootBindings(saved, current, rootThreadId))
+      return { bindings: current, legacy: candidate };
+    if (!retriesRemaining)
+      throw new Error(
+        "Work bindings changed repeatedly while resolving legacy context. Retry the operation.",
+      );
+    return context(rootThreadId, projectId, retriesRemaining - 1);
+  };
   const outcome = async (input: {
     rootThreadId: string;
     title: string;
@@ -694,6 +737,7 @@ export function createWorkBindingsService(
     summarize,
     links,
     legacy,
+    context,
     invalidateLegacy,
     outcome,
     execution,

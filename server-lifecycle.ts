@@ -134,11 +134,12 @@ export class ServerLifecycle {
     this.legacyWorkGenerations.delete(key);
   }
 
-  /** Memoizes one legacy work probe within this server generation only. */
+  /** Memoizes one legacy work probe and retries one superseding generation. */
   async readLegacyWork(
     key: string,
     ttlMs: number,
     load: () => Promise<LegacyWorkContext>,
+    retriesRemaining = 1,
   ): Promise<LegacyWorkContext> {
     if (this.disposed)
       throw new Error("Legacy work discovery lifecycle is disposed.");
@@ -160,8 +161,13 @@ export class ServerLifecycle {
       .then((value) => {
         if (this.disposed)
           throw new Error("Legacy work discovery lifecycle is disposed.");
-        if ((this.legacyWorkGenerations.get(key) ?? 0) !== generation)
-          throw new Error("Legacy work discovery was invalidated.");
+        if ((this.legacyWorkGenerations.get(key) ?? 0) !== generation) {
+          if (!retriesRemaining)
+            throw new Error(
+              "Legacy work changed repeatedly while resolving. Retry the operation.",
+            );
+          return this.readLegacyWork(key, ttlMs, load, retriesRemaining - 1);
+        }
         this.cacheLegacyWork(key, value, ttlMs);
         return value;
       })

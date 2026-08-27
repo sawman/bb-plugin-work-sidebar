@@ -82,11 +82,13 @@ export function createWorkContextRegistration(
 ): WorkContextHandlers {
   const { bb, tasks } = dependencies;
   const readStatus = async (threadId: string) => {
-    const [thread, children] = await Promise.all([
+    const [thread, children, root] = await Promise.all([
       bb.sdk.threads.get({ threadId }),
       tasks.descendants(threadId),
+      tasks.rootThread(threadId),
     ]);
     return {
+      rootThreadId: root.id,
       currentThread: {
         title: thread.title ?? thread.titleFallback ?? "Untitled thread",
         status: thread.status,
@@ -106,8 +108,10 @@ export function createWorkContextRegistration(
     };
   };
   const readOutcome = async (threadId: string) => {
+    const root = await tasks.rootThread(threadId);
     if (!(await tasks.available())) {
       return {
+        rootThreadId: root.id,
         tasksAvailable: false,
         outcome: null,
         executionTasks: [],
@@ -115,20 +119,18 @@ export function createWorkContextRegistration(
         legacy: emptyLegacyContext(),
       };
     }
-    const [root, saved, byId, projects] = await Promise.all([
-      tasks.rootThread(threadId),
-      tasks.bindings(),
+    const snapshot = await tasks.context(root.id, root.projectId);
+    const [byId, projects] = await Promise.all([
       tasks.allTasksById(),
       tasks.projects(),
     ]);
+    const saved = snapshot.bindings;
     const names = new Map(projects.map((project) => [project.id, project.name]));
     const outcomeBinding = saved.outcomes.find((binding) => binding.rootThreadId === root.id) ?? null;
-    const legacy = outcomeBinding
-      ? emptyLegacyContext()
-      : await tasks.legacy(root.id, root.projectId);
     const executions = saved.executions.filter((binding) => binding.rootThreadId === root.id);
     const outcome = outcomeBinding ? byId.get(outcomeBinding.outcomeTaskId) ?? null : null;
     return {
+      rootThreadId: root.id,
       tasksAvailable: true,
       outcome: outcome ? {
         ...outcome,
@@ -142,7 +144,7 @@ export function createWorkContextRegistration(
         ...(outcomeBinding ? [tasks.summarize(outcomeBinding)] : []),
         ...executions.map(tasks.summarize),
       ],
-      legacy,
+      legacy: snapshot.legacy,
     };
   };
   const readGoal = async (threadId: string) => {
@@ -161,19 +163,19 @@ export function createWorkContextRegistration(
   };
   const cards = createWorkContextReadService({ readStatus, readOutcome, readGoal, readPlan });
   const getContext = async (threadId: string) => {
-    const [thread, available, timeline, children, root, saved] = await Promise.all([
+    const [thread, available, timeline, children, root] = await Promise.all([
       bb.sdk.threads.get({ threadId }),
       tasks.available(),
       bb.sdk.threads.timeline({ threadId }),
       tasks.descendants(threadId),
       tasks.rootThread(threadId),
-      tasks.bindings(),
     ]);
+    const snapshot = available
+      ? await tasks.context(root.id, root.projectId)
+      : { bindings: await tasks.bindings(), legacy: emptyLegacyContext() };
+    const saved = snapshot.bindings;
     const links = available ? await tasks.links() : {};
     const outcomeBinding = saved.outcomes.find((binding) => binding.rootThreadId === root.id) ?? null;
-    const legacy = available && !outcomeBinding
-      ? await tasks.legacy(root.id, root.projectId)
-      : emptyLegacyContext();
     const [byId, projects] = available
       ? await Promise.all([tasks.allTasksById(), tasks.projects()])
       : [new Map(), []];
@@ -185,6 +187,7 @@ export function createWorkContextRegistration(
       return task ? [{ ...task, projectName: names.get(task.projectId) ?? "Work" }] : [];
     });
     return {
+      rootThreadId: root.id,
       tasksAvailable: available,
       currentThread: {
         title: thread.title ?? thread.titleFallback ?? "Untitled thread",
@@ -200,7 +203,7 @@ export function createWorkContextRegistration(
         ...(outcomeBinding ? [tasks.summarize(outcomeBinding)] : []),
         ...executions.map(tasks.summarize),
       ],
-      legacy,
+      legacy: snapshot.legacy,
       goal: timeline.goal ? {
         objective: timeline.goal.objective,
         status: timeline.goal.status,

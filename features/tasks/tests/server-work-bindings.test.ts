@@ -21,7 +21,7 @@ const pendingBinding: ExecutionBinding = {
 };
 
 describe("work binding realtime publication", () => {
-  it("keeps the root Work then Tasks pair adjacent before a distinct owner Work envelope", () => {
+  it("publishes exactly the root-scoped Work then Tasks pair", () => {
     const published = vi.fn();
     const realtime = {
       publish: (channel: string, payload: unknown) =>
@@ -31,16 +31,15 @@ describe("work binding realtime publication", () => {
     publishWorkBindingReady(realtime, "thr_root");
 
     expect(published.mock.calls).toEqual([
-      ["work-sidebar:changed", { family: "work", threadId: "thr_root" }],
+      ["work-sidebar:changed", { family: "work", rootThreadId: "thr_root" }],
       ["work-sidebar:changed", { family: "tasks", threadId: "thr_root" }],
     ]);
 
     published.mockClear();
-    publishWorkBindingReady(realtime, "thr_root", "thr_child");
+    publishWorkBindingReady(realtime, "thr_root");
     expect(published.mock.calls).toEqual([
-      ["work-sidebar:changed", { family: "work", threadId: "thr_root" }],
+      ["work-sidebar:changed", { family: "work", rootThreadId: "thr_root" }],
       ["work-sidebar:changed", { family: "tasks", threadId: "thr_root" }],
-      ["work-sidebar:changed", { family: "work", threadId: "thr_child" }],
     ]);
   });
 
@@ -48,7 +47,7 @@ describe("work binding realtime publication", () => {
     ["direct", "thr_root", null],
     ["delegated", "thr_child", "thr_child"],
   ] as const)(
-    "finalizes a %s owner by saving ready state and publishing both families",
+    "finalizes a %s owner by saving ready state and publishing the root pair",
     async (mode, ownerThreadId, spawnedThreadId) => {
       const saved = vi.fn(async (binding: ExecutionBinding) => binding);
       const published = vi.fn();
@@ -85,18 +84,10 @@ describe("work binding realtime publication", () => {
         },
         spawnedThreadId,
       });
-      expect(published.mock.calls).toEqual(
-        ownerThreadId === "thr_root"
-          ? [
-              ["work-sidebar:changed", { family: "work", threadId: "thr_root" }],
-              ["work-sidebar:changed", { family: "tasks", threadId: "thr_root" }],
-            ]
-          : [
-              ["work-sidebar:changed", { family: "work", threadId: "thr_root" }],
-              ["work-sidebar:changed", { family: "tasks", threadId: "thr_root" }],
-              ["work-sidebar:changed", { family: "work", threadId: "thr_child" }],
-            ],
-      );
+      expect(published.mock.calls).toEqual([
+        ["work-sidebar:changed", { family: "work", rootThreadId: "thr_root" }],
+        ["work-sidebar:changed", { family: "tasks", threadId: "thr_root" }],
+      ]);
     },
   );
 });

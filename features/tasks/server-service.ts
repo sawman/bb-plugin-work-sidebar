@@ -68,7 +68,7 @@ export type TasksRegistration = TaskHandlers & Pick<
   "available" | "projects" | "allTasksById"
 > & Pick<
   ReturnType<typeof createWorkBindingsService>,
-  "rootThread" | "descendants" | "summarize" | "links" | "legacy" | "outcome" | "execution" | "owner"
+  "rootThread" | "descendants" | "summarize" | "links" | "legacy" | "context" | "outcome" | "execution" | "owner"
 > & {
   bindings(): ReturnType<ReturnType<typeof createWorkBindingsService>["read"]>;
   registerTools(): void;
@@ -122,9 +122,10 @@ export function createTasksService(
     },
     async adoptLegacyOutcome({ rootThreadId, taskId }) {
       const root = await bindings.rootThread(rootThreadId);
-      const saved = await bindings.read();
+      const snapshot = await bindings.context(root.id, root.projectId);
+      const saved = snapshot.bindings;
       if (saved.outcomes.some((binding) => binding.rootThreadId === root.id)) throw new Error("A durable outcome binding already exists for this root thread");
-      const candidate = await bindings.legacy(root.id, root.projectId);
+      const candidate = snapshot.legacy;
       if (candidate.state !== "adoptable" || candidate.taskIds[0] !== taskId) throw new Error(candidate.message ?? "This legacy task cannot be adopted unambiguously");
       const task = (await adapter.allTasksById()).get(taskId);
       if (!task || task.parentTaskId !== null) throw new Error("Only an unambiguous top-level legacy task can be adopted as an outcome");
@@ -154,6 +155,7 @@ export function createTasksService(
         z.object({ threadId: taskThreadIdSchema }),
       );
       bindings.invalidateLegacy(root.id, root.projectId);
+      publishWorkBindingReady(bb.realtime, root.id);
       return result;
     },
     async detachTaskFromThread({ taskId, threadId }) {
@@ -166,6 +168,7 @@ export function createTasksService(
         z.object({ threadId: taskThreadIdSchema }),
       );
       bindings.invalidateLegacy(root.id, root.projectId);
+      publishWorkBindingReady(bb.realtime, root.id);
       return result;
     },
     async reorderTask({ taskId, beforeTaskId, afterTaskId }) { return adapter.reorder(taskId, beforeTaskId, afterTaskId); },
@@ -181,6 +184,7 @@ export function createTasksService(
     summarize: bindings.summarize,
     links: bindings.links,
     legacy: bindings.legacy,
+    context: bindings.context,
     outcome: bindings.outcome,
     execution: bindings.execution,
     owner: bindings.owner,
