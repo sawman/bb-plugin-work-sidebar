@@ -15,10 +15,6 @@
   font-size: 0.59rem;
   line-height: 1.1;
 }
-.ws-status {
-  width: 0.65rem;
-  font-size: 0.68rem;
-}
 .ws-project-icon {
   width: 0.78rem;
   height: 0.78rem;
@@ -34,8 +30,6 @@
 .ws-thread-child-depth-3,
 .ws-thread-child-depth-4 {
   border-left: 1px solid var(--border);
-  margin-left: 0.7rem;
-  padding-left: 0.35rem;
 }
 .ws-thread-child-depth-2 {
   margin-left: 1.35rem;
@@ -130,7 +124,6 @@
 }
 .ws-section-count {
   color: var(--muted-foreground);
-  font-size: 0.66rem;
 }
 .ws-current-pr-card h3 a {
   color: inherit;
@@ -162,12 +155,6 @@
   gap: 0.35rem;
   color: var(--muted-foreground);
   font-size: 0.64rem;
-}
-.ws-card-note {
-  margin: 0;
-  color: var(--muted-foreground);
-  font-size: 0.64rem;
-  line-height: 1.35;
 }
 .ws-status-dot {
   font-size: 0.72rem;
@@ -205,20 +192,8 @@
   justify-self: start;
   padding: 0;
 }
-.ws-stack-rail {
-  display: grid;
-  gap: 0.2rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
 .ws-stack-layer {
-  grid-template-columns: 0.9rem 1fr auto;
-  align-items: start;
   min-width: 0;
-  border-left: 2px solid var(--border);
-  border-radius: 0;
-  padding: 0.55rem 0.45rem;
 }
 .ws-stack-rail li {
   min-width: 0;
@@ -240,13 +215,9 @@
 }
 .ws-agent-card small {
   color: var(--muted-foreground);
-  font-size: 0.62rem;
 }
 .ws-agent-card {
-  grid-template-columns: 0.85rem 1fr auto;
-  align-items: start;
   min-width: 0;
-  padding: 0.55rem;
 }
 .ws-agent-card > span:nth-child(2) {
   display: grid;
@@ -254,13 +225,8 @@
 }
 .ws-agent-card strong {
   overflow: hidden;
-  font-size: 0.72rem;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.ws-agent-state-waiting,
-.ws-agent-state-idle {
-  color: var(--muted-foreground);
 }
 .ws-agent-review {
   border-color: var(--primary);
@@ -281,7 +247,6 @@
 }
 .ws-thread {
   display: grid;
-  grid-template-columns: 0.9rem minmax(0, 1fr);
   align-items: center;
   cursor: grab;
 }
@@ -294,10 +259,6 @@
   display: grid;
   grid-template-columns: 0.8rem minmax(0, 1fr) auto;
   width: 100%;
-  padding-left: 0.12rem;
-}
-.ws-thread > .ws-thread-anchor.ws-thread-has-children {
-  padding-left: 0.12rem;
 }
 .ws-thread > .ws-rename {
   grid-column: 2;
@@ -319,9 +280,6 @@
 }
 .ws-thread-dragging {
   opacity: 0.55;
-}
-.ws-thread-dragging > .ws-thread-anchor {
-  background: var(--accent);
 }
 .ws-thread[data-drop-placement]::after {
   position: absolute;
@@ -357,18 +315,11 @@
 .ws-view-selector {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0.15rem;
-  padding: 0.35rem;
   border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: var(--background);
 }
 .ws-view-selector button {
   border: 0;
   border-radius: calc(var(--radius) - 2px);
-  padding: 0.42rem 0.25rem;
   background: transparent;
   color: var(--muted-foreground);
   font-size: 0.72rem;
@@ -427,7 +378,6 @@
 .ws-task-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
   color: var(--muted-foreground);
   font-size: 0.59rem;
 }
@@ -435,7 +385,6 @@
 .ws-task-badge {
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 0.08rem 0.3rem;
   white-space: nowrap;
 }
 .ws-task-key-badge {
@@ -444,27 +393,15 @@
 }
 .ws-task-status-picker {
   display: inline-flex;
-  min-height: 1.55rem;
   align-items: center;
   justify-content: center;
   gap: 0.22rem;
-  border: 1px solid color-mix(in srgb, currentColor 38%, var(--border));
-  border-radius: calc(var(--radius) - 3px);
-  padding: 0.2rem 0.42rem;
-  background: color-mix(in srgb, currentColor 10%, transparent);
   font: inherit;
   font-size: 0.62rem;
   font-weight: 650;
   line-height: 1.15;
   white-space: nowrap;
   cursor: pointer;
-}
-.ws-task-status-picker:hover:not(:disabled) {
-  background: color-mix(in srgb, currentColor 17%, var(--card));
-}
-.ws-task-status-picker svg {
-  width: 0.78rem;
-  height: 0.78rem;
 }
 .ws-task-status-picker:disabled {
   cursor: wait;
@@ -496,9 +433,6 @@
   position: relative;
   border-radius: calc(var(--radius) - 2px);
 }
-.ws-pr-changes_requested {
-  color: var(--destructive);
-}
 .ws-pr-stack {
   display: grid;
   gap: 0.08rem;
@@ -506,24 +440,10 @@
 }
 .ws-pr-stack-disclosure {
   display: inline-flex;
-  width: 1.2rem;
-  height: 1.5rem;
   align-items: center;
   justify-content: center;
   flex: none;
-  border: 0;
   border-radius: calc(var(--radius) - 3px);
-  background: transparent;
-  color: var(--muted-foreground);
-  cursor: pointer;
-}
-.ws-pr-stack-disclosure[data-state="open"] {
-  background: color-mix(in srgb, var(--accent) 80%, var(--primary) 20%);
-  color: var(--foreground);
-}
-.ws-pr-stack-disclosure:hover {
-  background: var(--accent);
-  color: var(--foreground);
 }
 .ws-pr-stack-disclosure:focus-visible {
   outline: 2px solid var(--ring);
@@ -535,10 +455,8 @@
 }
 .ws-pr-stack-layer-item {
   min-width: 0;
-  padding-left: 0.28rem;
 }
 .ws-pr-stack-layer-item .ws-pr-row {
-  padding-left: 0.28rem;
   border-bottom: 0;
 }
 .ws-pr-stack-closed {
@@ -546,24 +464,16 @@
 }
 .ws-pr-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.35rem;
   align-items: center;
-  min-height: 2.65rem;
   padding: 0.35rem 0.45rem;
   border-bottom: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 2px);
 }
 .ws-pr-row:hover {
   background: var(--accent);
 }
 .ws-pr-target {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: "meta badges" "title badges" "context badges";
-  grid-template-rows: auto auto auto;
   min-width: 0;
-  gap: 0.14rem 0.35rem;
   color: inherit;
   text-decoration: none;
 }
@@ -605,9 +515,6 @@
   outline: 2px solid var(--ring);
   outline-offset: 1px;
 }
-.ws-pr-row {
-  min-height: 3.35rem;
-}
 .ws-pr-stack-layer-item .ws-pr-row {
   padding-left: 0;
 }
@@ -627,21 +534,11 @@
   font-weight: 650;
   line-height: 1.2;
 }
-.ws-pr-row {
-  grid-template-columns: 1.25rem minmax(0, 1fr) auto;
-  gap: 0.18rem;
-  min-height: 2.8rem;
-}
 .ws-pr-stack-slot {
   display: flex;
   min-height: 100%;
   align-items: center;
   justify-content: center;
-}
-.ws-pr-target {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "meta" "title" "context";
-  gap: 0.12rem;
 }
 .ws-pr-status-icons {
   display: flex;
@@ -683,15 +580,11 @@
   transform: translateY(0);
 }
 .ws-pr-stack {
-  margin-left: 0;
-  padding-left: 0;
   border-left: 0;
   background: none;
 }
 .ws-pr-stack-layer-item {
   position: relative;
-  margin-left: 0;
-  padding-left: 0;
   border-left: 0;
   background: none;
 }
@@ -699,18 +592,11 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 0.6rem;
-  width: 2px;
+  /* R17 important: host pseudo-element offsets must not move the calculated rail. */
+  left: calc(var(--ws-pr-row-inline-padding) + (var(--ws-pr-stack-gutter) - 1px) / 2 - 1px) !important;
+  width: 1px;
   background: color-mix(in srgb, var(--primary) 72%, var(--border));
   content: "";
-}
-.ws-pr-stack-layer-item > .ws-pr-row {
-  margin-left: 0.24rem;
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--primary) 8%, transparent),
-    transparent 42%
-  );
 }
 .ws-pr-stack-disclosure {
   width: 0.8rem;
@@ -753,15 +639,13 @@
 
 /* PR rows intentionally use only a title and one compact subtitle line. */
 .ws-pr-target {
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "title" "context";
   grid-template-rows: auto auto;
   gap: 0.08rem;
 }
 .ws-pr-row {
   min-height: 2.35rem;
-}
-.ws-pr-stack-layer-item > .ws-pr-row {
-  margin-left: 0.14rem;
 }
 .ws-pr-context .ws-pr-number {
   flex: none;
@@ -773,18 +657,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* A compact root rail keeps ordinary and stack-base PRs aligned. */
-.ws-pr-row {
-  grid-template-columns: 1rem minmax(0, 1fr) auto;
-}
-.ws-pr-stack-layer-item::before {
-  left: 0.63rem;
-  width: 1px;
-}
-.ws-pr-stack-layer-item > .ws-pr-row {
-  margin-left: 0.12rem;
 }
 
 /* Keep project creation available without turning it into a full-width footer. */
@@ -863,10 +735,6 @@
 .ws-new-thread {
   /* R17 important: the host Button preset must not change the icon-only display. */
   display: inline-flex !important;
-  /* R17 important: the host Button preset must not change the icon-only width. */
-  width: 1.55rem !important;
-  /* R17 important: the host Button preset must not change the icon-only height. */
-  height: 1.55rem !important;
   align-items: center;
   justify-content: center;
   /* R17 important: the host Button preset must not add icon-only margins. */
@@ -879,6 +747,10 @@
   border-radius: calc(var(--radius) - 3px) !important;
   /* R17 important: the host Button preset must not alter the icon-only color. */
   color: var(--muted-foreground) !important;
+  /* R17 important: host Button sizing must keep the new-thread action width aligned with icons. */
+  width: 1.6rem !important;
+  /* R17 important: host Button sizing must keep the new-thread action height aligned with icons. */
+  height: 1.6rem !important;
 }
 .ws-new-thread:hover {
   /* R17 important: the host Button hover preset overrides this semantic action border. */
@@ -937,14 +809,9 @@
 }
 .ws-pr-row {
   grid-template-columns: var(--ws-pr-stack-gutter) minmax(0, 1fr) auto;
+  gap: 0.18rem;
   padding-left: 0;
 }
-.ws-pr-stack-layer-item::before {
-  /* R17 important: host pseudo-element offsets must not move the calculated rail. */
-  left: calc(var(--ws-pr-row-inline-padding) + (var(--ws-pr-stack-gutter) - 1px) / 2 - 1px) !important;
-  width: 1px;
-}
-
 .ws-archived-thread {
   opacity: 0.8;
 }
@@ -1170,13 +1037,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ws-agent-card {
-  gap: 0.38rem;
-  padding: 0.4rem;
-  border-width: 0 0 1px;
-  border-radius: 0;
-  background: transparent;
-}
 .ws-agent-card:hover {
   background: var(--accent);
 }
@@ -1264,7 +1124,7 @@
 }
 .ws-current-pr-summary {
   display: grid;
-  grid-template-columns: 0.75rem minmax(0, 1fr);
+  grid-template-columns: 0.75rem minmax(0, 1fr) auto;
   width: 100%;
   align-items: center;
   gap: 0.35rem;
@@ -1468,9 +1328,7 @@
 }
 .ws-thread-settings-menu {
   position: absolute;
-  z-index: 20;
   right: 0;
-  top: calc(100% + 0.2rem);
   display: grid;
   min-width: 10.5rem;
   padding: 0.18rem;
@@ -1478,6 +1336,12 @@
   border-radius: var(--radius);
   background: var(--popover);
   box-shadow: 0 8px 24px color-mix(in srgb, var(--foreground) 18%, transparent);
+  /* R17 important: host popover placement must overlay the sticky toolbar from the top. */
+  top: calc(100% + 0.2rem) !important;
+  /* R17 important: host popover placement must not anchor below the sticky toolbar. */
+  bottom: auto !important;
+  /* R17 important: host popover placement must clear the sticky toolbar stacking context. */
+  z-index: 100 !important;
 }
 .ws-thread-settings-menu button {
   border: 0;
@@ -1586,9 +1450,6 @@
   font-weight: 650;
   letter-spacing: 0.01em;
 }
-.ws-section-count {
-  font-size: 0.61rem;
-}
 .ws-card {
   display: grid;
   min-width: 0;
@@ -1667,15 +1528,6 @@
 .ws-current-pr-open.ws-pr-tooltip,
 .ws-current-pr-expand.ws-pr-tooltip {
   position: absolute;
-}
-.ws-agent-card {
-  grid-template-columns: 0.82rem minmax(0, 1fr) 0.72rem;
-  gap: 0.36rem;
-  align-items: center;
-  padding: 0.42rem 0.18rem;
-  border-width: 0 0 1px;
-  border-radius: 0;
-  background: transparent;
 }
 .ws-agent-card > span:nth-child(2) {
   gap: 0.1rem;
@@ -2030,9 +1882,6 @@ button.ws-provider-health:focus-visible {
   flex: none;
   color: var(--muted-foreground);
 }
-.ws-current-pr-summary {
-  grid-template-columns: 0.75rem minmax(0, 1fr) auto;
-}
 .ws-current-pr-signals {
   display: flex;
   align-items: center;
@@ -2219,22 +2068,8 @@ button.ws-provider-health:focus-visible {
   height: 0.76rem;
   margin: 0;
 }
-.ws-new-thread {
-  /* R17 important: host Button sizing must keep the new-thread action width aligned with icons. */
-  width: 1.6rem !important;
-  /* R17 important: host Button sizing must keep the new-thread action height aligned with icons. */
-  height: 1.6rem !important;
-}
 .ws-thread-settings {
   z-index: 41;
-}
-.ws-thread-settings-menu {
-  /* R17 important: host popover placement must overlay the sticky toolbar from the top. */
-  top: calc(100% + 0.2rem) !important;
-  /* R17 important: host popover placement must not anchor below the sticky toolbar. */
-  bottom: auto !important;
-  /* R17 important: host popover placement must clear the sticky toolbar stacking context. */
-  z-index: 100 !important;
 }
 .ws-native-thread-list {
   position: relative;
@@ -2345,7 +2180,8 @@ button.ws-provider-health:focus-visible {
 }
 .ws-thread-task-card {
   display: grid;
-  gap: 0.36rem;
+  gap: 0.38rem;
+  padding: 0.58rem;
 }
 .ws-github-api-indicator {
   display: inline-flex;
@@ -2394,21 +2230,12 @@ button.ws-provider-health:focus-visible {
 }
 .ws-task-status-picker {
   position: relative;
-  width: 1.15rem;
-  min-width: 1.15rem;
-  height: 1.15rem;
-  min-height: 1.15rem;
   border: 0;
-  border-radius: 3px;
   padding: 0;
   background: transparent;
 }
 .ws-task-status-picker:hover:not(:disabled) {
   background: var(--accent);
-}
-.ws-task-status-picker svg {
-  width: 0.68rem;
-  height: 0.68rem;
 }
 .ws-task-status-picker select {
   position: absolute;
@@ -2497,12 +2324,6 @@ button.ws-provider-health:focus-visible {
 .ws-linear-search-row input:focus {
   outline: 1px solid var(--ring);
   outline-offset: 0;
-}
-/* Tasks deliberately borrow the card type scale; these rules only arrange
-   rows and controls, so a new Tasks card cannot introduce a second style. */
-.ws-thread-task-card {
-  gap: 0.38rem;
-  padding: 0.58rem;
 }
 .ws-task-meta .ws-task-key-badge,
 .ws-task-meta .ws-task-badge {
