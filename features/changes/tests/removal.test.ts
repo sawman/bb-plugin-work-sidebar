@@ -1,6 +1,9 @@
-import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { productionSourcePaths } from "../../../tests/architecture/production-source-paths.js";
+
+const repositoryRoot = resolve(import.meta.dirname, "../../..");
 
 const legacyTokens = [
   ["get", "WorkChanges"].join(""),
@@ -17,26 +20,18 @@ const legacyTokens = [
 
 describe("R13 legacy Changes removal", () => {
   it("keeps migrated legacy names out of production TypeScript sources", () => {
+    const productionSources = productionSourcePaths(repositoryRoot).map((path) => ({ path, source: readFileSync(path, "utf8") }));
     for (const token of legacyTokens) {
-      const result = spawnSync(
-        "rg",
-        [
-          "-l",
-          "-F",
-          token,
-          "--glob",
-          "!**/tests/**",
-          "--glob",
-          "*.ts",
-          "--glob",
-          "*.tsx",
-          ".",
-        ],
-        { cwd: process.cwd(), encoding: "utf8" },
-      );
-
-      expect(result.status, result.stdout || result.stderr).toBe(1);
+      const matches = productionSources.filter((file) => file.source.includes(token)).map((file) => file.path);
+      expect(matches, `legacy token ${token} remains in production source`).toEqual([]);
     }
+  });
+
+  it("detects an in-process source match before asserting production absence", () => {
+    const fixtureRoot = resolve(repositoryRoot, "tests/fixtures/nested");
+    const matches = productionSourcePaths(fixtureRoot)
+      .filter((path) => readFileSync(path, "utf8").includes("node:fs"));
+    expect(matches).toEqual([resolve(fixtureRoot, "browser-node.ts")]);
   });
 
   it("keeps the R14 renderer dependency and its source/CSS markers out of production", () => {

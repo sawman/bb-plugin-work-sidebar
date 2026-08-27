@@ -1,8 +1,10 @@
 import { readFileSync } from "node:fs";
+import { builtinModules } from "node:module";
 import { dirname, extname, resolve, sep } from "node:path";
 import * as ts from "typescript";
 
 const sourceExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"]);
+const bareNodeBuiltins = new Set(builtinModules.map((name) => name.replace(/^node:/, "")));
 
 type CompilerContext = {
   compilerOptions: ts.CompilerOptions;
@@ -99,8 +101,13 @@ function isServerModule(path: string): boolean {
   const segments = resolve(path).split(sep);
   const basename = segments.at(-1) ?? "";
   return segments.slice(0, -1).includes("server")
-    || basename.startsWith("server.")
-    || basename.includes(".server.");
+    || /(?:^|[._-])server(?:[._-]|$)/.test(basename);
+}
+
+function isForbiddenBrowserRuntimeSpecifier(specifier: string): boolean {
+  return specifier === "@get-bb/plugin-sdk"
+    || specifier.startsWith("node:")
+    || bareNodeBuiltins.has(specifier);
 }
 
 export function collectBrowserRuntimeGraph(entry: string): Map<string, string[]> {
@@ -143,7 +150,7 @@ export function assertBrowserRuntimeBoundary(entry: string): void {
 
   for (const [modulePath, imports] of graph) {
     for (const specifier of imports) {
-      if (specifier === "@get-bb/plugin-sdk" || specifier.startsWith("node:")) {
+      if (isForbiddenBrowserRuntimeSpecifier(specifier)) {
         throw new Error(`Browser module ${modulePath} imports forbidden runtime module ${specifier}`);
       }
 
