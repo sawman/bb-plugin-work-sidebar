@@ -40,6 +40,7 @@ const outcome = {
   outcome: null,
   executionTasks: [],
   bindings: [],
+  legacy: { state: "none" as const, taskIds: [], message: null },
 };
 const populatedOutcome = {
   tasksAvailable: true,
@@ -57,6 +58,7 @@ const populatedOutcome = {
   },
   executionTasks: [],
   bindings: [],
+  legacy: { state: "none" as const, taskIds: [], message: null },
 };
 
 function fixture(overrides: Partial<Rpc> = {}): Rpc {

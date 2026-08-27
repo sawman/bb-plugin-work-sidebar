@@ -44,6 +44,7 @@ function fixture(overrides: Partial<Rpc> = {}): Rpc {
       outcome: null,
       executionTasks: [],
       bindings: [],
+      legacy: { state: "none" as const, taskIds: [], message: null },
     }),
     getWorkGoal: () => null,
     getWorkPlan: () => ({ items: [] }),
@@ -87,6 +88,7 @@ describe("registered Status activity lifecycle", () => {
       outcome: null,
       executionTasks: [],
       bindings: [],
+      legacy: { state: "none" as const, taskIds: [], message: null },
     }));
     const getWorkGoal = vi.fn(() => null);
     const getWorkPlan = vi.fn(() => ({ items: [] }));
@@ -170,6 +172,7 @@ describe("registered Status activity lifecycle", () => {
       outcome: null,
       executionTasks: [],
       bindings: [],
+      legacy: { state: "none" as const, taskIds: [], message: null },
     }));
     const getWorkGoal = vi.fn(() => null);
     const getWorkPlan = vi.fn(() => ({ items: [] }));

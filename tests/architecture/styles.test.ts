@@ -247,6 +247,16 @@ describe("stylesheet architecture baseline", () => {
 });
 
 describe("shared surface and list-row architecture", () => {
+  test("gives the semantic active combobox option a host-token highlight", () => {
+    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const activeOption = rules.find(({ selector }) =>
+      selector === '.ws-combobox-options button[data-active="true"]',
+    );
+
+    expect(activeOption?.declarations).toContain("background: var(--accent)");
+    expect(activeOption?.declarations).toContain("color: var(--accent-foreground)");
+  });
+
   test("associates each important declaration with its immediately preceding R17 comment", () => {
     expect(undocumentedImportantDeclarations(`
       /* R17 important: a former blanket comment. */

@@ -137,6 +137,7 @@ function fixture() {
         },
       ],
       bindings: [],
+      legacy: { state: "none", taskIds: [], message: null },
     }),
     getWorkGoal: () => null,
     getWorkPlan: () => ({ items: [] }),
@@ -291,6 +292,10 @@ describe("R19D registered slot accessibility", () => {
     await waitFor(() =>
       expect(slot.getByText("Accessible execution task")).toBeTruthy(),
     );
+    const executionTasks = slot.getByRole("group", { name: "Execution tasks" });
+    expect(
+      executionTasks.querySelector(".ws-status-dot")?.getAttribute("aria-hidden"),
+    ).toBe("true");
     await expectNoAriaViolations(slot.container);
     fireEvent.click(slot.getByRole("tab", { name: "Changes" }));
     await waitFor(() =>

@@ -239,7 +239,6 @@ export function TaskRow(props: TaskRowProps) {
                 <span
                   id={bindingDescriptionId}
                   className="ws-task-badge"
-                  role="status"
                 >
                   {bindingState}
                 </span>

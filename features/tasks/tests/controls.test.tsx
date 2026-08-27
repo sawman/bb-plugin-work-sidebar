@@ -49,8 +49,121 @@ describe("Tasks registered controls", () => {
     fireEvent.change(project, { target: { value: "Work" } });
     const option = await rendered.findByRole("option", { name: "Work" });
     expect(option.getAttribute("aria-selected")).toBe("true");
+    expect(option.getAttribute("tabindex")).toBe("-1");
+    expect(project.getAttribute("aria-autocomplete")).toBe("list");
+    expect(project.hasAttribute("aria-activedescendant")).toBe(false);
     await expectNoAriaViolations(rendered.container);
     rendered.lifecycle.unmount();
+  });
+
+  it("dismisses a registered Combobox for pointer-down outside and focus leaving its wrapper", async () => {
+    const { rendered } = await leftSlot();
+    fireEvent.click(rendered.getByRole("button", { name: "Add task" }));
+    const project = rendered.getByRole("combobox", { name: "Task project" });
+    fireEvent.focus(project);
+    await rendered.findByRole("listbox");
+    fireEvent.pointerDown(document.body);
+    await waitFor(() => expect(rendered.queryByRole("listbox")).toBeNull());
+
+    fireEvent.focus(project);
+    await rendered.findByRole("listbox");
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    fireEvent.blur(project, { relatedTarget: outside });
+    await waitFor(() => expect(rendered.queryByRole("listbox")).toBeNull());
+    outside.remove();
+    rendered.lifecycle.unmount();
+  });
+
+  it("uses active-descendant listbox keyboard navigation in the registered Work Tasks card", async () => {
+    const captured = await app();
+    const rendered = renderSlot(
+      captured.threadPanelActions[0]!,
+      { threadId: "thr_test", params: null },
+      { rpc: rpcFixtures(() => tasks([task, taskTwo])) },
+    );
+    const combo = await rendered.findByLabelText("Add task to this thread");
+    fireEvent.focus(combo);
+    const options = await rendered.findAllByRole("option");
+    expect(options).toHaveLength(2);
+    expect(options[0]!.id).toBeTruthy();
+    expect(options[1]!.id).toBeTruthy();
+
+    fireEvent.keyDown(combo, { key: "ArrowDown" });
+    expect(combo.getAttribute("aria-activedescendant")).toBe(options[0]!.id);
+    expect(options[0]!.getAttribute("data-active")).toBe("true");
+    expect(options[0]!.getAttribute("aria-selected")).toBe("false");
+    await expectNoAriaViolations(rendered.container);
+    fireEvent.keyDown(combo, { key: "ArrowDown" });
+    expect(combo.getAttribute("aria-activedescendant")).toBe(options[1]!.id);
+    expect(options[0]!.hasAttribute("data-active")).toBe(false);
+    expect(options[1]!.getAttribute("data-active")).toBe("true");
+    expect(options[1]!.getAttribute("aria-selected")).toBe("false");
+    fireEvent.keyDown(combo, { key: "ArrowUp" });
+    expect(combo.getAttribute("aria-activedescendant")).toBe(options[0]!.id);
+    fireEvent.keyDown(combo, { key: "End" });
+    expect(combo.getAttribute("aria-activedescendant")).toBe(options[1]!.id);
+    fireEvent.keyDown(combo, { key: "Home" });
+    expect(combo.getAttribute("aria-activedescendant")).toBe(options[0]!.id);
+    fireEvent.keyDown(combo, { key: "Enter" });
+    await waitFor(() => expect(combo.getAttribute("aria-expanded")).toBe("false"));
+    expect((combo as HTMLInputElement).value).toBe("WORK-1");
+
+    fireEvent.focus(combo);
+    fireEvent.change(combo, { target: { value: "second" } });
+    const filteredOption = await rendered.findByRole("option", {
+      name: /WORK-2/,
+    });
+    fireEvent.keyDown(combo, { key: "End" });
+    expect(combo.getAttribute("aria-activedescendant")).toBe(filteredOption.id);
+    fireEvent.keyDown(combo, { key: "Escape" });
+    fireEvent.keyDown(combo, { key: "ArrowDown" });
+    expect(combo.getAttribute("aria-activedescendant")).toBe(filteredOption.id);
+    fireEvent.keyDown(combo, { key: "Enter" });
+    await waitFor(() => expect(combo.getAttribute("aria-expanded")).toBe("false"));
+    expect((combo as HTMLInputElement).value).toBe("WORK-2");
+    fireEvent.click(combo);
+    await rendered.findByRole("listbox");
+    fireEvent.keyDown(combo, { key: "Escape" });
+    expect(combo.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).not.toBe(combo);
+    rendered.lifecycle.unmount();
+  });
+
+  it("preserves pointer selection across all three registered Combobox call sites", async () => {
+    const { rendered: left } = await leftSlot();
+    fireEvent.click(left.getByRole("button", { name: "Add task" }));
+    const project = left.getByRole("combobox", { name: "Task project" });
+    project.focus();
+    const projectOption = await left.findByRole("option", { name: "Work" });
+    fireEvent.mouseDown(projectOption);
+    fireEvent.click(projectOption);
+    expect((project as HTMLInputElement).value).toBe("Work");
+    expect(left.queryByRole("listbox")).toBeNull();
+    expect(document.activeElement).toBe(project);
+    fireEvent.click(project);
+    await left.findByRole("listbox");
+    fireEvent.keyDown(project, { key: "Escape" });
+    const assignee = left.getByRole("combobox", { name: "Task assignee" });
+    fireEvent.focus(assignee);
+    fireEvent.click(await left.findByRole("option", { name: "Agent" }));
+    expect((assignee as HTMLInputElement).value).toBe("Agent");
+    expect(left.queryByRole("listbox")).toBeNull();
+    left.lifecycle.unmount();
+    getPluginQueryClient().clear();
+
+    const captured = await app();
+    const right = renderSlot(
+      captured.threadPanelActions[0]!,
+      { threadId: "thr_test", params: null },
+      { rpc: rpcFixtures(() => tasks([task, taskTwo])) },
+    );
+    const taskPicker = await right.findByLabelText("Add task to this thread");
+    fireEvent.focus(taskPicker);
+    fireEvent.click(await right.findByRole("option", { name: /WORK-2/ }));
+    expect((taskPicker as HTMLInputElement).value).toBe("WORK-2");
+    expect(right.queryByRole("listbox")).toBeNull();
+    right.lifecycle.unmount();
   });
 
   it("rejects a listbox child that lacks the option role", async () => {
@@ -149,7 +262,11 @@ describe("Tasks registered controls", () => {
     });
     const row = rendered.getByRole("button", { name: bound.title });
     expect(rendered.getByText("Bound outcome task")).toBeTruthy();
-    expect(row.getAttribute("aria-describedby")).toBeTruthy();
+    const bindingDescription = document.getElementById(
+      row.getAttribute("aria-describedby")!,
+    );
+    expect(bindingDescription?.textContent).toBe("Bound outcome task");
+    expect(bindingDescription?.getAttribute("role")).toBeNull();
     fireEvent.click(row);
     expect(call).not.toHaveBeenCalled();
     rendered.lifecycle.unmount();
