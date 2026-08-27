@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
+import { waitFor } from "@testing-library/react";
 import { getPluginQueryClient, pluginInteractionStore, queryKeys, queryPolicies } from "../../query-runtime";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 
@@ -29,8 +30,8 @@ describe("R2 app registration and Query lifecycle", () => {
     pluginInteractionStore.getState().setSelectedWorkTab("work");
 
     // The harness mounts slots independently, matching BB's left/right slot
-    // ownership. R5 turns the PR consumers into real observers on the same
-    // module-generation QueryClient.
+    // ownership. R5 and R6 make both PR and Tasks consumers real observers on
+    // the same module-generation QueryClient.
     const client = getPluginQueryClient();
     const mount = vi.spyOn(client, "mount");
     const unmount = vi.spyOn(client, "unmount");
@@ -40,13 +41,48 @@ describe("R2 app registration and Query lifecycle", () => {
     });
     const right = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_test", params: null });
     expect(mount).toHaveBeenCalledTimes(2);
-    expect(client.getQueryCache().getAll()).toHaveLength(5);
+    expect(client.getQueryCache().getAll()).toHaveLength(7);
     expect(client.getQueryCache().findAll({ queryKey: ["work-sidebar", "pull-requests", "authored", "stacks"] })[0]?.getObserversCount()).toBe(1);
     expect(client.getQueryCache().findAll({ queryKey: ["work-sidebar", "pull-requests", "health"] })[0]?.getObserversCount()).toBe(2);
+    expect(client.getQueryCache().find({ queryKey: queryKeys.sidebar.tasks.list() })?.getObserversCount()).toBe(2);
+    expect(client.getQueryCache().find({ queryKey: queryKeys.sidebar.tasks.links() })?.getObserversCount()).toBe(1);
     left.unmount();
     right.unmount();
     expect(unmount).toHaveBeenCalledTimes(2);
     expect(client.getQueryCache().getAll().every((query) => query.getObserversCount() === 0)).toBe(true);
     client.clear();
+    expect(client.getQueryCache().getAll()).toEqual([]);
+  });
+});
+
+describe("R6 mounted Tasks reads", () => {
+  it("dedupes the shared task read across real left/right slots and cleans observers", async () => {
+    const app = await loadPluginApp(() => import("../../app"));
+    const client = getPluginQueryClient();
+    client.clear();
+    const rpc = {
+      sidebarTasks: () => ({ available: true, tasks: [], projects: [], error: null }),
+      sidebarTaskLinks: () => ({ available: true, links: {}, error: null }),
+    } as never;
+    const left = renderSlot(app.threadLists[0]!, { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => undefined, searchQuery: "", Original: () => null }, { rpc });
+    const right = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_test", params: null }, { rpc });
+    await waitFor(() => expect(left.inspection.rpcCalls.filter((call) => call.method === "sidebarTasks")).toHaveLength(1));
+    expect(left.inspection.rpcCalls.filter((call) => call.method === "sidebarTaskLinks")).toHaveLength(1);
+    expect(right.inspection.rpcCalls.filter((call) => call.method === "sidebarTasks")).toHaveLength(0);
+    left.lifecycle.unmount(); right.lifecycle.unmount();
+    expect(client.getQueryCache().getAll().every((query) => query.getObserversCount() === 0)).toBe(true);
+    client.clear();
+  });
+
+  it("polls only task links every 30 seconds", async () => {
+    vi.useFakeTimers();
+    const app = await loadPluginApp(() => import("../../app"));
+    const client = getPluginQueryClient(); client.clear();
+    const slot = renderSlot(app.threadLists[0]!, { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => undefined, searchQuery: "", Original: () => null }, { rpc: { sidebarTasks: () => ({ available: true, tasks: [], projects: [], error: null }), sidebarTaskLinks: () => ({ available: true, links: {}, error: null }) } as never });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(slot.inspection.rpcCalls.filter((call) => call.method === "sidebarTaskLinks")).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(slot.inspection.rpcCalls.filter((call) => call.method === "sidebarTaskLinks")).toHaveLength(2);
+    slot.lifecycle.unmount(); client.clear(); vi.useRealTimers();
   });
 });

@@ -1,34 +1,13 @@
 import { z } from "zod";
 import { authoredPullRequest, pullRequest, pullRequestSignal, sidebarStack, sidebarStackLayer } from "./features/pull-requests/schemas.js";
+import { sidebarTaskProjectSchema, sidebarTaskSchema, taskLinkSchema, taskPrioritySchema, taskStatusSchema, taskSummarySchema } from "./features/tasks/schemas.js";
 
-const taskStatus = z.enum(["backlog", "todo", "in_progress", "in_review", "done", "canceled"]);
-const taskPriority = z.enum(["urgent", "high", "medium", "low", "none"]);
-const taskSummary = z.object({
-  id: z.string(),
-  projectId: z.string(),
-  projectName: z.string(),
-  key: z.string(),
-  title: z.string(),
-  status: taskStatus,
-  priority: taskPriority,
-  dueDate: z.string().nullable(),
-  parentTaskId: z.string().nullable(),
-});
-const sidebarTask = taskSummary.extend({
-  position: z.number().optional(),
-  linkedThreadIds: z.array(z.string()),
-  assignee: z.enum(["agent", "human"]),
-});
-const sidebarTaskProject = z.object({ id: z.string(), name: z.string() });
-const taskLink = z.object({
-  task: taskSummary,
-  threadId: z.string(),
-  liveStatus: z.enum(["starting", "working", "idle", "completed", "failed"]),
-  role: z.enum(["outcome", "execution"]),
-  mode: z.enum(["direct", "delegated"]).nullable(),
-  idempotencyKey: z.string().nullable(),
-  dispatchState: z.enum(["ready", "pending_spawn", "pending_attachment", "recovery_required"]).nullable(),
-});
+const taskStatus = taskStatusSchema;
+const taskPriority = taskPrioritySchema;
+const taskSummary = taskSummarySchema;
+const sidebarTask = sidebarTaskSchema;
+const sidebarTaskProject = sidebarTaskProjectSchema;
+const taskLink = taskLinkSchema;
 const binding = z.object({
   rootThreadId: z.string(),
   outcomeTaskId: z.string(),

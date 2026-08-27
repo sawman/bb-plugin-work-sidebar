@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   definePluginApp,
   useBbNavigate,
@@ -66,11 +67,11 @@ import { Icon } from "@/components/ui/icon";
 import { githubHealthPresentation, pullRequestPresentation } from "@/features/pull-requests/presentation";
 import { invalidateThreadPullRequestChanges, useAuthoredPullRequests, useGitHubApiHealth, useSetAuthoredPullRequestDraft, useThreadPullRequestChanges } from "@/features/pull-requests/queries";
 import { PullRequestChangesError, pullRequestChangesHeaderLabel } from "@/features/pull-requests/views";
-import { useQueryClient } from "@tanstack/react-query";
+import { useTaskLinksRead, useTasksRead, useTasksRealtimeInvalidation } from "@/features/tasks/queries";
 import "./app.css";
 import "./scrollbar.css";
 import "./views.css";
-import { PluginProviders } from "./query-runtime";
+import { PluginProviders, queryKeys } from "./query-runtime";
 
 const SIDEBAR_ORDER_CHANNEL = "sidebar-order:changed";
 type SidebarThreadGroup = { id: string; name: string; threadIds: string[] };
@@ -486,8 +487,12 @@ function WorkThreadList(props: PluginThreadListProps) {
   const { status, threads, projects } = experimental_useSidebarThreads();
   const actions = experimental_useSidebarThreadActions();
   const rpc = useRpc<typeof rpcContract>();
+  const queryClient = useQueryClient();
+  const { data: tasksData, isPending: tasksPending, isError: tasksFailed, error: tasksReadError, refetch: refetchTasks } = useTasksRead();
+  const { data: taskLinksData, refetch: refetchTaskLinks } = useTaskLinksRead();
+  useTasksRealtimeInvalidation();
   const { values: pluginSettings } = useSettings();
-  const [taskLinks, setTaskLinks] = useState<Record<string, ThreadTaskLink[]>>({});
+  const taskLinks = taskLinksData?.links ?? {};
   const [view, setView] = useState<SidebarView>("work");
   const [threadListMode, setThreadListMode] = useState<"enhanced" | "native">("enhanced");
   const [threadSettingsOpen, setThreadSettingsOpen] = useState(false);
@@ -496,22 +501,23 @@ function WorkThreadList(props: PluginThreadListProps) {
   const [archivedThreads, setArchivedThreads] = useState<ArchivedThread[]>([]);
   const [archivedThreadState, setArchivedThreadState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [archivedThreadError, setArchivedThreadError] = useState<string | null>(null);
-  const [tasks, setTasks] = useState<SidebarTask[]>([]);
-  const [taskProjects, setTaskProjects] = useState<SidebarTaskProject[]>([]);
-  const [taskState, setTaskState] = useState<"loading" | "ready" | "error">("loading");
-  const [taskError, setTaskError] = useState<string | null>(null);
+  const tasks = tasksData?.tasks ?? [];
+  // Query cache is canonical, but this mirrors the last observed record set
+  // while a query is between observer updates. Mutation snapshots always read
+  // the cache first so a callback never rolls back a render-time stale list.
+  const tasksRef = useRef<SidebarTask[]>(tasks);
+  const taskProjects = tasksData?.projects ?? [];
+  const taskState = tasksPending ? "loading" : tasksFailed ? "error" : "ready";
+  const taskError = tasksFailed ? tasksReadError.message : null;
   const [taskComposerOpen, setTaskComposerOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskProjectId, setNewTaskProjectId] = useState("");
   const [newTaskAssignee, setNewTaskAssignee] = useState<SidebarTask["assignee"]>("human");
   const [creatingTask, setCreatingTask] = useState(false);
-  const tasksRef = useRef<SidebarTask[]>([]);
   const taskMutation = useRef(0);
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
   const [taskDropTarget, setTaskDropTarget] = useState<{ taskId: string; placement: "before" | "after" } | null>(null);
-  const taskLinksRequest = useRef(0);
-  const tasksRequest = useRef(0);
   const orderRequest = useRef(0);
   const orderMutation = useRef(0);
   const orderRef = useRef<string[]>([]);
@@ -629,16 +635,7 @@ function WorkThreadList(props: PluginThreadListProps) {
     }
   }, [applyOrder, rpc, threads]);
 
-  const refreshTaskLinks = useCallback(async () => {
-    const request = ++taskLinksRequest.current;
-    try {
-      const result = await rpc.call("sidebarTaskLinks", null);
-      if (request !== taskLinksRequest.current) return;
-      setTaskLinks(result.links);
-    } catch {
-      if (request === taskLinksRequest.current) setTaskLinks({});
-    }
-  }, [rpc]);
+  const refreshTaskLinks = useCallback(async () => { await refetchTaskLinks(); }, [refetchTaskLinks]);
   const refreshThreadDetails = useCallback(async () => {
     void refreshSidebarOrder();
     void refreshThreadGroups();
@@ -646,105 +643,91 @@ function WorkThreadList(props: PluginThreadListProps) {
     void refreshArchivedThreads(true);
     setSubtextRefreshKey((current) => current + 1);
   }, [refreshArchivedThreads, refreshThreadGroups, refreshSidebarOrder, refreshTaskLinks]);
+  const refreshTasks = useCallback(async () => { await refetchTasks(); }, [refetchTasks]);
   useEffect(() => {
-    void refreshTaskLinks();
-    const timer = window.setInterval(() => void refreshTaskLinks(), 30_000);
-    return () => { taskLinksRequest.current += 1; window.clearInterval(timer); };
-  }, [refreshTaskLinks]);
-  const refreshTasks = useCallback(async () => {
-    const request = ++tasksRequest.current;
-    setTaskState("loading");
-    try {
-      const result = await rpc.call("sidebarTasks", null);
-      if (request !== tasksRequest.current) return;
-      if (!result.available) throw new Error(result.error ?? "The official BB Tasks plugin is unavailable.");
-      tasksRef.current = result.tasks; setTasks(result.tasks); setTaskProjects(result.projects); setNewTaskProjectId((current) => current && result.projects.some((project) => project.id === current) ? current : result.projects[0]?.id ?? ""); setTaskError(null); setTaskState("ready");
-    } catch (error) {
-      if (request !== tasksRequest.current) return;
-      setTasks([]); setTaskProjects([]); setTaskError(error instanceof Error ? error.message : "Could not load tasks"); setTaskState("error");
-    }
-  }, [rpc]);
-  useEffect(() => {
-    // Preload Tasks alongside PRs so changing sidebar tabs is immediate.
-    void refreshTasks();
-    return () => { tasksRequest.current += 1; };
-  }, [refreshTasks]);
+    if (!tasksData) return;
+    tasksRef.current = tasksData.tasks;
+    setNewTaskProjectId((current) => current && tasksData.projects.some((project) => project.id === current) ? current : tasksData.projects[0]?.id ?? "");
+  }, [tasksData]);
+  const currentTaskSnapshot = useCallback(() => queryClient.getQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list())?.tasks ?? tasksRef.current, [queryClient]);
 
   const updateTaskStatus = useCallback(async (taskId: string, status: SidebarTask["status"]) => {
-    const previous = tasksRef.current;
+    const previous = currentTaskSnapshot();
     const current = previous.find((task) => task.id === taskId);
     if (!current || current.status === status) return;
     const mutation = ++taskMutation.current;
     const optimistic = previous.map((task) => task.id === taskId ? { ...task, status } : task);
-    tasksRef.current = optimistic; setTasks(optimistic); setUpdatingTaskId(taskId);
+    tasksRef.current = optimistic; queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: optimistic } : data); setUpdatingTaskId(taskId);
     try { await rpc.call("updateTaskStatus", { taskId, status }); if (mutation === taskMutation.current) await refreshTasks(); }
-    catch (error) { if (mutation === taskMutation.current) { tasksRef.current = previous; setTasks(previous); toast.error(error instanceof Error ? error.message : "Could not update task"); } }
+    catch (error) { if (mutation === taskMutation.current) { tasksRef.current = previous; queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: previous } : data); toast.error(error instanceof Error ? error.message : "Could not update task"); } }
     finally { if (mutation === taskMutation.current) setUpdatingTaskId(null); }
-  }, [refreshTasks, rpc]);
+  }, [currentTaskSnapshot, queryClient, refreshTasks, rpc]);
   const updateTaskAssignee = useCallback(async (taskId: string, assignee: SidebarTask["assignee"]) => {
-    const previous = tasksRef.current;
+    const previous = currentTaskSnapshot();
     const optimistic = previous.map((task) => task.id === taskId ? { ...task, assignee } : task);
-    tasksRef.current = optimistic; setTasks(optimistic);
+    tasksRef.current = optimistic; queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: optimistic } : data);
     try { await rpc.call("updateTaskAssignee", { taskId, assignee }); }
-    catch (error) { tasksRef.current = previous; setTasks(previous); toast.error(error instanceof Error ? error.message : "Could not update task assignee"); }
-  }, [rpc]);
+    catch (error) { tasksRef.current = previous; queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: previous } : data); toast.error(error instanceof Error ? error.message : "Could not update task assignee"); }
+  }, [currentTaskSnapshot, queryClient, rpc]);
   const createSidebarTask = useCallback(async () => {
     const title = newTaskTitle.trim();
     if (!title || !newTaskProjectId || creatingTask) return;
     setCreatingTask(true);
     try {
       const { task } = await rpc.call("createSidebarTask", { projectId: newTaskProjectId, title, assignee: newTaskAssignee });
-      tasksRef.current = [...tasksRef.current, task]; setTasks(tasksRef.current);
+      const next = [...currentTaskSnapshot(), task]; tasksRef.current = next;
+      queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: next } : data);
       setNewTaskTitle(""); setTaskComposerOpen(false);
       void refreshTasks();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not create task");
     } finally { setCreatingTask(false); }
-  }, [creatingTask, newTaskAssignee, newTaskProjectId, newTaskTitle, refreshTasks, rpc]);
+  }, [creatingTask, currentTaskSnapshot, newTaskAssignee, newTaskProjectId, newTaskTitle, queryClient, refreshTasks, rpc]);
   const deleteSidebarTask = useCallback(async (task: SidebarTask) => {
     if (!window.confirm(`Delete ${task.key}: ${task.title}? This cannot be undone.`)) return;
-    const previous = tasksRef.current;
-    tasksRef.current = previous.filter((candidate) => candidate.id !== task.id); setTasks(tasksRef.current);
+    const previous = currentTaskSnapshot();
+    const optimistic = previous.filter((candidate) => candidate.id !== task.id); tasksRef.current = optimistic;
+    queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: optimistic } : data);
     try {
       const { deleted } = await rpc.call("deleteSidebarTask", { taskId: task.id });
       if (!deleted) throw new Error("Task was not found.");
       setSelectedTaskIds((current) => { const next = new Set(current); next.delete(task.id); return next; });
     } catch (error) {
-      tasksRef.current = previous; setTasks(previous);
+      tasksRef.current = previous; queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: previous } : data);
       toast.error(error instanceof Error ? error.message : "Could not delete task");
     }
-  }, [rpc]);
+  }, [currentTaskSnapshot, queryClient, rpc]);
   const updateTaskThreadAttachment = useCallback(async (taskId: string, threadId: string, attached: boolean) => {
-    const previous = tasksRef.current;
+    const previous = currentTaskSnapshot();
     const optimistic = previous.map((task) => task.id !== taskId ? task : { ...task, linkedThreadIds: attached ? [...new Set([...task.linkedThreadIds, threadId])] : task.linkedThreadIds.filter((id) => id !== threadId) });
-    tasksRef.current = optimistic; setTasks(optimistic);
+    tasksRef.current = optimistic; queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: optimistic } : data);
     try {
       await rpc.call(attached ? "attachTaskToThread" : "detachTaskFromThread", { taskId, threadId });
     } catch (error) {
-      tasksRef.current = previous; setTasks(previous);
+      tasksRef.current = previous; queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: previous } : data);
       toast.error(error instanceof Error ? error.message : `Could not ${attached ? "attach" : "detach"} task`);
     }
-  }, [rpc]);
+  }, [currentTaskSnapshot, queryClient, rpc]);
 
   const persistTaskReorder = useCallback(async (sourceId: string, targetId: string, placement: "before" | "after") => {
     if (props.searchQuery.trim()) return;
-    const previous = tasksRef.current;
+    const previous = currentTaskSnapshot();
     const neighbors = taskReorderNeighbors(previous, sourceId, targetId, placement);
     if (!neighbors) return;
     const optimistic = reorderTaskSiblings(previous, sourceId, targetId, placement);
     const mutation = ++taskMutation.current;
-    tasksRef.current = optimistic; setTasks(optimistic); setTaskDropTarget(null); setDragTaskId(null);
+    tasksRef.current = optimistic; queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: optimistic } : data); setTaskDropTarget(null); setDragTaskId(null);
     try { await rpc.call("reorderTask", { taskId: sourceId, ...neighbors }); if (mutation === taskMutation.current) await refreshTasks(); }
-    catch (error) { if (mutation === taskMutation.current) { tasksRef.current = previous; setTasks(previous); toast.error(error instanceof Error ? error.message : "Could not save task order"); } }
-  }, [props.searchQuery, refreshTasks, rpc]);
+    catch (error) { if (mutation === taskMutation.current) { tasksRef.current = previous; queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (data) => data ? { ...data, tasks: previous } : data); toast.error(error instanceof Error ? error.message : "Could not save task order"); } }
+  }, [currentTaskSnapshot, props.searchQuery, queryClient, refreshTasks, rpc]);
 
   const moveTask = useCallback((taskId: string, direction: -1 | 1) => {
-    const task = tasksRef.current.find((candidate) => candidate.id === taskId);
+    const task = tasks.find((candidate) => candidate.id === taskId);
     if (!task) return;
-    const peers = tasksRef.current.filter((candidate) => candidate.projectId === task.projectId && candidate.status === task.status && candidate.parentTaskId === task.parentTaskId).sort((left, right) => (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER));
+    const peers = tasks.filter((candidate) => candidate.projectId === task.projectId && candidate.status === task.status && candidate.parentTaskId === task.parentTaskId).sort((left, right) => (left.position ?? Number.MAX_SAFE_INTEGER) - (right.position ?? Number.MAX_SAFE_INTEGER));
     const target = peers[peers.findIndex((candidate) => candidate.id === taskId) + direction];
     if (target) void persistTaskReorder(taskId, target.id, direction < 0 ? "before" : "after");
-  }, [persistTaskReorder]);
+  }, [persistTaskReorder, tasks]);
 
   const projectNames = useMemo(() => Object.fromEntries(projects.map((project) => [project.id, project.name])), [projects]);
   const effectiveOrder = useMemo(() => reconcileThreadOrder(threadOrder, threads), [threadOrder, threads]);
@@ -953,8 +936,8 @@ function WorkThreadList(props: PluginThreadListProps) {
       <div className="ws-list-toolbar">{viewToolbar}</div>
       {view === "queue" && <div className="ws-view-content">
         {taskComposerOpen && <form className="ws-task-composer" onSubmit={(event) => { event.preventDefault(); void createSidebarTask(); }}><Input autoFocus value={newTaskTitle} placeholder="Task title" onChange={(event) => setNewTaskTitle(event.target.value)} /><Combobox value={newTaskProjectId} options={taskProjects.map((project) => ({ value: project.id, label: project.name }))} onChange={setNewTaskProjectId} placeholder="Project" ariaLabel="Task project" /><Combobox value={newTaskAssignee} options={[{ value: "human", label: "Human" }, { value: "agent", label: "Agent" }]} onChange={(value) => setNewTaskAssignee(value as SidebarTask["assignee"])} placeholder="Assignee" ariaLabel="Task assignee" /><button type="submit" disabled={!newTaskTitle.trim() || !newTaskProjectId || creatingTask}>{creatingTask ? "Adding…" : "Add"}</button><button type="button" onClick={() => setTaskComposerOpen(false)}>Cancel</button></form>}
-        {taskState === "loading" && <div className="ws-empty">Loading tasks…</div>}
-        {taskState === "error" && <div className="ws-callout">{taskError ?? "Could not load tasks."}<button onClick={() => void refreshTasks()}>Try again</button></div>}
+        {taskState === "loading" && <div className="ws-empty" role="status" aria-live="polite" aria-busy="true">Loading tasks…</div>}
+        {taskState === "error" && <div className="ws-callout" role="alert">{taskError ?? "Could not load tasks."}<button onClick={() => void refreshTasks()}>Try again</button></div>}
         {taskState === "ready" && taskQueue.map((node) => <SidebarTaskRow key={node.task.id} node={node} siblings={taskQueue} showProject={(taskKeys.get(node.task.key) ?? 0) > 1} reorderDisabled={reorderDisabled} dragTaskId={dragTaskId} dropTarget={taskDropTarget} onDragTaskChange={setDragTaskId} onDragTargetChange={(taskId, placement) => setTaskDropTarget(taskId && placement ? { taskId, placement } : null)} onDropTask={(sourceId, targetId, placement) => void persistTaskReorder(sourceId, targetId, placement)} onMoveTask={moveTask} onOpenThread={navigateToThread} onUpdateStatus={updateTaskStatus} onUpdateAssignee={updateTaskAssignee} onDelete={deleteSidebarTask} activeThreadId={props.activeThreadId} activeThreadTitle={activeSidebarThread ? threadTitle(activeSidebarThread) : null} onAttachToThread={(taskId, threadId) => updateTaskThreadAttachment(taskId, threadId, true)} onDetachFromThread={(taskId, threadId) => updateTaskThreadAttachment(taskId, threadId, false)} updatingTaskId={updatingTaskId} selectedTaskIds={selectedTaskIds} onSelect={selectTask} />)}
         {taskState === "ready" && filteredTasks.length === 0 && <div className="ws-empty">{props.searchQuery ? `No tasks match “${props.searchQuery}”.` : "No active tasks."}</div>}
       </div>}
@@ -1071,8 +1054,9 @@ function WorkAgentRow({ child, bindings }: { child: WorkPanelChild; bindings: re
 
 function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const rpc = useRpc<typeof rpcContract>();
-  const { values: pluginSettings } = useSettings();
+  const { data: tasksData, isPending: tasksReadPending, isError: tasksReadFailed, error: tasksReadError, refetch: refetchTasks } = useTasksRead();
   const queryClient = useQueryClient();
+  const { values: pluginSettings } = useSettings();
   const pullRequestChanges = useThreadPullRequestChanges(rpc, threadId, {
     visiblePollMs: Number(pluginSettings?.githubActivePollSeconds ?? "60") * 1_000,
     backgroundPollMs: Number(pluginSettings?.githubBackgroundPollSeconds ?? "300") * 1_000,
@@ -1099,8 +1083,6 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const [taskTitle, setTaskTitle] = useState("");
   const [createTaskState, setCreateTaskState] = useState<"idle" | "working" | "error">("idle");
   const [createTaskError, setCreateTaskError] = useState<string | null>(null);
-  const [availableTasks, setAvailableTasks] = useState<SidebarTask[]>([]);
-  const [threadTasksLoading, setThreadTasksLoading] = useState(false);
   const [selectedAttachTaskId, setSelectedAttachTaskId] = useState("");
   const [threadTaskBusyId, setThreadTaskBusyId] = useState<string | null>(null);
   const [linearBusy, setLinearBusy] = useState(false);
@@ -1182,15 +1164,6 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
     void refreshProviderHealth();
     return () => { requestId.current += 1; changesRequestId.current += 1; trackerRequestId.current += 1; providerHealthRequestId.current += 1; };
   }, [refresh, refreshChanges, refreshProviderHealth, refreshTracker, threadId]);
-  const refreshThreadTasks = useCallback(async () => {
-    setThreadTasksLoading(true);
-    try {
-      const result = await rpc.call("sidebarTasks", null);
-      if (result.available) setAvailableTasks(result.tasks);
-    } catch { /* The main Work context keeps its own Tasks availability state. */ }
-    finally { setThreadTasksLoading(false); }
-  }, [rpc]);
-  useEffect(() => { void refreshThreadTasks(); }, [refreshThreadTasks, threadId]);
   useRealtime("work-sidebar:changed", () => { void refresh(true); void refreshChanges(true); void refreshTracker(true); void refreshProviderHealth(); void invalidateThreadPullRequestChanges(queryClient, threadId); });
   useEffect(() => {
     const interval = window.setInterval(() => { void refreshProviderHealth(); }, 30_000);
@@ -1241,7 +1214,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
     setThreadTaskBusyId(taskId);
     try {
       await rpc.call(attached ? "attachTaskToThread" : "detachTaskFromThread", { taskId, threadId });
-      setAvailableTasks((current) => current.map((task) => task.id !== taskId ? task : { ...task, linkedThreadIds: attached ? [...new Set([...task.linkedThreadIds, threadId])] : task.linkedThreadIds.filter((id) => id !== threadId) }));
+      queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (current) => current ? { ...current, tasks: current.tasks.map((task) => task.id !== taskId ? task : { ...task, linkedThreadIds: attached ? [...new Set([...task.linkedThreadIds, threadId])] : task.linkedThreadIds.filter((id) => id !== threadId) }) } : current);
       setSelectedAttachTaskId("");
     } catch (error) { toast.error(error instanceof Error ? error.message : `Could not ${attached ? "attach" : "detach"} task`); }
     finally { setThreadTaskBusyId(null); }
@@ -1251,7 +1224,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
     setThreadTaskBusyId(taskId);
     try {
       await rpc.call("updateTaskAssignee", { taskId, assignee });
-      setAvailableTasks((current) => current.map((task) => task.id === taskId ? { ...task, assignee } : task));
+      queryClient.setQueryData<typeof tasksData>(queryKeys.sidebar.tasks.list(), (current) => current ? { ...current, tasks: current.tasks.map((task) => task.id === taskId ? { ...task, assignee } : task) } : current);
     } catch (error) { toast.error(error instanceof Error ? error.message : "Could not update task assignee"); }
     finally { setThreadTaskBusyId(null); }
   };
@@ -1274,6 +1247,8 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const tabPanelId = `ws-panel-${selectedTab.id}`;
   const outcomeTask = context?.outcome ?? context?.tasks[0] ?? null;
   const executionTasks = context?.executionTasks?.length ? context.executionTasks : (context?.subtasks ?? []);
+  const availableTasks = tasksData?.tasks ?? [];
+  const threadTasksLoading = !tasksData;
   const threadTasks = availableTasks.filter((task) => task.linkedThreadIds.includes(threadId));
   const attachableTasks = availableTasks.filter((task) => !task.linkedThreadIds.includes(threadId));
   const bindings = context?.bindings ?? [];
@@ -1338,7 +1313,9 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
             <header><div><h2>Work</h2></div><span className="ws-work-header-badges">{outcomeTask && <span className="ws-work-header-badge" title={`${outcomeTask.key} · ${outcomeTask.title}`}>{outcomeTask.key}</span>}{!trackerLoading && context.tracker.item && <a className="ws-work-header-badge ws-linear-header-badge" href={context.tracker.item.url} target="_blank" rel="noreferrer" title={`${context.tracker.item.key} · ${context.tracker.item.title}`}>{context.tracker.item.key}</a>}</span></header>
             {trackerLoading ? <article className="ws-card ws-empty-state-card" aria-busy="true"><div className="ws-card-heading"><strong>Linear</strong></div><p className="ws-card-note">Loading linked work…</p></article> : <LinearCard context={context} linking={linearBusy} onLink={(key) => void linkLinear(key)} onUnlink={() => void unlinkLinear()} onMove={(statusId) => void moveLinear(statusId)} onSearch={searchLinear} />}
             {!context.tasksAvailable && <article className="ws-card ws-empty-state-card"><div className="ws-card-heading"><strong>Tasks</strong></div><p className="ws-card-note">Tasks are unavailable right now.</p><button type="button" className="ws-compact-action" onClick={() => void refresh()}>Check again</button></article>}
-            {context.tasksAvailable && <WorkCard className="ws-thread-task-card"><WorkCardHeading title="Tasks" trailing={<span className="ws-section-count">{threadTasks.length + executionTasks.length}</span>} />{threadTasks.length > 0 && <div className="ws-work-card-list">{threadTasks.map((task) => <div key={task.id} className="ws-work-card-row"><span className="ws-work-card-key">{task.key}</span><span className="ws-work-card-copy">{task.title}</span><AssigneePicker value={task.assignee} disabled={threadTaskBusyId === task.id} onChange={(assignee) => void updateThreadTaskAssignee(task.id, assignee)} /><button type="button" disabled={threadTaskBusyId === task.id} onClick={() => void updateThreadTaskAttachment(task.id, false)} aria-label={`Detach ${task.key} from this thread`} title="Detach from this thread"><Icon name="X" aria-hidden /></button></div>)}</div>}<div className="ws-work-card-control"><Combobox value={selectedAttachTaskId} disabled={threadTasksLoading || Boolean(threadTaskBusyId)} options={attachableTasks.map((task) => ({ value: task.id, label: task.key, detail: task.title }))} onChange={setSelectedAttachTaskId} placeholder="Add an existing task…" ariaLabel="Add task to this thread" /><button type="button" disabled={!selectedAttachTaskId || Boolean(threadTaskBusyId)} onClick={() => void updateThreadTaskAttachment(selectedAttachTaskId, true)}>{threadTaskBusyId ? "…" : "Add"}</button></div>{executionTasks.length > 0 && <div className="ws-work-card-list ws-work-card-list-separated" aria-label="Execution tasks">{executionTasks.map((task) => { const binding = bindings.find((candidate) => candidate.executionTaskId === task.id); return <div key={task.id} className="ws-work-card-row"><span className={`ws-status-dot ws-status-dot-${task.status}`}>{task.status === "done" ? "✓" : "•"}</span><span className="ws-work-card-copy"><strong>{task.title}</strong><small>{task.key} · {readableStatus(task.status)}{binding?.mode ? ` · ${readableStatus(binding.mode)}` : ""}</small></span></div>; })}</div>}</WorkCard>}
+            {context.tasksAvailable && tasksReadPending && <article className="ws-card ws-empty-state-card" role="status" aria-live="polite" aria-busy="true"><div className="ws-card-heading"><strong>Tasks</strong></div><p className="ws-card-note">Loading tasks…</p></article>}
+            {context.tasksAvailable && tasksReadFailed && <article className="ws-card ws-empty-state-card" role="alert"><div className="ws-card-heading"><strong>Tasks</strong></div><p className="ws-card-note">{tasksReadError.message}</p><button type="button" className="ws-compact-action" onClick={() => void refetchTasks()}>Try again</button></article>}
+            {context.tasksAvailable && !tasksReadPending && !tasksReadFailed && <WorkCard className="ws-thread-task-card"><WorkCardHeading title="Tasks" trailing={<span className="ws-section-count">{threadTasks.length + executionTasks.length}</span>} />{threadTasks.length > 0 ? <div className="ws-work-card-list">{threadTasks.map((task) => <div key={task.id} className="ws-work-card-row"><span className="ws-work-card-key">{task.key}</span><span className="ws-work-card-copy">{task.title}</span><AssigneePicker value={task.assignee} disabled={threadTaskBusyId === task.id} onChange={(assignee) => void updateThreadTaskAssignee(task.id, assignee)} /><button type="button" disabled={threadTaskBusyId === task.id} onClick={() => void updateThreadTaskAttachment(task.id, false)} aria-label={`Detach ${task.key} from this thread`} title="Detach from this thread"><Icon name="X" aria-hidden /></button></div>)}</div> : <p className="ws-card-note">No tasks are attached to this thread.</p>}<div className="ws-work-card-control"><Combobox value={selectedAttachTaskId} disabled={threadTasksLoading || Boolean(threadTaskBusyId)} options={attachableTasks.map((task) => ({ value: task.id, label: task.key, detail: task.title }))} onChange={setSelectedAttachTaskId} placeholder="Add an existing task…" ariaLabel="Add task to this thread" /><button type="button" disabled={!selectedAttachTaskId || Boolean(threadTaskBusyId)} onClick={() => void updateThreadTaskAttachment(selectedAttachTaskId, true)}>{threadTaskBusyId ? "…" : "Add"}</button></div>{executionTasks.length > 0 && <div className="ws-work-card-list ws-work-card-list-separated" aria-label="Execution tasks">{executionTasks.map((task) => { const binding = bindings.find((candidate) => candidate.executionTaskId === task.id); return <div key={task.id} className="ws-work-card-row"><span className={`ws-status-dot ws-status-dot-${task.status}`}>{task.status === "done" ? "✓" : "•"}</span><span className="ws-work-card-copy"><strong>{task.title}</strong><small>{task.key} · {readableStatus(task.status)}{binding?.mode ? ` · ${readableStatus(binding.mode)}` : ""}</small></span></div>; })}</div>}</WorkCard>}
             {outcomeTask && (
               <article key={outcomeTask.id} className="ws-card ws-outcome-card">
                 <div className="ws-card-heading"><strong>Outcome</strong><span className="ws-task-card-icons">{outcomeTask.priority !== "none" && <span className="ws-pr-tooltip" data-tooltip={`${readableStatus(outcomeTask.priority)} priority`}><Icon name="AlertCircle" className={`ws-priority-icon ws-priority-${outcomeTask.priority}`} aria-label={`${readableStatus(outcomeTask.priority)} priority`} /></span>}</span></div>
