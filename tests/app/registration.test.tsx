@@ -31,8 +31,7 @@ describe("R2 app registration and Query lifecycle", () => {
     pluginInteractionStore.getState().setSelectedWorkTab("work");
 
     // The harness mounts slots independently, matching BB's left/right slot
-    // ownership. These registrations only provide the runtime foundation in
-    // R2, so neither creates an observer, timer, or subscription yet.
+    // ownership. R6 makes both surfaces observe the shared Tasks records.
     const client = getPluginQueryClient();
     const mount = vi.spyOn(client, "mount");
     const unmount = vi.spyOn(client, "unmount");
@@ -42,10 +41,13 @@ describe("R2 app registration and Query lifecycle", () => {
     });
     const right = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_test", params: null });
     expect(mount).toHaveBeenCalledTimes(2);
-    expect(client.getQueryCache().getAll()).toEqual([]);
+    expect(client.getQueryCache().getAll().map((query) => query.queryKey)).toEqual([
+      queryKeys.sidebar.tasks.list(), queryKeys.sidebar.tasks.links(),
+    ]);
     left.unmount();
     right.unmount();
     expect(unmount).toHaveBeenCalledTimes(2);
+    client.clear();
     expect(client.getQueryCache().getAll()).toEqual([]);
   });
 });

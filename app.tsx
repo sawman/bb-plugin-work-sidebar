@@ -64,6 +64,7 @@ import {
 } from "./work-model";
 import { Icon } from "@/components/ui/icon";
 import { githubHealthPresentation, pullRequestPresentation } from "@/features/pull-requests/presentation";
+import { useTaskLinksRead, useTasksRead } from "@/features/tasks/queries";
 import "./app.css";
 import "./scrollbar.css";
 import "./views.css";
@@ -483,6 +484,8 @@ function WorkThreadList(props: PluginThreadListProps) {
   const { status, threads, projects } = experimental_useSidebarThreads();
   const actions = experimental_useSidebarThreadActions();
   const rpc = useRpc<typeof rpcContract>();
+  const tasksRead = useTasksRead();
+  const taskLinksRead = useTaskLinksRead();
   const { values: pluginSettings } = useSettings();
   const [taskLinks, setTaskLinks] = useState<Record<string, ThreadTaskLink[]>>({});
   const [view, setView] = useState<SidebarView>("work");
@@ -507,8 +510,6 @@ function WorkThreadList(props: PluginThreadListProps) {
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null);
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
   const [taskDropTarget, setTaskDropTarget] = useState<{ taskId: string; placement: "before" | "after" } | null>(null);
-  const taskLinksRequest = useRef(0);
-  const tasksRequest = useRef(0);
   const orderRequest = useRef(0);
   const orderMutation = useRef(0);
   const orderRef = useRef<string[]>([]);
@@ -635,16 +636,10 @@ function WorkThreadList(props: PluginThreadListProps) {
     }
   }, [applyOrder, rpc, threads]);
 
-  const refreshTaskLinks = useCallback(async () => {
-    const request = ++taskLinksRequest.current;
-    try {
-      const result = await rpc.call("sidebarTaskLinks", null);
-      if (request !== taskLinksRequest.current) return;
-      setTaskLinks(result.links);
-    } catch {
-      if (request === taskLinksRequest.current) setTaskLinks({});
-    }
-  }, [rpc]);
+  const refreshTaskLinks = useCallback(async () => { await taskLinksRead.refetch(); }, [taskLinksRead]);
+  useEffect(() => {
+    if (taskLinksRead.data) setTaskLinks(taskLinksRead.data.links);
+  }, [taskLinksRead.data]);
   const refreshThreadDetails = useCallback(async () => {
     void refreshSidebarOrder();
     void refreshThreadGroups();
@@ -652,11 +647,7 @@ function WorkThreadList(props: PluginThreadListProps) {
     void refreshArchivedThreads(true);
     setSubtextRefreshKey((current) => current + 1);
   }, [refreshArchivedThreads, refreshThreadGroups, refreshSidebarOrder, refreshTaskLinks]);
-  useEffect(() => {
-    void refreshTaskLinks();
-    const timer = window.setInterval(() => void refreshTaskLinks(), 30_000);
-    return () => { taskLinksRequest.current += 1; window.clearInterval(timer); };
-  }, [refreshTaskLinks]);
+  useEffect(() => { void refreshTaskLinks(); }, [refreshTaskLinks]);
   useEffect(() => {
     let cancelled = false;
     const loadAuthoredPullRequests = async (foreground: boolean, force = false) => {
@@ -683,24 +674,15 @@ function WorkThreadList(props: PluginThreadListProps) {
     const refreshTimer = window.setInterval(() => { void loadAuthoredPullRequests(false); }, Number(pluginSettings?.githubLeftListRefreshSeconds ?? "300") * 1_000);
     return () => { cancelled = true; window.clearInterval(refreshTimer); };
   }, [authoredPullRequestRefreshKey, pluginSettings?.githubLeftListRefreshSeconds, refreshGitHubApiHealth, rpc]);
-  const refreshTasks = useCallback(async () => {
-    const request = ++tasksRequest.current;
-    setTaskState("loading");
-    try {
-      const result = await rpc.call("sidebarTasks", null);
-      if (request !== tasksRequest.current) return;
-      if (!result.available) throw new Error(result.error ?? "The official BB Tasks plugin is unavailable.");
-      tasksRef.current = result.tasks; setTasks(result.tasks); setTaskProjects(result.projects); setNewTaskProjectId((current) => current && result.projects.some((project) => project.id === current) ? current : result.projects[0]?.id ?? ""); setTaskError(null); setTaskState("ready");
-    } catch (error) {
-      if (request !== tasksRequest.current) return;
-      setTasks([]); setTaskProjects([]); setTaskError(error instanceof Error ? error.message : "Could not load tasks"); setTaskState("error");
-    }
-  }, [rpc]);
+  const refreshTasks = useCallback(async () => { await tasksRead.refetch(); }, [tasksRead]);
   useEffect(() => {
-    // Preload Tasks alongside PRs so changing sidebar tabs is immediate.
-    void refreshTasks();
-    return () => { tasksRequest.current += 1; };
-  }, [refreshTasks]);
+    if (tasksRead.isPending) { setTaskState("loading"); return; }
+    if (tasksRead.isError) { setTaskError(tasksRead.error.message); setTaskState("error"); return; }
+    if (!tasksRead.data) return;
+    tasksRef.current = tasksRead.data.tasks; setTasks(tasksRead.data.tasks); setTaskProjects(tasksRead.data.projects);
+    setNewTaskProjectId((current) => current && tasksRead.data!.projects.some((project) => project.id === current) ? current : tasksRead.data!.projects[0]?.id ?? "");
+    setTaskError(null); setTaskState("ready");
+  }, [tasksRead.data, tasksRead.error, tasksRead.isError, tasksRead.isPending]);
 
   const updateTaskStatus = useCallback(async (taskId: string, status: SidebarTask["status"]) => {
     const previous = tasksRef.current;
@@ -1110,6 +1092,7 @@ function WorkAgentRow({ child, bindings }: { child: WorkPanelChild; bindings: re
 
 function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const rpc = useRpc<typeof rpcContract>();
+  const tasksRead = useTasksRead();
   const { values: pluginSettings } = useSettings();
   const navigate = useBbNavigate();
   const actions = experimental_useSidebarThreadActions();
@@ -1221,15 +1204,6 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
     void refreshGitHubApiHealth();
     return () => { requestId.current += 1; changesRequestId.current += 1; trackerRequestId.current += 1; providerHealthRequestId.current += 1; };
   }, [refresh, refreshChanges, refreshGitHubApiHealth, refreshProviderHealth, refreshTracker, threadId]);
-  const refreshThreadTasks = useCallback(async () => {
-    setThreadTasksLoading(true);
-    try {
-      const result = await rpc.call("sidebarTasks", null);
-      if (result.available) setAvailableTasks(result.tasks);
-    } catch { /* The main Work context keeps its own Tasks availability state. */ }
-    finally { setThreadTasksLoading(false); }
-  }, [rpc]);
-  useEffect(() => { void refreshThreadTasks(); }, [refreshThreadTasks, threadId]);
   useRealtime("work-sidebar:changed", () => { void refresh(true); void refreshChanges(true); void refreshTracker(true); void refreshProviderHealth(); void refreshGitHubApiHealth(); });
   useEffect(() => {
     const interval = window.setInterval(() => { void refreshProviderHealth(); }, 30_000);
@@ -1341,6 +1315,15 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const tabPanelId = `ws-panel-${selectedTab.id}`;
   const outcomeTask = context?.outcome ?? context?.tasks[0] ?? null;
   const executionTasks = context?.executionTasks?.length ? context.executionTasks : (context?.subtasks ?? []);
+  const refreshThreadTasks = useCallback(async () => {
+    setThreadTasksLoading(true);
+    try {
+      const result = await tasksRead.refetch();
+      if (result.data) setAvailableTasks(result.data.tasks);
+    } catch { /* The main Work context keeps its own Tasks availability state. */ }
+    finally { setThreadTasksLoading(false); }
+  }, [tasksRead]);
+  useEffect(() => { void refreshThreadTasks(); }, [refreshThreadTasks, threadId]);
   const threadTasks = availableTasks.filter((task) => task.linkedThreadIds.includes(threadId));
   const attachableTasks = availableTasks.filter((task) => !task.linkedThreadIds.includes(threadId));
   const bindings = context?.bindings ?? [];

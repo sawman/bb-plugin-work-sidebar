@@ -4,6 +4,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { normalizePullRequestSignal } from "./features/pull-requests/presentation.js";
 import { isVisibleAuthoredPullRequest } from "./features/pull-requests/presentation.js";
+import { readSidebarTasks } from "./features/tasks/server-read.js";
 import { rpcContract } from "./contracts.js";
 import { sanitizeThreadOrder, type SidebarStack } from "./work-model.js";
 import { createServerLifecycle, type GitHubApiHealth, type ServerLifecycle } from "./server-lifecycle.js";
@@ -1013,20 +1014,18 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
   }
 
   async function sidebarTasks() {
-    const [tasks, assignees] = await Promise.all([listAllTasks({ activeOnly: true, sort: "priority" }), readTaskAssignees()]);
-    const projects = (await tasksCall(
-      "listProjects", {}, z.object({ projects: z.array(projectSchema) }),
-    )).projects;
-    const projectNames = new Map(projects.map((project) => [project.id, project.name]));
-    const result = [];
-    for (const task of tasks) {
-      const threads = (await tasksCall(
-        "listTaskThreads", { taskId: task.id },
-        z.object({ taskThreads: z.array(taskThreadSchema) }),
-      )).taskThreads;
-      result.push(projectSidebarTask(task, projectNames.get(task.projectId) ?? "Work", threads.map((thread) => thread.threadId), assignees[task.id] ?? "human"));
-    }
-    return { tasks: result, projects: projects.map((project) => ({ id: project.id, name: project.name })) };
+    return readSidebarTasks({
+      listTasks: () => listAllTasks({ activeOnly: true, sort: "priority" }),
+      readAssignees: readTaskAssignees,
+      listProjects: tasksProjects,
+      listTaskThreads: async (taskId) => (await tasksCall("listTaskThreads", { taskId }, z.object({ taskThreads: z.array(taskThreadSchema) }))).taskThreads,
+      taskId: (task) => task.id,
+      projectId: (task) => task.projectId,
+      projectIdOf: (project) => project.id,
+      projectName: (project) => project.name,
+      threadId: (thread) => thread.threadId,
+      projectTask: projectSidebarTask,
+    });
   }
 
   async function readBindings(): Promise<WorkBindings> { return normalizeBindings(await bb.storage.kv.get<unknown>(WORK_BINDINGS_KEY)); }
