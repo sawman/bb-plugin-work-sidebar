@@ -52,9 +52,12 @@ Ownership details:
   groups, sibling order, and enhanced/native list mode.
 - BB owns panel/thread navigation. Zustand may own the plugin's
   Work/Changes/Agents tab and presentation-only selection/expansion state.
-- Zustand uses no persistence middleware. Per-thread entries are removed when
-  a thread leaves the active host roster and are additionally bounded by a
-  40-entry least-recently-used cap.
+- Zustand uses no persistence middleware. Per-thread presentation state that
+  must outlive the active left roster—such as a Work/Changes/Agents tab for an
+  archived thread that remains open in the right panel—is retained by the
+  40-entry least-recently-used cap and is not roster-pruned. Other
+  roster-scoped interaction state may be pruned when a thread leaves the
+  active host roster.
 
 Query policies are declared by key, not inherited accidentally from library
 defaults. GitHub queries do not retry client-side after server-classified
@@ -88,5 +91,6 @@ and performs one targeted invalidation after settle.
 - Polling settings map to query policies rather than independent intervals.
 - Persist only genuine preferences; never persist drag, hover, or mutation
   state.
-- Do not use Zustand `persist`; clean up per-thread entries and enforce the
-  bounded LRU.
+- Do not use Zustand `persist`; prune roster-scoped interaction entries and
+  enforce the bounded LRU for per-thread presentation state retained beyond the
+  active roster.

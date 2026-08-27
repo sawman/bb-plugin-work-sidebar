@@ -35,8 +35,8 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   const actions = experimental_useSidebarThreadActions();
   const queryClient = useQueryClient();
   const threadPreferences = useThreadPreferences();
-  // This controller is deliberately the sole global task-links observer.
-  // Every live WorkThreadTree receives its one shared query result below.
+  // Sole task-links observer, including native mode: Agents and WorkThreadTree share one
+  // cache and polling owner rather than creating per-consumer intervals.
   const { data: taskLinksData, refetch: refetchTaskLinks } = useTaskLinksRead();
   const unarchiveMutation = useUnarchiveSidebarThread();
   const [view, setView] = useState<SidebarView>("work");
