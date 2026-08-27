@@ -41,6 +41,32 @@ async function expectNoAriaViolations(container: HTMLElement) {
 afterEach(() => { cleanup(); getPluginQueryClient().clear(); vi.restoreAllMocks(); });
 
 describe("Tasks registered controls", () => {
+  it("keeps an open matching Combobox ARIA-valid with selected option semantics", async () => {
+    const { rendered } = await leftSlot();
+    fireEvent.click(rendered.getByRole("button", { name: "Add task" }));
+    const project = rendered.getByRole("combobox", { name: "Task project" });
+    fireEvent.focus(project);
+    fireEvent.change(project, { target: { value: "Work" } });
+    const option = await rendered.findByRole("option", { name: "Work" });
+    expect(option.getAttribute("aria-selected")).toBe("true");
+    await expectNoAriaViolations(rendered.container);
+    rendered.lifecycle.unmount();
+  });
+
+  it("rejects a listbox child that lacks the option role", async () => {
+    const malformed = document.createElement("div");
+    const listbox = document.createElement("div");
+    listbox.setAttribute("role", "listbox");
+    const option = document.createElement("button");
+    option.textContent = "Work";
+    option.setAttribute("aria-selected", "true");
+    listbox.append(option);
+    malformed.append(listbox);
+    document.body.append(malformed);
+    await expect(expectNoAriaViolations(malformed)).rejects.toThrow();
+    malformed.remove();
+  });
+
   it("keeps an open filtered Combobox ARIA-valid without an empty listbox or dangling controls", async () => {
     const { rendered } = await leftSlot();
     fireEvent.click(rendered.getByRole("button", { name: "Add task" }));

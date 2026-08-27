@@ -151,6 +151,20 @@ afterEach(() => {
 });
 
 describe("registered tracker card", () => {
+  it("keeps populated tracker suggestions ARIA-valid with selected option semantics", async () => {
+    const app = await loadPluginApp(() => import("../../../app"));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_populated_tracker", params: null },
+      { rpc: fixture() },
+    );
+    const option = await slot.findByRole("option");
+    expect(option.textContent).toContain("LIN-1");
+    expect(option.getAttribute("aria-selected")).toBe("false");
+    await expectNoAriaViolations(slot.container);
+    slot.lifecycle.unmount();
+  });
+
   it("keeps an available tracker with no suggestions ARIA-valid without an empty listbox", async () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
