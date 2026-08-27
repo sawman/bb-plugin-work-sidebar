@@ -1,6 +1,6 @@
 # ADR 0003: Build the UI from atomic, theme-aware primitives
 
-Status: Accepted
+Status: Superseded by 0005
 Date: 2026-08-27
 
 ## Context

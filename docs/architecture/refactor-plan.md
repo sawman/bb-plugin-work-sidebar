@@ -1,7 +1,7 @@
 # Work Sidebar vertical-slice refactor plan
 
-Status: Audited; authorized baseline checkpoint in progress
-Date: 2026-08-27
+Status: Integrated baseline; staged migration plan
+Date: 2026-08-28
 Scope: The complete Work Sidebar plugin, including both sidebars, contracts,
 server integrations, styling, state management, and tests.
 
@@ -16,7 +16,7 @@ the host already owns.
 This is a large architectural change delivered incrementally. Every slice must
 remain usable and verified while the next slice is migrated.
 
-## Current baseline
+## Historical pre-G0 audit snapshot (2026-08-27)
 
 The audit on 2026-08-27 found:
 
@@ -36,30 +36,54 @@ The audit on 2026-08-27 found:
   list, and the right Changes view.
 - The frontend manually implements caching, stale-data retention, request
   cancellation by counters, polling, mutation-busy state, and refetch fan-out.
-- Only seven pure-model tests exist. There are no frontend slot tests or server
-  RPC tests.
-- `npm test` and `npm run typecheck` pass. `bb plugin types --check` fails
+- The audit found only seven pure-model tests; there were no frontend slot
+  tests or server RPC tests at that point.
+- At that point, `npm test` and `npm run typecheck` passed, while
+  `bb plugin types --check` failed
   because the repository SDK/dependency layout is behind the running BB host.
 
 The complete recovered feature inventory and parity requirements live in
 `implementation-handoff.md`. That inventory is an acceptance catalog, not a
 second task queue.
 
-## Baseline checkpoint gate
+## Current integrated baseline (R22 review snapshot)
 
-The recovered working tree is the only complete product snapshot. Managed BB
-worktrees start from committed Git state and cannot see it. No code-editing
-child may start until the user approves a reproducible checkpoint.
+The recovered implementation and architecture package were integrated into
+canonical `main` at `f09c031f131b93b707c32a452b95ea2ab7a2414c` for the R22 review
+snapshot, with the annotated tag
+`checkpoint/work-sidebar-recovered-2026-08-27` available as the recovery
+checkpoint. Later commits may advance the branch; the owning BB Task and fresh
+validation output are authoritative for current state.
 
-The approved checkpoint must contain all recovered tracked and untracked
-implementation, the amended architecture package, and these recorded facts:
+At that snapshot, `npm test -- --no-file-parallelism` passed 52 test files and
+248 tests, `npm run typecheck` passed, and the production build completed with
+no plugin compiler or CSS optimizer warnings. The BB CLI still emitted Node's
+`DEP0205` deprecation warning. `bb plugin types --check .` passed with
+SDK/host 0.4.21, and `git diff --check` passed. These are dated review
+results, not claims that every future commit has the same state.
+
+The R1–R22 implementation loops were completed and reviewed through that
+integration point. R23C is the documentation-only follow-up for R22 findings
+M8 and M9; its status and evidence are tracked in BB Tasks.
+
+## Completed baseline checkpoint record
+
+The recovered working tree was the complete pre-G0 product snapshot. The
+reproducible checkpoint is now committed and reviewed; managed BB worktrees may
+be used for subsequent explicitly assigned tasks from a verified canonical
+base.
+
+The completed checkpoint record contains all recovered tracked and untracked
+implementation, the amended architecture package, and these historical facts:
 
 - parent commit `8ee5356` on `main`;
 - exact `git status --short` and `git diff --check` output;
-- passing `npm test` (7 tests), `npm run typecheck`, production build, and
+- passing baseline commands, including the then-current test suite,
+  `npm run typecheck`, production build, and
   `bb plugin reload work-sidebar` against the verified path registration;
 - the known pre-refactor failure of `bb plugin types --check .` and the two CSS
-  optimizer warnings;
+  optimizer warnings (both superseded by the integrated validation snapshot
+  above);
 - screenshots under the root thread's `baseline/2026-08-27/` storage directory
   for representative populated states on both surfaces, plus an explicit matrix
   of uncaptured tabs/themes/widths/states. A missing matrix cell does not weaken
@@ -70,21 +94,20 @@ implementation, the amended architecture package, and these recorded facts:
   extractions: they are recovered behavior prototypes, retained and migrated
   by their owning slices, not accepted as final primitives and not discarded.
 
-Pre-checkpoint recovery artifacts are stored outside the repository in the root
-thread storage as `recovered-tracked.patch` and
-`recovered-untracked.tar.gz`. Regenerate both immediately before G0, write their
-SHA-256 digests to the G0 execution task and an external `SHA256SUMS` file beside
-the artifacts, prove the tracked patch with `git apply --check -R`, and prove
-the extracted archive matches every untracked path. The handoff records the
-external manifest path rather than embedding the hash of an archive that
-contains the handoff itself. A stale artifact blocks G0. These artifacts are
-disaster-recovery aids, not a substitute for the approved Git checkpoint used
-by child worktrees.
+At G0, pre-checkpoint recovery artifacts were stored outside the repository in
+the root thread storage as `recovered-tracked.patch` and
+`recovered-untracked.tar.gz`. Their SHA-256 digests were recorded in the G0
+execution task and an external `SHA256SUMS` file, the tracked patch was checked
+with `git apply --check -R`, and the extracted archive was compared with every
+untracked path. The handoff records the external manifest path rather than
+embedding the hash of an archive that contains the handoff itself. These
+artifacts are historical disaster-recovery aids, not a substitute for the
+approved Git checkpoint or a recurring gate for new worktree children.
 
-No commit, tag, or push is authorized by this plan. Once the user authorizes
-local checkpoint commits, create one baseline commit and checkpoint tag. Each
-green stage thereafter gets one reviewable local checkpoint. Nothing is pushed
-without separate authorization.
+The recovery record contains the local checkpoint and tag described above.
+Future commits remain local unless separately authorized for push. Each
+reviewable stage should be represented in BB Tasks and may use a managed
+worktree branched from the verified base.
 
 ## Runtime and bundling constraints
 
@@ -97,7 +120,7 @@ The dependency decision is explicit:
 | `@tanstack/react-query` | Plugin bundle | `dependencies` | Bundle marker test proves Query is present without bundled React; two slot tests observe one QueryClient |
 | `zustand` | Plugin bundle | `dependencies` | Bundle marker test proves Zustand is present without bundled React; store tests prove no persistence |
 | Zod | Plugin bundle | `dependencies` | Browser bundle includes it only from a browser-safe schema module; SDK contract composition remains server-only |
-| Vendored shadcn source | Plugin source plus verified styling path | Source owned by this repository; host-shim imports stay in `devDependencies` | R3 live utility probe decides whether utilities compile or primitives require plain plugin CSS over host tokens |
+| Plugin-local atomic primitives | Plugin source plus plain plugin CSS over host tokens | Source and stylesheet owned by this repository; no vendored shadcn styling prerequisite | Architecture style checks, build with no plugin compiler/CSS optimizer warnings, and live theme/width checks |
 
 `definePluginApp` is evaluated once per plugin frontend generation in each app
 window. A module-level QueryClient is therefore shared by the left and right
@@ -110,10 +133,10 @@ plugin factory or a factory-owned service. `bb.onDispose` clears timers, maps,
 pending references, and subscriptions. No module-level cache may retain a stale
 BB handle across reload.
 
-R1 pins `@get-bb/plugin-sdk` to the running host's exact version (`0.4.21` in
-the current build metadata), updates `engines.bbPluginSdk` to match, and runs
-`bb plugin types --check .` before host API types are trusted. Until R1 lands,
-typecheck evidence uses the installed 0.4.16 types. `experimental_*`
+R1 pinned `@get-bb/plugin-sdk` to the running host's exact version (`0.4.21` at
+the R22 review snapshot), updated `engines.bbPluginSdk`, and made
+`bb plugin types --check .` part of the host API verification gate.
+`experimental_*`
 hooks/components and deprecated props such as `experimental_Original` are
 wrapped in narrow adapters under `shared/host/` so SDK adjustment has one
 migration point.
@@ -249,8 +272,11 @@ consumers in the same loop. Likely candidates—not a pre-approved library—are
 surfaces, list rows, tabs, disclosures, icon/status controls, badges, tooltips,
 selection controls, and loading/empty/error states.
 
-Use BB's host Diff and SourceCode components. Remove the plugin-owned diff
-review implementation once the Changes slice has migrated.
+Use plugin-local atomic CSS over BB host theme tokens, as decided in
+[ADR 0005](../adr/0005-plugin-local-atomic-css.md). Do not treat host utility
+class compilation or vendored shadcn source as a prerequisite. Use BB's host
+Diff and SourceCode components, and remove the plugin-owned diff review
+implementation once the Changes slice has migrated.
 
 Central presentation functions return a label, icon, tone, and optional
 secondary marker for:
@@ -266,7 +292,8 @@ Both sidebars consume the same presentation functions.
 
 ### Styling contract
 
-Use host theme variables and a small plugin token layer. Candidate tokens:
+Use host theme variables and a small plugin token layer. The shipped styling
+boundary is plugin-local CSS over those host tokens. Candidate tokens:
 
 ```css
 --ws-control-size
@@ -290,10 +317,16 @@ Selected and hover treatments derive from the same semantic surface token.
 
 ## Migration plan
 
-### Stage map
+### Historical stage map and loop record
 
-0. Create the user-approved Git baseline checkpoint and finish behavioral
-   characterization. No implementation worktree exists before this gate.
+Stages G0–R19 below describe the recovery-era roadmap and its acceptance
+criteria. They are retained for traceability; completed-loop status and current
+ownership live in BB Tasks. A new task must not copy their historical baseline
+claims as current facts.
+
+0. Create the reproducible Git baseline checkpoint and finish behavioral
+   characterization. This recovery gate is complete; it is not an active ban
+   on subsequent managed worktree children.
 1. Correct SDK/dependency ownership, recursive typechecking, import-boundary
    checks, the test harness, Query runtime, and CSS parsing baseline. This
    stage creates no speculative component catalog.
@@ -330,11 +363,11 @@ For every loop, the owning BB execution task records the failing red output,
 the focused green output, the diff reviewed by the root owner, the full gate,
 and its rollback checkpoint.
 
-#### Gate G0 — reproducible recovered baseline
+#### Gate G0 — reproducible recovered baseline (completed)
 
-This is an authorization gate, not a code loop. After explicit user approval,
-commit every recovered tracked and untracked file plus the audited
-documentation as one local commit named
+This was an authorization gate, not a code loop. After explicit user approval,
+the recovered tracked and untracked files plus audited documentation were
+committed as one local commit named
 `chore: checkpoint recovered sidebar baseline`, add the annotated local tag
 `checkpoint/work-sidebar-recovered-2026-08-27`, and record its commit ID and
 artifact digests in BB Tasks. Later loop checkpoints use the matching
@@ -345,7 +378,8 @@ than normalizing the difference.
 
 #### Loop R1 — SDK, package, and compile boundary
 
-- **Red:** preserve the current failing `bb plugin types --check .` output and
+- **Red (historical pre-G0 evidence):** preserve the then-failing
+  `bb plugin types --check .` output and
   add `tests/architecture/package-contract.test.ts` asserting the exact host
   SDK pin, host shim `devDependencies`, bundled Query/Zustand dependencies,
   and recursive source/test inclusion. Add a nested type-error fixture check
@@ -646,20 +680,20 @@ than normalizing the difference.
 
 ### BB child execution protocol
 
-After G0 is explicitly authorized and created, each code-editing loop receives
-one direct BB execution task, one owner, and its own task-memory directory.
+G0 is complete. Each new code-editing loop receives one direct BB execution
+task, one owner, and its own task-memory directory.
 Before task creation, binding, dispatch, or status change, the root rereads the
 durable work context. Children are spawned with `--parent-self`, provider
 `codex`, `--new-environment worktree`, and `--base-branch main`; Luna owns
 mechanical/bounded migrations and Terra owns state, lifecycle, interaction, or
 cross-surface work. Overlapping slices are not run concurrently.
 
-The root inspects every child diff and evidence before integrating it into
-`main`; integration and local checkpoint commits occur only under the user's
-commit authorization. A failed or uncertain dispatch is reconciled from BB
-Tasks/thread state rather than retried blindly. The final independent child is
-read-only and shares the already integrated environment rather than receiving
-an isolated code-editing worktree.
+The root inspects every child diff and evidence before integrating it into the
+verified canonical branch; integration and local checkpoint commits occur only
+under the user's commit authorization. A failed or uncertain dispatch is
+reconciled from BB Tasks/thread state rather than retried blindly. The final
+independent child is read-only and shares the already integrated environment
+rather than receiving an isolated code-editing worktree.
 
 ## Testing strategy
 
