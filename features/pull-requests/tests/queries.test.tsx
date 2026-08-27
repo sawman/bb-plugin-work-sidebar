@@ -10,6 +10,8 @@ import {
   useAuthoredPullRequestRefresh,
   useSetAuthoredPullRequestDraft,
   useThreadPullRequestChanges,
+  useGitHubApiHealth,
+  type PullRequestRpc,
 } from "../queries";
 
 const authored = [{
@@ -24,38 +26,103 @@ function wrapper(client: QueryClient) {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => { resolve = nextResolve; reject = nextReject; });
+  return { promise, resolve, reject };
+}
+
 describe("R5 pull-request queries", () => {
   afterEach(() => vi.useRealTimers());
 
-  it("shares authored PR list and stack cache across left/right consumers, supports manual refresh, and filters no client records", async () => {
-    let reads = 0;
+  it("progressively paints the shared authored list before deferred stack enrichment settles", async () => {
+    const stacks = deferred<{ available: boolean; pullRequests: typeof authored; error: null }>();
     const rpc = {
-      call: vi.fn(async (method: string) => {
-        if (method === "sidebarAuthoredPullRequests") { reads += 1; return { available: true, pullRequests: authored, error: null }; }
-        if (method === "sidebarAuthoredPullRequestStacks") return { available: true, pullRequests: authored, error: null };
-        if (method === "getGitHubApiHealth") return { state: "available", scope: "unknown", message: null, retryAt: null };
+      call: vi.fn((method: string) => {
+        if (method === "sidebarAuthoredPullRequests") return Promise.resolve({ available: true, pullRequests: authored, error: null });
+        if (method === "sidebarAuthoredPullRequestStacks") return stacks.promise;
         throw new Error(`unexpected ${method}`);
       }),
-    };
+    } as unknown as PullRequestRpc;
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const left = renderHook(() => useAuthoredPullRequests(rpc), { wrapper: wrapper(client) });
     const right = renderHook(() => useAuthoredPullRequests(rpc), { wrapper: wrapper(client) });
     await waitFor(() => expect(left.result.current.data).toEqual(authored));
     expect(right.result.current.data).toEqual(authored);
+    expect(rpc.call).toHaveBeenCalledTimes(2);
+    const enriched = [{ ...authored[0]!, title: "Enriched Stack" }];
+    stacks.resolve({ available: true, pullRequests: enriched, error: null });
+    await waitFor(() => expect(left.result.current.data).toEqual(enriched));
+    await act(async () => { left.unmount(); right.unmount(); await Promise.resolve(); });
+    client.clear();
+  });
+
+  it("shares authored PR list and stack cache across left/right consumers, force-refreshes server data, and filters no client records", async () => {
+    let reads = 0;
+    let version = "base";
+    const rpc = {
+      call: vi.fn(async (method: string, input: unknown) => {
+        if (method === "sidebarAuthoredPullRequests") { reads += 1; return { available: true, pullRequests: [{ ...authored[0]!, title: version }], error: null }; }
+        if (method === "sidebarAuthoredPullRequestStacks") return { available: true, pullRequests: [{ ...authored[0]!, title: `${version} stack` }], error: null };
+        if (method === "getGitHubApiHealth") return { state: "available", scope: "unknown", message: null, retryAt: null };
+        throw new Error(`unexpected ${method}`);
+      }),
+    } as unknown as PullRequestRpc;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const left = renderHook(() => useAuthoredPullRequests(rpc), { wrapper: wrapper(client) });
+    const right = renderHook(() => useAuthoredPullRequests(rpc), { wrapper: wrapper(client) });
+    await waitFor(() => expect(left.result.current.data?.[0]?.title).toBe("base stack"));
+    expect(right.result.current.data?.[0]?.title).toBe("base stack");
     expect(reads).toBe(1);
-    expect(client.getQueryData(pullRequestKeys.authored())).toEqual(authored);
+    expect(client.getQueryData(pullRequestKeys.authored())).toEqual([{ ...authored[0]!, title: "base" }]);
     expect(pullRequestPolicies.authored.refetchInterval({ intervalMs: 7_000 })).toBe(7_000);
 
-    const refresh = renderHook(() => useAuthoredPullRequestRefresh(), { wrapper: wrapper(client) });
+    version = "forced";
+    const refresh = renderHook(() => useAuthoredPullRequestRefresh(rpc), { wrapper: wrapper(client) });
     await act(async () => { await refresh.result.current(); });
     await waitFor(() => expect(reads).toBe(2));
+    expect(rpc.call).toHaveBeenCalledWith("sidebarAuthoredPullRequests", { force: true });
+    await waitFor(() => expect(left.result.current.data?.[0]?.title).toBe("forced stack"));
     left.unmount();
     right.unmount();
     refresh.unmount();
     client.clear();
   });
 
-  it("uses declarative visible/background polling, leaves no observers after unmount, and never retries a classified rate limit", async () => {
+  it("cancels stale stack enrichment before a manual forced rebuild", async () => {
+    const oldStack = deferred<{ available: boolean; pullRequests: typeof authored; error: null }>();
+    let stackReads = 0;
+    const rpc = {
+      call: vi.fn((method: string, input: unknown) => {
+        if (method === "sidebarAuthoredPullRequests") {
+          const forced = (input as { force?: boolean }).force === true;
+          return Promise.resolve({ available: true, pullRequests: [{ ...authored[0]!, title: forced ? "new base" : "old base" }], error: null });
+        }
+        if (method === "sidebarAuthoredPullRequestStacks") {
+          stackReads += 1;
+          if (stackReads === 1) return oldStack.promise;
+          return Promise.resolve({ available: true, pullRequests: [{ ...authored[0]!, title: "new stack" }], error: null });
+        }
+        throw new Error(`unexpected ${method}`);
+      }),
+    } as unknown as PullRequestRpc;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderHook(() => ({
+      list: useAuthoredPullRequests(rpc),
+      refresh: useAuthoredPullRequestRefresh(rpc),
+    }), { wrapper: wrapper(client) });
+    await waitFor(() => expect(view.result.current.list.data?.[0]?.title).toBe("old base"));
+    await act(async () => { await view.result.current.refresh(); });
+    await waitFor(() => expect(view.result.current.list.data?.[0]?.title).toBe("new stack"));
+    oldStack.resolve({ available: true, pullRequests: [{ ...authored[0]!, title: "old stack" }], error: null });
+    await act(async () => { await Promise.resolve(); });
+    expect(view.result.current.list.data?.[0]?.title).toBe("new stack");
+    view.unmount();
+    client.clear();
+  });
+
+  it("reschedules fingerprint polling on document visibility changes, leaves no observers or timers after unmount, and never retries a classified rate limit", async () => {
     vi.useFakeTimers();
     let fingerprintReads = 0;
     const rpc = {
@@ -66,10 +133,11 @@ describe("R5 pull-request queries", () => {
       }),
     };
     const client = new QueryClient({ defaultOptions: { queries: { retry: 3 } } });
-    const view = renderHook(() => useThreadPullRequestChanges(rpc, "thr_r5", {
+    const previousVisibility = Object.getOwnPropertyDescriptor(document, "visibilityState");
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    const view = renderHook(() => useThreadPullRequestChanges(rpc as PullRequestRpc, "thr_r5", {
       visiblePollMs: 1_000,
       backgroundPollMs: 9_000,
-      isVisible: () => true,
     }), { wrapper: wrapper(client) });
     await act(async () => { await vi.advanceTimersByTimeAsync(0); await Promise.resolve(); });
     expect(view.result.current.data?.currentPullRequest?.url).toContain("/12");
@@ -78,10 +146,43 @@ describe("R5 pull-request queries", () => {
     // the rate-limit error itself is not retried by the client.
     expect(fingerprintReads).toBe(2);
     expect(pullRequestPolicies.threadChanges.retry).toBe(false);
-    expect(pullRequestPolicies.fingerprint.refetchInterval({ visiblePollMs: 1_000, backgroundPollMs: 9_000, isVisible: () => false })).toBe(9_000);
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    await vi.advanceTimersByTimeAsync(8_999);
+    expect(fingerprintReads).toBe(2);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fingerprintReads).toBe(3);
     view.unmount();
     expect(client.getQueryCache().findAll({ queryKey: pullRequestKeys.threadChanges("thr_r5") })[0]?.getObserversCount()).toBe(0);
     client.clear();
+    expect(vi.getTimerCount()).toBe(0);
+    if (previousVisibility) Object.defineProperty(document, "visibilityState", previousVisibility);
+    else delete (document as { visibilityState?: string }).visibilityState;
+  });
+
+  it("polls shared GitHub health every 30 seconds and releases its timer after unmount", async () => {
+    vi.useFakeTimers();
+    expect(vi.getTimerCount()).toBe(0);
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    const rpc = { call: vi.fn(async (method: string) => {
+      if (method === "getGitHubApiHealth") return { state: "available", scope: "unknown", message: null, retryAt: null };
+      throw new Error(`unexpected ${method}`);
+    }) } as unknown as PullRequestRpc;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const setInterval = vi.spyOn(globalThis, "setInterval");
+    const clearInterval = vi.spyOn(globalThis, "clearInterval");
+    const left = renderHook(() => useGitHubApiHealth(rpc), { wrapper: wrapper(client) });
+    const right = renderHook(() => useGitHubApiHealth(rpc), { wrapper: wrapper(client) });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(rpc.call).toHaveBeenCalledTimes(1);
+    expect(setInterval).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(rpc.call).toHaveBeenCalledTimes(2);
+    await act(async () => { left.unmount(); right.unmount(); await Promise.resolve(); });
+    client.clear();
+    await act(async () => { await vi.runAllTimersAsync(); });
+    expect(clearInterval).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("exposes draft mutation busy/error state and invalidates only the authored PR family after settlement", async () => {
@@ -94,7 +195,7 @@ describe("R5 pull-request queries", () => {
         return { draft: true };
       }
       throw new Error(`unexpected ${method}`);
-    }) };
+    }) } as unknown as PullRequestRpc;
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const invalidate = vi.spyOn(client, "invalidateQueries");
     const mutation = renderHook(() => useSetAuthoredPullRequestDraft(rpc), { wrapper: wrapper(client) });
@@ -106,8 +207,52 @@ describe("R5 pull-request queries", () => {
     reject = false;
     await act(async () => { await mutation.result.current.mutateAsync({ url: authored[0]!.url, draft: true }); });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: pullRequestKeys.authored() });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: pullRequestKeys.authoredStacks() });
     expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ["work-sidebar", "work"] });
     mutation.unmount();
+    client.clear();
+  });
+
+  it("shows fresh base data instead of stale stacks after a failed then successful draft mutation", async () => {
+    const refreshedStack = deferred<{ available: boolean; pullRequests: typeof authored; error: null }>();
+    let revision = "old";
+    let draftAttempts = 0;
+    let deferStacks = false;
+    const rpc = {
+      call: vi.fn(async (method: string) => {
+        if (method === "sidebarAuthoredPullRequests") return { available: true, pullRequests: [{ ...authored[0]!, title: `${revision} base` }], error: null };
+        if (method === "sidebarAuthoredPullRequestStacks") {
+          if (deferStacks) return refreshedStack.promise;
+          return { available: true, pullRequests: [{ ...authored[0]!, title: "old stack" }], error: null };
+        }
+        if (method === "setAuthoredPullRequestDraft") {
+          draftAttempts += 1;
+          if (draftAttempts === 1) throw new Error("draft update failed");
+          revision = "new";
+          deferStacks = true;
+          return { draft: true };
+        }
+        throw new Error(`unexpected ${method}`);
+      }),
+    } as unknown as PullRequestRpc;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderHook(() => ({
+      list: useAuthoredPullRequests(rpc),
+      draft: useSetAuthoredPullRequestDraft(rpc),
+    }), { wrapper: wrapper(client) });
+    await waitFor(() => expect(view.result.current.list.data?.[0]?.title).toBe("old stack"));
+
+    act(() => { view.result.current.draft.mutate({ url: authored[0]!.url, draft: true }); });
+    await waitFor(() => expect(view.result.current.draft.isError).toBe(true));
+    expect(view.result.current.list.data?.[0]?.title).toBe("old stack");
+
+    act(() => { view.result.current.draft.mutate({ url: authored[0]!.url, draft: true }); });
+    await waitFor(() => expect(view.result.current.list.data?.[0]?.title).toBe("new base"));
+    expect(view.result.current.draft.isPending).toBe(true);
+    refreshedStack.resolve({ available: true, pullRequests: [{ ...authored[0]!, title: "new stack" }], error: null });
+    await waitFor(() => expect(view.result.current.list.data?.[0]?.title).toBe("new stack"));
+    await waitFor(() => expect(view.result.current.draft.isSuccess).toBe(true));
+    view.unmount();
     client.clear();
   });
 });
