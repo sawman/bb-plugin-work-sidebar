@@ -5,7 +5,11 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
-import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import {
+  useRealtime,
+  useRpc,
+  type PluginRpcClient,
+} from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
 import { queryPolicies } from "../../query-runtime";
 import type { SidebarThreadGroup } from "./model";
@@ -22,29 +26,16 @@ export const threadQueryPolicies = {
   listMode: queryPolicies.sidebarOrderPreferences,
   groups: queryPolicies.sidebarOrderPreferences,
 } as const;
-type Rpc = { call(method: string, input: unknown): Promise<any> };
+export type ThreadsRpc = PluginRpcClient<typeof rpcContract>;
 
 export async function saveThreadGroups(
   client: QueryClient,
-  rpc: Rpc,
+  rpc: ThreadsRpc,
   groups: SidebarThreadGroup[],
 ) {
   const result = await rpc.call("saveThreadGroups", { groups });
   client.setQueryData(threadQueryKeys.groups(), result.groups);
   return result.groups as SidebarThreadGroup[];
-}
-
-async function savePreference<T>(
-  client: QueryClient,
-  rpc: Rpc,
-  key: readonly string[],
-  method: string,
-  input: unknown,
-  field: string,
-): Promise<T> {
-  const result = (await rpc.call(method, input)) as Record<string, T>;
-  client.setQueryData(key, result[field]);
-  return result[field]!;
 }
 
 export function useThreadPreferences() {
@@ -73,26 +64,18 @@ export function useThreadPreferences() {
       saveThreadGroups(client, rpc, next),
   });
   const saveOrder = useMutation({
-    mutationFn: (threadIds: string[]) =>
-      savePreference<string[]>(
-        client,
-        rpc,
-        threadQueryKeys.order(),
-        "saveSiblingOrder",
-        { threadIds },
-        "threadIds",
-      ),
+    mutationFn: async (threadIds: string[]) => {
+      const result = await rpc.call("saveSiblingOrder", { threadIds });
+      client.setQueryData(threadQueryKeys.order(), result.threadIds);
+      return result.threadIds;
+    },
   });
   const saveListMode = useMutation({
-    mutationFn: (mode: "enhanced" | "native") =>
-      savePreference<"enhanced" | "native">(
-        client,
-        rpc,
-        threadQueryKeys.listMode(),
-        "saveThreadListMode",
-        { mode },
-        "mode",
-      ),
+    mutationFn: async (mode: "enhanced" | "native") => {
+      const result = await rpc.call("saveThreadListMode", { mode });
+      client.setQueryData(threadQueryKeys.listMode(), result.mode);
+      return result.mode;
+    },
   });
   return { order, listMode, groups, saveGroups, saveOrder, saveListMode };
 }
@@ -104,7 +87,7 @@ export const archivedThreadQueryPolicy = {
   refetchOnWindowFocus: false,
 } as const;
 export function useArchivedThreadsQuery(
-  rpc: Rpc,
+  rpc: ThreadsRpc,
   enabled: boolean,
   rosterFingerprint: string,
 ) {

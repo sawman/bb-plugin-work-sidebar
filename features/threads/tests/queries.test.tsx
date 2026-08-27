@@ -10,6 +10,7 @@ import {
   threadQueryPolicies,
   saveThreadGroups,
   useArchivedThreadsQuery,
+  type ThreadsRpc,
 } from "../queries";
 
 function queryWrapper(client: QueryClient) {
@@ -46,7 +47,7 @@ describe("R9 Threads query ownership", () => {
             : [],
       }),
     };
-    await saveThreadGroups(client, rpc, [
+    await saveThreadGroups(client, rpc as unknown as ThreadsRpc, [
       { id: "group_later", name: "Later", threadIds: ["thr_1"] },
     ]);
     expect(client.getQueryData(threadQueryKeys.groups())).toEqual([
@@ -66,7 +67,7 @@ describe("R9 Threads query ownership", () => {
     };
     const view = renderHook(
       ({ enabled, roster }: { enabled: boolean; roster: string }) =>
-        useArchivedThreadsQuery(rpc, enabled, roster),
+        useArchivedThreadsQuery(rpc as unknown as ThreadsRpc, enabled, roster),
       {
         initialProps: { enabled: false, roster: "thr_active" },
         wrapper: queryWrapper(client),
@@ -122,7 +123,11 @@ describe("R9 Threads query ownership", () => {
     };
     const view = renderHook(
       ({ enabled }: { enabled: boolean }) =>
-        useArchivedThreadsQuery(rpc, enabled, "stable"),
+        useArchivedThreadsQuery(
+          rpc as unknown as ThreadsRpc,
+          enabled,
+          "stable",
+        ),
       {
         initialProps: { enabled: true },
         wrapper: queryWrapper(client),
