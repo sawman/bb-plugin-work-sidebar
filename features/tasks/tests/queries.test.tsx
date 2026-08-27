@@ -91,26 +91,30 @@ describe("Tasks read slots", () => {
     retry.lifecycle.unmount();
   });
 
-  it("invalidates the two targeted task keys, retries task links independently, and cleans polling observers", async () => {
+  it("has one left-owned realtime invalidator across both registered slots", async () => {
     vi.useFakeTimers();
     const captured = await app();
+    const tasks = vi.fn<RpcHandlers["sidebarTasks"]>().mockReturnValue(populatedTasks);
     const links = vi.fn<RpcHandlers["sidebarTaskLinks"]>()
       .mockRejectedValueOnce(new Error("Task links endpoint is down"))
       .mockReturnValue({ available: true, links: {}, error: null });
-    const left = renderSlot(captured.threadLists[0]!, leftProps(), { rpc: { ...rpcFixtures(() => populatedTasks), sidebarTaskLinks: links } as RpcHandlers });
+    const rpc = { ...rpcFixtures(tasks), sidebarTaskLinks: links } as RpcHandlers;
+    const left = renderSlot(captured.threadLists[0]!, leftProps(), { rpc });
+    const right = renderSlot(captured.threadPanelActions[0]!, { threadId: "thr_test", params: null }, { rpc });
     await vi.advanceTimersByTimeAsync(0);
-    expect(left.inspection.rpcCalls.filter((call) => call.method === "sidebarTasks")).toHaveLength(1);
-    expect(left.inspection.rpcCalls.filter((call) => call.method === "sidebarTaskLinks")).toHaveLength(1);
+    expect(tasks).toHaveBeenCalledTimes(1);
+    expect(links).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1_000);
-    expect(left.inspection.rpcCalls.filter((call) => call.method === "sidebarTasks")).toHaveLength(1);
-    expect(left.inspection.rpcCalls.filter((call) => call.method === "sidebarTaskLinks")).toHaveLength(2);
+    expect(tasks).toHaveBeenCalledTimes(1);
+    expect(links).toHaveBeenCalledTimes(2);
     await left.behavior.emitRealtime("work-sidebar:changed", { changed: "tasks" });
     await vi.advanceTimersByTimeAsync(1);
-    expect(left.inspection.rpcCalls.filter((call) => call.method === "sidebarTasks")).toHaveLength(2);
-    expect(left.inspection.rpcCalls.filter((call) => call.method === "sidebarTaskLinks")).toHaveLength(3);
+    expect(tasks).toHaveBeenCalledTimes(2);
+    expect(links).toHaveBeenCalledTimes(3);
     await vi.advanceTimersByTimeAsync(30_000);
-    expect(left.inspection.rpcCalls.filter((call) => call.method === "sidebarTaskLinks")).toHaveLength(4);
-    expect(left.inspection.rpcCalls.filter((call) => call.method === "sidebarTasks")).toHaveLength(2);
+    expect(links).toHaveBeenCalledTimes(4);
+    expect(tasks).toHaveBeenCalledTimes(2);
+    right.lifecycle.unmount();
     left.lifecycle.unmount();
     expect(getPluginQueryClient().getQueryCache().find({ queryKey: queryKeys.sidebar.tasks.list() })?.getObserversCount()).toBe(0);
     expect(getPluginQueryClient().getQueryCache().find({ queryKey: queryKeys.sidebar.tasks.links() })?.getObserversCount()).toBe(0);

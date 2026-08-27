@@ -5,8 +5,7 @@ import { queryKeys, queryPolicies } from "../../query-runtime";
 
 export function useTasksRead() {
   const rpc = useRpc<typeof rpcContract>();
-  const queryClient = useQueryClient();
-  const query = useQuery({
+  return useQuery({
     queryKey: queryKeys.sidebar.tasks.list(),
     queryFn: async () => {
       const result = await rpc.call("sidebarTasks", null);
@@ -15,16 +14,11 @@ export function useTasksRead() {
     },
     ...queryPolicies.sidebarTasksList,
   });
-  useRealtime("work-sidebar:changed", () => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.sidebar.tasks.list() });
-  });
-  return query;
 }
 
 export function useTaskLinksRead() {
   const rpc = useRpc<typeof rpcContract>();
-  const queryClient = useQueryClient();
-  const query = useQuery({
+  return useQuery({
     queryKey: queryKeys.sidebar.tasks.links(),
     queryFn: async () => {
       const result = await rpc.call("sidebarTaskLinks", null);
@@ -34,8 +28,13 @@ export function useTaskLinksRead() {
     ...queryPolicies.sidebarTaskLinks,
     refetchInterval: 30_000,
   });
+}
+
+/** The left sidebar owns the one Tasks-domain realtime subscription. */
+export function useTasksRealtimeInvalidation() {
+  const queryClient = useQueryClient();
   useRealtime("work-sidebar:changed", () => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.sidebar.tasks.list() });
     void queryClient.invalidateQueries({ queryKey: queryKeys.sidebar.tasks.links() });
   });
-  return query;
 }

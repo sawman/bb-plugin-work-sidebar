@@ -65,7 +65,7 @@ import {
 } from "./work-model";
 import { Icon } from "@/components/ui/icon";
 import { githubHealthPresentation, pullRequestPresentation } from "@/features/pull-requests/presentation";
-import { useTaskLinksRead, useTasksRead } from "@/features/tasks/queries";
+import { useTaskLinksRead, useTasksRead, useTasksRealtimeInvalidation } from "@/features/tasks/queries";
 import "./app.css";
 import "./scrollbar.css";
 import "./views.css";
@@ -488,6 +488,7 @@ function WorkThreadList(props: PluginThreadListProps) {
   const queryClient = useQueryClient();
   const { data: tasksData, isPending: tasksPending, isError: tasksFailed, error: tasksReadError, refetch: refetchTasks } = useTasksRead();
   const { data: taskLinksData, refetch: refetchTaskLinks } = useTaskLinksRead();
+  useTasksRealtimeInvalidation();
   const { values: pluginSettings } = useSettings();
   const taskLinks = taskLinksData?.links ?? {};
   const [view, setView] = useState<SidebarView>("work");
