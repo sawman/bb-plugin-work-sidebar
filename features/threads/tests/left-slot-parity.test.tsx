@@ -3,8 +3,6 @@ import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { getPluginQueryClient } from "../../../query-runtime";
 
 const project = { id: "project", name: "Project", isPersonal: false };
@@ -70,14 +68,14 @@ function mockElementAt(element: Element | null) {
 }
 
 describe("R18 registered left sidebar parity", () => {
-  it("keeps the Later default editable only while empty and exposes a downward settings menu", async () => {
+  it("keeps the Later default editable only while empty and exposes a dismissible settings dialog", async () => {
     const saveGroups = vi.fn(({ groups }: { groups: unknown[] }) => ({ groups }));
     const prompt = vi.spyOn(window, "prompt").mockReturnValueOnce("Soon").mockReturnValueOnce("Later renamed");
     const slot = await leftSlot({ rpc: { saveThreadGroups: saveGroups } });
     await waitFor(() => expect(slot.getByRole("link", { name: /One/ })).toBeTruthy());
     await waitFor(() => expect(slot.getByText("Later")).toBeTruthy());
     fireEvent.click(slot.getByRole("button", { name: "Thread list settings" }));
-    const menu = slot.getByRole("menu");
+    const menu = slot.getByRole("dialog", { name: "Thread list settings" });
     expect(menu.classList.contains("ws-thread-settings-menu")).toBe(true);
     expect(slot.getByLabelText("Remove Later").hasAttribute("disabled")).toBe(false);
     fireEvent.click(slot.getByRole("button", { name: "Add group" }));
@@ -86,7 +84,21 @@ describe("R18 registered left sidebar parity", () => {
     await waitFor(() => expect(saveGroups).toHaveBeenCalledWith({ groups: expect.arrayContaining([expect.objectContaining({ name: "Later renamed" })]) }));
     fireEvent.click(slot.getByLabelText("Remove Later renamed"));
     await waitFor(() => expect(saveGroups).toHaveBeenLastCalledWith({ groups: expect.not.arrayContaining([expect.objectContaining({ name: "Later renamed" })]) }));
-    expect(readFileSync(resolve(process.cwd(), "views.css"), "utf8")).toMatch(/\.ws-thread-settings-menu\s*\{[^}]*top:\s*calc\(100% \+ 0\.2rem\)[^}]*bottom:\s*auto/s);
+    fireEvent.keyDown(menu, { key: "Escape" });
+    await waitFor(() =>
+      expect(slot.queryByRole("dialog", { name: "Thread list settings" })).toBeNull(),
+    );
+    expect(document.activeElement).toBe(
+      slot.getByRole("button", { name: "Thread list settings" }),
+    );
+    fireEvent.click(slot.getByRole("button", { name: "Thread list settings" }));
+    fireEvent.pointerDown(document.body);
+    await waitFor(() =>
+      expect(slot.queryByRole("dialog", { name: "Thread list settings" })).toBeNull(),
+    );
+    expect(document.activeElement).toBe(
+      slot.getByRole("button", { name: "Thread list settings" }),
+    );
     slot.lifecycle.unmount();
   });
 
@@ -96,13 +108,48 @@ describe("R18 registered left sidebar parity", () => {
     await waitFor(() => expect(slot.getByText("Later")).toBeTruthy());
     fireEvent.click(slot.getByRole("button", { name: "Thread list settings" }));
     expect(slot.getByLabelText("Remove Later").hasAttribute("disabled")).toBe(true);
-    fireEvent.click(slot.getByRole("menuitemradio", { name: "BB native list" }));
+    fireEvent.click(slot.getByRole("button", { name: "BB native list" }));
     await waitFor(() => expect(saveMode).toHaveBeenCalledWith({ mode: "native" }));
     expect(slot.getByText("Native BB list")).toBeTruthy();
     fireEvent.click(slot.getByRole("button", { name: "Thread list settings" }));
-    fireEvent.click(slot.getByRole("menuitemradio", { name: "Enhanced list" }));
+    fireEvent.click(slot.getByRole("button", { name: "Enhanced list" }));
     await waitFor(() => expect(saveMode).toHaveBeenNthCalledWith(2, { mode: "enhanced" }));
     expect(slot.getByRole("link", { name: /One/ })).toBeTruthy();
+    slot.lifecycle.unmount();
+  });
+
+  it("restores an archived thread with Enter or Space on its drag handle", async () => {
+    const unarchive = vi.fn(({ threadId }: { threadId: string }) => ({ threadId }));
+    const slot = await leftSlot({
+      rpc: {
+        sidebarArchivedThreads: () => ({
+          available: true,
+          error: null,
+          threads: [{
+            id: "thr_archived",
+            projectId: project.id,
+            title: "Archived thread",
+            titleFallback: null,
+            parentThreadId: null,
+            environmentBranchName: null,
+            isPinned: false,
+            isUnread: false,
+            createdAt: 0,
+            updatedAt: 0,
+            archivedAt: 0,
+          }],
+        }),
+        unarchiveSidebarThread: unarchive,
+      },
+    });
+    fireEvent.click(slot.container.querySelector(".ws-archived summary")!);
+    const restore = await slot.findByRole("button", { name: "Restore Archived thread" });
+    fireEvent.keyDown(restore, { key: "Enter" });
+    await waitFor(() =>
+      expect(unarchive).toHaveBeenCalledWith({ threadId: "thr_archived" }),
+    );
+    fireEvent.keyDown(restore, { key: " " });
+    await waitFor(() => expect(unarchive).toHaveBeenCalledTimes(2));
     slot.lifecycle.unmount();
   });
 

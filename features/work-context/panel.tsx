@@ -152,7 +152,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
         hidden={tab !== "changes"}
         tabIndex={0}
       >
-        <ChangesPanel threadId={threadId} />
+        {tab === "changes" && <ChangesPanel threadId={threadId} />}
       </div>
       <div
         className="ws-panel-body"

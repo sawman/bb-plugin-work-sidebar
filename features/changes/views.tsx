@@ -264,6 +264,7 @@ export function ChangesCurrentPullRequestCard({
         </span>
         <span
           className="ws-current-pr-signals"
+          role="group"
           aria-label="Pull request signals"
         >
           <Status presentation={signal.checks} />

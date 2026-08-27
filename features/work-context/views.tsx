@@ -196,6 +196,7 @@ function ProviderHealth({
   ) : (
     <span
       className={`ws-provider-health ws-provider-health-${provider.tone}`}
+      role="img"
       aria-label={label}
       title={label}
     />
@@ -360,7 +361,7 @@ function PlanCard({ threadId }: { threadId: string }) {
                     : "○"}
               </span>
               <span>{item.text}</span>
-              <span className="sr-only">{readableStatus(item.status)}</span>
+              <span className="ws-sr-only">{readableStatus(item.status)}</span>
             </div>
           ))}
         </div>
@@ -472,6 +473,7 @@ function TasksCard({ threadId }: { threadId: string }) {
         {outcome.data?.executionTasks.length ? (
           <div
             className="ws-work-card-list ws-work-card-list-separated"
+            role="group"
             aria-label="Execution tasks"
           >
             {outcome.data.executionTasks.map((task) => (

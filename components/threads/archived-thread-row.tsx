@@ -100,6 +100,12 @@ export function ArchivedThreadRow({
                   event.preventDefault();
                   event.stopPropagation();
                 }}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onUnarchive(thread.id, null);
+                }}
               >
                 <Icon name="GripVertical" aria-hidden />
               </span>

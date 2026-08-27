@@ -118,8 +118,24 @@ function fixture() {
     }),
     getWorkOutcome: () => ({
       tasksAvailable: true,
-      outcome: null,
-      executionTasks: [],
+      outcome: {
+        id: "outcome_1",
+        key: "PROJ-2",
+        title: "Accessible outcome",
+        status: "in_progress",
+        priority: "medium",
+        dueDate: null,
+      },
+      executionTasks: [
+        {
+          id: "execution_1",
+          key: "PROJ-3",
+          title: "Accessible execution task",
+          status: "todo",
+          assignee: "agent",
+          ownerThreadId: "thr_accessible",
+        },
+      ],
       bindings: [],
     }),
     getWorkGoal: () => null,
@@ -165,7 +181,8 @@ function fixture() {
 
 async function expectNoAriaViolations(container: HTMLElement) {
   const results = await axe(container);
-  expect(results).toHaveNoViolations();
+  expect(results.violations).toEqual([]);
+  expect(results.incomplete).toEqual([]);
 }
 
 function expectTabRelationships(container: HTMLElement) {
@@ -242,6 +259,10 @@ describe("R19D registered slot accessibility", () => {
     );
     expect(threadLink.getAttribute("aria-current")).toBe("true");
     expect(threadLink.hasAttribute("aria-selected")).toBe(false);
+    fireEvent.click(slot.getByRole("button", { name: "Thread list settings" }));
+    await waitFor(() =>
+      expect(slot.getByRole("dialog", { name: "Thread list settings" })).toBeTruthy(),
+    );
     await expectNoAriaViolations(slot.container);
     fireEvent.click(slot.getByRole("button", { name: "Tasks" }));
     await waitFor(() => expect(slot.getByText("Accessible task")).toBeTruthy());
@@ -262,6 +283,14 @@ describe("R19D registered slot accessibility", () => {
     );
     await waitFor(() => expect(slot.getByRole("tabpanel")).toBeTruthy());
     expectTabRelationships(slot.container);
+    await waitFor(() =>
+      expect(
+        slot.getByRole("img", { name: /Codex provider status: ready/i }),
+      ).toBeTruthy(),
+    );
+    await waitFor(() =>
+      expect(slot.getByText("Accessible execution task")).toBeTruthy(),
+    );
     await expectNoAriaViolations(slot.container);
     fireEvent.click(slot.getByRole("tab", { name: "Changes" }));
     await waitFor(() =>
@@ -274,5 +303,22 @@ describe("R19D registered slot accessibility", () => {
     );
     await expectNoAriaViolations(slot.container);
     slot.lifecycle.unmount();
+  });
+
+  it("fails closed for the exact missing-role and malformed-menu controls", async () => {
+    const container = document.createElement("div");
+    const provider = document.createElement("span");
+    provider.setAttribute("aria-label", "Codex provider status: ready");
+    const executionTasks = document.createElement("div");
+    executionTasks.setAttribute("aria-label", "Execution tasks");
+    const menu = document.createElement("span");
+    menu.setAttribute("role", "menu");
+    const groupControl = document.createElement("button");
+    groupControl.textContent = "Custom group";
+    menu.append(groupControl);
+    container.append(provider, executionTasks, menu);
+    document.body.append(container);
+    await expect(expectNoAriaViolations(container)).rejects.toThrow();
+    container.remove();
   });
 });

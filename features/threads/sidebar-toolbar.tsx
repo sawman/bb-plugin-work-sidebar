@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import type { SidebarThreadGroup } from "./model";
@@ -39,43 +39,74 @@ function ThreadListSettings({
   | "onRemoveGroup"
 >) {
   const [open, setOpen] = useState(false);
-  const saveListMode = (mode: "enhanced" | "native") => {
+  const settingsRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const closeSettings = () => {
     setOpen(false);
+    triggerRef.current?.focus();
+  };
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (event: PointerEvent) => {
+      if (!settingsRef.current?.contains(event.target as Node)) closeSettings();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      closeSettings();
+    };
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+  const saveListMode = (mode: "enhanced" | "native") => {
+    closeSettings();
     onSaveListMode(mode);
   };
   return (
-    <span className="ws-thread-settings">
+    <div className="ws-thread-settings" ref={settingsRef}>
       <button
+        ref={triggerRef}
         className="ws-icon-button"
         title="Thread list settings"
         aria-label="Thread list settings"
+        aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
         <Icon name="Wrench" aria-hidden />
       </button>
       {open && (
-        <span className="ws-thread-settings-menu" role="menu">
+        <div
+          className="ws-thread-settings-menu"
+          role="dialog"
+          aria-label="Thread list settings"
+        >
           <button
-            role="menuitemradio"
-            aria-checked={listMode === "enhanced"}
+            aria-pressed={listMode === "enhanced"}
             onClick={() => saveListMode("enhanced")}
           >
             Enhanced list
           </button>
           <button
-            role="menuitemradio"
-            aria-checked={listMode === "native"}
+            aria-pressed={listMode === "native"}
             onClick={() => saveListMode("native")}
           >
             BB native list
           </button>
-          <span className="ws-thread-group-settings">
-            <b>Custom groups</b>
+          <div
+            className="ws-thread-group-settings"
+            role="group"
+            aria-label="Custom groups"
+          >
+            <strong>Custom groups</strong>
             {groups.map((group) => {
               const occupied = occupiedGroupIds.has(group.id);
               return (
-                <span key={group.id}>
+                <div key={group.id}>
                   <button
                     title={`Rename ${group.name}`}
                     onClick={() => onRenameGroup(group)}
@@ -95,16 +126,16 @@ function ThreadListSettings({
                   >
                     <Icon name="X" aria-hidden />
                   </button>
-                </span>
+                </div>
               );
             })}
             <button className="ws-thread-group-add" onClick={onAddGroup}>
               Add group
             </button>
-          </span>
-        </span>
+          </div>
+        </div>
       )}
-    </span>
+    </div>
   );
 }
 
