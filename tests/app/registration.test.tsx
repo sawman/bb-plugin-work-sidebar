@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { waitFor } from "@testing-library/react";
-import { getPluginQueryClient, pluginInteractionStore, queryKeys, queryPolicies } from "../../query-runtime";
+import { getPluginQueryClient, queryKeys, queryPolicies } from "../../query-runtime";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 
 describe("R2 app registration and Query lifecycle", () => {
@@ -24,11 +24,6 @@ describe("R2 app registration and Query lifecycle", () => {
     expect(queryPolicies.sidebarTaskLinks).toMatchObject({ staleTime: 15_000, gcTime: 10 * 60_000, retry: 1 });
     expect(queryPolicies.workContext).toMatchObject({ staleTime: 5_000, gcTime: 10 * 60_000, retry: 1 });
     expect(queryPolicies.workChanges).toMatchObject({ staleTime: 30_000, gcTime: 10 * 60_000, retry: false });
-    expect(pluginInteractionStore.getState().selectedWorkTab).toBe("work");
-    pluginInteractionStore.getState().setSelectedWorkTab("changes");
-    expect(pluginInteractionStore.getState().selectedWorkTab).toBe("changes");
-    pluginInteractionStore.getState().setSelectedWorkTab("work");
-
     // The harness mounts slots independently, matching BB's left/right slot
     // ownership. R5 and R6 make both PR and Tasks consumers real observers on
     // the same module-generation QueryClient.

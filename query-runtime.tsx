@@ -1,5 +1,4 @@
 import { QueryClient, QueryClientProvider, type QueryKey } from "@tanstack/react-query";
-import { createStore } from "zustand/vanilla";
 import type { PropsWithChildren, ReactElement } from "react";
 
 export type QueryPolicy = Readonly<{
@@ -58,18 +57,6 @@ const pluginQueryClient = new QueryClient({
     queries: { staleTime: 0, gcTime: 5 * 60_000, retry: false, refetchOnWindowFocus: false },
   },
 });
-
-export type PluginInteractionState = {
-  selectedWorkTab: "work" | "changes" | "agents";
-  setSelectedWorkTab(tab: PluginInteractionState["selectedWorkTab"]): void;
-};
-
-// Interaction-only state is deliberately separate from future RPC records.
-// This is one module-generation store, shared by independently mounted slots.
-export const pluginInteractionStore = createStore<PluginInteractionState>((set) => ({
-  selectedWorkTab: "work",
-  setSelectedWorkTab: (selectedWorkTab) => set({ selectedWorkTab }),
-}));
 
 export function getPluginQueryClient(): QueryClient {
   return pluginQueryClient;

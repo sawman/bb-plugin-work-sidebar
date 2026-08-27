@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useStore } from "zustand";
 import {
   definePluginApp,
   useBbNavigate,
@@ -73,6 +74,8 @@ import "./app.css";
 import "./scrollbar.css";
 import "./views.css";
 import { PluginProviders } from "./query-runtime";
+import { selectThreadIds } from "./features/threads/model";
+import { threadInteractionStore, type ThreadDropTarget, type WorkTab } from "./features/threads/store";
 
 const SIDEBAR_ORDER_CHANNEL = "sidebar-order:changed";
 type SidebarThreadGroup = { id: string; name: string; threadIds: string[] };
@@ -411,7 +414,7 @@ function WorkThreadTree({
   const activeChildren = children.filter(threadIsWorking).length;
   // New child agents should not take over the sidebar; reveal each subtree
   // only when the user deliberately opens its disclosure.
-  const [childrenExpanded, setChildrenExpanded] = useState(false);
+  const childrenExpanded = useStore(threadInteractionStore, (state) => state.expandedThreadIds.has(thread.id));
   const siblingIndex = orderedSiblings.findIndex((sibling) => sibling.id === thread.id);
   return (
     <>
@@ -425,7 +428,7 @@ function WorkThreadTree({
         selected={selectedThreadIds.has(thread.id)}
         groupId={groupIds.get(thread.id) ?? null}
         groups={groups}
-        onToggleChildren={() => setChildrenExpanded((expanded) => !expanded)}
+        onToggleChildren={() => threadInteractionStore.getState().toggleChildren(thread.id)}
         onSelect={onSelect}
         onMoveToGroup={onMoveToGroup}
         project={projectsById.get(thread.projectId)}
@@ -517,10 +520,17 @@ function WorkThreadList(props: PluginThreadListProps) {
   const orderRef = useRef<string[]>([]);
   const [threadOrder, setThreadOrder] = useState<string[]>([]);
   const [threadGroups, setThreadGroups] = useState<SidebarThreadGroup[]>([]);
-  const [dragThreadId, setDragThreadId] = useState<string | null>(null);
-  const [threadDropTarget, setThreadDropTarget] = useState<{ threadId: string; placement: "before" | "after" } | null>(null);
-  const [selectedThreadIds, setSelectedThreadIds] = useState<Set<string>>(() => new Set());
-  const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(null);
+  const dragThreadId = useStore(threadInteractionStore, (state) => state.dragThreadId);
+  const threadDropTarget = useStore(threadInteractionStore, (state) => state.dropTarget);
+  const selectedThreadIds = useStore(threadInteractionStore, (state) => state.selectedThreadIds);
+  const setDragThreadId = useCallback((threadId: string | null) => {
+    const state = threadInteractionStore.getState();
+    state.setDrag(threadId, state.dropTarget);
+  }, []);
+  const setThreadDropTarget = useCallback((dropTarget: ThreadDropTarget) => {
+    const state = threadInteractionStore.getState();
+    state.setDrag(state.dragThreadId, dropTarget);
+  }, []);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(() => new Set());
   const [taskSelectionAnchorId, setTaskSelectionAnchorId] = useState<string | null>(null);
   const [selectedPullRequestIds, setSelectedPullRequestIds] = useState<Set<string>>(() => new Set());
@@ -534,6 +544,10 @@ function WorkThreadList(props: PluginThreadListProps) {
   const authoredPullRequestError = authoredPullRequestQuery.error?.message ?? null;
   const changingDraftUrl = authoredPullRequestDraft.isPending ? authoredPullRequestDraft.variables?.url ?? null : null;
   const githubApiHealth = githubHealthQuery.data ?? { state: "available" as const, scope: "unknown" as const, message: null, retryAt: null };
+
+  useEffect(() => {
+    threadInteractionStore.getState().reconcileRoster(threads.map((thread) => thread.id));
+  }, [threads]);
 
   useEffect(() => {
     void rpc.call("getThreadListMode", null).then((result) => setThreadListMode(result.mode)).catch(() => undefined);
@@ -764,31 +778,14 @@ function WorkThreadList(props: PluginThreadListProps) {
   // Plain click retains BB's normal open behavior. Ctrl/Cmd toggles an item,
   // while Shift extends a range through the currently visible work list.
   const selectThread = useCallback((thread: PluginSidebarThread, event: ReactMouseEvent<HTMLAnchorElement>) => {
-    const toggle = event.ctrlKey || event.metaKey;
-    if (event.shiftKey && selectionAnchorId) {
-      const first = visibleThreadIds.indexOf(selectionAnchorId);
-      const last = visibleThreadIds.indexOf(thread.id);
-      if (first >= 0 && last >= 0) {
-        setSelectedThreadIds(new Set(visibleThreadIds.slice(Math.min(first, last), Math.max(first, last) + 1)));
-      } else {
-        setSelectedThreadIds(new Set([thread.id]));
-        setSelectionAnchorId(thread.id);
-      }
-      return true;
-    }
-    if (toggle) {
-      setSelectedThreadIds((current) => {
-        const next = new Set(current);
-        if (next.has(thread.id)) next.delete(thread.id); else next.add(thread.id);
-        return next;
-      });
-      setSelectionAnchorId(thread.id);
-      return true;
-    }
-    setSelectedThreadIds(new Set([thread.id]));
-    setSelectionAnchorId(thread.id);
-    return false;
-  }, [selectionAnchorId, visibleThreadIds]);
+    const state = threadInteractionStore.getState();
+    const next = selectThreadIds(state.selectedThreadIds, state.selectionAnchorId, visibleThreadIds, thread.id, {
+      toggle: event.ctrlKey || event.metaKey,
+      range: event.shiftKey,
+    });
+    state.setSelected(next.anchorId, next.selectedIds);
+    return next.handled;
+  }, [visibleThreadIds]);
   const selectedArchiveRoots = useMemo(() => {
     const byId = new Map(threads.map((thread) => [thread.id, thread]));
     return [...selectedThreadIds].filter((id) => {
@@ -801,8 +798,7 @@ function WorkThreadList(props: PluginThreadListProps) {
   const archiveSelected = useCallback(async () => {
     if (!selectedArchiveRoots.length) return;
     await Promise.all(selectedArchiveRoots.map((id) => actions.archive(id)));
-    setSelectedThreadIds(new Set());
-    setSelectionAnchorId(null);
+    threadInteractionStore.getState().setSelected(null, []);
   }, [actions, selectedArchiveRoots]);
 
   const reorder = (sourceId: string, targetId: string, placement: "before" | "after") => {
@@ -953,8 +949,6 @@ function WorkThreadList(props: PluginThreadListProps) {
   );
 }
 
-type WorkTab = "work" | "changes" | "agents";
-
 const WORK_TABS: readonly { id: WorkTab; label: string; description: string }[] = [
   { id: "work", label: "Work", description: "Outcome, execution tasks, goal, and plan" },
   { id: "changes", label: "Changes", description: "Pull request, stack, branch, and working-tree state" },
@@ -1031,7 +1025,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const githubApiHealth = githubHealthQuery.data ?? { state: "available" as const, scope: "unknown" as const, message: null, retryAt: null };
   const navigate = useBbNavigate();
   const actions = experimental_useSidebarThreadActions();
-  const [tab, setTab] = useState<WorkTab>("work");
+  const tab = useStore(threadInteractionStore, (state) => state.workTabsByThread.get(threadId) ?? "work");
   const [context, setContext] = useState<WorkPanelContext | null>(() => workPanelCache.get(threadId) ?? null);
   const [loading, setLoading] = useState(() => !workPanelCache.has(threadId));
   const [changesLoading, setChangesLoading] = useState(() => !workPanelDetailsCache.get(threadId)?.repository);
@@ -1187,7 +1181,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   };
 
   const selectedTab = WORK_TABS.find((candidate) => candidate.id === tab) ?? WORK_TABS[0]!;
-  const selectTab = (next: WorkTab) => setTab(next);
+  const selectTab = (next: WorkTab) => threadInteractionStore.getState().setWorkTab(threadId, next);
   const onTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
