@@ -507,9 +507,14 @@ function parseRules(source: string): Rule[] {
   return rules;
 }
 
-function effectiveDeclarations(rules: Rule[], selector: string) {
+function ruleKey({ atRules, selector }: Pick<Rule, "atRules" | "selector">) {
+  return JSON.stringify([...atRules, selector]);
+}
+
+function effectiveDeclarations(rules: Rule[], selector: string, atRules: string[] = []) {
   const effective = new Map<string, Declaration>();
-  for (const rule of rules.filter((candidate) => candidate.selector === selector)) {
+  const key = ruleKey({ atRules, selector });
+  for (const rule of rules.filter((candidate) => ruleKey(candidate) === key)) {
     for (const declaration of rule.declarations) {
       const previous = effective.get(declaration.property);
       if (!previous || declaration.important || !previous.important) effective.set(declaration.property, declaration);
@@ -519,11 +524,14 @@ function effectiveDeclarations(rules: Rule[], selector: string) {
 }
 
 function overlappingProperties(rules: Rule[]) {
-  const bySelector = new Map<string, Rule[]>();
-  for (const rule of rules) bySelector.set(rule.selector, [...(bySelector.get(rule.selector) ?? []), rule]);
+  const byCascade = new Map<string, Rule[]>();
+  for (const rule of rules) {
+    const key = ruleKey(rule);
+    byCascade.set(key, [...(byCascade.get(key) ?? []), rule]);
+  }
   const duplicates: DuplicateInventoryItem[] = [];
 
-  for (const [selector, selectorRules] of bySelector) {
+  for (const selectorRules of byCascade.values()) {
     if (selectorRules.length < 2) continue;
     const properties = new Set<string>();
     for (let first = 0; first < selectorRules.length; first += 1) {
@@ -534,17 +542,25 @@ function overlappingProperties(rules: Rule[]) {
       }
     }
     if (properties.size === 0) continue;
-    duplicates.push({ selector, lines: selectorRules.map(({ line }) => line), overlappingProperties: [...properties].sort() });
+    duplicates.push({
+      selector: selectorRules[0]!.selector,
+      lines: selectorRules.map(({ line }) => line),
+      overlappingProperties: [...properties].sort(),
+    });
   }
   return duplicates;
 }
 
 function repeatedExactSelectors(rules: Rule[]) {
-  const counts = new Map<string, number>();
-  for (const rule of rules) counts.set(rule.selector, (counts.get(rule.selector) ?? 0) + 1);
-  return [...counts.entries()]
-    .filter(([, count]) => count > 1)
-    .map(([selector]) => selector);
+  const counts = new Map<string, { count: number; selector: string }>();
+  for (const rule of rules) {
+    const key = ruleKey(rule);
+    const count = counts.get(key);
+    counts.set(key, { count: (count?.count ?? 0) + 1, selector: rule.selector });
+  }
+  return [...counts.values()]
+    .filter(({ count }) => count > 1)
+    .map(({ selector }) => selector);
 }
 
 function emptyRules(rules: Rule[]) {
@@ -568,6 +584,28 @@ describe("protected stylesheet duplicate ownership", () => {
         atRules: ["@media (min-width: 1px)"],
       },
     ]);
+  });
+
+  test("keeps top-level and at-rule stack toggle gaps in separate cascades", () => {
+    const media = "@media (max-width: 320px)";
+    const rules = parseRules(`
+      .ws-stack-layer-toggle { gap: 0.05rem; }
+      @media (max-width: 320px) {
+        .ws-stack-layer-toggle { gap: 0.02rem; }
+      }
+    `);
+
+    expect({
+      topLevel: effectiveDeclarations(rules, ".ws-stack-layer-toggle"),
+      media: effectiveDeclarations(rules, ".ws-stack-layer-toggle", [media]),
+      overlaps: overlappingProperties(rules),
+      repeated: repeatedExactSelectors(rules),
+    }).toEqual({
+      topLevel: { gap: "0.05rem" },
+      media: { gap: "0.02rem" },
+      overlaps: [],
+      repeated: [],
+    });
   });
 
   test("preserves the exact RED inventory and effective declarations", () => {
