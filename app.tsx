@@ -76,8 +76,8 @@ import "./views.css";
 import { PluginProviders } from "./query-runtime";
 import { selectThreadIds } from "./features/threads/model";
 import { threadInteractionStore, type ThreadDropTarget, type WorkTab } from "./features/threads/store";
+import { useArchivedThreads, useThreadPreferences } from "./features/threads/queries";
 
-const SIDEBAR_ORDER_CHANNEL = "sidebar-order:changed";
 type SidebarThreadGroup = { id: string; name: string; threadIds: string[] };
 
 function withPluginProviders<Props extends object>(Component: ComponentType<Props>): ComponentType<Props> {
@@ -496,14 +496,16 @@ function WorkThreadList(props: PluginThreadListProps) {
   useTasksRealtimeInvalidation();
   const { values: pluginSettings } = useSettings();
   const taskLinks = taskLinksData?.links ?? {};
+  const threadPreferences = useThreadPreferences();
+  const archivedThreadQuery = useArchivedThreads();
   const [view, setView] = useState<SidebarView>("work");
-  const [threadListMode, setThreadListMode] = useState<"enhanced" | "native">("enhanced");
+  const threadListMode = threadPreferences.listMode.data ?? "enhanced";
   const [threadSettingsOpen, setThreadSettingsOpen] = useState(false);
   const [activeThreadsOpen, setActiveThreadsOpen] = useState(true);
   const [archivedOpen, setArchivedOpen] = useState(false);
-  const [archivedThreads, setArchivedThreads] = useState<ArchivedThread[]>([]);
-  const [archivedThreadState, setArchivedThreadState] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [archivedThreadError, setArchivedThreadError] = useState<string | null>(null);
+  const archivedThreads = archivedThreadQuery.archive.data ?? [];
+  const archivedThreadState = archivedThreadQuery.archive.isPending ? "loading" : archivedThreadQuery.archive.isError ? "error" : archivedThreadQuery.archive.isSuccess ? "ready" : "idle";
+  const archivedThreadError = archivedThreadQuery.archive.error?.message ?? null;
   const tasks = tasksData?.tasks ?? [];
   const taskMutations = useTasksMutations(rpc);
   const taskProjects = tasksData?.projects ?? [];
@@ -515,11 +517,8 @@ function WorkThreadList(props: PluginThreadListProps) {
   const [newTaskAssignee, setNewTaskAssignee] = useState<SidebarTask["assignee"]>("human");
   const [dragTaskId, setDragTaskId] = useState<string | null>(null);
   const [taskDropTarget, setTaskDropTarget] = useState<{ taskId: string; placement: "before" | "after" } | null>(null);
-  const orderRequest = useRef(0);
-  const orderMutation = useRef(0);
-  const orderRef = useRef<string[]>([]);
-  const [threadOrder, setThreadOrder] = useState<string[]>([]);
-  const [threadGroups, setThreadGroups] = useState<SidebarThreadGroup[]>([]);
+  const threadOrder = threadPreferences.order.data ?? [];
+  const threadGroups = threadPreferences.groups.data ?? [];
   const dragThreadId = useStore(threadInteractionStore, (state) => state.dragThreadId);
   const threadDropTarget = useStore(threadInteractionStore, (state) => state.dropTarget);
   const selectedThreadIds = useStore(threadInteractionStore, (state) => state.selectedThreadIds);
@@ -549,99 +548,34 @@ function WorkThreadList(props: PluginThreadListProps) {
     threadInteractionStore.getState().reconcileRoster(threads.map((thread) => thread.id));
   }, [threads]);
 
-  useEffect(() => {
-    void rpc.call("getThreadListMode", null).then((result) => setThreadListMode(result.mode)).catch(() => undefined);
-  }, [rpc]);
   const setSavedThreadListMode = (mode: "enhanced" | "native") => {
-    setThreadListMode(mode); setThreadSettingsOpen(false);
-    void rpc.call("saveThreadListMode", { mode }).catch(() => toast.error("Could not save thread-list preference."));
+    setThreadSettingsOpen(false);
+    void threadPreferences.saveListMode.mutateAsync(mode).catch(() => toast.error("Could not save thread-list preference."));
   };
 
-  const applyOrder = useCallback((next: string[]) => {
-    orderRef.current = next;
-    setThreadOrder(next);
-  }, []);
-  const refreshSidebarOrder = useCallback(async () => {
-    const request = ++orderRequest.current;
-    try {
-      const result = await rpc.call("getSidebarOrder", null);
-      if (request === orderRequest.current) applyOrder(reconcileThreadOrder(result.threadIds, threads));
-    } catch {
-      // Older/temporarily rolled-back backends have no ordering RPC. Keep the
-      // host order and all native behavior available.
-      if (request === orderRequest.current && orderRef.current.length === 0) {
-        applyOrder(reconcileThreadOrder([], threads));
-      }
-    }
-  }, [applyOrder, rpc, threads]);
-  useEffect(() => {
-    void refreshSidebarOrder();
-    return () => { orderRequest.current += 1; orderMutation.current += 1; };
-  }, [refreshSidebarOrder]);
-  const refreshThreadGroups = useCallback(async () => {
-    try {
-      const result = await rpc.call("getThreadGroups", null);
-      setThreadGroups(result.groups);
-    } catch {
-      // Keep the last known custom groups while the plugin backend reloads.
-    }
-  }, [rpc]);
-  useEffect(() => {
-    void refreshThreadGroups();
-  }, [refreshThreadGroups]);
+  const refreshSidebarOrder = useCallback(async () => { await threadPreferences.order.refetch(); }, [threadPreferences.order]);
+  const refreshThreadGroups = useCallback(async () => { await threadPreferences.groups.refetch(); }, [threadPreferences.groups]);
   const refreshArchivedThreads = useCallback(async (force = false) => {
-    setArchivedThreadState("loading"); setArchivedThreadError(null);
-    try {
-      const result = await rpc.call("sidebarArchivedThreads", { force });
-      if (!result.available) throw new Error(result.error ?? "Archive threads are unavailable.");
-      setArchivedThreads(result.threads); setArchivedThreadState("ready");
-    } catch (error) {
-      setArchivedThreads([]); setArchivedThreadError(error instanceof Error ? error.message : String(error)); setArchivedThreadState("error");
-    }
-  }, [rpc]);
-  useEffect(() => {
-    // Warm this slow native query after the visible sidebar is responsive, so
-    // expanding Archived normally renders from the plugin/server cache.
-    const timer = window.setTimeout(() => void refreshArchivedThreads(), 350);
-    return () => window.clearTimeout(timer);
-  }, [refreshArchivedThreads]);
+    await archivedThreadQuery.archive.refetch();
+  }, [archivedThreadQuery.archive]);
   const saveThreadGroups = useCallback((next: SidebarThreadGroup[], previous = threadGroups) => {
-    setThreadGroups(next);
-    void rpc.call("saveThreadGroups", { groups: next }).then((result) => {
-      setThreadGroups(result.groups);
-    }).catch((error: unknown) => {
-      setThreadGroups(previous);
+    void threadPreferences.saveGroups.mutateAsync(next).catch((error: unknown) => {
       toast.error(error instanceof Error ? error.message : "Could not save thread groups");
     });
-  }, [rpc, threadGroups]);
+  }, [threadPreferences.saveGroups, threadGroups]);
   const unarchiveThread = useCallback((threadId: string, destination: string | null) => {
-    void rpc.call("unarchiveSidebarThread", { threadId }).then(async () => {
+    void archivedThreadQuery.unarchive.mutateAsync(threadId).then(async () => {
       if (destination) saveThreadGroups(threadGroups.map((group) => group.id === destination ? { ...group, threadIds: [...new Set([...group.threadIds, threadId])] } : group));
-      setArchivedThreads((current) => current.filter((thread) => thread.id !== threadId));
       toast.success(`Moved to ${destination ? threadGroups.find((group) => group.id === destination)?.name ?? "group" : "Active"}`);
     }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not unarchive thread"));
-  }, [rpc, saveThreadGroups, threadGroups]);
-  useRealtime(SIDEBAR_ORDER_CHANNEL, () => {
-    void refreshSidebarOrder();
-    void refreshThreadGroups();
-  });
-
+  }, [archivedThreadQuery.unarchive, saveThreadGroups, threadGroups]);
   const persistSidebarOrder = useCallback(async (next: string[]) => {
-    const previous = orderRef.current;
-    const mutation = ++orderMutation.current;
-    applyOrder(next);
     try {
-      const result = await rpc.call("saveSiblingOrder", { threadIds: next });
-      if (mutation === orderMutation.current) {
-        applyOrder(reconcileThreadOrder(result.threadIds, threads));
-      }
+      await threadPreferences.saveOrder.mutateAsync(next);
     } catch (error) {
-      if (mutation === orderMutation.current) {
-        applyOrder(previous);
-        toast.error(error instanceof Error ? error.message : "Could not save sidebar order");
-      }
+      toast.error(error instanceof Error ? error.message : "Could not save sidebar order");
     }
-  }, [applyOrder, rpc, threads]);
+  }, [threadPreferences.saveOrder]);
 
   const refreshTaskLinks = useCallback(async () => { await refetchTaskLinks(); }, [refetchTaskLinks]);
   const refreshThreadDetails = useCallback(async () => {

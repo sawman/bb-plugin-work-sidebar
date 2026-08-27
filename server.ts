@@ -6,15 +6,12 @@ import { normalizePullRequestSignal } from "./features/pull-requests/presentatio
 import { classifyPullRequestError, createPullRequestService } from "./features/pull-requests/server.js";
 import { readSidebarTasks } from "./features/tasks/server-read.js";
 import { rpcContract } from "./contracts.js";
-import { sanitizeThreadOrder, type SidebarStack } from "./work-model.js";
+import { type SidebarStack } from "./work-model.js";
+import { createThreadPreferencesService } from "./features/threads/server.js";
 import { createServerLifecycle, type GitHubApiHealth, type ServerLifecycle } from "./server-lifecycle.js";
 
 const execFileAsync = promisify(execFile);
 const TASKS_PLUGIN_ID = "tasks";
-const SIDEBAR_ORDER_KEY = "sidebar-thread-order:v1";
-const THREAD_LIST_MODE_KEY = "sidebar-thread-list-mode:v1";
-const LATER_THREADS_KEY = "sidebar-later-threads:v1";
-const THREAD_GROUPS_KEY = "sidebar-thread-groups:v1";
 const WORK_BINDINGS_KEY = "work-bindings:v2";
 const TASK_ASSIGNEES_KEY = "sidebar-task-assignees:v1";
 const LINEAR_LINKS_KEY = "work-linear-links:v1";
@@ -285,23 +282,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-type SidebarThreadGroup = { id: string; name: string; threadIds: string[] };
-
-export function normalizeThreadGroups(value: unknown, legacyLater: unknown = []): SidebarThreadGroup[] {
-  const rawGroups = isRecord(value) && Array.isArray(value.groups) ? value.groups : null;
-  const candidates = rawGroups ?? [{ id: "group_later", name: "Later", threadIds: sanitizeThreadOrder(legacyLater) }];
-  const usedIds = new Set<string>();
-  const assignedThreads = new Set<string>();
-  return candidates.flatMap((candidate): SidebarThreadGroup[] => {
-    if (!isRecord(candidate) || typeof candidate.id !== "string" || !/^group_[a-z0-9_-]{1,48}$/.test(candidate.id) || usedIds.has(candidate.id)) return [];
-    const name = typeof candidate.name === "string" ? candidate.name.trim().slice(0, 40) : "";
-    if (!name) return [];
-    usedIds.add(candidate.id);
-    const threadIds = sanitizeThreadOrder(candidate.threadIds).filter((threadId) => !assignedThreads.has(threadId));
-    threadIds.forEach((threadId) => assignedThreads.add(threadId));
-    return [{ id: candidate.id, name, threadIds }];
-  });
-}
 
 function requiredString(value: unknown, field: string): string {
   if (typeof value !== "string" || value.length === 0) throw new Error(`GitHub Stack response has invalid ${field}`);
@@ -724,39 +704,24 @@ function assertExecutionTaskBinding(binding: ExecutionBinding, task: Task) {
   if (task.projectId !== binding.taskProjectId) throw new Error(`Execution binding project mismatch: task ${task.id} is in ${task.projectId}, binding expects ${binding.taskProjectId}`);
 }
 
-async function loadSidebarArchivedThreads() {
-  const { stdout } = await execFileAsync(BB_CLI, ["thread", "list", "--archived", "--json"], { maxBuffer: 8_000_000 });
-  const rows: unknown = JSON.parse(stdout);
-  if (!Array.isArray(rows)) throw new Error("BB returned an invalid archived-thread list.");
-  return rows.flatMap((row) => {
-    if (!isRecord(row) || typeof row.id !== "string" || !row.id.startsWith("thr_") || typeof row.projectId !== "string") return [];
-    const archivedAt = typeof row.archivedAt === "number" ? row.archivedAt : null;
-    if (archivedAt === null || typeof row.deletedAt === "number") return [];
+async function loadSidebarArchivedThreads(bb: BbPluginApi) {
+  const threads = await bb.sdk.threads.list({ archived: true, includeHidden: true, limit: 2_000 });
+  return threads.flatMap((row) => {
+    if (row.archivedAt === null || row.deletedAt !== null) return [];
     return [{
       id: row.id,
       projectId: row.projectId,
-      title: typeof row.title === "string" ? row.title : null,
-      titleFallback: typeof row.titleFallback === "string" ? row.titleFallback : null,
-      parentThreadId: typeof row.parentThreadId === "string" ? row.parentThreadId : null,
-      environmentBranchName: typeof row.environmentBranchName === "string" ? row.environmentBranchName : null,
+      title: row.title,
+      titleFallback: row.titleFallback,
+      parentThreadId: row.parentThreadId,
+      environmentBranchName: row.environmentBranchName,
       isPinned: row.pinnedAt !== null,
       isUnread: false,
-      createdAt: typeof row.createdAt === "number" ? row.createdAt : 0,
-      updatedAt: typeof row.updatedAt === "number" ? row.updatedAt : archivedAt,
-      archivedAt,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      archivedAt: row.archivedAt,
     }];
   });
-}
-
-async function sidebarArchivedThreads() {
-  const lifecycle = runtime();
-  const cached = lifecycle.archivedThreadsCache as { expiresAt: number; value: Awaited<ReturnType<typeof loadSidebarArchivedThreads>> } | null;
-  if (cached && cached.expiresAt > Date.now()) return cached.value;
-  if (!lifecycle.archivedThreadsPending) lifecycle.archivedThreadsPending = loadSidebarArchivedThreads().then((value) => {
-    if (!lifecycle.isDisposed) lifecycle.archivedThreadsCache = { value, expiresAt: Date.now() + 5 * 60_000 };
-    return value;
-  }).finally(() => { lifecycle.archivedThreadsPending = null; });
-  return lifecycle.archivedThreadsPending as Promise<Awaited<ReturnType<typeof loadSidebarArchivedThreads>>>;
 }
 
 export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle = createServerLifecycle()) {
@@ -1411,47 +1376,37 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     },
   });
   bb.onDispose(() => authoredPullRequestService.dispose());
+  const threadPreferences = createThreadPreferencesService({
+    get: (key) => bb.storage.kv.get<unknown>(key),
+    set: (key, value) => bb.storage.kv.set(key, value),
+    publish: (channel, payload) => bb.realtime.publish(channel, payload),
+  });
 
   bb.rpc.register(rpcContract, {
     async getGitHubApiHealth() { return githubReadHealth(); },
     async getSidebarOrder() {
-      return { threadIds: sanitizeThreadOrder(await bb.storage.kv.get<unknown>(SIDEBAR_ORDER_KEY)) };
+      return { threadIds: await threadPreferences.order() };
     },
     async getThreadListMode() {
-      const value = await bb.storage.kv.get<unknown>(THREAD_LIST_MODE_KEY);
-      return { mode: value === "native" ? "native" as const : "enhanced" as const };
+      return { mode: await threadPreferences.listMode() };
     },
     async saveThreadListMode({ mode }) {
-      await bb.storage.kv.set(THREAD_LIST_MODE_KEY, mode);
-      return { mode };
+      return { mode: await threadPreferences.saveListMode(mode) };
     },
     async saveSiblingOrder({ threadIds }) {
-      const sanitized = sanitizeThreadOrder(threadIds);
-      await bb.storage.kv.set(SIDEBAR_ORDER_KEY, sanitized);
-      bb.realtime.publish(SIDEBAR_ORDER_CHANNEL, { threadIds: sanitized });
-      return { threadIds: sanitized };
+      return { threadIds: await threadPreferences.saveOrder(threadIds) };
     },
     async getLaterThreads() {
-      return { threadIds: sanitizeThreadOrder(await bb.storage.kv.get<unknown>(LATER_THREADS_KEY)) };
+      return { threadIds: await threadPreferences.later() };
     },
     async saveLaterThreads({ threadIds }) {
-      const sanitized = sanitizeThreadOrder(threadIds);
-      await bb.storage.kv.set(LATER_THREADS_KEY, sanitized);
-      bb.realtime.publish(SIDEBAR_ORDER_CHANNEL, { threadIds: sanitized });
-      return { threadIds: sanitized };
+      return { threadIds: await threadPreferences.saveLater(threadIds) };
     },
     async getThreadGroups() {
-      const [savedGroups, legacyLater] = await Promise.all([
-        bb.storage.kv.get<unknown>(THREAD_GROUPS_KEY),
-        bb.storage.kv.get<unknown>(LATER_THREADS_KEY),
-      ]);
-      return { groups: normalizeThreadGroups(savedGroups, legacyLater) };
+      return { groups: await threadPreferences.groups() };
     },
     async saveThreadGroups({ groups }) {
-      const normalized = normalizeThreadGroups({ groups });
-      await bb.storage.kv.set(THREAD_GROUPS_KEY, { groups: normalized });
-      bb.realtime.publish(SIDEBAR_ORDER_CHANNEL, { groups: normalized });
-      return { groups: normalized };
+      return { groups: await threadPreferences.saveGroups(groups) };
     },
     async sidebarTasks() {
       try {
@@ -1522,15 +1477,13 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     },
     async sidebarArchivedThreads({ force }) {
       try {
-        if (force) runtime().archivedThreadsCache = null;
-        return { available: true, threads: await sidebarArchivedThreads(), error: null };
+        return { available: true, threads: await loadSidebarArchivedThreads(bb), error: null };
       } catch (error) {
         return { available: false, threads: [], error: error instanceof Error ? error.message : String(error) };
       }
     },
     async unarchiveSidebarThread({ threadId }) {
-      await execFileAsync(BB_CLI, ["thread", "unarchive", threadId], { maxBuffer: 1_000_000 });
-      runtime().archivedThreadsCache = null;
+      await bb.sdk.threads.unarchive({ threadId });
       return { threadId };
     },
     async getWorkContext({ threadId }) {

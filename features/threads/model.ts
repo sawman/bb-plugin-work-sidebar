@@ -1,5 +1,39 @@
 export type ThreadSelectionModifiers = Readonly<{ toggle?: boolean; range?: boolean }>;
 
+export type SidebarThreadGroup = Readonly<{ id: string; name: string; threadIds: string[] }>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function sanitizeThreadIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  return value.flatMap((item) => {
+    const id = typeof item === "string" ? item.trim() : "";
+    if (!/^thr_[A-Za-z0-9_-]+$/.test(id) || seen.has(id)) return [];
+    seen.add(id);
+    return [id];
+  });
+}
+
+/** Browser-safe recovered preference normalization; it deliberately has no server dependency. */
+export function normalizeThreadGroups(value: unknown, legacyLater: unknown = []): SidebarThreadGroup[] {
+  const rawGroups = isRecord(value) && Array.isArray(value.groups) ? value.groups : null;
+  const candidates = rawGroups ?? [{ id: "group_later", name: "Later", threadIds: sanitizeThreadIds(legacyLater) }];
+  const usedIds = new Set<string>();
+  const assignedThreads = new Set<string>();
+  return candidates.flatMap((candidate): SidebarThreadGroup[] => {
+    if (!isRecord(candidate) || typeof candidate.id !== "string" || !/^group_[a-z0-9_-]{1,48}$/.test(candidate.id) || usedIds.has(candidate.id)) return [];
+    const name = typeof candidate.name === "string" ? candidate.name.trim().slice(0, 40) : "";
+    if (!name) return [];
+    usedIds.add(candidate.id);
+    const threadIds = sanitizeThreadIds(candidate.threadIds).filter((threadId) => !assignedThreads.has(threadId));
+    threadIds.forEach((threadId) => assignedThreads.add(threadId));
+    return [{ id: candidate.id, name, threadIds }];
+  });
+}
+
 export type ThreadSelectionResult = Readonly<{
   selectedIds: Set<string>;
   anchorId: string | null;
