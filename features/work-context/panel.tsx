@@ -8,6 +8,7 @@ import {
 import { Icon } from "../../components/ui/icon";
 import { ChangesPanel } from "../changes/panel";
 import { invalidateChanges } from "../changes/queries";
+import { changesInteractionStore } from "../changes/store";
 import { AgentsView } from "../agents/views";
 import { invalidateGitHubApiHealth } from "../pull-requests/queries";
 import { threadInteractionStore, type WorkTab } from "../threads/store";
@@ -44,6 +45,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
   );
   useEffect(() => {
     threadInteractionStore.getState().touchWorkTab(threadId);
+    return () => changesInteractionStore.getState().selectFile(threadId, null);
   }, [threadId]);
   useRealtime("work-sidebar:changed", (payload) => {
     const event = parseWorkSidebarRealtimeEvent(payload);
