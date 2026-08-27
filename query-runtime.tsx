@@ -1,4 +1,8 @@
-import { QueryClient, QueryClientProvider, type QueryKey } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  type QueryKey,
+} from "@tanstack/react-query";
 import type { ComponentType, PropsWithChildren, ReactElement } from "react";
 
 export type QueryPolicy = Readonly<{
@@ -20,7 +24,42 @@ export const queryKeys = {
     },
   },
   work: {
-    context: (threadId: string): QueryKey => [...queryRoot, "work", "context", threadId],
+    status: (threadId: string): QueryKey => [
+      ...queryRoot,
+      "work",
+      "status",
+      threadId,
+    ],
+    activity: (threadId: string): QueryKey => [
+      ...queryRoot,
+      "work",
+      "activity",
+      threadId,
+    ],
+    outcome: (threadId: string): QueryKey => [
+      ...queryRoot,
+      "work",
+      "outcome",
+      threadId,
+    ],
+    goal: (threadId: string): QueryKey => [
+      ...queryRoot,
+      "work",
+      "goal",
+      threadId,
+    ],
+    plan: (threadId: string): QueryKey => [
+      ...queryRoot,
+      "work",
+      "plan",
+      threadId,
+    ],
+    providerHealth: (threadId: string): QueryKey => [
+      ...queryRoot,
+      "work",
+      "provider-health",
+      threadId,
+    ],
   },
 } as const;
 
@@ -31,13 +70,30 @@ export const queryPolicies = {
     retry: false,
     refetchOnWindowFocus: false,
   },
-  sidebarTasksList: { staleTime: 15_000, gcTime: 10 * 60_000, retry: 1, refetchOnWindowFocus: false },
-  sidebarTaskLinks: { staleTime: 15_000, gcTime: 10 * 60_000, retry: 1, refetchOnWindowFocus: false },
+  sidebarTasksList: {
+    staleTime: 15_000,
+    gcTime: 10 * 60_000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  },
+  sidebarTaskLinks: {
+    staleTime: 15_000,
+    gcTime: 10 * 60_000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  },
   workContext: {
     staleTime: 5_000,
     gcTime: 10 * 60_000,
     retry: 1,
     refetchOnWindowFocus: false,
+  },
+  workActivity: {
+    staleTime: 0,
+    gcTime: 2 * 60_000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   },
 } as const satisfies Record<string, QueryPolicy>;
 
@@ -48,7 +104,12 @@ const pluginQueryClient = new QueryClient({
   defaultOptions: {
     // New query families must opt into one of the named policies above.
     // This conservative fallback cannot accidentally freeze remote records.
-    queries: { staleTime: 0, gcTime: 5 * 60_000, retry: false, refetchOnWindowFocus: false },
+    queries: {
+      staleTime: 0,
+      gcTime: 5 * 60_000,
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
   },
 });
 
@@ -57,12 +118,22 @@ export function getPluginQueryClient(): QueryClient {
 }
 
 export function PluginProviders({ children }: PropsWithChildren): ReactElement {
-  return <QueryClientProvider client={pluginQueryClient}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={pluginQueryClient}>
+      {children}
+    </QueryClientProvider>
+  );
 }
 
 /** The provider boundary belongs to the shared client generation, not a slot. */
-export function withPluginProviders<Props extends object>(Component: ComponentType<Props>): ComponentType<Props> {
+export function withPluginProviders<Props extends object>(
+  Component: ComponentType<Props>,
+): ComponentType<Props> {
   return function PluginSlot(props: Props) {
-    return <PluginProviders><Component {...props} /></PluginProviders>;
+    return (
+      <PluginProviders>
+        <Component {...props} />
+      </PluginProviders>
+    );
   };
 }

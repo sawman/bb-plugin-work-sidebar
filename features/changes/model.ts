@@ -1,4 +1,44 @@
+import type { GitHubStackBranch, GitHubStackSignal } from "../../contracts.js";
 import type { Changes, Repository } from "./schemas.js";
+
+export type StackBranchSignals = Pick<
+  GitHubStackSignal,
+  "state" | "draft" | "checks" | "review" | "reviewCommentCount"
+>;
+
+/** Merge the stack summary and branch-local signals without weakening RPC types. */
+export function mergeStackBranchSignals(
+  branch: GitHubStackBranch,
+  changes: Changes,
+): StackBranchSignals | undefined {
+  const stackPullRequest = changes.stack?.pullRequests.find(
+    (pullRequest) =>
+      pullRequest.number === branch.pr?.number ||
+      pullRequest.head === branch.name,
+  );
+  const current =
+    branch.pr?.number === changes.currentPullRequest?.number
+      ? changes.currentPullRequest
+      : null;
+
+  if (current) {
+    return {
+      ...stackPullRequest,
+      state: current.state,
+      draft: current.state === "draft",
+      ...current.signal,
+    };
+  }
+  if (!branch.pr) return stackPullRequest;
+  return {
+    ...stackPullRequest,
+    state: stackPullRequest?.state ?? branch.pr.state,
+    draft: stackPullRequest?.draft ?? branch.pr.isDraft,
+    checks: branch.checks ?? stackPullRequest?.checks ?? "unknown",
+    review: branch.review ?? stackPullRequest?.review ?? "none",
+    reviewCommentCount: stackPullRequest?.reviewCommentCount ?? 0,
+  };
+}
 
 export const changesKeys = {
   projection: (threadId: string) =>
@@ -6,7 +46,14 @@ export const changesKeys = {
   fingerprint: (threadId: string, url: string) =>
     ["work-sidebar", "changes", threadId, "fingerprint", url] as const,
   fileDiff: (threadId: string, fingerprint: string | null, path: string) =>
-    ["work-sidebar", "changes", threadId, "file-diff", fingerprint ?? "unknown", path] as const,
+    [
+      "work-sidebar",
+      "changes",
+      threadId,
+      "file-diff",
+      fingerprint ?? "unknown",
+      path,
+    ] as const,
 };
 export const changesPolicies = {
   projection: {

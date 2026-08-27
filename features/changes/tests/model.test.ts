@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { changesHeaderLabel, repositoryPresentation } from "../model";
+import {
+  changesHeaderLabel,
+  mergeStackBranchSignals,
+  repositoryPresentation,
+} from "../model";
 
 describe("R13 Changes model", () => {
   it("distinguishes clean, dirty, absent, and unavailable repositories and retains renamed, untracked, and deleted files", () => {
@@ -58,5 +62,63 @@ describe("R13 Changes model", () => {
         false,
       ),
     ).toBe("#7");
+  });
+
+  it("merges current-PR and stack signals with typed branch-local precedence", () => {
+    const branch = {
+      name: "feature/one",
+      isCurrent: true,
+      isMerged: false,
+      isQueued: false,
+      needsRebase: false,
+      hasStash: false,
+      stashCount: null,
+      pr: {
+        number: 7,
+        url: "https://github.com/acme/repo/pull/7",
+        state: "open",
+        title: "One",
+        isDraft: false,
+        metadataStale: false,
+      },
+      diff: null,
+      aheadOfRemote: 0,
+      behindRemote: 0,
+      checks: "passing",
+      review: "approved",
+    } as const;
+    const changes = {
+      currentPullRequest: {
+        number: 7,
+        state: "open",
+        signal: {
+          checks: "failed",
+          review: "changes_requested",
+          reviewCommentCount: 2,
+        },
+      },
+      stack: {
+        pullRequests: [
+          {
+            number: 7,
+            head: "feature/one",
+            state: "open",
+            draft: false,
+            checks: "passing",
+            review: "approved",
+            reviewCommentCount: 1,
+          },
+        ],
+      },
+    };
+    expect(mergeStackBranchSignals(branch, changes as never)).toEqual({
+      number: 7,
+      head: "feature/one",
+      state: "open",
+      draft: false,
+      checks: "failed",
+      review: "changes_requested",
+      reviewCommentCount: 2,
+    });
   });
 });

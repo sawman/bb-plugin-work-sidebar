@@ -1,28 +1,75 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { waitFor } from "@testing-library/react";
-import { getPluginQueryClient, queryKeys, queryPolicies } from "../../query-runtime";
+import {
+  getPluginQueryClient,
+  queryKeys,
+  queryPolicies,
+} from "../../query-runtime";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 
 describe("R2 app registration and Query lifecycle", () => {
   it("preserves every current slot registration and routes both mounted slots through one module client", async () => {
     const app = await loadPluginApp(() => import("../../app"));
 
-    expect(app.settingsSections.map(({ id }) => id)).toEqual(["github-polling"]);
+    expect(app.settingsSections.map(({ id }) => id)).toEqual([
+      "github-polling",
+    ]);
     expect(app.threadLists.map(({ id }) => id)).toEqual(["work-queue"]);
-    expect(app.threadPanelActions.map(({ id }) => id)).toEqual(["work-context"]);
-    expect(app.threadHeaderActions.map(({ id }) => id)).toEqual(["work-context-header"]);
-    expect(app.composerCustomizations.map(({ id }) => id)).toEqual(["task-first"]);
+    expect(app.threadPanelActions.map(({ id }) => id)).toEqual([
+      "work-context",
+    ]);
+    expect(app.threadHeaderActions.map(({ id }) => id)).toEqual([
+      "work-context-header",
+    ]);
+    expect(app.composerCustomizations.map(({ id }) => id)).toEqual([
+      "task-first",
+    ]);
 
     expect(getPluginQueryClient()).toBe(getPluginQueryClient());
-    expect(queryKeys.sidebar.order()).toEqual(["work-sidebar", "sidebar", "order"]);
-    expect(queryKeys.sidebar.tasks.list()).toEqual(["work-sidebar", "sidebar", "tasks", "list"]);
-    expect(queryKeys.sidebar.tasks.links()).toEqual(["work-sidebar", "sidebar", "tasks", "links"]);
-    expect(queryKeys.work.context("thr_test")).toEqual(["work-sidebar", "work", "context", "thr_test"]);
-    expect(queryPolicies.sidebarOrderPreferences).toMatchObject({ staleTime: Infinity, gcTime: 30 * 60_000, retry: false });
-    expect(queryPolicies.sidebarTasksList).toMatchObject({ staleTime: 15_000, gcTime: 10 * 60_000, retry: 1 });
-    expect(queryPolicies.sidebarTaskLinks).toMatchObject({ staleTime: 15_000, gcTime: 10 * 60_000, retry: 1 });
-    expect(queryPolicies.workContext).toMatchObject({ staleTime: 5_000, gcTime: 10 * 60_000, retry: 1 });
+    expect(queryKeys.sidebar.order()).toEqual([
+      "work-sidebar",
+      "sidebar",
+      "order",
+    ]);
+    expect(queryKeys.sidebar.tasks.list()).toEqual([
+      "work-sidebar",
+      "sidebar",
+      "tasks",
+      "list",
+    ]);
+    expect(queryKeys.sidebar.tasks.links()).toEqual([
+      "work-sidebar",
+      "sidebar",
+      "tasks",
+      "links",
+    ]);
+    expect(queryKeys.work.status("thr_test")).toEqual([
+      "work-sidebar",
+      "work",
+      "status",
+      "thr_test",
+    ]);
+    expect(queryPolicies.sidebarOrderPreferences).toMatchObject({
+      staleTime: Infinity,
+      gcTime: 30 * 60_000,
+      retry: false,
+    });
+    expect(queryPolicies.sidebarTasksList).toMatchObject({
+      staleTime: 15_000,
+      gcTime: 10 * 60_000,
+      retry: 1,
+    });
+    expect(queryPolicies.sidebarTaskLinks).toMatchObject({
+      staleTime: 15_000,
+      gcTime: 10 * 60_000,
+      retry: 1,
+    });
+    expect(queryPolicies.workContext).toMatchObject({
+      staleTime: 5_000,
+      gcTime: 10 * 60_000,
+      retry: 1,
+    });
     // The harness mounts slots independently, matching BB's left/right slot
     // ownership. R5 and R6 make both PR and Tasks consumers real observers on
     // the same module-generation QueryClient.
@@ -30,25 +77,76 @@ describe("R2 app registration and Query lifecycle", () => {
     const mount = vi.spyOn(client, "mount");
     const unmount = vi.spyOn(client, "unmount");
     const left = renderSlot(app.threadLists[0]!, {
-      activeThreadId: null, activeProjectId: null, isCompactViewport: false,
-      onNavigate: () => undefined, searchQuery: "", Original: () => null,
+      activeThreadId: null,
+      activeProjectId: null,
+      isCompactViewport: false,
+      onNavigate: () => undefined,
+      searchQuery: "",
+      Original: () => null,
     });
-    const right = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_test", params: null });
+    const right = renderSlot(app.threadPanelActions[0]!, {
+      threadId: "thr_test",
+      params: null,
+    });
     expect(mount).toHaveBeenCalledTimes(2);
     // R14 keeps the selected-file query mounted but disabled until a file is
     // opened; this preserves hook order without starting a diff request.
-    expect(client.getQueryCache().getAll()).toHaveLength(21);
-    expect(client.getQueryCache().find({ queryKey: ["work-sidebar", "sidebar", "threads", "order"] })?.getObserversCount()).toBe(1);
-    expect(client.getQueryCache().find({ queryKey: ["work-sidebar", "sidebar", "threads", "list-mode"] })?.getObserversCount()).toBe(1);
-    expect(client.getQueryCache().find({ queryKey: ["work-sidebar", "sidebar", "threads", "groups"] })?.getObserversCount()).toBe(1);
-    expect(client.getQueryCache().findAll({ queryKey: ["work-sidebar", "pull-requests", "authored", "stacks"] })[0]?.getObserversCount()).toBe(1);
-    expect(client.getQueryCache().findAll({ queryKey: ["work-sidebar", "pull-requests", "health"] })[0]?.getObserversCount()).toBe(2);
-    expect(client.getQueryCache().find({ queryKey: queryKeys.sidebar.tasks.list() })?.getObserversCount()).toBe(3);
-    expect(client.getQueryCache().find({ queryKey: queryKeys.sidebar.tasks.links() })?.getObserversCount()).toBe(1);
+    expect(client.getQueryCache().getAll()).toHaveLength(20);
+    expect(
+      client
+        .getQueryCache()
+        .find({ queryKey: ["work-sidebar", "sidebar", "threads", "order"] })
+        ?.getObserversCount(),
+    ).toBe(1);
+    expect(
+      client
+        .getQueryCache()
+        .find({ queryKey: ["work-sidebar", "sidebar", "threads", "list-mode"] })
+        ?.getObserversCount(),
+    ).toBe(1);
+    expect(
+      client
+        .getQueryCache()
+        .find({ queryKey: ["work-sidebar", "sidebar", "threads", "groups"] })
+        ?.getObserversCount(),
+    ).toBe(1);
+    expect(
+      client
+        .getQueryCache()
+        .findAll({
+          queryKey: ["work-sidebar", "pull-requests", "authored", "stacks"],
+        })[0]
+        ?.getObserversCount(),
+    ).toBe(1);
+    expect(
+      client
+        .getQueryCache()
+        .findAll({ queryKey: ["work-sidebar", "pull-requests", "health"] })[0]
+        ?.getObserversCount(),
+    ).toBe(2);
+    expect(
+      client
+        .getQueryCache()
+        .find({ queryKey: queryKeys.sidebar.tasks.list() })
+        ?.getObserversCount(),
+    ).toBe(2);
+    expect(
+      client
+        .getQueryCache()
+        .find({ queryKey: queryKeys.sidebar.tasks.links() })
+        ?.getObserversCount(),
+    ).toBe(1);
     left.unmount();
     right.unmount();
     expect(unmount).toHaveBeenCalledTimes(2);
-    await waitFor(() => expect(client.getQueryCache().getAll().every((query) => query.getObserversCount() === 0)).toBe(true));
+    await waitFor(() =>
+      expect(
+        client
+          .getQueryCache()
+          .getAll()
+          .every((query) => query.getObserversCount() === 0),
+      ).toBe(true),
+    );
     client.clear();
     expect(client.getQueryCache().getAll()).toEqual([]);
   });
@@ -64,16 +162,30 @@ describe("R2 app registration and Query lifecycle", () => {
 
     for (let generation = 0; generation < 2; generation += 1) {
       const left = renderSlot(app.threadLists[0]!, {
-        activeThreadId: null, activeProjectId: null, isCompactViewport: false,
-        onNavigate: () => undefined, searchQuery: "", Original: () => null,
+        activeThreadId: null,
+        activeProjectId: null,
+        isCompactViewport: false,
+        onNavigate: () => undefined,
+        searchQuery: "",
+        Original: () => null,
       });
-      const right = renderSlot(app.threadPanelActions[0]!, { threadId: `thr_generation_${generation}`, params: null });
+      const right = renderSlot(app.threadPanelActions[0]!, {
+        threadId: `thr_generation_${generation}`,
+        params: null,
+      });
       expect(app.threadLists).toHaveLength(1);
       expect(app.threadPanelActions).toHaveLength(1);
       expect(app.threadHeaderActions).toHaveLength(1);
       left.lifecycle.unmount();
       right.lifecycle.unmount();
-      await waitFor(() => expect(client.getQueryCache().getAll().every((query) => query.getObserversCount() === 0)).toBe(true));
+      await waitFor(() =>
+        expect(
+          client
+            .getQueryCache()
+            .getAll()
+            .every((query) => query.getObserversCount() === 0),
+        ).toBe(true),
+      );
       client.clear();
     }
 
@@ -88,33 +200,135 @@ describe("R6 mounted Tasks reads", () => {
     const client = getPluginQueryClient();
     client.clear();
     const rpc = {
-      sidebarTasks: () => ({ available: true, tasks: [], projects: [], error: null }),
+      sidebarTasks: () => ({
+        available: true,
+        tasks: [],
+        projects: [],
+        error: null,
+      }),
       sidebarTaskLinks: () => ({ available: true, links: {}, error: null }),
-      getSidebarOrder: () => ({ threadIds: [] }), getThreadListMode: () => ({ mode: "enhanced" }), getThreadGroups: () => ({ groups: [] }),
-      sidebarArchivedThreads: () => ({ available: true, threads: [], error: null }), getWorkTracker: () => ({ visible: false, available: false, message: null, suggestions: [], item: null, statusOptions: [] }),
+      getSidebarOrder: () => ({ threadIds: [] }),
+      getThreadListMode: () => ({ mode: "enhanced" }),
+      getThreadGroups: () => ({ groups: [] }),
+      sidebarArchivedThreads: () => ({
+        available: true,
+        threads: [],
+        error: null,
+      }),
+      getWorkTracker: () => ({
+        visible: false,
+        available: false,
+        message: null,
+        suggestions: [],
+        item: null,
+        statusOptions: [],
+      }),
     } as never;
-    const left = renderSlot(app.threadLists[0]!, { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => undefined, searchQuery: "", Original: () => null }, { rpc });
-    const right = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_test", params: null }, { rpc });
-    await waitFor(() => expect(left.inspection.rpcCalls.filter((call) => call.method === "sidebarTasks")).toHaveLength(1));
-    expect(left.inspection.rpcCalls.filter((call) => call.method === "sidebarTaskLinks")).toHaveLength(1);
-    expect(right.inspection.rpcCalls.filter((call) => call.method === "sidebarTasks")).toHaveLength(0);
+    const left = renderSlot(
+      app.threadLists[0]!,
+      {
+        activeThreadId: null,
+        activeProjectId: null,
+        isCompactViewport: false,
+        onNavigate: () => undefined,
+        searchQuery: "",
+        Original: () => null,
+      },
+      { rpc },
+    );
+    const right = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_test", params: null },
+      { rpc },
+    );
+    await waitFor(() =>
+      expect(
+        left.inspection.rpcCalls.filter(
+          (call) => call.method === "sidebarTasks",
+        ),
+      ).toHaveLength(1),
+    );
+    expect(
+      left.inspection.rpcCalls.filter(
+        (call) => call.method === "sidebarTaskLinks",
+      ),
+    ).toHaveLength(1);
+    expect(
+      right.inspection.rpcCalls.filter(
+        (call) => call.method === "sidebarTasks",
+      ),
+    ).toHaveLength(0);
     // Header badge and body card are separate observers but share one tracker
     // context request through the module QueryClient.
-    await waitFor(() => expect(right.inspection.rpcCalls.filter((call) => call.method === "getWorkTracker")).toHaveLength(1));
-    left.lifecycle.unmount(); right.lifecycle.unmount();
-    await waitFor(() => expect(client.getQueryCache().getAll().every((query) => query.getObserversCount() === 0)).toBe(true));
+    await waitFor(() =>
+      expect(
+        right.inspection.rpcCalls.filter(
+          (call) => call.method === "getWorkTracker",
+        ),
+      ).toHaveLength(1),
+    );
+    left.lifecycle.unmount();
+    right.lifecycle.unmount();
+    await waitFor(() =>
+      expect(
+        client
+          .getQueryCache()
+          .getAll()
+          .every((query) => query.getObserversCount() === 0),
+      ).toBe(true),
+    );
     client.clear();
   });
 
   it("polls only task links every 30 seconds", async () => {
     vi.useFakeTimers();
     const app = await loadPluginApp(() => import("../../app"));
-    const client = getPluginQueryClient(); client.clear();
-    const slot = renderSlot(app.threadLists[0]!, { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: () => undefined, searchQuery: "", Original: () => null }, { rpc: { sidebarTasks: () => ({ available: true, tasks: [], projects: [], error: null }), sidebarTaskLinks: () => ({ available: true, links: {}, error: null }), getSidebarOrder: () => ({ threadIds: [] }), getThreadListMode: () => ({ mode: "enhanced" }), getThreadGroups: () => ({ groups: [] }), sidebarArchivedThreads: () => ({ available: true, threads: [], error: null }) } as never });
+    const client = getPluginQueryClient();
+    client.clear();
+    const slot = renderSlot(
+      app.threadLists[0]!,
+      {
+        activeThreadId: null,
+        activeProjectId: null,
+        isCompactViewport: false,
+        onNavigate: () => undefined,
+        searchQuery: "",
+        Original: () => null,
+      },
+      {
+        rpc: {
+          sidebarTasks: () => ({
+            available: true,
+            tasks: [],
+            projects: [],
+            error: null,
+          }),
+          sidebarTaskLinks: () => ({ available: true, links: {}, error: null }),
+          getSidebarOrder: () => ({ threadIds: [] }),
+          getThreadListMode: () => ({ mode: "enhanced" }),
+          getThreadGroups: () => ({ groups: [] }),
+          sidebarArchivedThreads: () => ({
+            available: true,
+            threads: [],
+            error: null,
+          }),
+        } as never,
+      },
+    );
     await vi.advanceTimersByTimeAsync(0);
-    expect(slot.inspection.rpcCalls.filter((call) => call.method === "sidebarTaskLinks")).toHaveLength(1);
+    expect(
+      slot.inspection.rpcCalls.filter(
+        (call) => call.method === "sidebarTaskLinks",
+      ),
+    ).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(30_000);
-    expect(slot.inspection.rpcCalls.filter((call) => call.method === "sidebarTaskLinks")).toHaveLength(2);
-    slot.lifecycle.unmount(); client.clear(); vi.useRealTimers();
+    expect(
+      slot.inspection.rpcCalls.filter(
+        (call) => call.method === "sidebarTaskLinks",
+      ),
+    ).toHaveLength(2);
+    slot.lifecycle.unmount();
+    client.clear();
+    vi.useRealTimers();
   });
 });

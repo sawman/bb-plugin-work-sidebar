@@ -11,7 +11,7 @@ import { goalProgressPercent, readableStatus, runtimeStatusPresentation } from "
 import { useTasksMutations } from "../tasks/mutations";
 import { useTasksRead } from "../tasks/queries";
 import { nextOutcomeStatus } from "./model";
-import { useLatestActivity, useLegacyProviderHealth, useWorkGoal, useWorkOutcome, useWorkOutcomeMutation, useWorkPlan, useWorkStatus } from "./queries";
+import { useLatestActivity, useWorkGoal, useWorkOutcome, useWorkOutcomeMutation, useWorkPlan, useWorkProviderHealth, useWorkStatus } from "./queries";
 
 type CardStateProps = { title: string; className?: string; pending: boolean; error: Error | null; onRetry: () => void; children: ReactNode };
 
@@ -29,7 +29,7 @@ function CardState({ title, className = "", pending, error, onRetry, children }:
 function StatusCard({ threadId }: { threadId: string }) {
   const query = useWorkStatus(threadId);
   const latestActivity = useLatestActivity(threadId, query.data?.currentThread.status);
-  const provider = useLegacyProviderHealth(threadId);
+  const provider = useWorkProviderHealth(threadId);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const data = query.data;
   const runtime = data ? runtimeStatusPresentation(data.currentThread) : null;

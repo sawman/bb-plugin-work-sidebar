@@ -30,7 +30,7 @@ function stylesheetRules(source: string) {
 const dynamicClassFamilies = [
   { prefix: "ws-agent-state-", file: "features/agents/views.tsx", suffixes: ["working", "waiting", "blocked", "complete", "idle"] },
   { prefix: "ws-file-", file: "features/changes/views.tsx", suffixes: ["added", "deleted", "modified", "renamed", "untracked"] },
-  { prefix: "ws-github-api-", file: "app.tsx", suffixes: ["available", "rate_limited", "unavailable"] },
+  { prefix: "ws-github-api-", file: "features/changes/panel.tsx", suffixes: ["available", "rate_limited", "unavailable"] },
   { prefix: "ws-plan-", file: "features/work-context/views.tsx", suffixes: ["completed", "in_progress", "pending"] },
   { prefix: "ws-provider-health-", file: "features/work-context/views.tsx", suffixes: ["green", "amber", "red"] },
   { prefix: "ws-status-dot-", file: "features/work-context/views.tsx", suffixes: ["in_progress", "running", "done"] },

@@ -86,26 +86,50 @@ function changesResult(
 type ChangesFixture = {
   getChanges: () => Promise<ChangesResult> | ChangesResult;
   getWorkContext?: () => typeof context;
+  getWorkStatus?: () => unknown;
+  getGitHubApiHealth?: () => unknown;
   githubHealth?: "available" | "rate_limited";
-  checkoutStackBranch?: (input: { threadId: string; branch: string }) => unknown;
-  getWorkingTreeFileDiff?: (input: { threadId: string; path: string }) => unknown;
+  checkoutStackBranch?: (input: {
+    threadId: string;
+    branch: string;
+  }) => unknown;
+  getWorkingTreeFileDiff?: (input: {
+    threadId: string;
+    path: string;
+  }) => unknown;
 };
 function rpc({
   getChanges,
   getWorkContext = () => context,
+  getWorkStatus = () => ({
+    currentThread: context.currentThread,
+    children: [],
+  }),
   githubHealth = "available",
-  checkoutStackBranch = () => ({ ok: true, message: "Checked out", detail: null }),
-  getWorkingTreeFileDiff = ({ path }) => ({ kind: "absent", path, patch: null, message: "No diff" }),
+  getGitHubApiHealth,
+  checkoutStackBranch = () => ({
+    ok: true,
+    message: "Checked out",
+    detail: null,
+  }),
+  getWorkingTreeFileDiff = ({ path }) => ({
+    kind: "absent",
+    path,
+    patch: null,
+    message: "No diff",
+  }),
 }: ChangesFixture) {
   return {
     getWorkContext,
     getChanges,
-    getGitHubApiHealth: () => ({
-      state: githubHealth,
-      scope: githubHealth === "available" ? "unknown" : "rest",
-      message: githubHealth === "available" ? null : "limited",
-      retryAt: null,
-    }),
+    getGitHubApiHealth:
+      getGitHubApiHealth ??
+      (() => ({
+        state: githubHealth,
+        scope: githubHealth === "available" ? "unknown" : "rest",
+        message: githubHealth === "available" ? null : "limited",
+        retryAt: null,
+      })),
     getWorkProviderStatus: () => ({
       tone: "green",
       providerId: "codex",
@@ -122,10 +146,7 @@ function rpc({
       item: null,
       statusOptions: [],
     }),
-    getWorkStatus: () => ({
-      currentThread: context.currentThread,
-      children: [],
-    }),
+    getWorkStatus,
     getLatestActivity: () => ({
       currentThread: { status: "idle", runtimeStatus: "idle" },
       latest: null,
@@ -297,36 +318,74 @@ describe("R13 registered Changes Work slot", () => {
         stack.getByRole("list", { name: "GitHub Stack based on main" }),
       ).toBeTruthy(),
     );
-    fireEvent.click(stack.getByText(/#43 Stack branch/));
+    const disclosure = stack.getByRole("button", {
+      name: /#43 Stack branch.*Show changed files for pull request #43/,
+    });
+    expect(disclosure.getAttribute("aria-expanded")).toBe("false");
+    expect(disclosure.querySelector(".ws-stack-expand")).toBeTruthy();
+    fireEvent.keyDown(disclosure, { key: "Enter" });
+    fireEvent.click(disclosure);
+    expect(disclosure.getAttribute("aria-expanded")).toBe("true");
     expect(stack.getByText("renamed.ts")).toBeTruthy();
     stack.lifecycle.unmount();
   });
-  it("refreshes Changes exactly once with the legacy work context on manual refresh", async () => {
+  it("refreshes Changes exactly once without calling the legacy aggregate on manual refresh", async () => {
     const getChanges = vi.fn(() => changesResult());
     const getWorkContext = vi.fn(() => context);
-    const slot = await changesSlot({ getChanges, getWorkContext });
+    const getGitHubApiHealth = vi.fn(() => ({
+      state: "available",
+      scope: "unknown",
+      message: null,
+      retryAt: null,
+    }));
+    const slot = await changesSlot({
+      getChanges,
+      getWorkContext,
+      getGitHubApiHealth,
+    });
     await waitFor(() => expect(getChanges).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(getWorkContext).toHaveBeenCalledTimes(1));
+    expect(getWorkContext).not.toHaveBeenCalled();
     fireEvent.click(slot.getByRole("button", { name: "Refresh work context" }));
     await waitFor(() => expect(getChanges).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(getWorkContext).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(getGitHubApiHealth).toHaveBeenCalledTimes(2));
     expect(getChanges).toHaveBeenCalledTimes(2);
-    expect(getWorkContext).toHaveBeenCalledTimes(2);
+    expect(getWorkContext).not.toHaveBeenCalled();
     slot.lifecycle.unmount();
   });
-  it("refreshes Changes exactly once with the legacy work context on realtime", async () => {
+  it("invalidates only the matching Changes thread and family", async () => {
     const getChanges = vi.fn(() => changesResult());
     const getWorkContext = vi.fn(() => context);
     const slot = await changesSlot({ getChanges, getWorkContext });
     await waitFor(() => expect(getChanges).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(getWorkContext).toHaveBeenCalledTimes(1));
+    expect(getWorkContext).not.toHaveBeenCalled();
     await slot.behavior.emitRealtime("work-sidebar:changed", {
-      changed: "changes",
+      family: "changes",
+      threadId: "thr_other",
+    });
+    expect(getChanges).toHaveBeenCalledTimes(1);
+    await slot.behavior.emitRealtime("work-sidebar:changed", {
+      family: "work",
+      threadId: "thr_changes",
+    });
+    expect(getChanges).toHaveBeenCalledTimes(1);
+    await slot.behavior.emitRealtime("work-sidebar:changed", {
+      family: "changes",
+      threadId: "thr_changes",
     });
     await waitFor(() => expect(getChanges).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(getWorkContext).toHaveBeenCalledTimes(2));
     expect(getChanges).toHaveBeenCalledTimes(2);
-    expect(getWorkContext).toHaveBeenCalledTimes(2);
+    expect(getWorkContext).not.toHaveBeenCalled();
+    slot.lifecycle.unmount();
+  });
+  it("renders Changes when the Work status query fails", async () => {
+    const getChanges = vi.fn(() => changesResult(repository("available")));
+    const getWorkStatus = vi.fn(() =>
+      Promise.reject(new Error("Work unavailable")),
+    );
+    const slot = await changesSlot({ getChanges, getWorkStatus });
+    await waitFor(() => expect(slot.getByText("Clean")).toBeTruthy());
+    expect(slot.getByRole("tabpanel").textContent).toContain("Changes");
+    expect(getChanges).toHaveBeenCalledTimes(1);
     slot.lifecycle.unmount();
   });
   it("renders clean and dirty repository states through the registered panel and preserves global health", async () => {
@@ -349,7 +408,12 @@ describe("R13 registered Changes Work slot", () => {
     slot.lifecycle.unmount();
   });
   it("keeps checkout busy through success and failure, and lazily opens/closes isolated file previews", async () => {
-    const checkout = deferred<{ ok: boolean; message: string; tone?: "success" | "warning" | "error"; detail: null }>();
+    const checkout = deferred<{
+      ok: boolean;
+      message: string;
+      tone?: "success" | "warning" | "error";
+      detail: null;
+    }>();
     let shouldFailCheckout = false;
     const getWorkingTreeFileDiff = vi.fn(({ path }: { path: string }) => ({
       kind: "binary" as const,
@@ -371,39 +435,89 @@ describe("R13 registered Changes Work slot", () => {
       behindRemote: 0,
     };
     const slot = await changesSlot({
-      getChanges: () => changesResult(repository("available", true), {
-        githubStack: {
-          stack: {
-            trunk: "main",
-            currentBranch: "main",
-            branches: [branch],
-            trunkBehind: 0,
-            prunableBranchCount: 0,
+      getChanges: () =>
+        changesResult(repository("available", true), {
+          githubStack: {
+            stack: {
+              trunk: "main",
+              currentBranch: "main",
+              branches: [branch],
+              trunkBehind: 0,
+              prunableBranchCount: 0,
+            },
+            pending: null,
+            error: null,
           },
-          pending: null,
-          error: null,
-        },
-      }),
-      checkoutStackBranch: () => shouldFailCheckout ? { ok: false, message: "Checkout blocked", tone: "error", detail: null } : checkout.promise,
+        }),
+      checkoutStackBranch: () =>
+        shouldFailCheckout
+          ? {
+              ok: false,
+              message: "Checkout blocked",
+              tone: "error",
+              detail: null,
+            }
+          : checkout.promise,
       getWorkingTreeFileDiff,
     });
 
-    await waitFor(() => expect(slot.getByRole("button", { name: "Check out feature/checkout" })).toBeTruthy());
-    fireEvent.click(slot.getByRole("button", { name: "Check out feature/checkout" }));
-    await waitFor(() => expect(slot.getByRole("button", { name: "Checking out feature/checkout" }).hasAttribute("disabled")).toBe(true));
+    await waitFor(() =>
+      expect(
+        slot.getByRole("button", { name: "Check out feature/checkout" }),
+      ).toBeTruthy(),
+    );
+    fireEvent.click(
+      slot.getByRole("button", { name: "Check out feature/checkout" }),
+    );
+    await waitFor(() =>
+      expect(
+        slot
+          .getByRole("button", { name: "Checking out feature/checkout" })
+          .hasAttribute("disabled"),
+      ).toBe(true),
+    );
     checkout.resolve({ ok: true, message: "Checked out", detail: null });
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Checked out"));
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith("Checked out"),
+    );
     shouldFailCheckout = true;
-    fireEvent.click(slot.getByRole("button", { name: "Check out feature/checkout" }));
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Checkout blocked"));
-    expect(slot.inspection.rpcCalls.filter((call) => call.method === "checkoutStackBranch")).toHaveLength(2);
+    fireEvent.click(
+      slot.getByRole("button", { name: "Check out feature/checkout" }),
+    );
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Checkout blocked"),
+    );
+    expect(
+      slot.inspection.rpcCalls.filter(
+        (call) => call.method === "checkoutStackBranch",
+      ),
+    ).toHaveLength(2);
 
-    fireEvent.click(slot.getByRole("button", { name: /(?:Show|Hide) 3 working-tree files/ }));
-    fireEvent.click(slot.getByRole("button", { name: "Open uncommitted diff for renamed.ts" }));
-    await waitFor(() => expect(getWorkingTreeFileDiff).toHaveBeenCalledWith({ threadId: "thr_changes", path: "renamed.ts" }));
-    await waitFor(() => expect(slot.getByText("This binary file cannot be shown as a text diff.")).toBeTruthy());
-    fireEvent.click(slot.getByRole("button", { name: "Close diff for renamed.ts" }));
-    expect(slot.queryByRole("button", { name: "Close diff for renamed.ts" })).toBeNull();
+    fireEvent.click(
+      slot.getByRole("button", { name: /(?:Show|Hide) 3 working-tree files/ }),
+    );
+    fireEvent.click(
+      slot.getByRole("button", {
+        name: "Open uncommitted diff for renamed.ts",
+      }),
+    );
+    await waitFor(() =>
+      expect(getWorkingTreeFileDiff).toHaveBeenCalledWith({
+        threadId: "thr_changes",
+        path: "renamed.ts",
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        slot.getByText("This binary file cannot be shown as a text diff."),
+      ).toBeTruthy(),
+    );
+    fireEvent.click(
+      slot.getByRole("button", { name: "Close diff for renamed.ts" }),
+    );
+    expect(
+      slot.queryByRole("button", { name: "Close diff for renamed.ts" }),
+    ).toBeNull();
     slot.lifecycle.unmount();
   });
 
@@ -419,19 +533,41 @@ describe("R13 registered Changes Work slot", () => {
       getWorkingTreeFileDiff,
     };
     const slot = await changesSlot(fixture);
-    await waitFor(() => expect(slot.getByRole("button", { name: "Show 3 working-tree files" })).toBeTruthy());
-    fireEvent.click(slot.getByRole("button", { name: "Show 3 working-tree files" }));
-    fireEvent.click(slot.getByRole("button", { name: "Open uncommitted diff for renamed.ts" }));
-    await waitFor(() => expect(slot.getByRole("button", { name: "Close diff for renamed.ts" })).toBeTruthy());
+    await waitFor(() =>
+      expect(
+        slot.getByRole("button", { name: "Show 3 working-tree files" }),
+      ).toBeTruthy(),
+    );
+    fireEvent.click(
+      slot.getByRole("button", { name: "Show 3 working-tree files" }),
+    );
+    fireEvent.click(
+      slot.getByRole("button", {
+        name: "Open uncommitted diff for renamed.ts",
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        slot.getByRole("button", { name: "Close diff for renamed.ts" }),
+      ).toBeTruthy(),
+    );
     changesInteractionStore.getState().selectFile("thr_other", "other.ts");
 
     slot.lifecycle.unmount();
-    expect(changesInteractionStore.getState().byThread.get("thr_changes")?.selectedFilePath).toBeNull();
-    expect(changesInteractionStore.getState().byThread.get("thr_other")?.selectedFilePath).toBe("other.ts");
+    expect(
+      changesInteractionStore.getState().byThread.get("thr_changes")
+        ?.selectedFilePath,
+    ).toBeNull();
+    expect(
+      changesInteractionStore.getState().byThread.get("thr_other")
+        ?.selectedFilePath,
+    ).toBe("other.ts");
 
     const remounted = await changesSlot(fixture);
     await waitFor(() => expect(remounted.getByText("Changed")).toBeTruthy());
-    expect(remounted.queryByRole("button", { name: "Close diff for renamed.ts" })).toBeNull();
+    expect(
+      remounted.queryByRole("button", { name: "Close diff for renamed.ts" }),
+    ).toBeNull();
     remounted.lifecycle.unmount();
   });
 });
