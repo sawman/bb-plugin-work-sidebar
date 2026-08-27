@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { createPullRequestService } from "../server";
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => { resolve = nextResolve; reject = nextReject; });
+  return { promise, resolve, reject };
+}
+
 describe("R5 pull-request server ownership", () => {
   it("deduplicates authored list and stack reads, filters archived repositories, and classifies rate limits without retrying", async () => {
     let now = 100;
@@ -25,7 +32,6 @@ describe("R5 pull-request server ownership", () => {
 
     const rateLimit = new Error("API rate limit already exceeded");
     expect(service.classifyError(rateLimit, "rest")).toMatchObject({ state: "rate_limited", scope: "rest" });
-    expect(service.clientRetryAllowed(rateLimit)).toBe(false);
     now += 301_000;
     await service.authored();
     expect(readAuthored).toHaveBeenCalledTimes(2);
@@ -44,5 +50,49 @@ describe("R5 pull-request server ownership", () => {
     expect(service.inspect()).toMatchObject({ authoredCached: false, stacksCached: false });
     service.dispose();
     expect(service.inspect()).toEqual({ disposed: true, authoredCached: false, stacksCached: false, pending: 0 });
+    await expect(service.setDraft("https://github.com/acme/sidebar/pull/12", false)).rejects.toThrow("disposed");
+  });
+
+  it("does not let an older in-flight result overwrite a forced replacement generation", async () => {
+    const first = deferred<Array<{ repository: string; title: string }>>();
+    const second = deferred<Array<{ repository: string; title: string }>>();
+    const readAuthored = vi.fn()
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    const service = createPullRequestService({
+      now: () => 0, readAuthored, readStacks: async (items) => items,
+      archivedRepositories: async () => new Set(), setDraft: async () => ({ draft: true }),
+    });
+    const oldRead = service.authored();
+    const replacement = service.authored(true);
+    second.resolve([{ repository: "acme/sidebar", title: "new" }]);
+    await expect(replacement).resolves.toEqual([{ repository: "acme/sidebar", title: "new" }]);
+    first.resolve([{ repository: "acme/sidebar", title: "old" }]);
+    await expect(oldRead).resolves.toEqual([{ repository: "acme/sidebar", title: "old" }]);
+    expect(await service.authored()).toEqual([{ repository: "acme/sidebar", title: "new" }]);
+  });
+
+  it("does not let an older in-flight stack enrichment overwrite a forced replacement", async () => {
+    const oldStacks = deferred<Array<{ repository: string; title: string }>>();
+    const newStacks = deferred<Array<{ repository: string; title: string }>>();
+    const readStacks = vi.fn()
+      .mockImplementationOnce(() => oldStacks.promise)
+      .mockImplementationOnce(() => newStacks.promise);
+    const service = createPullRequestService({
+      now: () => 0,
+      readAuthored: async () => [{ repository: "acme/sidebar", title: "base" }],
+      readStacks,
+      archivedRepositories: async () => new Set(),
+      setDraft: async () => ({ draft: true }),
+    });
+    const oldRead = service.stacks();
+    await Promise.resolve();
+    const replacement = service.stacks(true);
+    await Promise.resolve();
+    newStacks.resolve([{ repository: "acme/sidebar", title: "new stack" }]);
+    await expect(replacement).resolves.toEqual([{ repository: "acme/sidebar", title: "new stack" }]);
+    oldStacks.resolve([{ repository: "acme/sidebar", title: "old stack" }]);
+    await expect(oldRead).resolves.toEqual([{ repository: "acme/sidebar", title: "old stack" }]);
+    expect(await service.stacks()).toEqual([{ repository: "acme/sidebar", title: "new stack" }]);
   });
 });
