@@ -541,7 +541,10 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const navigate = useBbNavigate();
   const actions = experimental_useSidebarThreadActions();
   const tab = useStore(threadInteractionStore, (state) => state.workTabsByThread.get(threadId) ?? "work");
-  useEffect(() => { threadInteractionStore.getState().touchWorkTab(threadId); }, [threadId]);
+  useEffect(() => {
+    threadInteractionStore.getState().touchWorkTab(threadId);
+    return () => changesInteractionStore.getState().selectFile(threadId, null);
+  }, [threadId]);
   const legacyContext = useLegacyWorkContext(threadId);
   const legacyProviderHealth = useLegacyProviderHealth(threadId);
   const context = legacyContext.data;

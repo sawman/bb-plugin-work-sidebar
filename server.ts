@@ -11,7 +11,7 @@ import { createArchivedThreadService, createThreadPreferencesService } from "./f
 import { createServerLifecycle, type GitHubApiHealth, type ServerLifecycle } from "./server-lifecycle.js";
 import { createWorkContextReadService } from "./features/work-context/server-reads.js";
 import { createTrackerService, TRACKER_LINKS_KEY } from "./features/tracker/server.js";
-import { createChangesService } from "./features/changes/server.js";
+import { createChangesService, createWorkingTreeFileDiffReader } from "./features/changes/server.js";
 
 const execFileAsync = promisify(execFile);
 const TASKS_PLUGIN_ID = "tasks";
@@ -1400,27 +1400,11 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     readGoal: readWorkGoal,
     readPlan: readWorkPlan,
   });
-  async function workingTreeFileDiff(threadId: string, path: string) {
-    const thread = await bb.sdk.threads.get({ threadId });
-    if (!thread.environmentId)
-      return { kind: "unavailable" as const, path, patch: null, message: "This thread has no workspace." };
-    try {
-      const [patchResult, filesResult] = await Promise.all([
-        bb.sdk.environments.diffPatch({ environmentId: thread.environmentId, target: { type: "uncommitted" }, paths: [path] }),
-        bb.sdk.environments.diffFiles({ environmentId: thread.environmentId, target: "uncommitted" }),
-      ]);
-      if (patchResult.outcome !== "available")
-        return { kind: "unavailable" as const, path, patch: null, message: "message" in patchResult ? patchResult.message : patchResult.failure.message };
-      if (filesResult.outcome === "available" && filesResult.files.find((file) => file.path === path)?.binary)
-        return { kind: "binary" as const, path, patch: null, message: "This binary file cannot be shown as a text diff." };
-      const patch = patchResult.patches.find((entry) => entry.path === path)?.patch ?? null;
-      return patch
-        ? { kind: "patch" as const, path, patch, message: null }
-        : { kind: "absent" as const, path, patch: null, message: "No diff is available for this file." };
-    } catch (error) {
-      return { kind: "unavailable" as const, path, patch: null, message: error instanceof Error ? error.message : "Could not load the file diff." };
-    }
-  }
+  const workingTreeFileDiff = createWorkingTreeFileDiffReader({
+    getThread: async (threadId) => bb.sdk.threads.get({ threadId }),
+    diffPatch: ({ environmentId, target, paths }) => bb.sdk.environments.diffPatch({ environmentId, target, paths }),
+    diffFiles: ({ environmentId, target }) => bb.sdk.environments.diffFiles({ environmentId, target }),
+  });
   const changesService = createChangesService({
     repository: async (threadId) => repositorySummary(await bb.sdk.threads.get({ threadId })),
     projection: pullRequestChanges,

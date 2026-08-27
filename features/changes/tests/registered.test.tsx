@@ -410,4 +410,32 @@ describe("R13 registered Changes Work slot", () => {
     expect(slot.queryByRole("button", { name: "Close diff for renamed.ts" })).toBeNull();
     slot.lifecycle.unmount();
   });
+
+  it("clears an opened file selection on panel unmount without disturbing another thread", async () => {
+    const getWorkingTreeFileDiff = vi.fn(({ path }: { path: string }) => ({
+      kind: "binary" as const,
+      path,
+      patch: null,
+      message: "This binary file cannot be shown as a text diff.",
+    }));
+    const fixture = {
+      getChanges: () => changesResult(repository("available", true)),
+      getWorkingTreeFileDiff,
+    };
+    const slot = await changesSlot(fixture);
+    await waitFor(() => expect(slot.getByRole("button", { name: "Show 3 working-tree files" })).toBeTruthy());
+    fireEvent.click(slot.getByRole("button", { name: "Show 3 working-tree files" }));
+    fireEvent.click(slot.getByRole("button", { name: "Open uncommitted diff for renamed.ts" }));
+    await waitFor(() => expect(slot.getByRole("button", { name: "Close diff for renamed.ts" })).toBeTruthy());
+    changesInteractionStore.getState().selectFile("thr_other", "other.ts");
+
+    slot.lifecycle.unmount();
+    expect(changesInteractionStore.getState().byThread.get("thr_changes")?.selectedFilePath).toBeNull();
+    expect(changesInteractionStore.getState().byThread.get("thr_other")?.selectedFilePath).toBe("other.ts");
+
+    const remounted = await changesSlot(fixture);
+    await waitFor(() => expect(remounted.getByText("Changed")).toBeTruthy());
+    expect(remounted.queryByRole("button", { name: "Close diff for renamed.ts" })).toBeNull();
+    remounted.lifecycle.unmount();
+  });
 });
