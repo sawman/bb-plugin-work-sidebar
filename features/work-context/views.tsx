@@ -8,7 +8,7 @@ import {
   SurfaceCardHeading,
 } from "../../components/ui/surface-card";
 import { Combobox } from "../../components/ui/combobox";
-import { AssigneePicker } from "../../components/tasks/assignee-picker";
+import { AssigneePicker } from "./assignee-picker";
 import type { rpcContract } from "../../contracts";
 import {
   goalProgressPercent,

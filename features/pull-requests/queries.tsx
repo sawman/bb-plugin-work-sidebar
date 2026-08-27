@@ -3,6 +3,7 @@ import type { QueryKey } from "@tanstack/react-query";
 import { useRef } from "react";
 import type { PluginRpcClient } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
+import { queryPolicies } from "../../query-runtime";
 
 // This remains type-only: the app bundle sees neither the server contract
 // composer nor the root SDK runtime.
@@ -35,10 +36,7 @@ export const pullRequestPolicies = {
       polling.intervalMs,
   },
   health: {
-    staleTime: 15_000,
-    gcTime: 2 * 60_000,
-    retry: false,
-    refetchOnWindowFocus: false,
+    ...queryPolicies.health,
     refetchInterval: 30_000,
   },
 } as const;
@@ -112,13 +110,15 @@ export function useAuthoredPullRequests(
 
 export function useGitHubApiHealth(
   rpc: PullRequestRpc,
-  { poll = false }: { poll?: boolean } = {},
+  { poll = false, enabled = true }: { poll?: boolean; enabled?: boolean } = {},
 ) {
   return useQuery({
     queryKey: pullRequestKeys.health(),
     queryFn: () => rpc.call("getGitHubApiHealth", null),
     ...pullRequestPolicies.health,
+    enabled,
     refetchInterval: poll ? pullRequestPolicies.health.refetchInterval : false,
+    refetchIntervalInBackground: false,
   });
 }
 

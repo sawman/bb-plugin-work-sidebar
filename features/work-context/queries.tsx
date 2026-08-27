@@ -76,8 +76,9 @@ export function useWorkProviderHealth(threadId: string) {
   return useQuery({
     queryKey: queryKeys.work.providerHealth(threadId),
     queryFn: () => rpc.call("getWorkProviderStatus", { threadId }),
-    ...queryPolicies.workContext,
+    ...queryPolicies.health,
     refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
 }
 

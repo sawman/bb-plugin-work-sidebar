@@ -4,6 +4,20 @@ import { fetchGitHubStack as serverEntrypointFetchGitHubStack } from "../../serv
 import { createServerLifecycle } from "../../server-lifecycle.js";
 
 describe("GitHub Stack enrichment ownership", () => {
+  it("evicts the oldest signal deterministically at the bounded cache limit", () => {
+    const lifecycle = createServerLifecycle();
+    const signal = { checks: "passing" as const, review: "approved" as const };
+
+    for (let index = 0; index < 300; index += 1)
+      lifecycle.cacheGitHubPullRequestSignal(`repo#${index}`, signal, Infinity);
+    lifecycle.cacheGitHubPullRequestSignal("repo#300", signal, Infinity);
+
+    expect(lifecycle.githubPullRequestSignalCache).toHaveLength(300);
+    expect(lifecycle.githubPullRequestSignalCache.has("repo#0")).toBe(false);
+    expect(lifecycle.githubPullRequestSignalCache.has("repo#1")).toBe(true);
+    expect(lifecycle.githubPullRequestSignalCache.has("repo#300")).toBe(true);
+  });
+
   it("keeps the entrypoint export pointed at the PR-owned Stack service", () => {
     expect(serverEntrypointFetchGitHubStack).toBe(fetchGitHubStack);
   });

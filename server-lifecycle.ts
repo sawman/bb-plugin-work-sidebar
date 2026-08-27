@@ -15,6 +15,7 @@ export type GitHubPullRequestSignal = {
     | "none";
 };
 type ExpiringValue<T> = { expiresAt: number; value: T };
+const MAX_GITHUB_PULL_REQUEST_SIGNALS = 300;
 
 export class ServerLifecycle {
   readonly githubReadCache = new Map<
@@ -53,6 +54,23 @@ export class ServerLifecycle {
 
   cacheGitHubRead(key: string, value: string, expiresAt: number): void {
     if (!this.disposed) this.githubReadCache.set(key, { value, expiresAt });
+  }
+
+  cacheGitHubPullRequestSignal(
+    key: string,
+    value: GitHubPullRequestSignal,
+    expiresAt: number,
+  ): void {
+    if (this.disposed) return;
+    if (
+      !this.githubPullRequestSignalCache.has(key) &&
+      this.githubPullRequestSignalCache.size >= MAX_GITHUB_PULL_REQUEST_SIGNALS
+    ) {
+      this.githubPullRequestSignalCache.delete(
+        this.githubPullRequestSignalCache.keys().next().value!,
+      );
+    }
+    this.githubPullRequestSignalCache.set(key, { value, expiresAt });
   }
 
   releasePending(kind: "githubRead" | "pullRequestSignal", key: string): void {

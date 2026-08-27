@@ -12,7 +12,6 @@ export type ChangesInteractionState = {
   togglePullRequest(threadId: string): void;
   toggleStackBranch(threadId: string, branch: string): void;
   selectFile(threadId: string, path: string | null): void;
-  cleanup(threadIds: Iterable<string>): void;
 };
 const empty = (): ChangesPresentation => ({
   repositoryExpanded: false,
@@ -69,13 +68,6 @@ export function createChangesInteractionStore() {
         byThread.delete(threadId);
         byThread.set(threadId, { ...value, selectedFilePath });
         return { byThread: cap(byThread) };
-      }),
-    cleanup: (threadIds) =>
-      set((state) => {
-        const live = new Set(threadIds);
-        return {
-          byThread: new Map([...state.byThread].filter(([id]) => live.has(id))),
-        };
       }),
   }));
 }

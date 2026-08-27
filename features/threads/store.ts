@@ -84,9 +84,10 @@ export function createThreadInteractionStore() {
         const expandedThreadIds = new Set(
           [...current.expandedThreadIds].filter((id) => roster.has(id)),
         );
-        const workTabsByThread = cappedWorkTabs(
-          [...current.workTabsByThread].filter(([id]) => roster.has(id)),
-        );
+        // The left roster omits archived threads that BB may still have open
+        // in the right panel. Keep this presentation state and rely on the
+        // bounded LRU instead of pruning by the left surface alone.
+        const workTabsByThread = cappedWorkTabs(current.workTabsByThread);
         const dragThreadId =
           current.dragThreadId && roster.has(current.dragThreadId)
             ? current.dragThreadId

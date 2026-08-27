@@ -88,16 +88,18 @@ describe("R13 Changes presentation store", () => {
     expect(store.getState().byThread.has("thr_40")).toBe(true);
   });
 
-  it("cleans presentation state when its thread leaves the live roster", () => {
+  it("clears one thread's selected file without disturbing another thread", () => {
     const store = createChangesInteractionStore();
-    store.getState().selectFile("thr_a", "a.ts");
-    store.getState().selectFile("thr_b", "b.ts");
+    store.getState().selectFile("thr_changes", "renamed.ts");
+    store.getState().selectFile("thr_other", "other.ts");
 
-    store.getState().cleanup(["thr_b"]);
+    store.getState().selectFile("thr_changes", null);
 
-    expect(store.getState().byThread.has("thr_a")).toBe(false);
-    expect(store.getState().byThread.get("thr_b")?.selectedFilePath).toBe(
-      "b.ts",
+    expect(
+      store.getState().byThread.get("thr_changes")?.selectedFilePath,
+    ).toBeNull();
+    expect(store.getState().byThread.get("thr_other")?.selectedFilePath).toBe(
+      "other.ts",
     );
   });
 });

@@ -186,7 +186,7 @@ async function changesSlot(fixture: ChangesFixture) {
 afterEach(() => {
   cleanup();
   getPluginQueryClient().clear();
-  changesInteractionStore.getState().cleanup([]);
+  changesInteractionStore.setState({ byThread: new Map() });
   toast.success.mockReset();
   toast.error.mockReset();
 });

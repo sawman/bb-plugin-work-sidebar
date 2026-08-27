@@ -90,8 +90,8 @@ describe("R2 app registration and Query lifecycle", () => {
       params: null,
     });
     expect(mount).toHaveBeenCalledTimes(2);
-    // R14 keeps the selected-file query mounted but disabled until a file is
-    // opened; Changes has no cache entries until its tab owns the panel.
+    // Changes owns no cache entries until its tab mounts the panel; once
+    // selected, the file query remains hook-stable and disabled until opened.
     expect(client.getQueryCache().getAll()).toHaveLength(17);
     expect(
       client

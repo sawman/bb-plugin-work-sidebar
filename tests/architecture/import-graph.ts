@@ -1,6 +1,6 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { builtinModules } from "node:module";
-import { dirname, extname, resolve, sep } from "node:path";
+import { dirname, extname, isAbsolute, relative, resolve, sep } from "node:path";
 import * as ts from "typescript";
 
 const sourceExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"]);
@@ -97,6 +97,14 @@ function runtimeImports(sourceFile: ts.SourceFile): string[] {
   return imports;
 }
 
+function sourcePaths(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = resolve(directory, entry.name);
+    if (entry.isDirectory()) return sourcePaths(path);
+    return isSourceModule(path) ? [path] : [];
+  });
+}
+
 function isServerModule(path: string): boolean {
   const segments = resolve(path).split(sep);
   const basename = segments.at(-1) ?? "";
@@ -159,5 +167,55 @@ export function assertBrowserRuntimeBoundary(entry: string): void {
         throw new Error(`Browser module ${modulePath} reaches server module ${resolved}`);
       }
     }
+  }
+}
+
+/**
+ * Resolves component runtime imports through TypeScript's module resolver so
+ * aliases, extensions, and directory indexes are checked consistently.
+ */
+export function collectComponentsRuntimeImportGraph(repositoryRoot: string): Map<string, string[]> {
+  const resolvedRoot = resolve(repositoryRoot);
+  const context = compilerContext(resolve(resolvedRoot, "app.tsx"));
+  const graph = new Map<string, string[]>();
+  const componentsRoot = resolve(resolvedRoot, "components");
+
+  for (const importer of sourcePaths(componentsRoot)) {
+    const sourceFile = ts.createSourceFile(
+      importer,
+      readFileSync(importer, "utf8"),
+      ts.ScriptTarget.Latest,
+      true,
+      scriptKind(importer),
+    );
+    const resolvedImports = runtimeImports(sourceFile)
+      .map((specifier) => resolveSourceImport(importer, specifier, context))
+      .filter((path): path is string => path !== null);
+    graph.set(importer, resolvedImports);
+  }
+
+  return graph;
+}
+
+export function assertNoComponentsToFeaturesRuntimeImports(
+  graph: ReadonlyMap<string, readonly string[]>,
+  repositoryRoot: string,
+): void {
+  const componentsRoot = resolve(repositoryRoot, "components");
+  const featuresRoot = resolve(repositoryRoot, "features");
+  const isWithin = (path: string, directory: string) => {
+    const remainder = relative(directory, resolve(path));
+    return remainder === "" || (!remainder.startsWith("..") && !isAbsolute(remainder));
+  };
+  const violations: string[] = [];
+  for (const [importer, imports] of graph) {
+    for (const imported of imports) {
+      if (isWithin(importer, componentsRoot) && isWithin(imported, featuresRoot)) {
+        violations.push(`${importer} -> ${imported}`);
+      }
+    }
+  }
+  if (violations.length > 0) {
+    throw new Error(`components/ runtime imports must not reach features/: ${violations.join(", ")}`);
   }
 }
