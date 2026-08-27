@@ -20,20 +20,31 @@ describe("R2 server registration and disposal", () => {
     expect(lifecycle.legacyWorkCache.has("thr_0\u0000proj_root")).toBe(true);
     expect(lifecycle.legacyWorkCache.has("thr_1\u0000proj_root")).toBe(false);
 
+    const refreshed = {
+      state: "adoptable" as const,
+      taskIds: ["task_refreshed"],
+      message: "Legacy attachment changed while reading.",
+    };
     let resolvePending!: (value: typeof none) => void;
+    let pendingLoadCount = 0;
     const pendingKey = "thr_pending\u0000proj_root";
     const loadPending = vi.fn(
-      () => new Promise<typeof none>((resolve) => { resolvePending = resolve; }),
+      () => {
+        pendingLoadCount += 1;
+        return pendingLoadCount === 1
+          ? new Promise<typeof none>((resolve) => { resolvePending = resolve; })
+          : Promise.resolve(refreshed);
+      },
     );
     const leader = lifecycle.readLegacyWork(pendingKey, 5_000, loadPending);
     const follower = lifecycle.readLegacyWork(pendingKey, 5_000, loadPending);
     await Promise.resolve();
     expect(loadPending).toHaveBeenCalledOnce();
     lifecycle.invalidateLegacyWork(pendingKey);
-    await lifecycle.readLegacyWork(pendingKey, 5_000, async () => none);
     resolvePending(none);
-    await expect(leader).rejects.toThrow("Legacy work discovery was invalidated.");
-    await expect(follower).rejects.toThrow("Legacy work discovery was invalidated.");
+    await expect(leader).resolves.toEqual(refreshed);
+    await expect(follower).resolves.toEqual(refreshed);
+    expect(loadPending).toHaveBeenCalledTimes(2);
     expect(lifecycle.legacyWorkCache.size).toBe(MAX_LEGACY_WORK_CACHE);
     expect(lifecycle.legacyWorkCache.has(pendingKey)).toBe(true);
     expect(lifecycle.inspectLegacyWork()).toEqual({
@@ -56,7 +67,7 @@ describe("R2 server registration and disposal", () => {
     });
   });
 
-  it("rejects stale pending legacy probes after invalidation or disposal without leaking into a replacement lifecycle", async () => {
+  it("retries a stale pending legacy probe once, but still isolates disposal from a replacement lifecycle", async () => {
     const key = "thr_root\u0000proj_root";
     const adoptable = {
       state: "adoptable" as const,
@@ -64,9 +75,20 @@ describe("R2 server registration and disposal", () => {
       message: "One legacy top-level attachment can be explicitly adopted.",
     };
     const first = createServerLifecycle();
+    const refreshed = {
+      state: "adoptable" as const,
+      taskIds: ["task_current"],
+      message: "Fresh legacy attachment.",
+    };
     let resolveFirst!: (value: typeof adoptable) => void;
+    let firstLoadCount = 0;
     const loadFirst = vi.fn(
-      () => new Promise<typeof adoptable>((resolve) => { resolveFirst = resolve; }),
+      () => {
+        firstLoadCount += 1;
+        return firstLoadCount === 1
+          ? new Promise<typeof adoptable>((resolve) => { resolveFirst = resolve; })
+          : Promise.resolve(refreshed);
+      },
     );
     const pendingFirst = first.readLegacyWork(
       key,
@@ -77,17 +99,37 @@ describe("R2 server registration and disposal", () => {
     await Promise.resolve();
     expect(loadFirst).toHaveBeenCalledOnce();
     first.invalidateLegacyWork(key);
-    await expect(
-      first.readLegacyWork(key, 5_000, async () => ({
-        state: "none" as const,
-        taskIds: [],
-        message: null,
-      })),
-    ).resolves.toMatchObject({ state: "none" });
     resolveFirst(adoptable);
-    await expect(pendingFirst).rejects.toThrow("Legacy work discovery was invalidated.");
-    await expect(followerFirst).rejects.toThrow("Legacy work discovery was invalidated.");
-    expect(first.legacyWorkCache.get(key)?.value).toMatchObject({ state: "none" });
+    await expect(pendingFirst).resolves.toEqual(refreshed);
+    await expect(followerFirst).resolves.toEqual(refreshed);
+    expect(loadFirst).toHaveBeenCalledTimes(2);
+    expect(first.legacyWorkCache.get(key)?.value).toEqual(refreshed);
+
+    let resolveRepeated!: (value: typeof adoptable) => void;
+    let repeatedLoadCount = 0;
+    const repeatedlyInvalidated = createServerLifecycle();
+    const repeated = repeatedlyInvalidated.readLegacyWork(
+      key,
+      5_000,
+      () => {
+        repeatedLoadCount += 1;
+        return new Promise<typeof adoptable>((resolve) => {
+          resolveRepeated = resolve;
+        });
+      },
+    );
+    await Promise.resolve();
+    repeatedlyInvalidated.invalidateLegacyWork(key);
+    resolveRepeated(adoptable);
+    await vi.waitFor(() => expect(repeatedLoadCount).toBe(2));
+    repeatedlyInvalidated.invalidateLegacyWork(key);
+    resolveRepeated(adoptable);
+    await expect(repeated).rejects.toThrow(
+      "Legacy work changed repeatedly while resolving. Retry the operation.",
+    );
+    await expect(repeated).rejects.not.toThrow(
+      "Legacy work discovery was invalidated.",
+    );
 
     const retiring = createServerLifecycle();
     let resolveRetiring!: (value: typeof adoptable) => void;

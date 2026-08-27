@@ -40,7 +40,7 @@ const workProviderStatus = z.object({
   message: z.string().nullable(),
 });
 const workCardInput = z.object({ threadId: z.string() }).strict();
-const workStatus = z.object({
+const workStatus = z.object({ rootThreadId: z.string(),
   currentThread: z.object({ title: z.string(), status: z.enum(["active", "error", "idle", "starting", "stopping"]), runtimeStatus: z.string(), providerId: z.string() }),
   children: z.array(z.object({
     id: z.string(), title: z.string(), depth: z.number().int().nonnegative(),
@@ -51,7 +51,7 @@ const workStatus = z.object({
     }).nullable(),
   })),
 });
-const workOutcome = z.object({
+const workOutcome = z.object({ rootThreadId: z.string(),
   tasksAvailable: z.boolean(),
   outcome: taskSummary.nullable(),
   executionTasks: z.array(taskSummary),
@@ -117,7 +117,7 @@ export const rpcSchemas = {
   ...threadArchiveSchemas,
   getWorkContext: {
     input: z.object({ threadId: z.string() }).strict(),
-    output: z.object({
+    output: z.object({ rootThreadId: z.string(),
       tasksAvailable: z.boolean(),
       currentThread: z.object({
         title: z.string(),

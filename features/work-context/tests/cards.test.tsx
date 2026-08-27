@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, waitFor } from "@testing-library/react";
 import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
@@ -9,6 +10,7 @@ import { getPluginQueryClient } from "../../../query-runtime";
 type Rpc = NonNullable<RenderSlotOptions<typeof rpcContract>["rpc"]>;
 const taskResult = { available: true, tasks: [], projects: [], error: null };
 const aggregate = {
+  rootThreadId: "thr_one",
   tasksAvailable: true,
   currentThread: {
     title: "Thread",
@@ -34,8 +36,13 @@ const aggregate = {
     statusOptions: [],
   },
 };
-const status = { currentThread: aggregate.currentThread, children: [] };
+const status = {
+  rootThreadId: "thr_one",
+  currentThread: aggregate.currentThread,
+  children: [],
+};
 const outcome = {
+  rootThreadId: "thr_one",
   tasksAvailable: true,
   outcome: null,
   executionTasks: [],
@@ -43,6 +50,7 @@ const outcome = {
   legacy: { state: "none" as const, taskIds: [], message: null },
 };
 const populatedOutcome = {
+  rootThreadId: "thr_one",
   tasksAvailable: true,
   outcome: {
     id: "task_1",
@@ -189,9 +197,10 @@ describe("registered Work context cards", () => {
       },
     );
     await waitFor(() => expect(getWorkPlan).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(slot.getByText("Idle")).toBeTruthy());
     await slot.behavior.emitRealtime("work-sidebar:changed", {
       family: "work",
-      threadId: "thr_one",
+      rootThreadId: "thr_one",
     });
     await waitFor(() => expect(getWorkPlan).toHaveBeenCalledTimes(2));
     fireEvent.click(slot.getByRole("button", { name: "Refresh work context" }));
@@ -207,50 +216,146 @@ describe("registered Work context cards", () => {
     getPluginQueryClient().clear();
   });
 
-  it("refreshes mounted root then delegated-owner Work cards around the root Tasks signal", async () => {
+  it("refreshes root, descendant, and sibling Work panels from one root-scoped signal", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));
     const rootOutcome = vi.fn(() => outcome);
     const childOutcome = vi.fn(() => outcome);
+    const siblingOutcome = vi.fn(() => outcome);
+    const rootStatus = { ...status, rootThreadId: "thr_root" };
+    const childStatus = { ...status, rootThreadId: "thr_root" };
+    const siblingStatus = { ...status, rootThreadId: "thr_root" };
     const root = renderSlot(
       app.threadPanelActions[0]!,
       { threadId: "thr_root", params: null },
-      { rpc: fixture({ getWorkOutcome: rootOutcome }) },
+      { rpc: fixture({ getWorkStatus: () => rootStatus, getWorkOutcome: rootOutcome }) },
     );
     const child = renderSlot(
       app.threadPanelActions[0]!,
       { threadId: "thr_child", params: null },
-      { rpc: fixture({ getWorkOutcome: childOutcome }) },
+      { rpc: fixture({ getWorkStatus: () => childStatus, getWorkOutcome: childOutcome }) },
+    );
+    const sibling = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_sibling", params: null },
+      { rpc: fixture({ getWorkStatus: () => siblingStatus, getWorkOutcome: siblingOutcome }) },
     );
     try {
       await waitFor(() => expect(rootOutcome).toHaveBeenCalledExactlyOnceWith({ threadId: "thr_root" }));
       await waitFor(() => expect(childOutcome).toHaveBeenCalledExactlyOnceWith({ threadId: "thr_child" }));
+      await waitFor(() => expect(siblingOutcome).toHaveBeenCalledExactlyOnceWith({ threadId: "thr_sibling" }));
 
-      await root.behavior.emitRealtime("work-sidebar:changed", {
+      const rootEvent = {
         family: "work",
-        threadId: "thr_root",
-      });
+        rootThreadId: "thr_root",
+      } as const;
+      await root.behavior.emitRealtime("work-sidebar:changed", rootEvent);
+      await child.behavior.emitRealtime("work-sidebar:changed", rootEvent);
+      await sibling.behavior.emitRealtime("work-sidebar:changed", rootEvent);
       await waitFor(() => expect(rootOutcome).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(childOutcome).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(siblingOutcome).toHaveBeenCalledTimes(2));
       expect(rootOutcome).toHaveBeenLastCalledWith({ threadId: "thr_root" });
-      expect(childOutcome).toHaveBeenCalledExactlyOnceWith({ threadId: "thr_child" });
+      expect(childOutcome).toHaveBeenLastCalledWith({ threadId: "thr_child" });
+      expect(siblingOutcome).toHaveBeenLastCalledWith({ threadId: "thr_sibling" });
 
       await root.behavior.emitRealtime("work-sidebar:changed", {
         family: "tasks",
         threadId: "thr_root",
       });
       expect(rootOutcome).toHaveBeenCalledTimes(2);
-      expect(childOutcome).toHaveBeenCalledExactlyOnceWith({ threadId: "thr_child" });
-
-      await child.behavior.emitRealtime("work-sidebar:changed", {
-        family: "work",
-        threadId: "thr_child",
-      });
-      await waitFor(() => expect(childOutcome).toHaveBeenCalledTimes(2));
-      expect(childOutcome).toHaveBeenLastCalledWith({ threadId: "thr_child" });
-      expect(rootOutcome).toHaveBeenCalledTimes(2);
+      expect(childOutcome).toHaveBeenCalledTimes(2);
+      expect(siblingOutcome).toHaveBeenCalledTimes(2);
     } finally {
       root.lifecycle.unmount();
       child.lifecycle.unmount();
+      sibling.lifecycle.unmount();
+      getPluginQueryClient().clear();
+    }
+  });
+
+  it("ignores an old root signal while a panel switches threads before the new root resolves", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const statusA = { ...status, rootThreadId: "thr_root_a" };
+    const statusB = {
+      ...status,
+      rootThreadId: "thr_root_b",
+      currentThread: { ...status.currentThread, title: "Thread B" },
+    };
+    let resolveStatusB!: (value: typeof statusB) => void;
+    const pendingStatusB = new Promise<typeof statusB>((resolve) => {
+      resolveStatusB = resolve;
+    });
+    const getWorkStatus = vi.fn(({ threadId }: { threadId: string }) =>
+      threadId === "thr_a" ? statusA : pendingStatusB,
+    );
+    const getWorkPlan = vi.fn(() => ({ items: [] }));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_a", params: null },
+      { rpc: fixture({ getWorkStatus, getWorkPlan }) },
+    );
+    try {
+      await waitFor(() => expect(slot.getByText("Idle")).toBeTruthy());
+      slot.lifecycle.rerender(
+        createElement(app.threadPanelActions[0]!.component, {
+          threadId: "thr_b",
+          params: null,
+        }),
+      );
+      await waitFor(() =>
+        expect(getWorkPlan).toHaveBeenCalledWith({ threadId: "thr_b" }),
+      );
+      const callsBeforeOldRoot = getWorkPlan.mock.calls.length;
+      await slot.behavior.emitRealtime("work-sidebar:changed", {
+        family: "work",
+        rootThreadId: "thr_root_a",
+      });
+      await Promise.resolve();
+      expect(getWorkPlan).toHaveBeenCalledTimes(callsBeforeOldRoot);
+
+      resolveStatusB(statusB);
+      await waitFor(() => expect(slot.getByText("Thread B")).toBeTruthy());
+      await slot.behavior.emitRealtime("work-sidebar:changed", {
+        family: "work",
+        rootThreadId: "thr_root_b",
+      });
+      await waitFor(() =>
+        expect(getWorkPlan).toHaveBeenCalledTimes(callsBeforeOldRoot + 1),
+      );
+    } finally {
+      slot.lifecycle.unmount();
+      getPluginQueryClient().clear();
+    }
+  });
+
+  it("flushes a matching root signal received while its status scope is loading", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    let resolveStatus!: (value: typeof status) => void;
+    const pendingStatus = new Promise<typeof status>((resolve) => {
+      resolveStatus = resolve;
+    });
+    const getWorkStatus = vi.fn(() => pendingStatus);
+    const getWorkPlan = vi.fn(() => ({ items: [] }));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      { rpc: fixture({ getWorkStatus, getWorkPlan }) },
+    );
+    try {
+      await waitFor(() => expect(getWorkPlan).toHaveBeenCalledTimes(1));
+      await slot.behavior.emitRealtime("work-sidebar:changed", {
+        family: "work",
+        rootThreadId: "thr_one",
+      });
+      expect(getWorkPlan).toHaveBeenCalledTimes(1);
+      resolveStatus(status);
+      await waitFor(() => expect(slot.getByText("Idle")).toBeTruthy());
+      await waitFor(() => expect(getWorkPlan).toHaveBeenCalledTimes(2));
+    } finally {
+      slot.lifecycle.unmount();
       getPluginQueryClient().clear();
     }
   });
@@ -565,7 +670,7 @@ describe("registered Work context cards", () => {
     expect(adopt.disabled).toBe(true);
     resolveAdoption({ task: populatedOutcome.outcome!, binding: adoptedBinding });
     await waitFor(() => expect(slot.getByText("Legacy outcome adopted.")).toBeTruthy());
-    await slot.behavior.emitRealtime("work-sidebar:changed", { family: "work", threadId: "thr_one" });
+    await slot.behavior.emitRealtime("work-sidebar:changed", { family: "work", rootThreadId: "thr_one" });
     await waitFor(() => expect(getWorkOutcome).toHaveBeenCalledTimes(3));
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();

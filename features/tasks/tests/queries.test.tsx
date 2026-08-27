@@ -31,6 +31,7 @@ const emptyTasks: TasksResult = {
 };
 const populatedTasks: TasksResult = { ...emptyTasks, tasks: [task] };
 const workContext = {
+  rootThreadId: "thr_test",
   tasksAvailable: true,
   currentThread: {
     title: "Fixture thread",
@@ -91,6 +92,7 @@ function rpcFixtures(sidebarTasks: RpcHandlers["sidebarTasks"]): RpcHandlers {
       message: null,
     }),
     getWorkStatus: () => ({
+      rootThreadId: workContext.rootThreadId,
       currentThread: workContext.currentThread,
       children: [],
     }),
@@ -101,6 +103,7 @@ function rpcFixtures(sidebarTasks: RpcHandlers["sidebarTasks"]): RpcHandlers {
       current: null,
     }),
     getWorkOutcome: () => ({
+      rootThreadId: workContext.rootThreadId,
       tasksAvailable: true,
       outcome: null,
       executionTasks: [],

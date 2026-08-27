@@ -1,10 +1,17 @@
 export type WorkSidebarRealtimeFamily =
   "work" | "changes" | "tracker" | "tasks";
 
-export type WorkSidebarRealtimeEvent = Readonly<{
-  family: WorkSidebarRealtimeFamily;
+type RootScopedWorkEvent = Readonly<{
+  family: "work";
+  rootThreadId: string;
+}>;
+type ThreadScopedRealtimeEvent = Readonly<{
+  family: Exclude<WorkSidebarRealtimeFamily, "work">;
   threadId: string;
 }>;
+export type WorkSidebarRealtimeEvent =
+  | RootScopedWorkEvent
+  | ThreadScopedRealtimeEvent;
 
 const families = new Set<WorkSidebarRealtimeFamily>([
   "work",
@@ -19,15 +26,16 @@ export function parseWorkSidebarRealtimeEvent(
 ): WorkSidebarRealtimeEvent | null {
   if (!value || typeof value !== "object") return null;
   const event = value as Record<string, unknown>;
-  if (
-    typeof event.threadId !== "string" ||
-    !event.threadId.startsWith("thr_") ||
-    typeof event.family !== "string" ||
-    !families.has(event.family as WorkSidebarRealtimeFamily)
-  )
+  if (typeof event.family !== "string" || !families.has(event.family as WorkSidebarRealtimeFamily))
     return null;
-  return {
-    family: event.family as WorkSidebarRealtimeFamily,
-    threadId: event.threadId,
-  };
+  if (event.family === "work")
+    return typeof event.rootThreadId === "string" && event.rootThreadId.startsWith("thr_")
+      ? { family: "work", rootThreadId: event.rootThreadId }
+      : null;
+  return typeof event.threadId === "string" && event.threadId.startsWith("thr_")
+    ? {
+      family: event.family as Exclude<WorkSidebarRealtimeFamily, "work">,
+      threadId: event.threadId,
+    }
+    : null;
 }

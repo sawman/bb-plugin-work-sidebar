@@ -36,10 +36,9 @@ export function registerTasksTools(
     instructions: "Use at start, resume, and after compaction before creating tasks, dispatching work, or changing task status. This is a lookup tool, not a compaction hook.",
     async execute(params, context) {
       const root = await bindings.rootThread(params.rootThreadId ?? context.threadId);
-      const saved = await bindings.read();
-      const outcome = saved.outcomes.find((binding) => binding.rootThreadId === root.id) ?? null;
-      const legacy = outcome ? { state: "none", taskIds: [], message: null } : await bindings.legacy(root.id, root.projectId);
-      return JSON.stringify({ rootThreadId: root.id, outcome, executions: saved.executions.filter((binding) => binding.rootThreadId === root.id), legacy });
+      const snapshot = await bindings.context(root.id, root.projectId);
+      const outcome = snapshot.bindings.outcomes.find((binding) => binding.rootThreadId === root.id) ?? null;
+      return JSON.stringify({ rootThreadId: root.id, outcome, executions: snapshot.bindings.executions.filter((binding) => binding.rootThreadId === root.id), legacy: snapshot.legacy });
     },
   });
   bb.agents.registerTool({

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStore } from "zustand";
 import {
@@ -35,10 +35,37 @@ const WORK_TABS: readonly {
   },
   { id: "agents", label: "Agents", description: "Delegated child threads" },
 ];
+const MAX_QUEUED_ROOT_EVENTS = 8;
+
+type WorkPanelScope = {
+  threadId: string;
+  rootThreadId: string | null;
+  queuedRootThreadIds: string[];
+};
+
+function queueRootEvent(scope: WorkPanelScope, rootThreadId: string) {
+  if (scope.queuedRootThreadIds.includes(rootThreadId)) return;
+  if (scope.queuedRootThreadIds.length === MAX_QUEUED_ROOT_EVENTS)
+    scope.queuedRootThreadIds.shift();
+  scope.queuedRootThreadIds.push(rootThreadId);
+}
 
 export function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const queryClient = useQueryClient();
   const status = useWorkStatus(threadId);
+  const workScopeRef = useRef<WorkPanelScope>({
+    threadId,
+    rootThreadId: null,
+    queuedRootThreadIds: [],
+  });
+  if (workScopeRef.current.threadId !== threadId)
+    workScopeRef.current = {
+      threadId,
+      rootThreadId: null,
+      queuedRootThreadIds: [],
+    };
+  if (status.data?.rootThreadId)
+    workScopeRef.current.rootThreadId = status.data.rootThreadId;
   const tab = useStore(
     threadInteractionStore,
     (state) => state.workTabsByThread.get(threadId) ?? "work",
@@ -47,15 +74,33 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
     threadInteractionStore.getState().touchWorkTab(threadId);
     return () => changesInteractionStore.getState().selectFile(threadId, null);
   }, [threadId]);
+  useEffect(() => {
+    const scope = workScopeRef.current;
+    const rootThreadId = status.data?.rootThreadId;
+    if (scope.threadId !== threadId || !rootThreadId) return;
+    const shouldInvalidate = scope.queuedRootThreadIds.includes(rootThreadId);
+    scope.queuedRootThreadIds = [];
+    if (shouldInvalidate)
+      void invalidateWorkContextCards(queryClient, scope.threadId);
+  }, [queryClient, status.data?.rootThreadId, threadId]);
   useRealtime("work-sidebar:changed", (payload) => {
     const event = parseWorkSidebarRealtimeEvent(payload);
-    if (!event || event.threadId !== threadId) return;
-    if (event.family === "work")
-      void invalidateWorkContextCards(queryClient, threadId);
+    if (!event) return;
+    const scope = workScopeRef.current;
+    if (event.family === "work") {
+      if (!scope.rootThreadId) {
+        queueRootEvent(scope, event.rootThreadId);
+        return;
+      }
+      if (event.rootThreadId !== scope.rootThreadId) return;
+      void invalidateWorkContextCards(queryClient, scope.threadId);
+      return;
+    }
+    if (event.threadId !== scope.threadId) return;
     if (event.family === "tracker")
-      void invalidateTracker(queryClient, threadId);
+      void invalidateTracker(queryClient, scope.threadId);
     if (event.family === "changes")
-      void invalidateChanges(queryClient, threadId);
+      void invalidateChanges(queryClient, scope.threadId);
   });
   const selectTab = (next: WorkTab) =>
     threadInteractionStore.getState().setWorkTab(threadId, next);
