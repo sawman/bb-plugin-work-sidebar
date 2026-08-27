@@ -13,10 +13,10 @@ import {
   reconcileThreadOrder,
   reorderThreadSibling,
   rootThreads,
+  visibleThreadTreeIds,
 } from "../../work-model";
 import { selectThreadIds, type SidebarThreadGroup } from "./model";
 import { threadInteractionStore, type ThreadDropTarget } from "./store";
-import { visibleThreadTreeIds } from "./thread-row";
 
 type ThreadProject = { id: string; name: string; isPersonal: boolean };
 type ThreadTree = {

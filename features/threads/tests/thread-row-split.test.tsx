@@ -53,6 +53,7 @@ const thread = {
 function renderRow(reorderDisabled: boolean) {
   const onDragThreadChange = vi.fn();
   const onDropTargetChange = vi.fn();
+  const onDropThread = vi.fn();
   const view = render(
     <ThreadRow
       thread={thread}
@@ -75,11 +76,11 @@ function renderRow(reorderDisabled: boolean) {
       dropTarget={null}
       onDropTargetChange={onDropTargetChange}
       canDropThread={() => true}
-      onDropThread={vi.fn()}
+      onDropThread={onDropThread}
       onMoveThread={vi.fn()}
     />,
   );
-  return { ...view, onDragThreadChange, onDropTargetChange };
+  return { ...view, onDragThreadChange, onDropTargetChange, onDropThread };
 }
 
 afterEach(() => {
@@ -125,5 +126,31 @@ describe("ThreadRow split ownership", () => {
     fireEvent.pointerMove(window, { pointerId: 4, clientX: 10, clientY: 10 });
     expect(host.splitPointerDown).toHaveBeenCalledTimes(1);
     expect(enabled.onDragThreadChange).toHaveBeenCalledWith("thr_one");
+  });
+
+  it("cleans up an active pointer drag when the row unmounts", () => {
+    const view = renderRow(false);
+    const row = view.container.querySelector<HTMLElement>("[data-ws-thread-id]")!;
+    const target = document.createElement("div");
+    target.dataset.wsThreadId = "thr_two";
+    row.parentElement!.append(target);
+    Object.defineProperty(document, "elementFromPoint", {
+      configurable: true,
+      value: () => target,
+    });
+    vi.spyOn(target, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      height: 100,
+    } as DOMRect);
+
+    fireEvent.pointerDown(row, { button: 0, pointerId: 5, clientX: 0, clientY: 0 });
+    fireEvent.pointerMove(window, { pointerId: 5, clientX: 10, clientY: 10 });
+    expect(view.onDragThreadChange).toHaveBeenCalledWith("thr_one");
+    view.unmount();
+    expect(view.onDragThreadChange).toHaveBeenLastCalledWith(null);
+    expect(view.onDropTargetChange).toHaveBeenLastCalledWith(null);
+
+    fireEvent.pointerUp(window, { pointerId: 5, clientX: 10, clientY: 10 });
+    expect(view.onDropThread).not.toHaveBeenCalled();
   });
 });
