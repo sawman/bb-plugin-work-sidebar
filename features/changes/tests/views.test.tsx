@@ -74,5 +74,6 @@ describe("R13 Changes error presentation", () => {
     expect(label.getAttribute("aria-label")).not.toContain(
       "Show changed files",
     );
+    expect(label.querySelector(".ws-stack-expand")).toBeNull();
   });
 });

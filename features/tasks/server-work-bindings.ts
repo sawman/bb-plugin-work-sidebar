@@ -58,6 +58,17 @@ export type DescendantThread = {
   depth: number;
 };
 
+type WorkBindingsRealtime = Pick<BbPluginApi["realtime"], "publish">;
+
+/** Announces a completed binding to exactly the affected right and left slices. */
+export function publishWorkBindingReady(
+  realtime: WorkBindingsRealtime,
+  threadId: string,
+) {
+  realtime.publish("work-sidebar:changed", { family: "work", threadId });
+  realtime.publish("work-sidebar:changed", { family: "tasks", threadId });
+}
+
 /** Durable outcome/execution ownership, dispatch recovery, and legacy adoption. */
 export function createWorkBindingsService(
   bb: BbPluginApi,
@@ -516,14 +527,7 @@ export function createWorkBindingsService(
       const ready = await save(
         bindExecutionOwner(pending, "direct", root.id, "ready", null),
       );
-      bb.realtime.publish("work-sidebar:changed", {
-        family: "work",
-        threadId: root.id,
-      });
-      bb.realtime.publish("work-sidebar:changed", {
-        family: "tasks",
-        threadId: root.id,
-      });
+      publishWorkBindingReady(bb.realtime, root.id);
       return { binding: ready, spawnedThreadId: null };
     }
     if (!input.prompt) throw new Error("Delegated execution requires a prompt");
@@ -596,14 +600,7 @@ export function createWorkBindingsService(
         null,
       ),
     );
-    bb.realtime.publish("work-sidebar:changed", {
-      family: "work",
-      threadId: root.id,
-    });
-    bb.realtime.publish("work-sidebar:changed", {
-      family: "tasks",
-      threadId: root.id,
-    });
+    publishWorkBindingReady(bb.realtime, root.id);
     return { binding: ready, spawnedThreadId: spawned.id };
   };
   return {

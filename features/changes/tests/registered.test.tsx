@@ -322,6 +322,7 @@ describe("R13 registered Changes Work slot", () => {
       name: /#43 Stack branch.*Show changed files for pull request #43/,
     });
     expect(disclosure.getAttribute("aria-expanded")).toBe("false");
+    expect(disclosure.querySelector(".ws-stack-expand")).toBeTruthy();
     fireEvent.keyDown(disclosure, { key: "Enter" });
     fireEvent.click(disclosure);
     expect(disclosure.getAttribute("aria-expanded")).toBe("true");

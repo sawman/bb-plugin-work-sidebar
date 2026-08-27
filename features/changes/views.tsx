@@ -393,9 +393,11 @@ export function ChangesStackBranchRow({
               </>
             ) : null}
           </small>
-          <span className="ws-stack-expand" aria-hidden>
-            {expanded ? "⌄" : "›"}
-          </span>
+          {hasFiles && (
+            <span className="ws-stack-expand" aria-hidden>
+              {expanded ? "⌄" : "›"}
+            </span>
+          )}
         </button>
         <span className="ws-stack-actions">
           {pr && (
