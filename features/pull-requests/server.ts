@@ -85,7 +85,15 @@ export class PullRequestService<T extends AuthoredPullRequestRecord> {
     return result;
   }
 
-  clear(): void { this.generation += 1; this.authoredCache = null; this.stacksCache = null; }
+  clear(): void {
+    this.generation += 1;
+    this.authoredCache = null;
+    this.stacksCache = null;
+    // A late completion still resolves its original caller, but no normal
+    // read may join work from the generation this clear replaced.
+    this.authoredPending = null;
+    this.stacksPending = null;
+  }
   dispose(): void { this.disposed = true; this.clear(); this.authoredPending = null; this.stacksPending = null; }
   classifyError(error: unknown, scope: PullRequestHealth["scope"]): PullRequestHealth {
     return classifyPullRequestError(error, scope, this.options.now);

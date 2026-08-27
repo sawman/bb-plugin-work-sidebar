@@ -95,4 +95,28 @@ describe("R5 pull-request server ownership", () => {
     await expect(oldRead).resolves.toEqual([{ repository: "acme/sidebar", title: "old stack" }]);
     expect(await service.stacks()).toEqual([{ repository: "acme/sidebar", title: "new stack" }]);
   });
+
+  it("detaches pre-mutation pending reads so ordinary refetches enter the new generation", async () => {
+    const oldRead = deferred<Array<{ repository: string; title: string }>>();
+    const newRead = deferred<Array<{ repository: string; title: string }>>();
+    const readAuthored = vi.fn()
+      .mockImplementationOnce(() => oldRead.promise)
+      .mockImplementationOnce(() => newRead.promise);
+    const service = createPullRequestService({
+      now: () => 0,
+      readAuthored,
+      readStacks: async (items) => items,
+      archivedRepositories: async () => new Set(),
+      setDraft: async () => ({ draft: true }),
+    });
+    const staleCaller = service.authored();
+    await service.setDraft("https://github.com/acme/sidebar/pull/12", true);
+    const freshCaller = service.authored();
+    expect(readAuthored).toHaveBeenCalledTimes(2);
+    newRead.resolve([{ repository: "acme/sidebar", title: "new generation" }]);
+    await expect(freshCaller).resolves.toEqual([{ repository: "acme/sidebar", title: "new generation" }]);
+    oldRead.resolve([{ repository: "acme/sidebar", title: "old generation" }]);
+    await expect(staleCaller).resolves.toEqual([{ repository: "acme/sidebar", title: "old generation" }]);
+    expect(await service.authored()).toEqual([{ repository: "acme/sidebar", title: "new generation" }]);
+  });
 });
