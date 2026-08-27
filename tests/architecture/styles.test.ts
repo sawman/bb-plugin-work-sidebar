@@ -106,6 +106,27 @@ function hasProductionConsumer(className: string, consumers: ReturnType<typeof s
   );
 }
 
+function directSurfacePrimitivePaths() {
+  const violations: string[] = [];
+  for (const file of productionSourcePaths().filter((path) => path.endsWith(".tsx") && relative(root, path) !== "components/ui/surface-card.tsx")) {
+    const sourceFile = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const visit = (node: ts.Node) => {
+      if (ts.isJsxOpeningElement(node) && ["article", "div"].includes(node.tagName.getText())) {
+        const className = node.attributes.properties.find((attribute): attribute is ts.JsxAttribute =>
+          ts.isJsxAttribute(attribute) && attribute.name.getText() === "className",
+        );
+        const tokens = new Set(className?.initializer?.getText().match(/ws-[A-Za-z0-9_-]+/g) ?? []);
+        if ((node.tagName.getText() === "article" && tokens.has("ws-card")) || (node.tagName.getText() === "div" && tokens.has("ws-card-heading"))) {
+          violations.push(relative(root, file) + ":" + (sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1));
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(sourceFile);
+  }
+  return violations;
+}
+
 function jsxAttributeNames(attributes: ts.JsxAttributes) {
   return new Set(attributes.properties.filter(ts.isJsxAttribute).map((attribute) => attribute.name.getText()));
 }
@@ -255,6 +276,10 @@ describe("shared surface and list-row architecture", () => {
     expect(cardHeadingStrongDefinitions, "only the heading primitive owns its strong typography").toEqual([".ws-card-heading strong"]);
     expect(cardControlFocus?.declarations, "shared card controls retain an explicit visible focus treatment").toContain("outline: 2px solid var(--ring)");
     expect(broadTypography, "surface selectors must not override descendant typography").toEqual([]);
+  });
+
+  test("constructs card roots and headings only through the shared primitive", () => {
+    expect(directSurfacePrimitivePaths()).toEqual([]);
   });
 
   test("removes unsupported style debt rather than snapshotting it", () => {

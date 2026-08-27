@@ -20,11 +20,22 @@ function report(operation: Promise<unknown>, fallback: string) {
 }
 
 function TrackerLoading() {
-  return <article className="ws-card ws-empty-state-card" aria-busy="true"><div className="ws-card-heading"><strong>Linear</strong></div><p className="ws-card-note">Loading linked work…</p></article>;
+  return (
+    <SurfaceCard className="ws-empty-state-card" aria-busy="true">
+      <SurfaceCardHeading title="Linear" />
+      <p className="ws-card-note">Loading linked work…</p>
+    </SurfaceCard>
+  );
 }
 
 function TrackerError({ message, retry }: { message: string; retry(): void }) {
-  return <article className="ws-card ws-linear-card" role="alert"><div className="ws-card-heading"><strong>Linear</strong></div><small className="ws-linear-error">{message}</small><button type="button" className="ws-text-button" onClick={retry}>Try again</button></article>;
+  return (
+    <SurfaceCard className="ws-linear-card" role="alert">
+      <SurfaceCardHeading title="Linear" />
+      <small className="ws-linear-error">{message}</small>
+      <button type="button" className="ws-text-button" onClick={retry}>Try again</button>
+    </SurfaceCard>
+  );
 }
 
 export function TrackerHeaderBadge({ threadId }: { threadId: string }) {
