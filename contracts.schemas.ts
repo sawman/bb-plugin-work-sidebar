@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { pullRequestSignal } from "./features/pull-requests/schemas.js";
+import { authoredPullRequest, pullRequest, pullRequestSignal, sidebarStack, sidebarStackLayer } from "./features/pull-requests/schemas.js";
 
 const taskStatus = z.enum(["backlog", "todo", "in_progress", "in_review", "done", "canceled"]);
 const taskPriority = z.enum(["urgent", "high", "medium", "low", "none"]);
@@ -45,51 +45,6 @@ const legacyContext = z.object({
   taskIds: z.array(z.string()),
   message: z.string().nullable(),
 });
-const pullRequest = z.object({
-  number: z.number(),
-  title: z.string(),
-  url: z.string(),
-  state: z.enum(["closed", "draft", "merged", "open"]),
-  head: z.string(),
-  base: z.string(),
-  checks: z.object({
-    failedCount: z.number(),
-    passedCount: z.number(),
-    pendingCount: z.number(),
-    state: z.enum(["failing", "no_checks", "passing", "pending", "unknown"]),
-    totalCount: z.number(),
-  }),
-  review: z.object({
-    reviewRequestCount: z.number(),
-    state: z.enum(["approved", "changes_requested", "none", "review_requested", "review_required"]),
-  }),
-  attention: z.enum(["blocked", "changes_requested", "checks_failed", "checks_pending", "closed", "conflicts", "draft", "merged", "none", "ready_to_merge", "review_requested"]),
-  mergeability: z.object({
-    mergeStateStatus: z.enum(["BEHIND", "BLOCKED", "CLEAN", "DRAFT", "HAS_HOOKS", "DIRTY", "UNKNOWN", "UNSTABLE"]).nullable(),
-    mergeable: z.enum(["CONFLICTING", "MERGEABLE", "UNKNOWN"]).nullable(),
-    state: z.enum(["blocked", "conflicts", "draft", "mergeable", "unknown"]),
-  }),
-  signal: pullRequestSignal,
-});
-const sidebarStackLayer = pullRequestSignal.extend({
-  number: z.number().int().positive(), title: z.string(), state: z.string(), draft: z.boolean(),
-  url: z.string(), head: z.string(), base: z.string(), attention: z.string().nullable().optional(),
-});
-const sidebarStack = z.object({
-  id: z.string(), number: z.number().int().positive().nullable(), base: z.string(),
-  currentPullRequest: z.number().int().positive().nullable(), pullRequests: z.array(sidebarStackLayer),
-});
-const authoredPullRequest = pullRequestSignal.extend({
-  number: z.number().int().positive(),
-  title: z.string(),
-  url: z.string().url(),
-  repository: z.string(),
-  state: z.enum(["open", "draft"]),
-  draft: z.boolean(),
-  head: z.string(),
-  base: z.string(),
-  stack: sidebarStack.nullable(),
-});
 const sidebarThreadPullRequest = z.object({
   number: z.number(), title: z.string(), url: z.string().url(),
   state: z.enum(["closed", "draft", "merged", "open"]),
@@ -121,6 +76,7 @@ const workChanges = z.object({
   githubStack: z.object({ stack: githubStack.nullable(), pending: stackChange.nullable(), error: z.string().nullable() }).nullable(),
   repository: z.object({ outcome: z.enum(["available", "not_applicable", "unavailable", "absent"]), message: z.string().nullable(), branch: z.string().nullable(), base: z.string().nullable(), ahead: z.number(), behind: z.number(), worktreeState: z.string().nullable(), hasUncommittedChanges: z.boolean(), changedFileCount: z.number().int().nonnegative(), changedInsertions: z.number().int().nonnegative(), changedDeletions: z.number().int().nonnegative(), changedFiles: z.array(z.object({ path: z.string(), status: z.string(), insertions: z.number().nullable(), deletions: z.number().nullable() })) }),
 });
+const threadPullRequestChanges = workChanges.pick({ currentPullRequest: true, stack: true, stackUnavailableReason: true, githubStack: true });
 const workTracker = z.object({ visible: z.boolean(), available: z.boolean(), message: z.string().nullable(), suggestions: z.array(z.object({ key: z.string(), title: z.string(), url: z.string().url() })), item: z.object({ key: z.string(), title: z.string(), url: z.string().url(), status: z.string(), stateCategory: z.enum(["backlog", "todo", "in_progress", "done", "canceled"]), priority: z.string().nullable(), assignee: z.string().nullable(), project: z.string().nullable() }).nullable(), statusOptions: z.array(z.object({ id: z.string(), name: z.string(), current: z.boolean() })) });
 const workProviderStatus = z.object({
   tone: z.enum(["green", "amber", "red"]),
@@ -302,7 +258,8 @@ export const rpcSchemas = {
       }),
     }),
   },
-  getWorkChanges: { input: z.object({ threadId: z.string(), force: z.boolean().optional() }).strict(), output: workChanges },
+  getWorkChanges: { input: z.object({ threadId: z.string(), force: z.boolean().optional(), pullRequests: z.boolean().optional() }).strict(), output: workChanges },
+  getThreadPullRequestChanges: { input: z.object({ threadId: z.string().startsWith("thr_") }).strict(), output: threadPullRequestChanges },
   getPullRequestFingerprint: { input: z.object({ url: z.string().url() }).strict(), output: z.object({ fingerprint: z.string().nullable() }) },
   getGitHubPollingPolicy: { input: z.null(), output: z.object({ activePollMs: z.number().int().positive(), backgroundPollMs: z.number().int().positive(), maxRestPollsPerMinute: z.number().int().positive() }) },
   getWorkTracker: { input: z.object({ threadId: z.string() }).strict(), output: workTracker },

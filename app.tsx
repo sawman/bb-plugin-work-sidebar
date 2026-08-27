@@ -64,6 +64,8 @@ import {
 } from "./work-model";
 import { Icon } from "@/components/ui/icon";
 import { githubHealthPresentation, pullRequestPresentation } from "@/features/pull-requests/presentation";
+import { invalidateThreadPullRequestChanges, useAuthoredPullRequestRefresh, useAuthoredPullRequests, useGitHubApiHealth, useSetAuthoredPullRequestDraft, useThreadPullRequestChanges } from "@/features/pull-requests/queries";
+import { useQueryClient } from "@tanstack/react-query";
 import "./app.css";
 import "./scrollbar.css";
 import "./views.css";
@@ -522,24 +524,16 @@ function WorkThreadList(props: PluginThreadListProps) {
   const [taskSelectionAnchorId, setTaskSelectionAnchorId] = useState<string | null>(null);
   const [selectedPullRequestIds, setSelectedPullRequestIds] = useState<Set<string>>(() => new Set());
   const [pullRequestSelectionAnchorId, setPullRequestSelectionAnchorId] = useState<string | null>(null);
-  const [authoredPullRequests, setAuthoredPullRequests] = useState<AuthoredPullRequest[]>([]);
-  const [authoredPullRequestState, setAuthoredPullRequestState] = useState<"idle" | "loading" | "ready" | "error">("idle");
-  const [authoredPullRequestError, setAuthoredPullRequestError] = useState<string | null>(null);
-  const [changingDraftUrl, setChangingDraftUrl] = useState<string | null>(null);
-  const [authoredPullRequestRefreshKey, setAuthoredPullRequestRefreshKey] = useState(0);
-  const [githubApiHealth, setGithubApiHealth] = useState<{ state: "available" | "rate_limited" | "unavailable"; scope: "graphql" | "rest" | "unknown"; message: string | null; retryAt: number | null }>({ state: "available", scope: "unknown", message: null, retryAt: null });
   const [subtextRefreshKey, setSubtextRefreshKey] = useState(0);
-  const authoredPullRequestRequest = useRef(0);
-
-  const refreshGitHubApiHealth = useCallback(async () => {
-    try { setGithubApiHealth(await rpc.call("getGitHubApiHealth", null)); }
-    catch { setGithubApiHealth({ state: "unavailable", scope: "unknown", message: "GitHub API health could not be checked.", retryAt: null }); }
-  }, [rpc]);
-  useEffect(() => {
-    void refreshGitHubApiHealth();
-    const timer = window.setInterval(() => void refreshGitHubApiHealth(), 30_000);
-    return () => window.clearInterval(timer);
-  }, [refreshGitHubApiHealth]);
+  const authoredPullRequestQuery = useAuthoredPullRequests(rpc, { intervalMs: Number(pluginSettings?.githubLeftListRefreshSeconds ?? "300") * 1_000 });
+  const authoredPullRequestRefresh = useAuthoredPullRequestRefresh();
+  const authoredPullRequestDraft = useSetAuthoredPullRequestDraft(rpc);
+  const githubHealthQuery = useGitHubApiHealth(rpc);
+  const authoredPullRequests = (authoredPullRequestQuery.data ?? []) as AuthoredPullRequest[];
+  const authoredPullRequestState = authoredPullRequestQuery.isPending ? "loading" : authoredPullRequestQuery.isError ? "error" : "ready";
+  const authoredPullRequestError = authoredPullRequestQuery.error?.message ?? null;
+  const changingDraftUrl = authoredPullRequestDraft.isPending ? authoredPullRequestDraft.variables?.url ?? null : null;
+  const githubApiHealth = githubHealthQuery.data ?? { state: "available" as const, scope: "unknown" as const, message: null, retryAt: null };
 
   useEffect(() => {
     void rpc.call("getThreadListMode", null).then((result) => setThreadListMode(result.mode)).catch(() => undefined);
@@ -657,32 +651,6 @@ function WorkThreadList(props: PluginThreadListProps) {
     const timer = window.setInterval(() => void refreshTaskLinks(), 30_000);
     return () => { taskLinksRequest.current += 1; window.clearInterval(timer); };
   }, [refreshTaskLinks]);
-  useEffect(() => {
-    let cancelled = false;
-    const loadAuthoredPullRequests = async (foreground: boolean, force = false) => {
-      const request = ++authoredPullRequestRequest.current;
-      if (foreground) { setAuthoredPullRequestState("loading"); setAuthoredPullRequestError(null); }
-      try {
-        const result = await rpc.call("sidebarAuthoredPullRequests", { force });
-        if (!result.available) throw new Error(result.error ?? "GitHub authored pull requests are unavailable.");
-        if (cancelled || request !== authoredPullRequestRequest.current) return;
-        setAuthoredPullRequests(result.pullRequests);
-        setAuthoredPullRequestState("ready");
-        // Stack discovery needs one GitHub endpoint per PR. It enriches an
-        // already-visible list and never blocks either first paint or refresh.
-        const stackResult = await rpc.call("sidebarAuthoredPullRequestStacks", null);
-        if (!cancelled && request === authoredPullRequestRequest.current && stackResult.available) setAuthoredPullRequests(stackResult.pullRequests);
-      } catch (error) {
-        if (cancelled || request !== authoredPullRequestRequest.current || !foreground) return;
-        setAuthoredPullRequests([]); setAuthoredPullRequestState("error");
-        setAuthoredPullRequestError(error instanceof Error ? error.message : String(error));
-      } finally { void refreshGitHubApiHealth(); }
-    };
-    // Warm every tab at mount, then revalidate the left PR list at its own cadence.
-    void loadAuthoredPullRequests(true, authoredPullRequestRefreshKey > 0);
-    const refreshTimer = window.setInterval(() => { void loadAuthoredPullRequests(false); }, Number(pluginSettings?.githubLeftListRefreshSeconds ?? "300") * 1_000);
-    return () => { cancelled = true; window.clearInterval(refreshTimer); };
-  }, [authoredPullRequestRefreshKey, pluginSettings?.githubLeftListRefreshSeconds, refreshGitHubApiHealth, rpc]);
   const refreshTasks = useCallback(async () => {
     const request = ++tasksRequest.current;
     setTaskState("loading");
@@ -926,18 +894,11 @@ function WorkThreadList(props: PluginThreadListProps) {
     return [...groups.values()].map((group) => ({ ...group, stacks: [...group.stacks.values()] }));
   }, [visibleAuthoredPullRequests]);
   const toggleAuthoredPullRequestDraft = useCallback((pullRequest: Omit<AuthoredPullRequest, "stack">) => {
-    if (changingDraftUrl) return;
-    setChangingDraftUrl(pullRequest.url);
-    void rpc.call("setAuthoredPullRequestDraft", { url: pullRequest.url, draft: !pullRequest.draft }).then((result) => {
-      setAuthoredPullRequests((current) => current.map((item) => {
-        const updateLayer = (layer: SidebarStack["pullRequests"][number]) => layer.url === pullRequest.url ? { ...layer, draft: result.draft, state: result.draft ? "draft" : "open" } : layer;
-        const stack = item.stack ? { ...item.stack, pullRequests: item.stack.pullRequests.map(updateLayer) } : null;
-        return item.url === pullRequest.url ? { ...item, draft: result.draft, state: result.draft ? "draft" : "open", stack } : { ...item, stack };
-      }));
-    }).catch((error: unknown) => {
+    if (authoredPullRequestDraft.isPending) return;
+    authoredPullRequestDraft.mutate({ url: pullRequest.url, draft: !pullRequest.draft }, { onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : "Could not update pull request state");
-    }).finally(() => setChangingDraftUrl(null));
-  }, [changingDraftUrl, rpc]);
+    }});
+  }, [authoredPullRequestDraft]);
   const visibleTaskIds = taskQueue.flatMap((node) => [node.task.id, ...node.children.map((child) => child.id)]);
   const selectTask = (taskId: string, event: ReactMouseEvent<HTMLButtonElement>): boolean => {
     const toggle = event.ctrlKey || event.metaKey;
@@ -982,7 +943,7 @@ function WorkThreadList(props: PluginThreadListProps) {
 
   const githubHealth = githubHealthPresentation(githubApiHealth);
   const githubHealthIndicator = githubHealth ? <span className={`ws-github-api-indicator ws-github-api-${githubHealth.tone}`} title={githubApiHealth.message ?? githubHealth.label}><Icon name={githubHealth.icon} aria-hidden />{githubHealth.label}</span> : null;
-  const viewToolbar = view === "queue" ? <><span>{filteredTasks.length} active task{filteredTasks.length === 1 ? "" : "s"}</span><span className="ws-work-toolbar-actions">{selectedTaskIds.size > 1 && <span className="ws-selection-count" role="status">{selectedTaskIds.size} selected</span>}<button className="ws-icon-button" title="Add task" aria-label="Add task" disabled={!taskProjects.length} onClick={() => setTaskComposerOpen((open) => !open)}><Icon name="Plus" aria-hidden /></button><button className="ws-icon-button" title="Refresh tasks" aria-label="Refresh tasks" onClick={() => void refreshTasks()}><Icon name="RefreshCw" aria-hidden /></button></span></> : view === "prs" ? <><span>{visibleAuthoredPullRequests.length} open pull request{visibleAuthoredPullRequests.length === 1 ? "" : "s"}</span><span className="ws-work-toolbar-actions">{githubHealthIndicator}{selectedPullRequestIds.size > 1 && <span className="ws-selection-count" role="status">{selectedPullRequestIds.size} selected</span>}<button className="ws-icon-button" title="Refresh pull requests" aria-label="Refresh pull requests" disabled={authoredPullRequestState === "loading"} onClick={() => setAuthoredPullRequestRefreshKey((value) => value + 1)}><Icon name="RefreshCw" aria-hidden /></button></span></> : <><span>{threadListMode === "native" ? "Threads" : `${filtered.length} thread${filtered.length === 1 ? "" : "s"}`}</span><span className="ws-work-toolbar-actions">{threadListMode === "enhanced" && <>{selectedThreadIds.size > 1 && <><span className="ws-selection-count" role="status">{selectedThreadIds.size} selected</span><button className="ws-selection-archive" onClick={() => void archiveSelected()}>Archive selected</button></>}{reorderDisabled && <span className="ws-reorder-disabled" role="status">Clear search to reorder</span>}</>}<span className="ws-thread-settings"><button className="ws-icon-button" title="Thread list settings" aria-label="Thread list settings" aria-expanded={threadSettingsOpen} onClick={() => setThreadSettingsOpen((open) => !open)}><Icon name="Wrench" aria-hidden /></button>{threadSettingsOpen && <span className="ws-thread-settings-menu" role="menu"><button role="menuitemradio" aria-checked={threadListMode === "enhanced"} onClick={() => setSavedThreadListMode("enhanced")}>Enhanced list</button><button role="menuitemradio" aria-checked={threadListMode === "native"} onClick={() => setSavedThreadListMode("native")}>BB native list</button><span className="ws-thread-group-settings"><b>Custom groups</b>{threadGroups.map((group) => <span key={group.id}><button title={`Rename ${group.name}`} onClick={() => renameThreadGroup(group)}>{group.name}</button><button className="ws-thread-group-remove" title={[...threadGroupIds.values()].includes(group.id) ? "Move its threads before removing" : `Remove ${group.name}`} disabled={[...threadGroupIds.values()].includes(group.id)} onClick={() => removeThreadGroup(group)}><Icon name="X" aria-hidden /></button></span>)}<button className="ws-thread-group-add" onClick={addThreadGroup}>Add group</button></span></span>}</span><button className="ws-icon-button" title="Refresh threads" aria-label="Refresh threads" onClick={() => void refreshThreadDetails()}><Icon name="RefreshCw" aria-hidden /></button>{props.activeProjectId && <Button className="ws-new-thread" variant="ghost" size="icon" title="New thread in project" aria-label="New thread in project" onClick={() => actions.openNewThread({ projectId: props.activeProjectId!, focusPrompt: true })}><Icon name="Plus" aria-hidden /></Button>}</span></>;
+  const viewToolbar = view === "queue" ? <><span>{filteredTasks.length} active task{filteredTasks.length === 1 ? "" : "s"}</span><span className="ws-work-toolbar-actions">{selectedTaskIds.size > 1 && <span className="ws-selection-count" role="status">{selectedTaskIds.size} selected</span>}<button className="ws-icon-button" title="Add task" aria-label="Add task" disabled={!taskProjects.length} onClick={() => setTaskComposerOpen((open) => !open)}><Icon name="Plus" aria-hidden /></button><button className="ws-icon-button" title="Refresh tasks" aria-label="Refresh tasks" onClick={() => void refreshTasks()}><Icon name="RefreshCw" aria-hidden /></button></span></> : view === "prs" ? <><span>{visibleAuthoredPullRequests.length} open pull request{visibleAuthoredPullRequests.length === 1 ? "" : "s"}</span><span className="ws-work-toolbar-actions">{githubHealthIndicator}{selectedPullRequestIds.size > 1 && <span className="ws-selection-count" role="status">{selectedPullRequestIds.size} selected</span>}<button className="ws-icon-button" title="Refresh pull requests" aria-label="Refresh pull requests" disabled={authoredPullRequestQuery.isFetching} onClick={() => void authoredPullRequestRefresh()}><Icon name="RefreshCw" aria-hidden /></button></span></> : <><span>{threadListMode === "native" ? "Threads" : `${filtered.length} thread${filtered.length === 1 ? "" : "s"}`}</span><span className="ws-work-toolbar-actions">{threadListMode === "enhanced" && <>{selectedThreadIds.size > 1 && <><span className="ws-selection-count" role="status">{selectedThreadIds.size} selected</span><button className="ws-selection-archive" onClick={() => void archiveSelected()}>Archive selected</button></>}{reorderDisabled && <span className="ws-reorder-disabled" role="status">Clear search to reorder</span>}</>}<span className="ws-thread-settings"><button className="ws-icon-button" title="Thread list settings" aria-label="Thread list settings" aria-expanded={threadSettingsOpen} onClick={() => setThreadSettingsOpen((open) => !open)}><Icon name="Wrench" aria-hidden /></button>{threadSettingsOpen && <span className="ws-thread-settings-menu" role="menu"><button role="menuitemradio" aria-checked={threadListMode === "enhanced"} onClick={() => setSavedThreadListMode("enhanced")}>Enhanced list</button><button role="menuitemradio" aria-checked={threadListMode === "native"} onClick={() => setSavedThreadListMode("native")}>BB native list</button><span className="ws-thread-group-settings"><b>Custom groups</b>{threadGroups.map((group) => <span key={group.id}><button title={`Rename ${group.name}`} onClick={() => renameThreadGroup(group)}>{group.name}</button><button className="ws-thread-group-remove" title={[...threadGroupIds.values()].includes(group.id) ? "Move its threads before removing" : `Remove ${group.name}`} disabled={[...threadGroupIds.values()].includes(group.id)} onClick={() => removeThreadGroup(group)}><Icon name="X" aria-hidden /></button></span>)}<button className="ws-thread-group-add" onClick={addThreadGroup}>Add group</button></span></span>}</span><button className="ws-icon-button" title="Refresh threads" aria-label="Refresh threads" onClick={() => void refreshThreadDetails()}><Icon name="RefreshCw" aria-hidden /></button>{props.activeProjectId && <Button className="ws-new-thread" variant="ghost" size="icon" title="New thread in project" aria-label="New thread in project" onClick={() => actions.openNewThread({ projectId: props.activeProjectId!, focusPrompt: true })}><Icon name="Plus" aria-hidden /></Button>}</span></>;
 
   return (
     <div className="ws-list">
@@ -1063,7 +1024,7 @@ type WorkPanelChild = {
 
 type WorkPanelBinding = { ownerThreadId: string | null; dispatchState: string; recoveryMessage: string | null };
 type WorkPanelContext = Extract<Awaited<ReturnType<ReturnType<typeof useRpc<typeof rpcContract>>["call"]>>, { tasksAvailable: boolean }>;
-type WorkPanelChanges = Pick<WorkPanelContext, "currentPullRequest" | "stack" | "stackUnavailableReason" | "githubStack" | "repository">;
+type WorkPanelChanges = Pick<WorkPanelContext, "repository">;
 type WorkPanelTracker = Pick<WorkPanelContext, "tracker">;
 type WorkProviderHealth = { tone: "green" | "amber" | "red"; providerId: string; providerName: string; statusUrl: string | null; status: string; message: string | null };
 
@@ -1111,6 +1072,14 @@ function WorkAgentRow({ child, bindings }: { child: WorkPanelChild; bindings: re
 function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const rpc = useRpc<typeof rpcContract>();
   const { values: pluginSettings } = useSettings();
+  const queryClient = useQueryClient();
+  const pullRequestChanges = useThreadPullRequestChanges(rpc, threadId, {
+    visiblePollMs: Number(pluginSettings?.githubActivePollSeconds ?? "60") * 1_000,
+    backgroundPollMs: Number(pluginSettings?.githubBackgroundPollSeconds ?? "300") * 1_000,
+    isVisible: () => typeof document === "undefined" || document.visibilityState === "visible",
+  });
+  const githubHealthQuery = useGitHubApiHealth(rpc);
+  const githubApiHealth = githubHealthQuery.data ?? { state: "available" as const, scope: "unknown" as const, message: null, retryAt: null };
   const navigate = useBbNavigate();
   const actions = experimental_useSidebarThreadActions();
   const [tab, setTab] = useState<WorkTab>("work");
@@ -1119,14 +1088,12 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const [changesLoading, setChangesLoading] = useState(() => !workPanelDetailsCache.get(threadId)?.repository);
   const [trackerLoading, setTrackerLoading] = useState(() => !workPanelDetailsCache.get(threadId)?.tracker);
   const [providerHealth, setProviderHealth] = useState<WorkProviderHealth>({ tone: "amber", providerId: "", providerName: "Provider", statusUrl: null, status: "unknown", message: "Checking provider health…" });
-  const [githubApiHealth, setGithubApiHealth] = useState<{ state: "available" | "rate_limited" | "unavailable"; scope: "graphql" | "rest" | "unknown"; message: string | null; retryAt: number | null }>({ state: "available", scope: "unknown", message: null, retryAt: null });
   const [error, setError] = useState<string | null>(null);
   const [updatingTask, setUpdatingTask] = useState<string | null>(null);
   const requestId = useRef(0);
   const changesRequestId = useRef(0);
   const trackerRequestId = useRef(0);
   const providerHealthRequestId = useRef(0);
-  const pullRequestFingerprint = useRef<string | null>(null);
   const activityRefreshInFlight = useRef(false);
   const [activity, setActivity] = useState<{ latest: { text: string; kind: "assistant" | "user" | "command" | "activity" } | null; lastUser: { text: string; kind: "user" } | null; current: { text: string; kind: "assistant" | "user" | "command" | "activity" } | null } | null>(null);
   const [expandedActivity, setExpandedActivity] = useState<Set<string>>(() => new Set());
@@ -1170,9 +1137,9 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
     const request = ++changesRequestId.current;
     if (!background || !workPanelDetailsCache.get(threadId)?.repository) setChangesLoading(true);
     try {
-      const details = await rpc.call("getWorkChanges", { threadId, ...(force ? { force: true } : {}) });
+      const details = await rpc.call("getWorkChanges", { threadId, pullRequests: false, ...(force ? { force: true } : {}) });
       if (request !== changesRequestId.current) return;
-      const merged = cacheWorkPanelDetails(threadId, details);
+      const merged = cacheWorkPanelDetails(threadId, { repository: details.repository });
       setContext((current) => current ? { ...current, ...merged } : current);
     } catch (caught) {
       if (request === changesRequestId.current) toast.error(caught instanceof Error ? caught.message : "Could not load changes");
@@ -1203,10 +1170,6 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
       if (request === providerHealthRequestId.current) setProviderHealth({ tone: "amber", providerId: "", providerName: "Provider", statusUrl: null, status: "unknown", message: "Provider health could not be checked." });
     }
   }, [rpc, threadId]);
-  const refreshGitHubApiHealth = useCallback(async () => {
-    try { setGithubApiHealth(await rpc.call("getGitHubApiHealth", null)); }
-    catch { setGithubApiHealth({ state: "unavailable", scope: "unknown", message: "GitHub API health could not be checked.", retryAt: null }); }
-  }, [rpc]);
   useEffect(() => {
     const cached = workPanelCache.get(threadId);
     const details = workPanelDetailsCache.get(threadId);
@@ -1218,9 +1181,8 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
     void refreshChanges(Boolean(details?.repository));
     void refreshTracker(Boolean(details?.tracker));
     void refreshProviderHealth();
-    void refreshGitHubApiHealth();
     return () => { requestId.current += 1; changesRequestId.current += 1; trackerRequestId.current += 1; providerHealthRequestId.current += 1; };
-  }, [refresh, refreshChanges, refreshGitHubApiHealth, refreshProviderHealth, refreshTracker, threadId]);
+  }, [refresh, refreshChanges, refreshProviderHealth, refreshTracker, threadId]);
   const refreshThreadTasks = useCallback(async () => {
     setThreadTasksLoading(true);
     try {
@@ -1230,15 +1192,11 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
     finally { setThreadTasksLoading(false); }
   }, [rpc]);
   useEffect(() => { void refreshThreadTasks(); }, [refreshThreadTasks, threadId]);
-  useRealtime("work-sidebar:changed", () => { void refresh(true); void refreshChanges(true); void refreshTracker(true); void refreshProviderHealth(); void refreshGitHubApiHealth(); });
+  useRealtime("work-sidebar:changed", () => { void refresh(true); void refreshChanges(true); void refreshTracker(true); void refreshProviderHealth(); void invalidateThreadPullRequestChanges(queryClient, threadId); });
   useEffect(() => {
     const interval = window.setInterval(() => { void refreshProviderHealth(); }, 30_000);
     return () => window.clearInterval(interval);
   }, [refreshProviderHealth]);
-  useEffect(() => {
-    const interval = window.setInterval(() => { void refreshGitHubApiHealth(); }, 30_000);
-    return () => window.clearInterval(interval);
-  }, [refreshGitHubApiHealth]);
   useEffect(() => {
     if (context?.currentThread.status !== "active" && context?.currentThread.status !== "starting") return;
     const refreshActivity = async () => {
@@ -1254,30 +1212,6 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
     const interval = window.setInterval(() => { void refreshActivity(); }, 2_000);
     return () => window.clearInterval(interval);
   }, [context?.currentThread.status, rpc, threadId]);
-  useEffect(() => {
-    const url = context?.currentPullRequest?.url;
-    if (!url) { pullRequestFingerprint.current = null; return; }
-    let cancelled = false;
-    const poll = async () => {
-      try {
-        const next = await rpc.call("getPullRequestFingerprint", { url });
-        if (cancelled || !next.fingerprint) return;
-        const previous = pullRequestFingerprint.current;
-        pullRequestFingerprint.current = next.fingerprint;
-        // The initial read only establishes a baseline. A later change earns
-        // the expensive full-stack request and cache invalidation.
-        if (previous && previous !== next.fingerprint) await refreshChanges(true, true);
-      } catch { /* Preserve the displayed stack when the inexpensive poll fails. */ }
-    };
-    let timer: number | null = null;
-    const schedule = () => {
-      const activeMs = Number(pluginSettings?.githubActivePollSeconds ?? "60") * 1_000;
-      const backgroundMs = Number(pluginSettings?.githubBackgroundPollSeconds ?? "300") * 1_000;
-      timer = window.setTimeout(async () => { await poll(); if (!cancelled) schedule(); }, document.visibilityState === "visible" ? activeMs : backgroundMs);
-    };
-    void poll(); schedule();
-    return () => { cancelled = true; if (timer !== null) window.clearTimeout(timer); };
-  }, [context?.currentPullRequest?.url, pluginSettings?.githubActivePollSeconds, pluginSettings?.githubBackgroundPollSeconds, refreshChanges, rpc]);
 
   const openWorkingTreeDiff = async (path: string) => {
     setWorkingTreeDiff({ path, patch: null, loading: true, message: null });
@@ -1365,7 +1299,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const checkoutStackBranch = async (branch: string) => {
     if (checkingOutBranch) return;
     setCheckingOutBranch(branch);
-    try { const result = await rpc.call("checkoutStackBranch", { threadId, branch }); result.ok ? toast.success(result.message) : toast.error(result.message); await Promise.all([refresh(), refreshChanges()]); }
+    try { const result = await rpc.call("checkoutStackBranch", { threadId, branch }); result.ok ? toast.success(result.message) : toast.error(result.message); await Promise.all([refresh(), refreshChanges(), pullRequestChanges.refetch()]); }
     catch (caught) { toast.error(caught instanceof Error ? caught.message : "Could not check out branch"); }
     finally { setCheckingOutBranch(null); }
   };
@@ -1377,7 +1311,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
           <Icon name="ListTodo" className="ws-panel-icon" aria-hidden />
           <div><strong>Work</strong><span>{context?.currentThread.title ?? "Active thread"}</span></div>
         </div>
-        <button type="button" className="ws-icon-button" aria-label="Refresh work context" title="Refresh work context" onClick={() => { void refresh(); void refreshChanges(); void refreshTracker(); void refreshProviderHealth(); void refreshGitHubApiHealth(); }} disabled={loading}>↻</button>
+        <button type="button" className="ws-icon-button" aria-label="Refresh work context" title="Refresh work context" onClick={() => { void refresh(); void refreshChanges(); void refreshTracker(); void refreshProviderHealth(); void pullRequestChanges.refetch(); void githubHealthQuery.refetch(); }} disabled={loading}>↻</button>
       </header>
       <nav className="ws-tabs" role="tablist" aria-label="Work context views">
         {WORK_TABS.map((candidate) => (
@@ -1398,7 +1332,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
       </nav>
       <div className="ws-panel-body" role="tabpanel" id={tabPanelId} aria-labelledby={`ws-tab-${selectedTab.id}`} tabIndex={0}>
         {loading && <div className="ws-empty" role="status" aria-live="polite">Loading work context…</div>}
-        {!loading && error && <div className="ws-callout" role="alert"><span>{error}</span><button type="button" onClick={() => { void refresh(); void refreshChanges(); void refreshTracker(); void refreshProviderHealth(); void refreshGitHubApiHealth(); }}>Try again</button></div>}
+        {!loading && error && <div className="ws-callout" role="alert"><span>{error}</span><button type="button" onClick={() => { void refresh(); void refreshChanges(); void refreshTracker(); void refreshProviderHealth(); void pullRequestChanges.refetch(); void githubHealthQuery.refetch(); }}>Try again</button></div>}
         {!loading && context && <article className="ws-card ws-status-card"><div className="ws-card-heading"><strong>Status</strong></div><div className="ws-status-summary"><h3>{runtimeStatusPresentation(context.currentThread).label}</h3><p className="ws-working-state"><span title={`${context.children.filter((child) => !child.isArchived).length} child agent${context.children.filter((child) => !child.isArchived).length === 1 ? "" : "s"}`}><Icon name="Bot" aria-hidden />{context.children.filter((child) => !child.isArchived).length}</span><span title={`${context.children.filter((child) => !child.isArchived && child.status === "active").length} active child agent${context.children.filter((child) => !child.isArchived && child.status === "active").length === 1 ? "" : "s"}`}><Icon name="Wrench" aria-hidden />{context.children.filter((child) => !child.isArchived && child.status === "active").length}</span></p></div>{activityItems.length > 0 ? <div className="ws-activity-list">{activityItems.map(({ label, entry }) => entry && <button type="button" className={`ws-activity-item ${entry.kind === "command" ? "ws-activity-item-command" : ""} ${expandedActivity.has(label) ? "ws-activity-item-expanded" : ""}`} key={label} aria-expanded={expandedActivity.has(label)} onClick={() => setExpandedActivity((current) => { const next = new Set(current); next.has(label) ? next.delete(label) : next.add(label); return next; })}><span className="ws-activity-label">{label}</span>{entry.kind === "command" ? <code className="ws-activity-command">{entry.text}</code> : <span className="ws-activity-copy">{entry.text}</span>}</button>)}</div> : <p className="ws-card-note">No activity has been recorded yet.</p>}{providerHealth.statusUrl ? <button type="button" className={`ws-provider-health ws-provider-health-${providerHealth.tone}`} onClick={() => { navigate.openUrl(providerHealth.statusUrl!); }} title={`${providerHealth.providerName}: ${providerHealth.message ?? readableStatus(providerHealth.status)}. Open service status.`} aria-label={`${providerHealth.providerName} provider status: ${providerHealth.message ?? readableStatus(providerHealth.status)}. Open service status.`} /> : <span className={`ws-provider-health ws-provider-health-${providerHealth.tone}`} title={`${providerHealth.providerName}: ${providerHealth.message ?? readableStatus(providerHealth.status)}`} aria-label={`${providerHealth.providerName} provider status: ${providerHealth.message ?? readableStatus(providerHealth.status)}`} />}</article>}
         {!loading && context && tab === "work" && (
           <div className="ws-section-stack">
@@ -1435,12 +1369,12 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
         )}
         {!loading && context && tab === "changes" && (
           <div className="ws-section-stack">
-            <header><div><h2>Changes</h2></div><span className="ws-section-count">{githubApiHealth.state !== "available" && <span className={`ws-github-api-indicator ws-github-api-${githubApiHealth.state}`} title={githubApiHealth.message ?? "GitHub API is unavailable."}><Icon name="AlertCircle" aria-hidden />{githubApiHealth.scope === "graphql" ? "GraphQL limited" : "GitHub unavailable"}</span>}{changesLoading ? "Loading…" : context.currentPullRequest ? `#${context.currentPullRequest.number}` : "No PR"}</span></header>
+            <header><div><h2>Changes</h2></div><span className="ws-section-count">{githubApiHealth.state !== "available" && <span className={`ws-github-api-indicator ws-github-api-${githubApiHealth.state}`} title={githubApiHealth.message ?? "GitHub API is unavailable."}><Icon name="AlertCircle" aria-hidden />{githubApiHealth.scope === "graphql" ? "GraphQL limited" : "GitHub unavailable"}</span>}{changesLoading || pullRequestChanges.isPending ? "Loading…" : pullRequestChanges.data?.currentPullRequest ? `#${pullRequestChanges.data.currentPullRequest.number}` : "No PR"}</span></header>
             {changesLoading ? <article className="ws-card ws-empty-state-card" aria-busy="true"><div className="ws-card-heading"><strong>Repository</strong></div><p className="ws-card-note">Loading pull requests and working-tree changes…</p></article> : <article className="ws-card ws-repository-card"><div className="ws-card-heading"><strong>{context.repository.branch ?? "Repository"}</strong><span className={`ws-pill ${context.repository.hasUncommittedChanges ? "ws-pr-changes_requested" : ""}`}>{context.repository.hasUncommittedChanges ? "Changed" : context.repository.outcome === "available" ? "Clean" : "Unavailable"}</span></div>{context.repository.outcome === "available" ? <><div className="ws-card-meta"><span>{context.repository.ahead}↑ {context.repository.behind}↓</span><span>{context.repository.base ?? "—"}</span>{context.repository.changedFileCount > 0 && <button type="button" className="ws-repository-changes-toggle" aria-expanded={pendingChangesExpanded} onClick={() => setPendingChangesExpanded((expanded) => !expanded)} aria-label={`${pendingChangesExpanded ? "Hide" : "Show"} ${context.repository.changedFileCount} working-tree file${context.repository.changedFileCount === 1 ? "" : "s"}`}><b>{context.repository.changedFileCount}</b> file{context.repository.changedFileCount === 1 ? "" : "s"} <i>+{context.repository.changedInsertions}</i> <em>−{context.repository.changedDeletions}</em> {pendingChangesExpanded ? "⌄" : "›"}</button>}</div>{pendingChangesExpanded && context.repository.changedFileCount > 0 && <div className="ws-current-pr-details ws-working-tree-files">{context.repository.changedFiles.map((file) => <button type="button" className="ws-working-tree-file" key={file.path} onClick={() => void openWorkingTreeDiff(file.path)} aria-label={`Open uncommitted diff for ${file.path}`}><b className={`ws-file-${file.status}`}>{file.status[0]?.toUpperCase()}</b><em>{file.path}</em><small>{file.insertions !== null ? `+${file.insertions}` : ""} {file.deletions !== null ? `−${file.deletions}` : ""}</small></button>)}{context.repository.changedFileCount > context.repository.changedFiles.length && <small>Only the first {context.repository.changedFiles.length} files are shown.</small>}</div>}</> : <p className="ws-card-note">{context.repository.message ?? "Repository status is unavailable."}</p>}</article>}
             {workingTreeDiff && <article className="ws-card ws-working-tree-diff"><div className="ws-card-heading"><strong>{workingTreeDiff.path}</strong><button type="button" className="ws-text-button" onClick={() => setWorkingTreeDiff(null)}>Close</button></div>{workingTreeDiff.loading ? <p className="ws-card-note">Loading diff…</p> : workingTreeDiff.patch ? <ChangesWorkingTreeDiff patch={workingTreeDiff.patch} /> : <p className="ws-card-note">{workingTreeDiff.message ?? "No diff is available for this file."}</p>}</article>}
-            {!changesLoading && (context.githubStack?.stack ? <ol className="ws-stack-rail" aria-label={`GitHub Stack based on ${context.githubStack.stack.trunk}`}>
-              {context.githubStack.stack.branches.map((branch) => { const stackPullRequest = context.stack?.pullRequests.find((pullRequest) => pullRequest.number === branch.pr?.number || pullRequest.head === branch.name); const current = branch.pr?.number === context.currentPullRequest?.number ? context.currentPullRequest : null; const signals = current ? { ...stackPullRequest, state: current.state, draft: current.state === "draft", ...current.signal } : branch.pr ? { ...stackPullRequest, state: stackPullRequest?.state ?? branch.pr.state, draft: stackPullRequest?.draft ?? branch.pr.isDraft, checks: branch.checks ?? stackPullRequest?.checks ?? "unknown", review: branch.review ?? stackPullRequest?.review ?? "none", reviewCommentCount: stackPullRequest?.reviewCommentCount ?? 0 } : stackPullRequest; return <ChangesStackBranchRow key={branch.name} branch={branch} signals={signals} expanded={expandedStackBranches.has(branch.name)} checkingOut={checkingOutBranch === branch.name} onToggle={() => toggleStackBranch(branch.name)} onCheckout={() => void checkoutStackBranch(branch.name)} />; })}
-            </ol> : context.currentPullRequest ? <ChangesPullRequestCard pullRequest={context.currentPullRequest} expanded={currentPrExpanded} onToggle={() => setCurrentPrExpanded((expanded) => !expanded)} /> : <div className="ws-empty">No pull request is linked to this thread.</div>)}
+            {!pullRequestChanges.isPending && (pullRequestChanges.data?.githubStack?.stack ? <ol className="ws-stack-rail" aria-label={`GitHub Stack based on ${pullRequestChanges.data.githubStack.stack.trunk}`}>
+              {pullRequestChanges.data.githubStack.stack.branches.map((branch: any) => { const stackPullRequest = pullRequestChanges.data?.stack?.pullRequests.find((pullRequest: any) => pullRequest.number === branch.pr?.number || pullRequest.head === branch.name); const current = branch.pr?.number === pullRequestChanges.data?.currentPullRequest?.number ? pullRequestChanges.data.currentPullRequest : null; const signals = current ? { ...stackPullRequest, state: current.state, draft: current.state === "draft", ...current.signal } : branch.pr ? { ...stackPullRequest, state: stackPullRequest?.state ?? branch.pr.state, draft: stackPullRequest?.draft ?? branch.pr.isDraft, checks: branch.checks ?? stackPullRequest?.checks ?? "unknown", review: branch.review ?? stackPullRequest?.review ?? "none", reviewCommentCount: stackPullRequest?.reviewCommentCount ?? 0 } : stackPullRequest; return <ChangesStackBranchRow key={branch.name} branch={branch} signals={signals} expanded={expandedStackBranches.has(branch.name)} checkingOut={checkingOutBranch === branch.name} onToggle={() => toggleStackBranch(branch.name)} onCheckout={() => void checkoutStackBranch(branch.name)} />; })}
+            </ol> : pullRequestChanges.data?.currentPullRequest ? <ChangesPullRequestCard pullRequest={pullRequestChanges.data.currentPullRequest} expanded={currentPrExpanded} onToggle={() => setCurrentPrExpanded((expanded) => !expanded)} /> : <div className="ws-empty">No pull request is linked to this thread.</div>)}
           </div>
         )}
         {!loading && context && tab === "agents" && (

@@ -21,6 +21,7 @@ describe("R2 server registration and disposal", () => {
       "sidebarTasks", "sidebarTaskLinks", "sidebarPullRequestStacks", "sidebarThreadPullRequests",
       "sidebarAuthoredPullRequests", "sidebarAuthoredPullRequestStacks", "setAuthoredPullRequestDraft",
       "sidebarArchivedThreads", "unarchiveSidebarThread", "getWorkContext", "getWorkChanges",
+      "getThreadPullRequestChanges",
       "getPullRequestFingerprint", "getGitHubPollingPolicy", "getWorkTracker", "getWorkProviderStatus",
       "getGitHubApiHealth", "checkoutStackBranch", "linkLinearIssue", "searchLinearIssues",
       "getLatestActivity", "getWorkingTreeFileDiff", "unlinkLinearIssue", "updateLinearIssueStatus",

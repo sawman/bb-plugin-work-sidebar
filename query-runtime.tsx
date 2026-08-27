@@ -23,9 +23,6 @@ export const queryKeys = {
     context: (threadId: string): QueryKey => [...queryRoot, "work", "context", threadId],
     changes: (threadId: string): QueryKey => [...queryRoot, "work", "changes", threadId],
   },
-  github: {
-    health: (): QueryKey => [...queryRoot, "github", "health"],
-  },
 } as const;
 
 export const queryPolicies = {
@@ -46,12 +43,6 @@ export const queryPolicies = {
   workChanges: {
     staleTime: 30_000,
     gcTime: 10 * 60_000,
-    retry: false,
-    refetchOnWindowFocus: false,
-  },
-  githubHealth: {
-    staleTime: 15_000,
-    gcTime: 2 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
   },

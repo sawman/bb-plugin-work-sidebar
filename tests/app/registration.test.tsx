@@ -18,21 +18,19 @@ describe("R2 app registration and Query lifecycle", () => {
     expect(queryKeys.sidebar.tasks.list()).toEqual(["work-sidebar", "sidebar", "tasks", "list"]);
     expect(queryKeys.sidebar.tasks.links()).toEqual(["work-sidebar", "sidebar", "tasks", "links"]);
     expect(queryKeys.work.context("thr_test")).toEqual(["work-sidebar", "work", "context", "thr_test"]);
-    expect(queryKeys.github.health()).toEqual(["work-sidebar", "github", "health"]);
     expect(queryPolicies.sidebarOrderPreferences).toMatchObject({ staleTime: Infinity, gcTime: 30 * 60_000, retry: false });
     expect(queryPolicies.sidebarTasksList).toMatchObject({ staleTime: 15_000, gcTime: 10 * 60_000, retry: 1 });
     expect(queryPolicies.sidebarTaskLinks).toMatchObject({ staleTime: 15_000, gcTime: 10 * 60_000, retry: 1 });
     expect(queryPolicies.workContext).toMatchObject({ staleTime: 5_000, gcTime: 10 * 60_000, retry: 1 });
     expect(queryPolicies.workChanges).toMatchObject({ staleTime: 30_000, gcTime: 10 * 60_000, retry: false });
-    expect(queryPolicies.githubHealth).toMatchObject({ staleTime: 15_000, gcTime: 2 * 60_000, retry: false });
     expect(pluginInteractionStore.getState().selectedWorkTab).toBe("work");
     pluginInteractionStore.getState().setSelectedWorkTab("changes");
     expect(pluginInteractionStore.getState().selectedWorkTab).toBe("changes");
     pluginInteractionStore.getState().setSelectedWorkTab("work");
 
     // The harness mounts slots independently, matching BB's left/right slot
-    // ownership. These registrations only provide the runtime foundation in
-    // R2, so neither creates an observer, timer, or subscription yet.
+    // ownership. R5 turns the PR consumers into real observers on the same
+    // module-generation QueryClient.
     const client = getPluginQueryClient();
     const mount = vi.spyOn(client, "mount");
     const unmount = vi.spyOn(client, "unmount");
@@ -42,10 +40,12 @@ describe("R2 app registration and Query lifecycle", () => {
     });
     const right = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_test", params: null });
     expect(mount).toHaveBeenCalledTimes(2);
-    expect(client.getQueryCache().getAll()).toEqual([]);
+    expect(client.getQueryCache().getAll()).toHaveLength(4);
+    expect(client.getQueryCache().findAll({ queryKey: ["work-sidebar", "pull-requests", "health"] })[0]?.getObserversCount()).toBe(2);
     left.unmount();
     right.unmount();
     expect(unmount).toHaveBeenCalledTimes(2);
-    expect(client.getQueryCache().getAll()).toEqual([]);
+    expect(client.getQueryCache().getAll().every((query) => query.getObserversCount() === 0)).toBe(true);
+    client.clear();
   });
 });
