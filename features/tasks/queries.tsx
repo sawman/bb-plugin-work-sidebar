@@ -3,6 +3,7 @@ import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
 import { queryKeys, queryPolicies } from "../../query-runtime";
 import { invalidateTaskQueries } from "./mutations";
+import { parseWorkSidebarRealtimeEvent } from "../work-context/realtime";
 
 export function useTasksRead() {
   const rpc = useRpc<typeof rpcContract>();
@@ -10,7 +11,8 @@ export function useTasksRead() {
     queryKey: queryKeys.sidebar.tasks.list(),
     queryFn: async () => {
       const result = await rpc.call("sidebarTasks", null);
-      if (!result.available) throw new Error(result.error ?? "Tasks are unavailable.");
+      if (!result.available)
+        throw new Error(result.error ?? "Tasks are unavailable.");
       return result;
     },
     ...queryPolicies.sidebarTasksList,
@@ -23,7 +25,8 @@ export function useTaskLinksRead() {
     queryKey: queryKeys.sidebar.tasks.links(),
     queryFn: async () => {
       const result = await rpc.call("sidebarTaskLinks", null);
-      if (!result.available) throw new Error(result.error ?? "Task links are unavailable.");
+      if (!result.available)
+        throw new Error(result.error ?? "Task links are unavailable.");
       return result;
     },
     ...queryPolicies.sidebarTaskLinks,
@@ -34,7 +37,8 @@ export function useTaskLinksRead() {
 /** The left sidebar owns the one Tasks-domain realtime subscription. */
 export function useTasksRealtimeInvalidation() {
   const queryClient = useQueryClient();
-  useRealtime("work-sidebar:changed", () => {
+  useRealtime("work-sidebar:changed", (payload) => {
+    if (parseWorkSidebarRealtimeEvent(payload)?.family !== "tasks") return;
     void invalidateTaskQueries(queryClient, ["list", "links"]);
   });
 }
