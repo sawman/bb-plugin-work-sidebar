@@ -20,8 +20,11 @@ const GITHUB_STACK_PLUGIN_ID = "gh-stack";
 // Plugin hosts do not inherit the interactive shell PATH. BB_CLI is injected
 // by BB specifically so plugins can invoke the same daemon-compatible binary.
 const BB_CLI = process.env.BB_CLI || "bb";
-let archivedThreadsCache: { expiresAt: number; value: Awaited<ReturnType<typeof loadSidebarArchivedThreads>> } | null = null;
-let archivedThreadsPending: Promise<Awaited<ReturnType<typeof loadSidebarArchivedThreads>>> | null = null;
+let activeLifecycle: ServerLifecycle | null = null;
+function runtime(): ServerLifecycle {
+  if (!activeLifecycle) throw new Error("Work Sidebar server lifecycle is not active");
+  return activeLifecycle;
+}
 export const SIDEBAR_ORDER_CHANNEL = "sidebar-order:changed";
 export const GITHUB_STACK_API_VERSION = "2026-03-10";
 export const GITHUB_ACCEPT_HEADER = "application/vnd.github+json";
@@ -32,18 +35,11 @@ const PROVIDER_STATUS_URLS: Readonly<Record<string, string>> = {
 };
 const GITHUB_READ_CACHE_MS = 2 * 60_000;
 const GITHUB_SEARCH_CACHE_MS = 5 * 60_000;
-let githubReadCache: Map<string, { expiresAt: number; value: string }>;
-let githubReadPending: Map<string, Promise<string>>;
-let githubGraphqlHealth: GitHubApiHealth;
-let githubRestHealth: GitHubApiHealth;
 const GITHUB_SIGNAL_CACHE_MS = 2 * 60_000;
 // GitHub does not reliably include reset headers in gh's GraphQL error text.
 // A full window is conservative, but prevents every sidebar refresh from
 // immediately re-probing a bucket that GitHub has already exhausted.
 const GITHUB_GRAPHQL_BACKOFF_MS = 60 * 60_000;
-let githubPullRequestSignalCache: Map<string, { expiresAt: number; value: AuthoredPullRequestSignal }>;
-let githubPullRequestSignalPending: Map<string, Promise<AuthoredPullRequestSignal | null>>;
-let githubGraphqlBackoffUntil: number;
 const taskIdSchema = z.string().regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/);
 const taskThreadIdSchema = z.string().startsWith("thr_");
 
@@ -232,13 +228,13 @@ export type GitHubApiRunner = (args: readonly string[], maxBuffer: number) => Pr
 
 function githubReadScope(args: readonly string[]) { return args[0] === "api" && args[1] === "graphql" ? "graphql" as const : "rest" as const; }
 function githubReadHealth(): GitHubApiHealth {
-  if (githubGraphqlHealth.state !== "available") return githubGraphqlHealth;
-  if (githubRestHealth.state !== "available") return githubRestHealth;
+  if (runtime().githubGraphqlHealth.state !== "available") return runtime().githubGraphqlHealth;
+  if (runtime().githubRestHealth.state !== "available") return runtime().githubRestHealth;
   return { state: "available", scope: "unknown", message: null, retryAt: null };
 }
 function clearGitHubReadCache() {
-  githubReadCache.clear();
-  githubPullRequestSignalCache.clear();
+  runtime().githubReadCache.clear();
+  runtime().githubPullRequestSignalCache.clear();
 }
 function githubReadError(scope: "graphql" | "rest", error: unknown): Error {
   const message = error instanceof Error ? error.message : String(error);
@@ -247,28 +243,28 @@ function githubReadError(scope: "graphql" | "rest", error: unknown): Error {
     ? { state: "rate_limited", scope, message: scope === "graphql" ? "GitHub GraphQL is rate limited; using REST where possible." : "GitHub REST API is rate limited.", retryAt: Date.now() + 60 * 60_000 }
     : { state: "unavailable", scope, message: `GitHub ${scope === "graphql" ? "GraphQL" : "REST"} request failed.`, retryAt: null };
   if (scope === "graphql") {
-    githubGraphqlHealth = health;
-    if (health.state === "rate_limited") githubGraphqlBackoffUntil = health.retryAt ?? Date.now() + GITHUB_GRAPHQL_BACKOFF_MS;
-  } else githubRestHealth = health;
+    runtime().githubGraphqlHealth = health;
+    if (health.state === "rate_limited") runtime().githubGraphqlBackoffUntil = health.retryAt ?? Date.now() + GITHUB_GRAPHQL_BACKOFF_MS;
+  } else runtime().githubRestHealth = health;
   return new Error(message);
 }
 async function runCachedGitHubRead(args: readonly string[], maxBuffer: number, ttlMs = GITHUB_READ_CACHE_MS): Promise<string> {
   const scope = githubReadScope(args);
-  const health = scope === "graphql" ? githubGraphqlHealth : githubRestHealth;
+  const health = scope === "graphql" ? runtime().githubGraphqlHealth : runtime().githubRestHealth;
   if (health.state === "rate_limited" && health.retryAt && health.retryAt > Date.now()) throw new Error(health.message ?? "GitHub API is rate limited.");
   const key = args.join("\u0000");
-  const cached = githubReadCache.get(key);
+  const cached = runtime().githubReadCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
-  const pending = githubReadPending.get(key);
+  const pending = runtime().githubReadPending.get(key);
   if (pending) return pending;
   const request = execFileAsync("gh", [...args], { maxBuffer }).then(({ stdout }) => {
-    if (scope === "graphql") githubGraphqlHealth = { state: "available", scope, message: null, retryAt: null };
-    else githubRestHealth = { state: "available", scope, message: null, retryAt: null };
-    if (githubReadCache.size >= 300) githubReadCache.delete(githubReadCache.keys().next().value!);
-    githubReadCache.set(key, { value: stdout, expiresAt: Date.now() + ttlMs });
+    if (scope === "graphql") runtime().githubGraphqlHealth = { state: "available", scope, message: null, retryAt: null };
+    else runtime().githubRestHealth = { state: "available", scope, message: null, retryAt: null };
+    if (runtime().githubReadCache.size >= 300) runtime().githubReadCache.delete(runtime().githubReadCache.keys().next().value!);
+    runtime().githubReadCache.set(key, { value: stdout, expiresAt: Date.now() + ttlMs });
     return stdout;
-  }).catch((error) => { throw githubReadError(scope, error); }).finally(() => { githubReadPending.delete(key); });
-  githubReadPending.set(key, request);
+  }).catch((error) => { throw githubReadError(scope, error); }).finally(() => { runtime().githubReadPending.delete(key); });
+  runtime().githubReadPending.set(key, request);
   return request;
 }
 const runGitHubApi: GitHubApiRunner = runCachedGitHubRead;
@@ -478,12 +474,12 @@ const UNKNOWN_AUTHORED_PULL_REQUEST_SIGNAL: AuthoredPullRequestSignal = { checks
 
 function pullRequestSignalKey(owner: string, repo: string, number: number) { return `${owner}/${repo}#${number}`.toLowerCase(); }
 function cachedPullRequestSignal(owner: string, repo: string, number: number): AuthoredPullRequestSignal | null {
-  const cached = githubPullRequestSignalCache.get(pullRequestSignalKey(owner, repo, number));
+  const cached = runtime().githubPullRequestSignalCache.get(pullRequestSignalKey(owner, repo, number)) as { expiresAt: number; value: AuthoredPullRequestSignal } | undefined;
   return cached && cached.expiresAt > Date.now() ? cached.value : null;
 }
 function cachePullRequestSignal(owner: string, repo: string, number: number, value: AuthoredPullRequestSignal) {
   if (value.checks === "unknown" && value.review === "none") return;
-  githubPullRequestSignalCache.set(pullRequestSignalKey(owner, repo, number), { value, expiresAt: Date.now() + GITHUB_SIGNAL_CACHE_MS });
+  runtime().githubPullRequestSignalCache.set(pullRequestSignalKey(owner, repo, number), { value, expiresAt: Date.now() + GITHUB_SIGNAL_CACHE_MS });
 }
 function isGitHubGraphqlRateLimit(error: unknown) { return /graphql_rate_limit|API rate limit already exceeded|secondary rate limit/i.test(error instanceof Error ? error.message : String(error)); }
 
@@ -532,13 +528,13 @@ function cachedRestPullRequestSignal(owner: string, repo: string, number: number
   const cached = cachedPullRequestSignal(owner, repo, number);
   if (cached) return Promise.resolve(cached);
   const key = pullRequestSignalKey(owner, repo, number);
-  const pending = githubPullRequestSignalPending.get(key);
+  const pending = runtime().githubPullRequestSignalPending.get(key) as Promise<AuthoredPullRequestSignal | null> | undefined;
   if (pending) return pending;
   const request = restPullRequestSignal(owner, repo, number).then((signal) => {
     if (signal) cachePullRequestSignal(owner, repo, number, signal);
     return signal;
-  }).finally(() => { githubPullRequestSignalPending.delete(key); });
-  githubPullRequestSignalPending.set(key, request);
+  }).finally(() => { runtime().githubPullRequestSignalPending.delete(key); });
+  runtime().githubPullRequestSignalPending.set(key, request);
   return request;
 }
 
@@ -552,7 +548,7 @@ async function repositoryPullRequestSignals(owner: string, repo: string, numbers
     if (cached) signals.set(number, cached);
   }
   const uncached = unique.filter((number) => !signals.has(number));
-  if (uncached.length && Date.now() >= githubGraphqlBackoffUntil) try {
+  if (uncached.length && Date.now() >= runtime().githubGraphqlBackoffUntil) try {
     const selections = uncached.map((number, index) => `p${index}: pullRequest(number: ${number}) { reviewDecision reviewRequests(first: 1) { totalCount } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } }`).join(" ");
     const stdout = await runCachedGitHubRead(["api", "graphql", "-f", `query=query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${selections} } }`], 4_000_000);
     const parsed: unknown = JSON.parse(stdout);
@@ -573,7 +569,7 @@ async function repositoryPullRequestSignals(owner: string, repo: string, numbers
       cachePullRequestSignal(owner, repo, number, signal);
     });
   } catch (error) {
-    if (isGitHubGraphqlRateLimit(error)) githubGraphqlBackoffUntil = Date.now() + GITHUB_GRAPHQL_BACKOFF_MS;
+    if (isGitHubGraphqlRateLimit(error)) runtime().githubGraphqlBackoffUntil = Date.now() + GITHUB_GRAPHQL_BACKOFF_MS;
     // REST fallback below keeps the stack useful when GraphQL is unavailable.
   }
   const missing = uncached.filter((number) => !signals.has(number));
@@ -597,7 +593,7 @@ async function authoredPullRequestSignals(items: readonly GitHubSearchPullReques
     return !cached;
   });
   for (let start = 0; start < uncached.length; start += 50) {
-    if (Date.now() < githubGraphqlBackoffUntil) break;
+    if (Date.now() < runtime().githubGraphqlBackoffUntil) break;
     const batch = uncached.slice(start, start + 50);
     const selections = batch.flatMap((item, index) => {
       const repository = item.repository.nameWithOwner;
@@ -636,7 +632,7 @@ async function authoredPullRequestSignals(items: readonly GitHubSearchPullReques
         if (owner && repo) cachePullRequestSignal(owner, repo, item.number, signal);
       });
     } catch (error) {
-      if (isGitHubGraphqlRateLimit(error)) { githubGraphqlBackoffUntil = Date.now() + GITHUB_GRAPHQL_BACKOFF_MS; break; }
+      if (isGitHubGraphqlRateLimit(error)) { runtime().githubGraphqlBackoffUntil = Date.now() + GITHUB_GRAPHQL_BACKOFF_MS; break; }
       // The main PR search remains useful if one metadata batch fails.
     }
   }
@@ -746,25 +742,20 @@ async function loadSidebarArchivedThreads() {
 }
 
 async function sidebarArchivedThreads() {
-  if (archivedThreadsCache && archivedThreadsCache.expiresAt > Date.now()) return archivedThreadsCache.value;
-  if (!archivedThreadsPending) archivedThreadsPending = loadSidebarArchivedThreads().then((value) => {
-    archivedThreadsCache = { value, expiresAt: Date.now() + 5 * 60_000 };
+  const cached = runtime().archivedThreadsCache as { expiresAt: number; value: Awaited<ReturnType<typeof loadSidebarArchivedThreads>> } | null;
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  if (!runtime().archivedThreadsPending) runtime().archivedThreadsPending = loadSidebarArchivedThreads().then((value) => {
+    runtime().archivedThreadsCache = { value, expiresAt: Date.now() + 5 * 60_000 };
     return value;
-  }).finally(() => { archivedThreadsPending = null; });
-  return archivedThreadsPending;
+  }).finally(() => { runtime().archivedThreadsPending = null; });
+  return runtime().archivedThreadsPending as Promise<Awaited<ReturnType<typeof loadSidebarArchivedThreads>>>;
 }
 
 export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle = createServerLifecycle()) {
   // These caches are allocated by the factory, rather than at module load, so
   // a reload gets a fresh generation and disposal can release every handle.
-  githubReadCache = lifecycle.githubReadCache;
-  githubReadPending = lifecycle.githubReadPending;
-  githubPullRequestSignalCache = lifecycle.githubPullRequestSignalCache as Map<string, { expiresAt: number; value: AuthoredPullRequestSignal }>;
-  githubPullRequestSignalPending = lifecycle.githubPullRequestSignalPending as Map<string, Promise<AuthoredPullRequestSignal | null>>;
-  githubGraphqlHealth = lifecycle.githubGraphqlHealth;
-  githubRestHealth = lifecycle.githubRestHealth;
-  githubGraphqlBackoffUntil = lifecycle.githubGraphqlBackoffUntil;
-  bb.onDispose(() => lifecycle.dispose());
+  activeLifecycle = lifecycle;
+  bb.onDispose(() => { lifecycle.dispose(); if (activeLifecycle === lifecycle) activeLifecycle = null; });
   const githubPollingSettings = bb.settings.define({
     githubActivePollSeconds: { type: "select", label: "Right Work PR polling", description: "How often to poll the visible right-side Work PR through GitHub REST.", options: ["30", "60", "120", "300"], default: "60" },
     githubBackgroundPollSeconds: { type: "select", label: "Right Work PR background polling", description: "How often to poll the right-side Work PR while BB is not visible.", options: ["120", "300", "600", "900"], default: "300" },
@@ -1524,7 +1515,7 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     },
     async sidebarArchivedThreads({ force }) {
       try {
-        if (force) archivedThreadsCache = null;
+        if (force) runtime().archivedThreadsCache = null;
         return { available: true, threads: await sidebarArchivedThreads(), error: null };
       } catch (error) {
         return { available: false, threads: [], error: error instanceof Error ? error.message : String(error) };
@@ -1532,7 +1523,7 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     },
     async unarchiveSidebarThread({ threadId }) {
       await execFileAsync(BB_CLI, ["thread", "unarchive", threadId], { maxBuffer: 1_000_000 });
-      archivedThreadsCache = null;
+      runtime().archivedThreadsCache = null;
       return { threadId };
     },
     async getWorkContext({ threadId }) {

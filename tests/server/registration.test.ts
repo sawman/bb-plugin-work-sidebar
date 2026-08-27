@@ -30,7 +30,11 @@ describe("R2 server registration and disposal", () => {
     ]);
     expect(Object.keys(rpcContract)).toEqual(host.harness.inspection.registrations.rpcMethods);
 
+    lifecycle.seedForTest();
+    expect(lifecycle.inspect()).toMatchObject({ disposed: false, timers: 1, subscriptions: 1, caches: 4, archived: true, backoffUntil: 1 });
     await host.harness.lifecycle.dispose();
-    expect(lifecycle.inspect()).toEqual({ disposed: true, timers: 0, subscriptions: 0, caches: 0 });
+    expect(lifecycle.inspect()).toEqual({ disposed: true, timers: 0, subscriptions: 0, caches: 0, archived: false, backoffUntil: 0 });
+    lifecycle.dispose();
+    expect(lifecycle.inspect()).toEqual({ disposed: true, timers: 0, subscriptions: 0, caches: 0, archived: false, backoffUntil: 0 });
   });
 });

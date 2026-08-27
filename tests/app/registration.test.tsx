@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { getPluginQueryClient, queryKeys, queryPolicies } from "../../query-runtime";
+import { getMountedPluginProviderCount, getPluginQueryClient, pluginInteractionStore, queryKeys, queryPolicies } from "../../query-runtime";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 
 describe("R2 app registration and Query lifecycle", () => {
@@ -14,17 +14,26 @@ describe("R2 app registration and Query lifecycle", () => {
     expect(app.composerCustomizations.map(({ id }) => id)).toEqual(["task-first"]);
 
     expect(getPluginQueryClient()).toBe(getPluginQueryClient());
-    expect(queryKeys.registration()).toEqual(["work-sidebar", "registration"]);
-    expect(queryPolicies.registration).toMatchObject({ staleTime: 0, retry: false });
+    expect(queryKeys.sidebar.order()).toEqual(["work-sidebar", "sidebar", "order"]);
+    expect(queryKeys.work.context("thr_test")).toEqual(["work-sidebar", "work", "context", "thr_test"]);
+    expect(queryKeys.github.health()).toEqual(["work-sidebar", "github", "health"]);
+    expect(queryPolicies.sidebar).toMatchObject({ staleTime: 0, retry: false });
+    expect(queryPolicies.work).toMatchObject({ staleTime: 30_000, retry: false });
+    expect(pluginInteractionStore.getState().selectedWorkTab).toBe("work");
 
     // The harness mounts slots independently, matching BB's left/right slot
     // ownership. These registrations only provide the runtime foundation in
     // R2, so neither creates an observer, timer, or subscription yet.
-    const left = renderSlot(app.threadHeaderActions[0]!, { isCompactViewport: false, threadId: "thr_test", projectId: "proj_test" });
-    const right = renderSlot(app.settingsSections[0]!, {});
+    const left = renderSlot(app.threadLists[0]!, {
+      activeThreadId: null, activeProjectId: null, isCompactViewport: false,
+      onNavigate: () => undefined, searchQuery: "", Original: () => null,
+    });
+    const right = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_test", params: null });
+    expect(getMountedPluginProviderCount()).toBe(2);
     expect(getPluginQueryClient().getQueryCache().getAll()).toEqual([]);
     left.unmount();
     right.unmount();
+    expect(getMountedPluginProviderCount()).toBe(0);
     expect(getPluginQueryClient().getQueryCache().getAll()).toEqual([]);
   });
 });
