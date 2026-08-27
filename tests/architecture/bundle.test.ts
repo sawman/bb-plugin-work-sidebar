@@ -1,14 +1,23 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 const repositoryRoot = resolve(fileURLToPath(import.meta.url), "../../..");
 
 describe("R1 app bundle ownership", () => {
+  beforeAll(() => {
+    execFileSync("npm", ["run", "build"], {
+      cwd: repositoryRoot,
+      env: { ...process.env, BB_CLI: undefined },
+      stdio: "pipe",
+    });
+  });
+
   it("externalizes BB-owned React/SDK app runtime and bundles Query/Zustand", () => {
     const bundlePath = resolve(repositoryRoot, "dist/app.js");
-    expect(existsSync(bundlePath), "run npm run build before bundle inspection").toBe(true);
+    expect(existsSync(bundlePath), "the test-owned build must produce dist/app.js").toBe(true);
     const bundle = readFileSync(bundlePath, "utf8");
 
     expect(bundle).toContain("react/jsx-runtime");
