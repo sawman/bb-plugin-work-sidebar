@@ -70,6 +70,9 @@ export function useGitHubApiHealth(rpc: PullRequestRpc, { poll = false }: { poll
 export function useSetAuthoredPullRequestDraft(rpc: PullRequestRpc) {
   const client = useQueryClient();
   return useMutation({
+    // The control can be invoked twice before React paints its disabled state.
+    // A shared Query scope serializes that work without a duplicate React ref.
+    scope: { id: "authored-pull-request-draft" },
     mutationFn: ({ url, draft }: { url: string; draft: boolean }) => rpc.call("setAuthoredPullRequestDraft", { url, draft }),
     onSettled: async () => {
       await Promise.all([

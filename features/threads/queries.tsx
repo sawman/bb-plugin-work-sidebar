@@ -126,3 +126,16 @@ export function useArchivedThreads(
   const rpc = useRpc<typeof rpcContract>();
   return useArchivedThreadsQuery(rpc, enabled, rosterFingerprint);
 }
+
+/** Shared archive action for thread-group drop targets and archive rows. */
+export function useUnarchiveSidebarThread() {
+  const rpc = useRpc<typeof rpcContract>();
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (threadId: string) => {
+      const result = await rpc.call("unarchiveSidebarThread", { threadId });
+      await client.invalidateQueries({ queryKey: threadQueryKeys.archived() });
+      return result.threadId;
+    },
+  });
+}
