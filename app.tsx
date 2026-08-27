@@ -550,8 +550,6 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const trackerLoading = legacyTracker.isPending;
   const providerHealth: WorkProviderHealth = legacyProviderHealth.data ?? { tone: "amber", providerId: "", providerName: "Provider", statusUrl: null, status: "unknown", message: "Checking provider health…" };
   const error = legacyContext.error?.message ?? null;
-  const activity = context?.activity ?? null;
-  const [expandedActivity, setExpandedActivity] = useState<Set<string>>(() => new Set());
   const [linearBusy, setLinearBusy] = useState(false);
   const [pendingChangesExpanded, setPendingChangesExpanded] = useState(false);
   const [currentPrExpanded, setCurrentPrExpanded] = useState(false);
@@ -592,10 +590,6 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
     window.requestAnimationFrame(() => document.getElementById(`ws-tab-${next.id}`)?.focus());
   };
   const tabPanelId = `ws-panel-${selectedTab.id}`;
-  const activityItems = context && activity ? [
-    { label: "Agent", entry: activity.latest },
-    { label: "User", entry: activity.lastUser },
-  ].filter((item, index, items) => item.entry && items.findIndex((candidate) => candidate.entry?.text === item.entry?.text) === index) : [];
   const bindings = context?.bindings ?? [];
   const linkLinear = async (key: string) => { setLinearBusy(true); try { const item = await rpc.call("linkLinearIssue", { threadId, key }); toast.success(`${item.key} linked`); await Promise.all([refresh(), refreshTracker()]); } catch (caught) { toast.error(caught instanceof Error ? caught.message : "Could not link Linear issue"); } finally { setLinearBusy(false); } };
   const searchLinear = useCallback(async (query: string) => (await rpc.call("searchLinearIssues", { threadId, query })).items, [rpc, threadId]);

@@ -15,7 +15,7 @@ const populatedTasks: TasksResult = { ...emptyTasks, tasks: [task] };
 const workContext = {
   tasksAvailable: true, currentThread: { title: "Fixture thread", status: "idle" as const, runtimeStatus: "idle", providerId: "codex" },
   tasks: [], subtasks: [], outcome: null, executionTasks: [], bindings: [], legacy: { state: "none" as const, taskIds: [], message: null }, goal: null, todos: [],
-  activity: { latest: null, lastUser: null, current: null }, children: [], currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null,
+  children: [], currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null,
   repository: { outcome: "not_applicable" as const, message: null, branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFileCount: 0, changedInsertions: 0, changedDeletions: 0, changedFiles: [] },
   tracker: { visible: false, available: true, message: null, suggestions: [], item: null, statusOptions: [] },
 } satisfies Awaited<ReturnType<RpcHandlers["getWorkContext"]>>;
@@ -26,7 +26,8 @@ function rpcFixtures(sidebarTasks: RpcHandlers["sidebarTasks"]): RpcHandlers {
     getWorkChanges: () => ({ currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null, repository: workContext.repository }),
     getWorkTracker: () => workContext.tracker,
     getWorkProviderStatus: () => ({ tone: "green", providerId: "codex", providerName: "Codex", statusUrl: null, status: "ready", message: null }),
-    getWorkStatus: () => ({ currentThread: workContext.currentThread, children: [], activity: workContext.activity }),
+    getWorkStatus: () => ({ currentThread: workContext.currentThread, children: [] }),
+    getLatestActivity: () => ({ currentThread: { status: "idle", runtimeStatus: "idle" }, latest: null, lastUser: null, current: null }),
     getWorkOutcome: () => ({ tasksAvailable: true, outcome: null, executionTasks: [], bindings: [] }),
     getWorkGoal: () => null,
     getWorkPlan: () => ({ items: [] }),

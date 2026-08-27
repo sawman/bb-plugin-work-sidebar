@@ -1363,9 +1363,9 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
   });
 
   async function readWorkContext(threadId: string) {
-    const [thread, available, timeline, children, root, bindings, latestOutput] = await Promise.all([
+    const [thread, available, timeline, children, root, bindings] = await Promise.all([
       bb.sdk.threads.get({ threadId }), tasksAvailable(), bb.sdk.threads.timeline({ threadId }),
-      listDescendantThreads(threadId), rootThread(threadId), readBindings(), bb.sdk.threads.output({ threadId }),
+      listDescendantThreads(threadId), rootThread(threadId), readBindings(),
     ]);
     const links = available ? await taskLinks() : {};
     const outcomeBinding = bindings.outcomes.find((binding) => binding.rootThreadId === root.id) ?? null;
@@ -1386,7 +1386,6 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
       legacy: { state: "none" as const, taskIds: [], message: null },
       goal: timeline.goal ? { objective: timeline.goal.objective, status: timeline.goal.status, tokensUsed: timeline.goal.tokensUsed, tokenBudget: timeline.goal.tokenBudget, timeUsedSeconds: timeline.goal.timeUsedSeconds } : null,
       todos: timeline.pendingTodos?.items ?? [],
-      activity: latestActivity(timeline.rows, latestOutput.output, thread.status === "active" || thread.status === "starting"),
       children: children.map(({ thread: child, depth }) => ({ id: child.id, title: child.title ?? child.titleFallback ?? "Untitled agent", depth, status: child.status, runtimeStatus: child.runtime.displayStatus, providerId: child.providerId, isArchived: child.archivedAt !== null, task: links[child.id]?.[0] ? { key: links[child.id]![0].task.key, status: links[child.id]![0].task.status, liveStatus: links[child.id]![0].liveStatus } : null })),
       currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null,
       repository: { outcome: "absent" as const, message: null, branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFileCount: 0, changedInsertions: 0, changedDeletions: 0, changedFiles: [] },
@@ -1395,18 +1394,15 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
   }
 
   // Card endpoints deliberately read only the dependency set they render.
-  // The legacy aggregate remains a temporary seam for R11–R15 panels.
+  // The legacy aggregate remains a temporary seam for R12–R15 panels.
   async function readWorkStatus(threadId: string) {
-    const [thread, children, timeline, output] = await Promise.all([
+    const [thread, children] = await Promise.all([
       bb.sdk.threads.get({ threadId }),
       listDescendantThreads(threadId),
-      bb.sdk.threads.timeline({ threadId }),
-      bb.sdk.threads.output({ threadId }),
     ]);
     return {
       currentThread: { title: thread.title ?? thread.titleFallback ?? "Untitled thread", status: thread.status, runtimeStatus: thread.runtime.displayStatus, providerId: thread.providerId },
       children: children.map(({ thread: child, depth }) => ({ id: child.id, title: child.title ?? child.titleFallback ?? "Untitled agent", depth, status: child.status, runtimeStatus: child.runtime.displayStatus, providerId: child.providerId, isArchived: child.archivedAt !== null, task: null })),
-      activity: latestActivity(timeline.rows, output.output, thread.status === "active" || thread.status === "starting"),
     };
   }
 

@@ -14,7 +14,7 @@ const task = { id: "task_1", projectId: "project_1", projectName: "Work", key: "
 const taskTwo = { ...task, id: "task_2", key: "WORK-2", title: "Second task", position: 2048 };
 const tasks = (items = [task]): TasksResult => ({ available: true, tasks: items, projects: [{ id: "project_1", name: "Work" }], error: null });
 const workContext = {
-  tasksAvailable: true, currentThread: { title: "Fixture thread", status: "idle" as const, runtimeStatus: "idle", providerId: "codex" }, tasks: [], subtasks: [], outcome: null, executionTasks: [], bindings: [], legacy: { state: "none" as const, taskIds: [], message: null }, goal: null, todos: [], activity: { latest: null, lastUser: null, current: null }, children: [], currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null,
+  tasksAvailable: true, currentThread: { title: "Fixture thread", status: "idle" as const, runtimeStatus: "idle", providerId: "codex" }, tasks: [], subtasks: [], outcome: null, executionTasks: [], bindings: [], legacy: { state: "none" as const, taskIds: [], message: null }, goal: null, todos: [], children: [], currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null,
   repository: { outcome: "not_applicable" as const, message: null, branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFileCount: 0, changedInsertions: 0, changedDeletions: 0, changedFiles: [] }, tracker: { visible: false, available: true, message: null, suggestions: [], item: null, statusOptions: [] },
 } satisfies Awaited<ReturnType<RpcHandlers["getWorkContext"]>>;
 

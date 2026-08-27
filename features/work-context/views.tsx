@@ -11,7 +11,7 @@ import { goalProgressPercent, readableStatus, runtimeStatusPresentation } from "
 import { useTasksMutations } from "../tasks/mutations";
 import { useTasksRead } from "../tasks/queries";
 import { nextOutcomeStatus } from "./model";
-import { useLegacyProviderHealth, useWorkGoal, useWorkOutcome, useWorkOutcomeMutation, useWorkPlan, useWorkStatus } from "./queries";
+import { useLatestActivity, useLegacyProviderHealth, useWorkGoal, useWorkOutcome, useWorkOutcomeMutation, useWorkPlan, useWorkStatus } from "./queries";
 
 type CardStateProps = { title: string; className?: string; pending: boolean; error: Error | null; onRetry: () => void; children: ReactNode };
 
@@ -28,6 +28,7 @@ function CardState({ title, className = "", pending, error, onRetry, children }:
 
 function StatusCard({ threadId }: { threadId: string }) {
   const query = useWorkStatus(threadId);
+  const latestActivity = useLatestActivity(threadId, query.data?.currentThread.status);
   const provider = useLegacyProviderHealth(threadId);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const data = query.data;
@@ -37,7 +38,7 @@ function StatusCard({ threadId }: { threadId: string }) {
   return (
     <CardState title="Status" className="ws-status-card" pending={query.isPending} error={query.error} onRetry={() => void query.refetch()}>
       <div className="ws-status-summary"><h3>{runtime?.label ?? "Unknown"}</h3><p className="ws-working-state"><span title={`${total} child agents`}><Icon name="Bot" aria-hidden />{total}</span><span title={`${active} active child agents`}><Icon name="Wrench" aria-hidden />{active}</span></p></div>
-      {data?.activity.latest || data?.activity.lastUser ? <div className="ws-activity-list">{data?.activity.latest ? <ActivityRow label="Agent" entry={data.activity.latest} expanded={expanded.has("agent")} onToggle={() => setExpanded((current) => { const next = new Set(current); next.has("agent") ? next.delete("agent") : next.add("agent"); return next; })} /> : null}{data?.activity.lastUser ? <ActivityRow label="User" entry={data.activity.lastUser} expanded={expanded.has("user")} onToggle={() => setExpanded((current) => { const next = new Set(current); next.has("user") ? next.delete("user") : next.add("user"); return next; })} /> : null}</div> : null}
+      {latestActivity.data?.latest || latestActivity.data?.lastUser ? <div className="ws-activity-list">{latestActivity.data?.latest ? <ActivityRow label="Agent" entry={latestActivity.data.latest} expanded={expanded.has("agent")} onToggle={() => setExpanded((current) => { const next = new Set(current); next.has("agent") ? next.delete("agent") : next.add("agent"); return next; })} /> : null}{latestActivity.data?.lastUser ? <ActivityRow label="User" entry={latestActivity.data.lastUser} expanded={expanded.has("user")} onToggle={() => setExpanded((current) => { const next = new Set(current); next.has("user") ? next.delete("user") : next.add("user"); return next; })} /> : null}</div> : null}
       {provider.data ? <ProviderHealth provider={provider.data} /> : null}
     </CardState>
   );
