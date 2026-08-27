@@ -57,9 +57,9 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { githubHealthPresentation, pullRequestPresentation } from "@/features/pull-requests/presentation";
 import { useAuthoredPullRequests, useGitHubApiHealth, useSetAuthoredPullRequestDraft } from "@/features/pull-requests/queries";
-import { PullRequestChangesError, pullRequestChangesHeaderLabel } from "@/features/pull-requests/views";
+import { changesHeaderLabel } from "@/features/changes/model";
 import { invalidateChanges, useChanges } from "@/features/changes/queries";
-import { ChangesRepositoryCard } from "@/features/changes/views";
+import { ChangesError, ChangesRepositoryCard } from "@/features/changes/views";
 import { changesInteractionStore } from "@/features/changes/store";
 import { useTaskLinksRead, useTasksRead, useTasksRealtimeInvalidation } from "@/features/tasks/queries";
 import { useTasksMutations } from "@/features/tasks/mutations";
@@ -534,7 +534,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const queryClient = useQueryClient();
   const taskMutations = useTasksMutations(rpc);
   const { values: pluginSettings } = useSettings();
-  const pullRequestChanges = useChanges(rpc, threadId, {
+  const changesQuery = useChanges(rpc, threadId, {
     visiblePollMs: Number(pluginSettings?.githubActivePollSeconds ?? "60") * 1_000,
     backgroundPollMs: Number(pluginSettings?.githubBackgroundPollSeconds ?? "300") * 1_000,
   });
@@ -551,7 +551,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const legacyProviderHealth = useLegacyProviderHealth(threadId);
   const context = legacyContext.data;
   const loading = legacyContext.isPending;
-  const changesLoading = pullRequestChanges.isPending;
+  const changesLoading = changesQuery.isPending;
   const providerHealth: WorkProviderHealth = legacyProviderHealth.data ?? { tone: "amber", providerId: "", providerName: "Provider", statusUrl: null, status: "unknown", message: "Checking provider health…" };
   const error = legacyContext.error?.message ?? null;
   const changesPresentation = useStore(changesInteractionStore, (state) => state.byThread.get(threadId));
@@ -562,7 +562,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const [workingTreeDiff, setWorkingTreeDiff] = useState<{ identity: string; patch: string | null; loading: boolean; message: string | null } | null>(null);
 
   const refresh = () => legacyContext.refetch();
-  const refreshChanges = () => pullRequestChanges.refetch();
+  const refreshChanges = () => changesQuery.refetch();
   const refreshProviderHealth = () => legacyProviderHealth.refetch();
   const refreshWorkPanel = () => { void refresh(); void invalidateWorkContextCards(queryClient, threadId); void invalidateTracker(queryClient, threadId); void invalidateChanges(queryClient, threadId); void refreshProviderHealth(); };
   useRealtime("work-sidebar:changed", refreshWorkPanel);
@@ -633,7 +633,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
       </nav>
       <div className="ws-panel-body" role="tabpanel" id={tabPanelId} aria-labelledby={`ws-tab-${selectedTab.id}`} tabIndex={0}>
         {loading && <div className="ws-empty" role="status" aria-live="polite">Loading work context…</div>}
-        {!loading && error && <div className="ws-callout" role="alert"><span>{error}</span><button type="button" onClick={() => { void refresh(); void refreshChanges(); void refreshProviderHealth(); void pullRequestChanges.refetch(); void githubHealthQuery.refetch(); }}>Try again</button></div>}
+        {!loading && error && <div className="ws-callout" role="alert"><span>{error}</span><button type="button" onClick={() => { void refresh(); void refreshChanges(); void refreshProviderHealth(); void githubHealthQuery.refetch(); }}>Try again</button></div>}
         {tab === "work" && (
           <div className="ws-section-stack">
             <header><div><h2>Work</h2></div><span className="ws-work-header-badges"><TrackerHeaderBadge threadId={threadId} /></span></header>
@@ -643,13 +643,13 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
         )}
         {!loading && context && tab === "changes" && (
           <div className="ws-section-stack">
-            <header><div><h2>Changes</h2></div><span className="ws-section-count">{githubApiHealth.state !== "available" && <span className={`ws-github-api-indicator ws-github-api-${githubApiHealth.state}`} title={githubApiHealth.message ?? "GitHub API is unavailable."}><Icon name="AlertCircle" aria-hidden />{githubApiHealth.scope === "graphql" ? "GraphQL limited" : "GitHub unavailable"}</span>}{changesLoading ? "Loading…" : pullRequestChangesHeaderLabel({ isPending: pullRequestChanges.isPending, isError: pullRequestChanges.isError, currentPullRequest: pullRequestChanges.data?.currentPullRequest })}</span></header>
-            <ChangesRepositoryCard repository={pullRequestChanges.data?.repository} loading={changesLoading} expanded={pendingChangesExpanded} onToggle={() => changesInteractionStore.getState().toggleRepository(threadId)} onOpenFile={openWorkingTreeDiff} />
+            <header><div><h2>Changes</h2></div><span className="ws-section-count">{githubApiHealth.state !== "available" && <span className={`ws-github-api-indicator ws-github-api-${githubApiHealth.state}`} title={githubApiHealth.message ?? "GitHub API is unavailable."}><Icon name="AlertCircle" aria-hidden />{githubApiHealth.scope === "graphql" ? "GraphQL limited" : "GitHub unavailable"}</span>}{changesLoading ? "Loading…" : changesHeaderLabel(changesQuery.data, changesQuery.isPending, changesQuery.isError)}</span></header>
+            <ChangesRepositoryCard repository={changesQuery.data?.repository} loading={changesLoading} expanded={pendingChangesExpanded} onToggle={() => changesInteractionStore.getState().toggleRepository(threadId)} onOpenFile={openWorkingTreeDiff} />
             {workingTreeDiff && changesPresentation?.selectedFilePath && workingTreeDiff.identity === `${threadId}:${changesPresentation.selectedFilePath}` && <article className="ws-card ws-working-tree-diff"><div className="ws-card-heading"><strong>{changesPresentation.selectedFilePath}</strong><button type="button" className="ws-text-button" onClick={() => { changesInteractionStore.getState().selectFile(threadId, null); setWorkingTreeDiff(null); }}>Close</button></div>{workingTreeDiff.loading ? <p className="ws-card-note">Loading diff…</p> : workingTreeDiff.patch ? <ChangesWorkingTreeDiff patch={workingTreeDiff.patch} /> : <p className="ws-card-note">{workingTreeDiff.message ?? "No diff is available for this file."}</p>}</article>}
-            {pullRequestChanges.isError && <PullRequestChangesError error={pullRequestChanges.error} onRetry={() => { void pullRequestChanges.refetch(); }} />}
-            {!pullRequestChanges.isPending && !pullRequestChanges.isError && (pullRequestChanges.data?.githubStack?.stack ? <ol className="ws-stack-rail" aria-label={`GitHub Stack based on ${pullRequestChanges.data.githubStack.stack.trunk}`}>
-              {pullRequestChanges.data.githubStack.stack.branches.map((branch: any) => { const stackPullRequest = pullRequestChanges.data?.stack?.pullRequests.find((pullRequest: any) => pullRequest.number === branch.pr?.number || pullRequest.head === branch.name); const current = branch.pr?.number === pullRequestChanges.data?.currentPullRequest?.number ? pullRequestChanges.data.currentPullRequest : null; const signals = current ? { ...stackPullRequest, state: current.state, draft: current.state === "draft", ...current.signal } : branch.pr ? { ...stackPullRequest, state: stackPullRequest?.state ?? branch.pr.state, draft: stackPullRequest?.draft ?? branch.pr.isDraft, checks: branch.checks ?? stackPullRequest?.checks ?? "unknown", review: branch.review ?? stackPullRequest?.review ?? "none", reviewCommentCount: stackPullRequest?.reviewCommentCount ?? 0 } : stackPullRequest; return <ChangesStackBranchRow key={branch.name} branch={branch} signals={signals} expanded={expandedStackBranches.has(branch.name)} checkingOut={checkingOutBranch === branch.name} onToggle={() => toggleStackBranch(branch.name)} onCheckout={() => void checkoutStackBranch(branch.name)} />; })}
-            </ol> : pullRequestChanges.data?.currentPullRequest ? <ChangesPullRequestCard pullRequest={pullRequestChanges.data.currentPullRequest} expanded={currentPrExpanded} onToggle={() => changesInteractionStore.getState().togglePullRequest(threadId)} /> : <div className="ws-empty">No pull request is linked to this thread.</div>)}
+            {changesQuery.isError && <ChangesError error={changesQuery.error} onRetry={() => { void changesQuery.refetch(); }} />}
+            {!changesQuery.isPending && !changesQuery.isError && (changesQuery.data?.githubStack?.stack ? <ol className="ws-stack-rail" aria-label={`GitHub Stack based on ${changesQuery.data.githubStack.stack.trunk}`}>
+              {changesQuery.data.githubStack.stack.branches.map((branch: any) => { const stackPullRequest = changesQuery.data?.stack?.pullRequests.find((pullRequest: any) => pullRequest.number === branch.pr?.number || pullRequest.head === branch.name); const current = branch.pr?.number === changesQuery.data?.currentPullRequest?.number ? changesQuery.data.currentPullRequest : null; const signals = current ? { ...stackPullRequest, state: current.state, draft: current.state === "draft", ...current.signal } : branch.pr ? { ...stackPullRequest, state: stackPullRequest?.state ?? branch.pr.state, draft: stackPullRequest?.draft ?? branch.pr.isDraft, checks: branch.checks ?? stackPullRequest?.checks ?? "unknown", review: branch.review ?? stackPullRequest?.review ?? "none", reviewCommentCount: stackPullRequest?.reviewCommentCount ?? 0 } : stackPullRequest; return <ChangesStackBranchRow key={branch.name} branch={branch} signals={signals} expanded={expandedStackBranches.has(branch.name)} checkingOut={checkingOutBranch === branch.name} onToggle={() => toggleStackBranch(branch.name)} onCheckout={() => void checkoutStackBranch(branch.name)} />; })}
+            </ol> : changesQuery.data?.currentPullRequest ? <ChangesPullRequestCard pullRequest={changesQuery.data.currentPullRequest} expanded={currentPrExpanded} onToggle={() => changesInteractionStore.getState().togglePullRequest(threadId)} /> : <div className="ws-empty">No pull request is linked to this thread.</div>)}
           </div>
         )}
         {!loading && context && tab === "agents" && (

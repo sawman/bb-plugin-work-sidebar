@@ -38,7 +38,7 @@ export function useChanges(
     identity: "",
     fingerprint: null,
   });
-  const fingerprint = useQuery({
+  useQuery({
     queryKey: changesKeys.fingerprint(threadId, url ?? "none"),
     queryFn: async () => {
       const result = await rpc.call("getChangesFingerprint", {

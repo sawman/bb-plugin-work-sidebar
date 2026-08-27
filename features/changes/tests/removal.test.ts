@@ -9,6 +9,9 @@ const legacyTokens = [
   ["thread", "Changes"].join(""),
   ["queryPolicies", "workChanges"].join("."),
   ["queryKeys", "work", "changes"].join("."),
+  ["pull", "RequestChangesHeaderLabel"].join(""),
+  ["PullRequest", "ChangesError"].join(""),
+  ["features", "pull-requests", "views"].join("/"),
 ];
 
 describe("R13 legacy Changes removal", () => {
@@ -18,6 +21,7 @@ describe("R13 legacy Changes removal", () => {
         "rg",
         [
           "-l",
+          "-F",
           token,
           "--glob",
           "!**/tests/**",

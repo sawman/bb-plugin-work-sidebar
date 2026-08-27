@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { authoredPullRequest, pullRequest, pullRequestSignal, sidebarStack, sidebarStackLayer } from "./features/pull-requests/schemas.js";
+import { authoredPullRequest, sidebarStack, sidebarStackLayer } from "./features/pull-requests/schemas.js";
 import { sidebarTaskProjectSchema, sidebarTaskSchema, taskLinkSchema, taskPrioritySchema, taskStatusSchema, taskSummarySchema } from "./features/tasks/schemas.js";
 import { threadArchiveSchemas, threadPreferenceSchemas } from "./features/threads/schemas.js";
 import { trackerRpcSchemas } from "./features/tracker/schemas.js";
@@ -32,7 +32,6 @@ const sidebarThreadPullRequest = z.object({
   state: z.enum(["closed", "draft", "merged", "open"]),
   attention: z.enum(["blocked", "changes_requested", "checks_failed", "checks_pending", "closed", "conflicts", "draft", "merged", "none", "ready_to_merge", "review_requested"]),
 });
-const stackChange = z.object({ additions: z.number(), deletions: z.number(), files: z.array(z.object({ path: z.string(), previousPath: z.string().nullable(), status: z.enum(["added", "deleted", "modified", "renamed", "untracked"]), additions: z.number().nullable(), deletions: z.number().nullable() })), truncated: z.boolean() });
 const workProviderStatus = z.object({
   tone: z.enum(["green", "amber", "red"]),
   providerId: z.string(),
