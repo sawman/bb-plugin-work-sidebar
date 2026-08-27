@@ -12,6 +12,7 @@ const THREAD_LIST_MODE_KEY = "sidebar-thread-list-mode:v1";
 const LATER_THREADS_KEY = "sidebar-later-threads:v1";
 const THREAD_GROUPS_KEY = "sidebar-thread-groups:v1";
 const WORK_BINDINGS_KEY = "work-bindings:v2";
+const TASK_ASSIGNEES_KEY = "sidebar-task-assignees:v1";
 const LINEAR_LINKS_KEY = "work-linear-links:v1";
 const TASKBOARD_PLUGIN_ID = "taskboard";
 const GITHUB_STACK_PLUGIN_ID = "gh-stack";
@@ -23,6 +24,26 @@ let archivedThreadsPending: Promise<Awaited<ReturnType<typeof loadSidebarArchive
 export const SIDEBAR_ORDER_CHANNEL = "sidebar-order:changed";
 export const GITHUB_STACK_API_VERSION = "2026-03-10";
 export const GITHUB_ACCEPT_HEADER = "application/vnd.github+json";
+const PROVIDER_STATUS_URLS: Readonly<Record<string, string>> = {
+  codex: "https://status.openai.com/",
+  "claude-code": "https://status.claude.com/",
+  "acp-cursor": "https://status.cursor.com/",
+};
+type GitHubApiHealth = { state: "available" | "rate_limited" | "unavailable"; scope: "graphql" | "rest" | "unknown"; message: string | null; retryAt: number | null };
+const GITHUB_READ_CACHE_MS = 2 * 60_000;
+const GITHUB_SEARCH_CACHE_MS = 5 * 60_000;
+const githubReadCache = new Map<string, { expiresAt: number; value: string }>();
+const githubReadPending = new Map<string, Promise<string>>();
+let githubGraphqlHealth: GitHubApiHealth = { state: "available", scope: "graphql", message: null, retryAt: null };
+let githubRestHealth: GitHubApiHealth = { state: "available", scope: "rest", message: null, retryAt: null };
+const GITHUB_SIGNAL_CACHE_MS = 2 * 60_000;
+// GitHub does not reliably include reset headers in gh's GraphQL error text.
+// A full window is conservative, but prevents every sidebar refresh from
+// immediately re-probing a bucket that GitHub has already exhausted.
+const GITHUB_GRAPHQL_BACKOFF_MS = 60 * 60_000;
+const githubPullRequestSignalCache = new Map<string, { expiresAt: number; value: AuthoredPullRequestSignal }>();
+const githubPullRequestSignalPending = new Map<string, Promise<AuthoredPullRequestSignal | null>>();
+let githubGraphqlBackoffUntil = 0;
 const taskIdSchema = z.string().regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/);
 const taskThreadIdSchema = z.string().startsWith("thr_");
 
@@ -176,6 +197,9 @@ interface StackPullRequest {
   draft: boolean;
   head: string;
   base: string;
+  title?: string;
+  url?: string;
+  reviewCommentCount?: number;
 }
 
 interface GitHubStackResponse {
@@ -206,10 +230,48 @@ interface GitHubPullRequestDetails {
 
 export type GitHubApiRunner = (args: readonly string[], maxBuffer: number) => Promise<string>;
 
-const runGitHubApi: GitHubApiRunner = async (args, maxBuffer) => {
-  const { stdout } = await execFileAsync("gh", [...args], { maxBuffer });
-  return stdout;
-};
+function githubReadScope(args: readonly string[]) { return args[0] === "api" && args[1] === "graphql" ? "graphql" as const : "rest" as const; }
+function githubReadHealth(): GitHubApiHealth {
+  if (githubGraphqlHealth.state !== "available") return githubGraphqlHealth;
+  if (githubRestHealth.state !== "available") return githubRestHealth;
+  return { state: "available", scope: "unknown", message: null, retryAt: null };
+}
+function clearGitHubReadCache() {
+  githubReadCache.clear();
+  githubPullRequestSignalCache.clear();
+}
+function githubReadError(scope: "graphql" | "rest", error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error);
+  const rateLimited = /graphql_rate_limit|API rate limit already exceeded|secondary rate limit|rate limit/i.test(message);
+  const health: GitHubApiHealth = rateLimited
+    ? { state: "rate_limited", scope, message: scope === "graphql" ? "GitHub GraphQL is rate limited; using REST where possible." : "GitHub REST API is rate limited.", retryAt: Date.now() + 60 * 60_000 }
+    : { state: "unavailable", scope, message: `GitHub ${scope === "graphql" ? "GraphQL" : "REST"} request failed.`, retryAt: null };
+  if (scope === "graphql") {
+    githubGraphqlHealth = health;
+    if (health.state === "rate_limited") githubGraphqlBackoffUntil = health.retryAt ?? Date.now() + GITHUB_GRAPHQL_BACKOFF_MS;
+  } else githubRestHealth = health;
+  return new Error(message);
+}
+async function runCachedGitHubRead(args: readonly string[], maxBuffer: number, ttlMs = GITHUB_READ_CACHE_MS): Promise<string> {
+  const scope = githubReadScope(args);
+  const health = scope === "graphql" ? githubGraphqlHealth : githubRestHealth;
+  if (health.state === "rate_limited" && health.retryAt && health.retryAt > Date.now()) throw new Error(health.message ?? "GitHub API is rate limited.");
+  const key = args.join("\u0000");
+  const cached = githubReadCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  const pending = githubReadPending.get(key);
+  if (pending) return pending;
+  const request = execFileAsync("gh", [...args], { maxBuffer }).then(({ stdout }) => {
+    if (scope === "graphql") githubGraphqlHealth = { state: "available", scope, message: null, retryAt: null };
+    else githubRestHealth = { state: "available", scope, message: null, retryAt: null };
+    if (githubReadCache.size >= 300) githubReadCache.delete(githubReadCache.keys().next().value!);
+    githubReadCache.set(key, { value: stdout, expiresAt: Date.now() + ttlMs });
+    return stdout;
+  }).catch((error) => { throw githubReadError(scope, error); }).finally(() => { githubReadPending.delete(key); });
+  githubReadPending.set(key, request);
+  return request;
+}
+const runGitHubApi: GitHubApiRunner = runCachedGitHubRead;
 
 export function githubStackApiArgs(owner: string, repo: string, pullRequest: number): string[] {
   return [
@@ -287,6 +349,9 @@ function parseStackPullRequest(value: unknown): StackPullRequest {
     draft: typeof value.draft === "boolean" ? value.draft : false,
     head: requiredString(head, "pull request head"),
     base,
+    title: typeof value.title === "string" ? value.title : undefined,
+    url: typeof value.html_url === "string" ? value.html_url : undefined,
+    reviewCommentCount: typeof value.review_comments === "number" && Number.isFinite(value.review_comments) ? value.review_comments : undefined,
   };
 }
 
@@ -320,6 +385,12 @@ export async function fetchGitHubStack(
   const raw = parseGitHubStackResponse(JSON.parse(await run(githubStackApiArgs(owner, repo, pullRequest), 4_000_000)));
   if (!raw) return null;
   const pullRequests = await Promise.all(raw.pull_requests.map(async (pr) => {
+    // The Stack endpoint normally returns embedded PR objects. Use that
+    // payload first: a stack no longer costs one REST request per layer.
+    if (pr.title && pr.url) return {
+      number: pr.number, title: pr.title, state: pr.state, draft: pr.draft,
+      url: pr.url, head: pr.head, base: pr.base, reviewCommentCount: pr.reviewCommentCount ?? 0,
+    };
     try {
       const details = parseGitHubPullRequestDetails(JSON.parse(await run([
         "api", "--method", "GET", `repos/${owner}/${repo}/pulls/${pr.number}`,
@@ -381,7 +452,7 @@ async function archivedGitHubRepositories(repositories: readonly string[]): Prom
       return `r${index}: repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) { isArchived }`;
     }).join(" ");
     try {
-      const { stdout } = await execFileAsync("gh", ["api", "graphql", "-f", `query=query { ${selections} }`], { maxBuffer: 2_000_000 });
+      const stdout = await runCachedGitHubRead(["api", "graphql", "-f", `query=query { ${selections} }`], 2_000_000);
       const parsed: unknown = JSON.parse(stdout);
       const data = isRecord(parsed) && isRecord(parsed.data) ? parsed.data : {};
       batch.forEach((repository, index) => {
@@ -405,17 +476,88 @@ type AuthoredPullRequestSignal = {
 // an empty check set in the UI.
 const UNKNOWN_AUTHORED_PULL_REQUEST_SIGNAL: AuthoredPullRequestSignal = { checks: "unknown", review: "none" };
 
+function pullRequestSignalKey(owner: string, repo: string, number: number) { return `${owner}/${repo}#${number}`.toLowerCase(); }
+function cachedPullRequestSignal(owner: string, repo: string, number: number): AuthoredPullRequestSignal | null {
+  const cached = githubPullRequestSignalCache.get(pullRequestSignalKey(owner, repo, number));
+  return cached && cached.expiresAt > Date.now() ? cached.value : null;
+}
+function cachePullRequestSignal(owner: string, repo: string, number: number, value: AuthoredPullRequestSignal) {
+  if (value.checks === "unknown" && value.review === "none") return;
+  githubPullRequestSignalCache.set(pullRequestSignalKey(owner, repo, number), { value, expiresAt: Date.now() + GITHUB_SIGNAL_CACHE_MS });
+}
+function isGitHubGraphqlRateLimit(error: unknown) { return /graphql_rate_limit|API rate limit already exceeded|secondary rate limit/i.test(error instanceof Error ? error.message : String(error)); }
+
+/**
+ * GraphQL is the cheapest way to enrich a stack, but it can be unavailable
+ * independently of the REST API (for example, on a transient GraphQL rate
+ * limit). REST keeps the status badges truthful instead of showing the
+ * misleading "no reviewer / pending" fallback in that case.
+ */
+async function restPullRequestSignal(owner: string, repo: string, number: number): Promise<AuthoredPullRequestSignal | null> {
+  try {
+    const pullRequestPromise = runCachedGitHubRead(["api", "--method", "GET", `repos/${owner}/${repo}/pulls/${number}`, "-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`], 2_000_000);
+    const reviewsPromise = runCachedGitHubRead(["api", "--method", "GET", `repos/${owner}/${repo}/pulls/${number}/reviews?per_page=100`, "-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`], 2_000_000);
+    const [pullRequestStdout, reviewsStdout] = await Promise.all([pullRequestPromise, reviewsPromise]);
+    const pullRequest = JSON.parse(pullRequestStdout) as unknown;
+    const reviews = JSON.parse(reviewsStdout) as unknown;
+    if (!isRecord(pullRequest)) return null;
+    const requestedReviewers = Array.isArray(pullRequest.requested_reviewers) ? pullRequest.requested_reviewers.length : 0;
+    const requestedTeams = Array.isArray(pullRequest.requested_teams) ? pullRequest.requested_teams.length : 0;
+    const reviewRequests = requestedReviewers + requestedTeams;
+    const latestReviewByUser = new Map<string, string>();
+    if (Array.isArray(reviews)) for (const review of reviews) {
+      if (!isRecord(review) || !isRecord(review.user) || typeof review.user.login !== "string" || typeof review.state !== "string") continue;
+      latestReviewByUser.set(review.user.login, review.state);
+    }
+    const reviewStates = [...latestReviewByUser.values()];
+    const review: AuthoredPullRequestSignal["review"] = reviewStates.includes("CHANGES_REQUESTED")
+      ? reviewRequests > 0 ? "changes_requested_review_requested" : "changes_requested"
+      : reviewStates.includes("APPROVED") ? "approved"
+      : reviewRequests > 0 ? "review_requested" : "none";
+    const sha = isRecord(pullRequest.head) && typeof pullRequest.head.sha === "string" ? pullRequest.head.sha : null;
+    if (!sha) return { checks: "unknown", review };
+    const checksStdout = await runCachedGitHubRead(["api", "--method", "GET", `repos/${owner}/${repo}/commits/${sha}/check-runs?per_page=100`, "-H", "Accept: application/vnd.github+json", "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`], 4_000_000);
+    const checksResponse = JSON.parse(checksStdout) as unknown;
+    const checkRuns = isRecord(checksResponse) && Array.isArray(checksResponse.check_runs) ? checksResponse.check_runs : [];
+    const conclusions = checkRuns.map((check) => isRecord(check) ? String(check.conclusion ?? "") : "");
+    const failed = conclusions.some((conclusion) => ["FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE"].includes(conclusion));
+    const pending = checkRuns.some((check) => !isRecord(check) || check.status !== "completed" || check.conclusion === null);
+    return { checks: failed ? "failed" : pending ? "pending" : checkRuns.length ? "passing" : "none", review };
+  } catch {
+    return null;
+  }
+}
+
+function cachedRestPullRequestSignal(owner: string, repo: string, number: number): Promise<AuthoredPullRequestSignal | null> {
+  const cached = cachedPullRequestSignal(owner, repo, number);
+  if (cached) return Promise.resolve(cached);
+  const key = pullRequestSignalKey(owner, repo, number);
+  const pending = githubPullRequestSignalPending.get(key);
+  if (pending) return pending;
+  const request = restPullRequestSignal(owner, repo, number).then((signal) => {
+    if (signal) cachePullRequestSignal(owner, repo, number, signal);
+    return signal;
+  }).finally(() => { githubPullRequestSignalPending.delete(key); });
+  githubPullRequestSignalPending.set(key, request);
+  return request;
+}
+
 /** Fetch the compact status badges for every PR in one repository stack. */
 async function repositoryPullRequestSignals(owner: string, repo: string, numbers: readonly number[]): Promise<Map<number, AuthoredPullRequestSignal>> {
   const unique = [...new Set(numbers)].filter((number) => Number.isInteger(number) && number > 0);
   const signals = new Map<number, AuthoredPullRequestSignal>();
   if (!unique.length) return signals;
-  const selections = unique.map((number, index) => `p${index}: pullRequest(number: ${number}) { reviewDecision reviewRequests(first: 1) { totalCount } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } }`).join(" ");
-  try {
-    const { stdout } = await execFileAsync("gh", ["api", "graphql", "-f", `query=query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${selections} } }`], { maxBuffer: 4_000_000 });
+  for (const number of unique) {
+    const cached = cachedPullRequestSignal(owner, repo, number);
+    if (cached) signals.set(number, cached);
+  }
+  const uncached = unique.filter((number) => !signals.has(number));
+  if (uncached.length && Date.now() >= githubGraphqlBackoffUntil) try {
+    const selections = uncached.map((number, index) => `p${index}: pullRequest(number: ${number}) { reviewDecision reviewRequests(first: 1) { totalCount } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } }`).join(" ");
+    const stdout = await runCachedGitHubRead(["api", "graphql", "-f", `query=query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${selections} } }`], 4_000_000);
     const parsed: unknown = JSON.parse(stdout);
     const data = isRecord(parsed) && isRecord(parsed.data) && isRecord(parsed.data.repository) ? parsed.data.repository : {};
-    unique.forEach((number, index) => {
+    uncached.forEach((number, index) => {
       const pullRequest = data[`p${index}`];
       if (!isRecord(pullRequest)) return;
       const reviewDecision = String(pullRequest.reviewDecision ?? "");
@@ -426,10 +568,18 @@ async function repositoryPullRequestSignals(owner: string, repo: string, numbers
       const rollup = isRecord(commit) && isRecord(commit.commit) && isRecord(commit.commit.statusCheckRollup) ? commit.commit.statusCheckRollup : null;
       const state = String(rollup?.state ?? "");
       const checks: AuthoredPullRequestSignal["checks"] = state === "SUCCESS" ? "passing" : state === "FAILURE" || state === "ERROR" ? "failed" : state ? "pending" : "none";
-      signals.set(number, { checks, review });
+      const signal = { checks, review };
+      signals.set(number, signal);
+      cachePullRequestSignal(owner, repo, number, signal);
     });
-  } catch {
-    // Stack structure remains useful if GitHub's richer badge query fails.
+  } catch (error) {
+    if (isGitHubGraphqlRateLimit(error)) githubGraphqlBackoffUntil = Date.now() + GITHUB_GRAPHQL_BACKOFF_MS;
+    // REST fallback below keeps the stack useful when GraphQL is unavailable.
+  }
+  const missing = uncached.filter((number) => !signals.has(number));
+  if (missing.length) {
+    const fallback = await Promise.all(missing.map(async (number) => [number, await cachedRestPullRequestSignal(owner, repo, number)] as const));
+    for (const [number, signal] of fallback) if (signal) signals.set(number, signal);
   }
   return signals;
 }
@@ -437,8 +587,18 @@ async function repositoryPullRequestSignals(owner: string, repo: string, numbers
 /** Fetch the concise CI and review summaries shown beside account-wide PRs. */
 async function authoredPullRequestSignals(items: readonly GitHubSearchPullRequest[]): Promise<Map<string, AuthoredPullRequestSignal>> {
   const signals = new Map<string, AuthoredPullRequestSignal>();
-  for (let start = 0; start < items.length; start += 50) {
-    const batch = items.slice(start, start + 50);
+  const uncached = items.filter((item) => {
+    const repository = item.repository.nameWithOwner;
+    if (!repository) return false;
+    const [owner, repo] = repository.split("/", 2);
+    if (!owner || !repo) return true;
+    const cached = cachedPullRequestSignal(owner, repo, item.number);
+    if (cached) signals.set(`${repository}#${item.number}`, cached);
+    return !cached;
+  });
+  for (let start = 0; start < uncached.length; start += 50) {
+    if (Date.now() < githubGraphqlBackoffUntil) break;
+    const batch = uncached.slice(start, start + 50);
     const selections = batch.flatMap((item, index) => {
       const repository = item.repository.nameWithOwner;
       if (!repository) return [];
@@ -449,7 +609,7 @@ async function authoredPullRequestSignals(items: readonly GitHubSearchPullReques
     }).join(" ");
     if (!selections) continue;
     try {
-      const { stdout } = await execFileAsync("gh", ["api", "graphql", "-f", `query=query { ${selections} }`], { maxBuffer: 4_000_000 });
+      const stdout = await runCachedGitHubRead(["api", "graphql", "-f", `query=query { ${selections} }`], 4_000_000);
       const parsed: unknown = JSON.parse(stdout);
       const data = isRecord(parsed) && isRecord(parsed.data) ? parsed.data : {};
       batch.forEach((item, index) => {
@@ -470,9 +630,13 @@ async function authoredPullRequestSignals(items: readonly GitHubSearchPullReques
         const checks: AuthoredPullRequestSignal["checks"] = state === "SUCCESS" ? "passing"
           : state === "FAILURE" || state === "ERROR" ? "failed"
           : state ? "pending" : "none";
-        signals.set(`${repository}#${item.number}`, { checks, review });
+        const signal = { checks, review };
+        signals.set(`${repository}#${item.number}`, signal);
+        const [owner, repo] = repository.split("/", 2);
+        if (owner && repo) cachePullRequestSignal(owner, repo, item.number, signal);
       });
-    } catch {
+    } catch (error) {
+      if (isGitHubGraphqlRateLimit(error)) { githubGraphqlBackoffUntil = Date.now() + GITHUB_GRAPHQL_BACKOFF_MS; break; }
       // The main PR search remains useful if one metadata batch fails.
     }
   }
@@ -494,12 +658,13 @@ export function projectCurrentPullRequest(pullRequest: CurrentPullRequest): Curr
   };
 }
 
-export function projectSidebarTask(task: Task, projectName: string, linkedThreadIds: readonly string[]) {
+export function projectSidebarTask(task: Task, projectName: string, linkedThreadIds: readonly string[], assignee: "agent" | "human" = "human") {
   return {
     id: task.id, projectId: task.projectId, projectName, key: task.key, title: task.title,
     status: task.status, priority: task.priority, dueDate: task.dueDate, parentTaskId: task.parentTaskId,
     position: task.position,
     linkedThreadIds: [...linkedThreadIds],
+    assignee,
   };
 }
 
@@ -590,6 +755,22 @@ async function sidebarArchivedThreads() {
 }
 
 export default async function plugin(bb: BbPluginApi) {
+  const githubPollingSettings = bb.settings.define({
+    githubActivePollSeconds: { type: "select", label: "Right Work PR polling", description: "How often to poll the visible right-side Work PR through GitHub REST.", options: ["30", "60", "120", "300"], default: "60" },
+    githubBackgroundPollSeconds: { type: "select", label: "Right Work PR background polling", description: "How often to poll the right-side Work PR while BB is not visible.", options: ["120", "300", "600", "900"], default: "300" },
+    githubLeftListRefreshSeconds: { type: "select", label: "Left PR list refresh", description: "How often to refresh authored pull requests and Stack membership in the left sidebar.", options: ["60", "120", "300", "600"], default: "300" },
+    githubMaxRestPollsPerMinute: { type: "select", label: "Global REST poll budget", description: "Maximum fingerprint polls across all Work panels each minute.", options: ["10", "20", "30", "60"], default: "30" },
+  });
+  let lastGitHubFingerprintPollAt = 0;
+
+  async function githubPollingPolicy() {
+    const settings = await githubPollingSettings.get();
+    return {
+      activePollMs: Number(settings.githubActivePollSeconds) * 1_000,
+      backgroundPollMs: Number(settings.githubBackgroundPollSeconds) * 1_000,
+      maxRestPollsPerMinute: Number(settings.githubMaxRestPollsPerMinute),
+    };
+  }
   async function callPluginRpc<T>(pluginId: string, method: string, input: unknown, outputSchema: z.ZodType<T>): Promise<T> {
     // Cross-plugin RPC method names are runtime values, so the SDK cannot infer this input shape here.
     return bb.sdk.plugins.callRpc({ pluginId, method, input: input as never, outputSchema });
@@ -671,7 +852,20 @@ export default async function plugin(bb: BbPluginApi) {
   async function enhancedGithubStack(threadId: string, remoteStack: Awaited<ReturnType<typeof githubStack>>["stack"]) {
     try {
       const payload = await githubStackCall("getStack", { threadId }, ghStackPayloadSchema);
-      const stack = includeRemoteStackLayers(payload.stack, remoteStack);
+      // A stack can still be available from the GitHub Stack plugin when BB's
+      // environment PR lookup is transiently unavailable. In that case, use
+      // any visible PR to fetch the canonical remote stack, including merged
+      // base layers that the local plugin omits from its active projection.
+      let resolvedRemoteStack = remoteStack;
+      if (!resolvedRemoteStack) {
+        const visiblePullRequest = payload.stack?.branches.find((branch) => branch.pr)?.pr ?? null;
+        const match = visiblePullRequest?.url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+        if (match) {
+          try { resolvedRemoteStack = await fetchGitHubStack(match[1]!, match[2]!, Number(match[3]!)); }
+          catch { /* The active stack remains useful when the REST fallback is unavailable. */ }
+        }
+      }
+      const stack = includeRemoteStackLayers(payload.stack, resolvedRemoteStack);
       const firstPullRequest = stack?.branches.find((branch) => branch.pr)?.pr ?? null;
       const match = firstPullRequest?.url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+/);
       if (!stack || !match) return { stack, pending: payload.pending, error: payload.error?.message ?? null };
@@ -688,6 +882,25 @@ export default async function plugin(bb: BbPluginApi) {
       // stack integration is unavailable for this environment.
       const stack = includeRemoteStackLayers(null, remoteStack);
       return { stack, pending: null, error: stack ? null : error instanceof Error ? error.message : "GitHub Stack is unavailable." };
+    }
+  }
+
+  async function workChanges(threadId: string, thread: Awaited<ReturnType<typeof bb.sdk.threads.get>>) {
+    const [stackResult, repository] = await Promise.all([githubStack(threadId), repositorySummary(thread)]);
+    const enhancedStack = await enhancedGithubStack(threadId, stackResult.stack);
+    return { currentPullRequest: stackResult.currentPullRequest, stack: stackResult.stack, stackUnavailableReason: stackResult.reason, githubStack: enhancedStack, repository };
+  }
+
+  async function workProviderStatus(threadId: string) {
+    const thread = await bb.sdk.threads.get({ threadId });
+    try {
+      const states = await bb.sdk.system.providerStates(thread.environmentId ? { environmentId: thread.environmentId } : {});
+      const provider = states.providers.find((candidate) => candidate.providerId === thread.providerId);
+      if (!provider) return { tone: "amber" as const, providerId: thread.providerId, providerName: thread.providerId, statusUrl: PROVIDER_STATUS_URLS[thread.providerId] ?? null, status: "unavailable" as const, message: "Provider health is not available from this host." };
+      const tone = provider.status === "ready" ? "green" as const : provider.status === "unknown" ? "amber" as const : "red" as const;
+      return { tone, providerId: thread.providerId, providerName: provider.displayName, statusUrl: PROVIDER_STATUS_URLS[thread.providerId] ?? null, status: provider.status, message: provider.statusMessage };
+    } catch (error) {
+      return { tone: "amber" as const, providerId: thread.providerId, providerName: thread.providerId, statusUrl: PROVIDER_STATUS_URLS[thread.providerId] ?? null, status: "unknown" as const, message: error instanceof Error ? error.message : "Provider health could not be checked." };
     }
   }
 
@@ -789,7 +1002,7 @@ export default async function plugin(bb: BbPluginApi) {
   }
 
   async function sidebarTasks() {
-    const tasks = await listAllTasks({ activeOnly: true, sort: "priority" });
+    const [tasks, assignees] = await Promise.all([listAllTasks({ activeOnly: true, sort: "priority" }), readTaskAssignees()]);
     const projects = (await tasksCall(
       "listProjects", {}, z.object({ projects: z.array(projectSchema) }),
     )).projects;
@@ -800,13 +1013,18 @@ export default async function plugin(bb: BbPluginApi) {
         "listTaskThreads", { taskId: task.id },
         z.object({ taskThreads: z.array(taskThreadSchema) }),
       )).taskThreads;
-      result.push(projectSidebarTask(task, projectNames.get(task.projectId) ?? "Work", threads.map((thread) => thread.threadId)));
+      result.push(projectSidebarTask(task, projectNames.get(task.projectId) ?? "Work", threads.map((thread) => thread.threadId), assignees[task.id] ?? "human"));
     }
-    return result;
+    return { tasks: result, projects: projects.map((project) => ({ id: project.id, name: project.name })) };
   }
 
   async function readBindings(): Promise<WorkBindings> { return normalizeBindings(await bb.storage.kv.get<unknown>(WORK_BINDINGS_KEY)); }
   async function writeBindings(bindings: WorkBindings) { await bb.storage.kv.set(WORK_BINDINGS_KEY, bindings); }
+  async function readTaskAssignees(): Promise<Record<string, "agent" | "human">> {
+    const value = await bb.storage.kv.get<unknown>(TASK_ASSIGNEES_KEY);
+    if (!isRecord(value)) return {};
+    return Object.fromEntries(Object.entries(value).flatMap(([taskId, assignee]) => typeof taskId === "string" && (assignee === "agent" || assignee === "human") ? [[taskId, assignee]] : []));
+  }
   async function allTasksById() { return new Map((await listAllTasks({ activeOnly: false, sort: "manual" })).map((task) => [task.id, task])); }
   async function tasksProjects() { return (await tasksCall("listProjects", {}, z.object({ projects: z.array(projectSchema) }))).projects; }
 
@@ -1057,6 +1275,25 @@ export default async function plugin(bb: BbPluginApi) {
     }
   }
 
+  async function pullRequestFingerprint(url: string) {
+    const match = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+    if (!match) return { fingerprint: null };
+    const [, owner, repo, number] = match;
+    const policy = await githubPollingPolicy();
+    // A single budget applies across split panels. If another PR was checked
+    // very recently, skip this non-critical heartbeat rather than burst REST.
+    if (Date.now() - lastGitHubFingerprintPollAt < 60_000 / policy.maxRestPollsPerMinute) return { fingerprint: null };
+    lastGitHubFingerprintPollAt = Date.now();
+    try {
+      const stdout = await runCachedGitHubRead(["api", "--method", "GET", `repos/${owner}/${repo}/pulls/${number}`, "-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`], 2_000_000, 55_000);
+      const value = JSON.parse(stdout) as unknown;
+      if (!isRecord(value)) return { fingerprint: null };
+      // This intentionally excludes presentation-only fields: a changed value
+      // means the stack’s status or head may have changed and merits a full refresh.
+      return { fingerprint: JSON.stringify([value.updated_at, value.state, value.merged, value.draft, isRecord(value.head) ? value.head.sha : null, value.mergeable_state]) };
+    } catch { return { fingerprint: null }; }
+  }
+
   async function sidebarThreadPullRequest(threadId: string) {
     const thread = await bb.sdk.threads.get({ threadId });
     if (!thread.environmentId) return null;
@@ -1121,7 +1358,7 @@ export default async function plugin(bb: BbPluginApi) {
     // GitHub search exposes at most 1,000 matches. Request that full window so
     // this is genuinely the user's account-wide open-PR list, not a 100-row
     // subset that happens to include the current checkout.
-    const { stdout } = await execFileAsync("gh", ["search", "prs", "--author", "@me", "--state", "open", "--limit", "1000", "--json", "number,title,url,repository,state,isDraft"], { maxBuffer: 12_000_000 });
+    const stdout = await runCachedGitHubRead(["search", "prs", "--author", "@me", "--state", "open", "--limit", "1000", "--json", "number,title,url,repository,state,isDraft"], 12_000_000, GITHUB_SEARCH_CACHE_MS);
     const search = parseAuthoredPullRequestSearch(JSON.parse(stdout));
     const archivedRepositories = await archivedGitHubRepositories(search.flatMap((item) => item.repository.nameWithOwner ? [item.repository.nameWithOwner] : []));
     const activeSearch = search.filter((item) => Boolean(item.repository.nameWithOwner) && !archivedRepositories.has(item.repository.nameWithOwner!));
@@ -1142,24 +1379,27 @@ export default async function plugin(bb: BbPluginApi) {
     const byPullRequest = new Map(base.map((item) => [`${item.repository}#${item.number}`, item]));
     const describe = async (item: AuthoredPullRequestEntry): Promise<AuthoredPullRequestEntry> => {
       try {
-        const { stdout } = await execFileAsync("gh", ["api", "--method", "GET", `repos/${item.repository}/stacks`, "-f", `pull_request=${item.number}`, "-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`], { maxBuffer: 2_000_000 });
+        const stdout = await runCachedGitHubRead(["api", "--method", "GET", `repos/${item.repository}/stacks`, "-f", `pull_request=${item.number}`, "-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`], 2_000_000);
         const raw = parseGitHubStackResponse(JSON.parse(stdout));
         if (!raw) return item;
+        const [owner, repo] = item.repository.split("/", 2);
+        const signals = owner && repo ? await repositoryPullRequestSignals(owner, repo, raw.pull_requests.map((layer) => layer.number)) : new Map<number, AuthoredPullRequestSignal>();
         const pullRequests = raw.pull_requests.flatMap((layer) => {
           const known = byPullRequest.get(`${item.repository}#${layer.number}`);
-          return known ? [{ ...known, head: layer.head, base: layer.base || raw.base }] : [];
+          return known ? [{ ...known, head: layer.head, base: layer.base || raw.base, ...(signals.get(layer.number) ?? {}) }] : [];
         });
         return pullRequests.length ? { ...item, stack: { id: `github-stack:${item.repository}:${raw.number}`, number: raw.number, base: raw.base, currentPullRequest: item.number, pullRequests } } : item;
       } catch { return item; }
     };
     const result: AuthoredPullRequestEntry[] = [];
-    for (let start = 0; start < base.length; start += 12) result.push(...await Promise.all(base.slice(start, start + 12).map(describe)));
+    for (let start = 0; start < base.length; start += 4) result.push(...await Promise.all(base.slice(start, start + 4).map(describe)));
     bb.log.info(`resolved ${result.length} authored PRs; ${result.filter((pullRequest) => pullRequest.stack).length} Stack memberships`);
     authoredPullRequestStacksCache = { expiresAt: Date.now() + 5 * 60_000, value: result };
     return result;
   }
 
   bb.rpc.register(rpcContract, {
+    async getGitHubApiHealth() { return githubReadHealth(); },
     async getSidebarOrder() {
       return { threadIds: sanitizeThreadOrder(await bb.storage.kv.get<unknown>(SIDEBAR_ORDER_KEY)) };
     },
@@ -1201,10 +1441,11 @@ export default async function plugin(bb: BbPluginApi) {
     },
     async sidebarTasks() {
       try {
-        if (!(await tasksAvailable())) return { available: false, tasks: [], error: null };
-        return { available: true, tasks: await sidebarTasks(), error: null };
+        if (!(await tasksAvailable())) return { available: false, tasks: [], projects: [], error: null };
+        const result = await sidebarTasks();
+        return { available: true, ...result, error: null };
       } catch (error) {
-        return { available: false, tasks: [], error: error instanceof Error ? error.message : String(error) };
+        return { available: false, tasks: [], projects: [], error: error instanceof Error ? error.message : String(error) };
       }
     },
     async sidebarTaskLinks() {
@@ -1249,7 +1490,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
     async sidebarAuthoredPullRequests({ force }) {
       try {
-        if (force) { authoredPullRequestCache = null; authoredPullRequestStacksCache = null; }
+        if (force) { authoredPullRequestCache = null; authoredPullRequestStacksCache = null; clearGitHubReadCache(); }
         return { available: true, pullRequests: await authoredPullRequests(), error: null };
       } catch (error) {
         return { available: false, pullRequests: [], error: error instanceof Error ? error.message : String(error) };
@@ -1268,6 +1509,7 @@ export default async function plugin(bb: BbPluginApi) {
       // rather than retain this process-local discovery cache.
       authoredPullRequestCache = null;
       authoredPullRequestStacksCache = null;
+      clearGitHubReadCache();
       return { draft };
     },
     async sidebarArchivedThreads({ force }) {
@@ -1284,13 +1526,18 @@ export default async function plugin(bb: BbPluginApi) {
       return { threadId };
     },
     async getWorkContext({ threadId }) {
-      const thread = await bb.sdk.threads.get({ threadId });
-      const available = await tasksAvailable();
+      // Keep this request to data required by every tab. Repository, GitHub
+      // Stack, and tracker queries are independently loaded by their cards.
+      const [thread, available, timeline, children, root, bindings, latestOutput] = await Promise.all([
+        bb.sdk.threads.get({ threadId }),
+        tasksAvailable(),
+        bb.sdk.threads.timeline({ threadId }),
+        listDescendantThreads(threadId),
+        rootThread(threadId),
+        readBindings(),
+        bb.sdk.threads.output({ threadId }),
+      ]);
       const links = available ? await taskLinks() : {};
-      const timeline = await bb.sdk.threads.timeline({ threadId });
-      const children = await listDescendantThreads(threadId);
-      const root = await rootThread(threadId);
-      const bindings = await readBindings();
       const outcomeBinding = bindings.outcomes.find((binding) => binding.rootThreadId === root.id) ?? null;
       const [tasksById, projects] = available ? await Promise.all([allTasksById(), tasksProjects()]) : [new Map<string, Task>(), [] as z.infer<typeof projectSchema>[]];
       const projectNames = new Map(projects.map((project) => [project.id, project.name]));
@@ -1300,9 +1547,6 @@ export default async function plugin(bb: BbPluginApi) {
         const task = tasksById.get(binding.executionTaskId);
         return task ? [summarizeTask(task, projectNames.get(task.projectId) ?? "Work")] : [];
       });
-      const legacy = available && !outcomeBinding ? await legacyContext(root.id, root.projectId) : { state: "none" as const, taskIds: [], message: null };
-      const [stackResult, repository, tracker, latestOutput] = await Promise.all([githubStack(threadId), repositorySummary(thread), trackerContext(root.id, root.projectId, thread.title ?? thread.titleFallback ?? ""), bb.sdk.threads.output({ threadId })]);
-      const enhancedStack = await enhancedGithubStack(threadId, stackResult.stack);
       return {
         tasksAvailable: available,
         currentThread: {
@@ -1319,7 +1563,9 @@ export default async function plugin(bb: BbPluginApi) {
           ...(outcomeBinding ? [bindingSummary(outcomeBinding)] : []),
           ...executionBindings.map(bindingSummary),
         ],
-        legacy,
+        // Legacy adoption is handled only by its explicit command. Scanning
+        // every historical task attachment here made opening Work needlessly slow.
+        legacy: { state: "none" as const, taskIds: [], message: null },
         goal: timeline.goal ? {
           objective: timeline.goal.objective, status: timeline.goal.status,
           tokensUsed: timeline.goal.tokensUsed, tokenBudget: timeline.goal.tokenBudget,
@@ -1336,13 +1582,24 @@ export default async function plugin(bb: BbPluginApi) {
             liveStatus: links[child.id]![0].liveStatus,
           } : null,
         })),
-        currentPullRequest: stackResult.currentPullRequest,
-        stack: stackResult.stack,
-        stackUnavailableReason: stackResult.reason,
-        githubStack: enhancedStack,
-        repository,
-        tracker,
+        currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null,
+        repository: { outcome: "absent" as const, message: null, branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFileCount: 0, changedInsertions: 0, changedDeletions: 0, changedFiles: [] },
+        tracker: { visible: false, available: false, message: null, suggestions: [], item: null, statusOptions: [] },
       };
+    },
+    async getWorkChanges({ threadId, force }) {
+      if (force) clearGitHubReadCache();
+      const thread = await bb.sdk.threads.get({ threadId });
+      return workChanges(threadId, thread);
+    },
+    async getPullRequestFingerprint({ url }) { return pullRequestFingerprint(url); },
+    async getGitHubPollingPolicy() { return githubPollingPolicy(); },
+    async getWorkTracker({ threadId }) {
+      const [thread, root] = await Promise.all([bb.sdk.threads.get({ threadId }), rootThread(threadId)]);
+      return trackerContext(root.id, root.projectId, thread.title ?? thread.titleFallback ?? "");
+    },
+    async getWorkProviderStatus({ threadId }) {
+      return workProviderStatus(threadId);
     },
     async checkoutStackBranch({ threadId, branch }) {
       return githubStackCall("checkoutBranch", { threadId, branch }, ghStackActionSchema);
@@ -1457,6 +1714,43 @@ export default async function plugin(bb: BbPluginApi) {
       if (!result.ok) throw new Error(result.error.message);
       return { task: summarizeTask(result.task) };
     },
+    async updateTaskAssignee({ taskId, assignee }) {
+      const assignees = await readTaskAssignees();
+      await bb.storage.kv.set(TASK_ASSIGNEES_KEY, { ...assignees, [taskId]: assignee });
+      return { taskId, assignee };
+    },
+    async createSidebarTask({ projectId, title, assignee }) {
+      const result = await tasksCall(
+        "createTask", { projectId, title, description: "", status: "todo", priority: "medium", dueDate: null, parentTaskId: null, labelIds: [] },
+        z.union([z.object({ ok: z.literal(true), task: taskSchema }), z.object({ ok: z.literal(false), error: z.object({ code: z.string(), message: z.string() }) })]),
+      );
+      if (!result.ok) throw new Error(result.error.message);
+      const assignees = await readTaskAssignees();
+      await bb.storage.kv.set(TASK_ASSIGNEES_KEY, { ...assignees, [result.task.id]: assignee });
+      const projects = await tasksProjects();
+      return { task: projectSidebarTask(result.task, projects.find((project) => project.id === projectId)?.name ?? "Work", [], assignee) };
+    },
+    async deleteSidebarTask({ taskId }) {
+      const bindings = await readBindings();
+      if (bindings.outcomes.some((binding) => binding.outcomeTaskId === taskId) || bindings.executions.some((binding) => binding.executionTaskId === taskId)) {
+        throw new Error("This task is part of a durable work binding and cannot be deleted from the sidebar.");
+      }
+      const result = await tasksCall("deleteTask", { taskId }, z.object({ deleted: z.boolean() }));
+      if (result.deleted) {
+        const assignees = await readTaskAssignees();
+        if (taskId in assignees) {
+          const { [taskId]: _removed, ...remaining } = assignees;
+          await bb.storage.kv.set(TASK_ASSIGNEES_KEY, remaining);
+        }
+      }
+      return result;
+    },
+    async attachTaskToThread({ taskId, threadId }) {
+      return tasksCall("taskThreadsAttach", { taskId, threadId }, z.object({ threadId: taskThreadIdSchema }));
+    },
+    async detachTaskFromThread({ taskId, threadId }) {
+      return tasksCall("taskThreadsDetach", { taskId, threadId }, z.object({ threadId: taskThreadIdSchema }));
+    },
     async reorderTask({ taskId, beforeTaskId, afterTaskId }) {
       const current = (await tasksCall("getTask", { taskId }, z.object({ task: taskSchema.nullable() }))).task;
       if (!current) throw new Error(`Task not found: ${taskId}`);
@@ -1529,9 +1823,21 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
 
+  bb.agents.registerTool({
+    name: "get_sidebar_tasks",
+    description: "List the active BB Tasks items and their Human or Agent assignment.",
+    parameters: z.object({}).strict(),
+    instructions: "Use this when the user asks to check tasks, task assignments, or the task queue. It reads BB Tasks, not a repository TODO file.",
+    async execute() {
+      if (!(await tasksAvailable())) throw new Error("The BB Tasks plugin is unavailable.");
+      const { tasks } = await sidebarTasks();
+      return JSON.stringify({ tasks: tasks.map(({ key, title, status, priority, assignee, linkedThreadIds }) => ({ key, title, status, priority, assignee, linkedThreadIds })) });
+    },
+  });
+
   bb.agents.configure(() => ({
-    tools: ["get_work_context", "create_work_task", "create_execution_task", "bind_execution_owner"], skills: [],
-    instructions: "Before task creation, dispatch, or status change, call get_work_context at start/resume/after compaction. It reads durable bindings; no automatic compaction hook exists. Keep one top-level outcome per root work item, with execution tasks as direct children only. Bind direct work to the root or delegated work to one spawned child. Pending/recovery dispatch states require explicit reconciliation; never retry an uncertain spawn automatically. Task lifecycle is explicit: thread idle/completion never promotes a task.",
+    tools: ["get_sidebar_tasks", "get_work_context", "create_work_task", "create_execution_task", "bind_execution_owner"], skills: [],
+    instructions: "Use BB Tasks as the source of truth for all work tracking. When asked to check tasks, use get_sidebar_tasks (or the BB Tasks skill), never a repository TODO file as the task source. Create or attach the durable top-level outcome before substantive work, and create direct execution tasks for distinct agent work. Treat Human-assigned tasks as user-owned and do not work them unless the user explicitly delegates them; Agent-assigned tasks are eligible for agent work. Before task creation, dispatch, or status change, call get_work_context at start/resume/after compaction. It reads durable bindings; no automatic compaction hook exists. Keep one top-level outcome per root work item, with execution tasks as direct children only. Bind direct work to the root or delegated work to one spawned child. Pending/recovery dispatch states require explicit reconciliation; never retry an uncertain spawn automatically. Task lifecycle is explicit: thread idle/completion never promotes a task.",
   }));
 
   bb.log.info("Work Sidebar backend loaded");

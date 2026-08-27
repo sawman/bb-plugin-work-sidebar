@@ -23,6 +23,7 @@ function task(overrides: Partial<SidebarTask> = {}): SidebarTask {
     dueDate: null,
     parentTaskId: null,
     linkedThreadIds: [],
+    assignee: "human",
     ...overrides,
   };
 }

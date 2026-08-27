@@ -17,7 +17,9 @@ const taskSummary = z.object({
 const sidebarTask = taskSummary.extend({
   position: z.number().optional(),
   linkedThreadIds: z.array(z.string()),
+  assignee: z.enum(["agent", "human"]),
 });
+const sidebarTaskProject = z.object({ id: z.string(), name: z.string() });
 const taskLink = z.object({
   task: taskSummary,
   threadId: z.string(),
@@ -116,6 +118,22 @@ const githubStackBranch = z.object({
   review: z.enum(["approved", "changes_requested", "changes_requested_review_requested", "review_requested", "review_required", "none"]).optional(),
 });
 const githubStack = z.object({ trunk: z.string(), currentBranch: z.string().nullable(), branches: z.array(githubStackBranch), trunkBehind: z.number().nullable(), prunableBranchCount: z.number().int().nonnegative().nullable() });
+const workChanges = z.object({
+  currentPullRequest: pullRequest.nullable(),
+  stack: z.object({ number: z.number(), base: z.string(), currentPullRequest: z.number(), pullRequests: z.array(z.object({ number: z.number(), title: z.string(), state: z.string(), draft: z.boolean(), url: z.string(), head: z.string(), base: z.string() })) }).nullable(),
+  stackUnavailableReason: z.string().nullable(),
+  githubStack: z.object({ stack: githubStack.nullable(), pending: stackChange.nullable(), error: z.string().nullable() }).nullable(),
+  repository: z.object({ outcome: z.enum(["available", "not_applicable", "unavailable", "absent"]), message: z.string().nullable(), branch: z.string().nullable(), base: z.string().nullable(), ahead: z.number(), behind: z.number(), worktreeState: z.string().nullable(), hasUncommittedChanges: z.boolean(), changedFileCount: z.number().int().nonnegative(), changedInsertions: z.number().int().nonnegative(), changedDeletions: z.number().int().nonnegative(), changedFiles: z.array(z.object({ path: z.string(), status: z.string(), insertions: z.number().nullable(), deletions: z.number().nullable() })) }),
+});
+const workTracker = z.object({ visible: z.boolean(), available: z.boolean(), message: z.string().nullable(), suggestions: z.array(z.object({ key: z.string(), title: z.string(), url: z.string().url() })), item: z.object({ key: z.string(), title: z.string(), url: z.string().url(), status: z.string(), stateCategory: z.enum(["backlog", "todo", "in_progress", "done", "canceled"]), priority: z.string().nullable(), assignee: z.string().nullable(), project: z.string().nullable() }).nullable(), statusOptions: z.array(z.object({ id: z.string(), name: z.string(), current: z.boolean() })) });
+const workProviderStatus = z.object({
+  tone: z.enum(["green", "amber", "red"]),
+  providerId: z.string(),
+  providerName: z.string(),
+  statusUrl: z.string().url().nullable(),
+  status: z.enum(["ready", "not_installed", "unauthenticated", "expired", "unsupported_version", "unknown", "unavailable"]),
+  message: z.string().nullable(),
+});
 
 export type GitHubStackBranch = z.infer<typeof githubStackBranch>;
 export type GitHubStackSignal = z.infer<typeof sidebarStackLayer>;
@@ -158,6 +176,7 @@ export const rpcContract = defineRpcContract({
     output: z.object({
       available: z.boolean(),
       tasks: z.array(sidebarTask),
+      projects: z.array(sidebarTaskProject),
       error: z.string().nullable(),
     }),
   },
@@ -300,6 +319,12 @@ export const rpcContract = defineRpcContract({
       }),
     }),
   },
+  getWorkChanges: { input: z.object({ threadId: z.string(), force: z.boolean().optional() }).strict(), output: workChanges },
+  getPullRequestFingerprint: { input: z.object({ url: z.string().url() }).strict(), output: z.object({ fingerprint: z.string().nullable() }) },
+  getGitHubPollingPolicy: { input: z.null(), output: z.object({ activePollMs: z.number().int().positive(), backgroundPollMs: z.number().int().positive(), maxRestPollsPerMinute: z.number().int().positive() }) },
+  getWorkTracker: { input: z.object({ threadId: z.string() }).strict(), output: workTracker },
+  getWorkProviderStatus: { input: z.object({ threadId: z.string() }).strict(), output: workProviderStatus },
+  getGitHubApiHealth: { input: z.null(), output: z.object({ state: z.enum(["available", "rate_limited", "unavailable"]), scope: z.enum(["graphql", "rest", "unknown"]), message: z.string().nullable(), retryAt: z.number().nullable() }) },
   checkoutStackBranch: {
     input: z.object({ threadId: z.string().startsWith("thr_"), branch: z.string().min(1).max(255) }).strict(),
     output: z.object({ ok: z.boolean(), message: z.string(), tone: z.enum(["success", "warning", "error"]).optional(), detail: z.string().nullable() }),
@@ -379,6 +404,26 @@ export const rpcContract = defineRpcContract({
   updateTaskStatus: {
     input: z.object({ taskId: z.string(), status: taskStatus }).strict(),
     output: z.object({ task: taskSummary }),
+  },
+  updateTaskAssignee: {
+    input: z.object({ taskId: z.string(), assignee: z.enum(["agent", "human"]) }).strict(),
+    output: z.object({ taskId: z.string(), assignee: z.enum(["agent", "human"]) }),
+  },
+  createSidebarTask: {
+    input: z.object({ projectId: z.string(), title: z.string().trim().min(1).max(240), assignee: z.enum(["agent", "human"]) }).strict(),
+    output: z.object({ task: sidebarTask }),
+  },
+  deleteSidebarTask: {
+    input: z.object({ taskId: z.string() }).strict(),
+    output: z.object({ deleted: z.boolean() }).strict(),
+  },
+  attachTaskToThread: {
+    input: z.object({ taskId: z.string(), threadId: z.string().startsWith("thr_") }).strict(),
+    output: z.object({ threadId: z.string().startsWith("thr_") }).strict(),
+  },
+  detachTaskFromThread: {
+    input: z.object({ taskId: z.string(), threadId: z.string().startsWith("thr_") }).strict(),
+    output: z.object({ threadId: z.string().startsWith("thr_") }).strict(),
   },
   reorderTask: {
     input: z.object({ taskId: z.string(), beforeTaskId: z.string().nullable(), afterTaskId: z.string().nullable() }).strict(),

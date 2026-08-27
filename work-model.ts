@@ -32,6 +32,7 @@ export interface TaskSummary {
 export interface SidebarTask extends TaskSummary {
   position?: number;
   linkedThreadIds: string[];
+  assignee: "agent" | "human";
 }
 
 export interface TaskQueueNode {
