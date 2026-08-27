@@ -60,6 +60,7 @@ import { useAuthoredPullRequests, useGitHubApiHealth, useSetAuthoredPullRequestD
 import { PullRequestChangesError, pullRequestChangesHeaderLabel } from "@/features/pull-requests/views";
 import { invalidateChanges, useChanges } from "@/features/changes/queries";
 import { ChangesRepositoryCard } from "@/features/changes/views";
+import { changesInteractionStore } from "@/features/changes/store";
 import { useTaskLinksRead, useTasksRead, useTasksRealtimeInvalidation } from "@/features/tasks/queries";
 import { useTasksMutations } from "@/features/tasks/mutations";
 import "./app.css";
@@ -153,7 +154,9 @@ function WorkThreadList(props: PluginThreadListProps) {
   const githubApiHealth = githubHealthQuery.data ?? { state: "available" as const, scope: "unknown" as const, message: null, retryAt: null };
 
   useEffect(() => {
-    threadInteractionStore.getState().reconcileRoster(threads.map((thread) => thread.id));
+    const threadIds = threads.map((thread) => thread.id);
+    threadInteractionStore.getState().reconcileRoster(threadIds);
+    changesInteractionStore.getState().cleanup(threadIds);
   }, [threads]);
 
   const setSavedThreadListMode = (mode: "enhanced" | "native") => {
@@ -542,6 +545,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const tab = useStore(threadInteractionStore, (state) => state.workTabsByThread.get(threadId) ?? "work");
   useEffect(() => {
     threadInteractionStore.getState().touchWorkTab(threadId);
+    return () => changesInteractionStore.getState().selectFile(threadId, null);
   }, [threadId]);
   const legacyContext = useLegacyWorkContext(threadId);
   const legacyProviderHealth = useLegacyProviderHealth(threadId);
@@ -550,11 +554,12 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const changesLoading = pullRequestChanges.isPending;
   const providerHealth: WorkProviderHealth = legacyProviderHealth.data ?? { tone: "amber", providerId: "", providerName: "Provider", statusUrl: null, status: "unknown", message: "Checking provider health…" };
   const error = legacyContext.error?.message ?? null;
-  const [pendingChangesExpanded, setPendingChangesExpanded] = useState(false);
-  const [currentPrExpanded, setCurrentPrExpanded] = useState(false);
-  const [expandedStackBranches, setExpandedStackBranches] = useState<Set<string>>(() => new Set());
+  const changesPresentation = useStore(changesInteractionStore, (state) => state.byThread.get(threadId));
+  const pendingChangesExpanded = changesPresentation?.repositoryExpanded ?? false;
+  const currentPrExpanded = changesPresentation?.currentPullRequestExpanded ?? false;
+  const expandedStackBranches = changesPresentation?.expandedStackBranches ?? new Set<string>();
   const [checkingOutBranch, setCheckingOutBranch] = useState<string | null>(null);
-  const [workingTreeDiff, setWorkingTreeDiff] = useState<{ path: string; patch: string | null; loading: boolean; message: string | null } | null>(null);
+  const [workingTreeDiff, setWorkingTreeDiff] = useState<{ identity: string; patch: string | null; loading: boolean; message: string | null } | null>(null);
 
   const refresh = () => legacyContext.refetch();
   const refreshChanges = () => pullRequestChanges.refetch();
@@ -563,12 +568,14 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   useRealtime("work-sidebar:changed", refreshWorkPanel);
 
   const openWorkingTreeDiff = async (path: string) => {
-    setWorkingTreeDiff({ path, patch: null, loading: true, message: null });
+    const identity = `${threadId}:${path}`;
+    changesInteractionStore.getState().selectFile(threadId, path);
+    setWorkingTreeDiff({ identity, patch: null, loading: true, message: null });
     try {
       const result = await rpc.call("getWorkingTreeFileDiff", { threadId, path });
-      setWorkingTreeDiff({ path, patch: result.patch, loading: false, message: result.message });
+      setWorkingTreeDiff((current) => current?.identity === identity ? { identity, patch: result.patch, loading: false, message: result.message } : current);
     } catch (error) {
-      setWorkingTreeDiff({ path, patch: null, loading: false, message: error instanceof Error ? error.message : "Could not load the file diff." });
+      setWorkingTreeDiff((current) => current?.identity === identity ? { identity, patch: null, loading: false, message: error instanceof Error ? error.message : "Could not load the file diff." } : current);
     }
   };
 
@@ -589,7 +596,7 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
   };
   const tabPanelId = `ws-panel-${selectedTab.id}`;
   const bindings = context?.bindings ?? [];
-  const toggleStackBranch = (branch: string) => setExpandedStackBranches((current) => { const next = new Set(current); next.has(branch) ? next.delete(branch) : next.add(branch); return next; });
+  const toggleStackBranch = (branch: string) => changesInteractionStore.getState().toggleStackBranch(threadId, branch);
   const checkoutStackBranch = async (branch: string) => {
     if (checkingOutBranch) return;
     setCheckingOutBranch(branch);
@@ -637,12 +644,12 @@ function WorkPanel({ threadId }: PluginThreadPanelProps) {
         {!loading && context && tab === "changes" && (
           <div className="ws-section-stack">
             <header><div><h2>Changes</h2></div><span className="ws-section-count">{githubApiHealth.state !== "available" && <span className={`ws-github-api-indicator ws-github-api-${githubApiHealth.state}`} title={githubApiHealth.message ?? "GitHub API is unavailable."}><Icon name="AlertCircle" aria-hidden />{githubApiHealth.scope === "graphql" ? "GraphQL limited" : "GitHub unavailable"}</span>}{changesLoading ? "Loading…" : pullRequestChangesHeaderLabel({ isPending: pullRequestChanges.isPending, isError: pullRequestChanges.isError, currentPullRequest: pullRequestChanges.data?.currentPullRequest })}</span></header>
-            <ChangesRepositoryCard repository={pullRequestChanges.data?.repository} loading={changesLoading} expanded={pendingChangesExpanded} onToggle={() => setPendingChangesExpanded((expanded) => !expanded)} onOpenFile={openWorkingTreeDiff} />
-            {workingTreeDiff && <article className="ws-card ws-working-tree-diff"><div className="ws-card-heading"><strong>{workingTreeDiff.path}</strong><button type="button" className="ws-text-button" onClick={() => setWorkingTreeDiff(null)}>Close</button></div>{workingTreeDiff.loading ? <p className="ws-card-note">Loading diff…</p> : workingTreeDiff.patch ? <ChangesWorkingTreeDiff patch={workingTreeDiff.patch} /> : <p className="ws-card-note">{workingTreeDiff.message ?? "No diff is available for this file."}</p>}</article>}
+            <ChangesRepositoryCard repository={pullRequestChanges.data?.repository} loading={changesLoading} expanded={pendingChangesExpanded} onToggle={() => changesInteractionStore.getState().toggleRepository(threadId)} onOpenFile={openWorkingTreeDiff} />
+            {workingTreeDiff && changesPresentation?.selectedFilePath && workingTreeDiff.identity === `${threadId}:${changesPresentation.selectedFilePath}` && <article className="ws-card ws-working-tree-diff"><div className="ws-card-heading"><strong>{changesPresentation.selectedFilePath}</strong><button type="button" className="ws-text-button" onClick={() => { changesInteractionStore.getState().selectFile(threadId, null); setWorkingTreeDiff(null); }}>Close</button></div>{workingTreeDiff.loading ? <p className="ws-card-note">Loading diff…</p> : workingTreeDiff.patch ? <ChangesWorkingTreeDiff patch={workingTreeDiff.patch} /> : <p className="ws-card-note">{workingTreeDiff.message ?? "No diff is available for this file."}</p>}</article>}
             {pullRequestChanges.isError && <PullRequestChangesError error={pullRequestChanges.error} onRetry={() => { void pullRequestChanges.refetch(); }} />}
             {!pullRequestChanges.isPending && !pullRequestChanges.isError && (pullRequestChanges.data?.githubStack?.stack ? <ol className="ws-stack-rail" aria-label={`GitHub Stack based on ${pullRequestChanges.data.githubStack.stack.trunk}`}>
               {pullRequestChanges.data.githubStack.stack.branches.map((branch: any) => { const stackPullRequest = pullRequestChanges.data?.stack?.pullRequests.find((pullRequest: any) => pullRequest.number === branch.pr?.number || pullRequest.head === branch.name); const current = branch.pr?.number === pullRequestChanges.data?.currentPullRequest?.number ? pullRequestChanges.data.currentPullRequest : null; const signals = current ? { ...stackPullRequest, state: current.state, draft: current.state === "draft", ...current.signal } : branch.pr ? { ...stackPullRequest, state: stackPullRequest?.state ?? branch.pr.state, draft: stackPullRequest?.draft ?? branch.pr.isDraft, checks: branch.checks ?? stackPullRequest?.checks ?? "unknown", review: branch.review ?? stackPullRequest?.review ?? "none", reviewCommentCount: stackPullRequest?.reviewCommentCount ?? 0 } : stackPullRequest; return <ChangesStackBranchRow key={branch.name} branch={branch} signals={signals} expanded={expandedStackBranches.has(branch.name)} checkingOut={checkingOutBranch === branch.name} onToggle={() => toggleStackBranch(branch.name)} onCheckout={() => void checkoutStackBranch(branch.name)} />; })}
-            </ol> : pullRequestChanges.data?.currentPullRequest ? <ChangesPullRequestCard pullRequest={pullRequestChanges.data.currentPullRequest} expanded={currentPrExpanded} onToggle={() => setCurrentPrExpanded((expanded) => !expanded)} /> : <div className="ws-empty">No pull request is linked to this thread.</div>)}
+            </ol> : pullRequestChanges.data?.currentPullRequest ? <ChangesPullRequestCard pullRequest={pullRequestChanges.data.currentPullRequest} expanded={currentPrExpanded} onToggle={() => changesInteractionStore.getState().togglePullRequest(threadId)} /> : <div className="ws-empty">No pull request is linked to this thread.</div>)}
           </div>
         )}
         {!loading && context && tab === "agents" && (

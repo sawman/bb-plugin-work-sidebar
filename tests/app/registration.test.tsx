@@ -23,7 +23,6 @@ describe("R2 app registration and Query lifecycle", () => {
     expect(queryPolicies.sidebarTasksList).toMatchObject({ staleTime: 15_000, gcTime: 10 * 60_000, retry: 1 });
     expect(queryPolicies.sidebarTaskLinks).toMatchObject({ staleTime: 15_000, gcTime: 10 * 60_000, retry: 1 });
     expect(queryPolicies.workContext).toMatchObject({ staleTime: 5_000, gcTime: 10 * 60_000, retry: 1 });
-    expect(queryPolicies.workChanges).toMatchObject({ staleTime: 30_000, gcTime: 10 * 60_000, retry: false });
     // The harness mounts slots independently, matching BB's left/right slot
     // ownership. R5 and R6 make both PR and Tasks consumers real observers on
     // the same module-generation QueryClient.

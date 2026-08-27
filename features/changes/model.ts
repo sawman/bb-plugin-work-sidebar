@@ -10,7 +10,7 @@ export const changesPolicies = {
 } as const;
 
 export function repositoryPresentation(repository: Repository) {
-  if (repository.outcome !== "available") return { label: repository.outcome === "absent" ? "No workspace" : "Unavailable", tone: "unavailable" as const };
+  if (repository.outcome !== "available") return { label: "Unavailable", tone: "unavailable" as const };
   return repository.hasUncommittedChanges ? { label: "Changed", tone: "changed" as const } : { label: "Clean", tone: "clean" as const };
 }
 
