@@ -3,15 +3,6 @@ import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
 import { queryKeys, queryPolicies } from "../../query-runtime";
 
-type TaskReadResult = { available: boolean; tasks: { id: string }[]; error: string | null };
-type ReadSnapshot = { status: "pending" } | { status: "success"; data: readonly { id: string }[] } | { status: "error"; error: Error };
-
-export function taskReadState(snapshot: ReadSnapshot): "loading" | "empty" | "populated" | "error" {
-  if (snapshot.status === "pending") return "loading";
-  if (snapshot.status === "error") return "error";
-  return snapshot.data.length === 0 ? "empty" : "populated";
-}
-
 export function useTasksRead() {
   const rpc = useRpc<typeof rpcContract>();
   const queryClient = useQueryClient();
