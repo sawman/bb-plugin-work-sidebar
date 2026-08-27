@@ -2469,6 +2469,10 @@ button.ws-provider-health:focus-visible {
 .ws-combobox-options button[aria-selected="true"] {
   background: var(--accent);
 }
+.ws-combobox-options button[data-active="true"] {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
 .ws-combobox-options small {
   overflow: hidden;
   color: var(--muted-foreground);

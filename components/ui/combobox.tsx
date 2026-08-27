@@ -164,17 +164,6 @@ export function Combobox({
                     role="option"
                     aria-selected={option.value === value}
                     data-active={active || undefined}
-                    className={
-                      active ? "bg-accent text-accent-foreground" : undefined
-                    }
-                    style={
-                      active
-                        ? {
-                            backgroundColor: "var(--accent)",
-                            color: "var(--accent-foreground)",
-                          }
-                        : undefined
-                    }
                     tabIndex={-1}
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => selectOption(option)}

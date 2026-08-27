@@ -92,15 +92,12 @@ describe("Tasks registered controls", () => {
     fireEvent.keyDown(combo, { key: "ArrowDown" });
     expect(combo.getAttribute("aria-activedescendant")).toBe(options[0]!.id);
     expect(options[0]!.getAttribute("data-active")).toBe("true");
-    expect(options[0]!.classList.contains("bg-accent")).toBe(true);
     expect(options[0]!.getAttribute("aria-selected")).toBe("false");
     await expectNoAriaViolations(rendered.container);
     fireEvent.keyDown(combo, { key: "ArrowDown" });
     expect(combo.getAttribute("aria-activedescendant")).toBe(options[1]!.id);
     expect(options[0]!.hasAttribute("data-active")).toBe(false);
-    expect(options[0]!.classList.contains("bg-accent")).toBe(false);
     expect(options[1]!.getAttribute("data-active")).toBe("true");
-    expect(options[1]!.classList.contains("bg-accent")).toBe(true);
     expect(options[1]!.getAttribute("aria-selected")).toBe("false");
     fireEvent.keyDown(combo, { key: "ArrowUp" });
     expect(combo.getAttribute("aria-activedescendant")).toBe(options[0]!.id);

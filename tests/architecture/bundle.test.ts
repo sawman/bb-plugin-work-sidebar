@@ -35,6 +35,10 @@ describe("R1 app bundle ownership", () => {
     // stronger ownership marker than application state literals alone.
     expect(bundle).toContain("getInitialState");
     expect(bundle).not.toContain("react-diff-view");
-    expect(readFileSync(resolve(repositoryRoot, "dist/app.css"), "utf8")).not.toMatch(/ws-(review-diff|diff-toolbar|split-diff|working-tree-patch)/);
+    const styles = readFileSync(resolve(repositoryRoot, "dist/app.css"), "utf8");
+    expect(styles).not.toMatch(/ws-(review-diff|diff-toolbar|split-diff|working-tree-patch)/);
+    expect(styles).toContain(
+      ".ws-combobox-options button[data-active=true]{background:var(--accent);color:var(--accent-foreground)}",
+    );
   });
 });
