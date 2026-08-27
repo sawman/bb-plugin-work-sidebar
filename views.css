@@ -2225,11 +2225,6 @@ button.ws-provider-health:focus-visible {
   /* R17 important: host Button sizing must keep the new-thread action height aligned with icons. */
   height: 1.6rem !important;
 }
-.ws-list-toolbar {
-  position: relative;
-  z-index: 40;
-  isolation: isolate;
-}
 .ws-thread-settings {
   z-index: 41;
 }
@@ -2295,6 +2290,7 @@ button.ws-provider-health:focus-visible {
   position: sticky !important;
   z-index: 44;
   top: 2rem;
+  isolation: isolate;
   /* R17 important: host toolbar margins otherwise add sticky toolbar margins. */
   margin: 0 !important;
   /* R17 important: host toolbar margins otherwise add sticky toolbar top padding. */

@@ -316,10 +316,8 @@ describe("shared surface and list-row architecture", () => {
       .filter(({ selector }) => selector === ".ws-thread-settings-menu")
       .map(({ declarations }) => declarations)
       .join("\n");
-    const toolbarDeclarations = rules
-      .filter(({ selector }) => selector === ".ws-list-toolbar")
-      .map(({ declarations }) => declarations)
-      .join("\n");
+    const toolbarRules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"))
+      .filter(({ selector }) => selector === ".ws-list-toolbar");
     const settingsDeclarations = rules
       .filter(({ selector }) => selector === ".ws-thread-settings")
       .map(({ declarations }) => declarations)
@@ -328,8 +326,11 @@ describe("shared surface and list-row architecture", () => {
     expect(menuDeclarations).toContain("top: calc(100% + 0.2rem) !important");
     expect(menuDeclarations).toContain("bottom: auto !important");
     expect(menuDeclarations).toContain("z-index: 100 !important");
-    expect(toolbarDeclarations).toContain("z-index: 40");
-    expect(toolbarDeclarations).toContain("isolation: isolate");
+    expect(toolbarRules).toHaveLength(1);
+    expect(toolbarRules[0]?.declarations).toContain("position: sticky !important");
+    expect(toolbarRules[0]?.declarations).toContain("z-index: 44");
+    expect(toolbarRules[0]?.declarations).toContain("top: 2rem");
+    expect(toolbarRules[0]?.declarations).toContain("isolation: isolate");
     expect(settingsDeclarations).toContain("z-index: 41");
   });
 
