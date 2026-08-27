@@ -40,7 +40,8 @@ describe("R2 app registration and Query lifecycle", () => {
     });
     const right = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_test", params: null });
     expect(mount).toHaveBeenCalledTimes(2);
-    expect(client.getQueryCache().getAll()).toHaveLength(4);
+    expect(client.getQueryCache().getAll()).toHaveLength(5);
+    expect(client.getQueryCache().findAll({ queryKey: ["work-sidebar", "pull-requests", "authored", "stacks"] })[0]?.getObserversCount()).toBe(1);
     expect(client.getQueryCache().findAll({ queryKey: ["work-sidebar", "pull-requests", "health"] })[0]?.getObserversCount()).toBe(2);
     left.unmount();
     right.unmount();
