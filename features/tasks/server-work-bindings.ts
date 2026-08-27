@@ -69,6 +69,33 @@ export function publishWorkBindingReady(
   realtime.publish("work-sidebar:changed", { family: "tasks", threadId });
 }
 
+type WorkBindingReadyFinalization = {
+  pending: ExecutionBinding;
+  mode: BindingMode;
+  ownerThreadId: string;
+  rootThreadId: string;
+  spawnedThreadId: string | null;
+  realtime: WorkBindingsRealtime;
+  save: (binding: ExecutionBinding) => Promise<ExecutionBinding>;
+};
+
+/** Persists and announces any successfully attached direct or delegated owner. */
+export async function finalizeWorkBindingOwner({
+  pending,
+  mode,
+  ownerThreadId,
+  rootThreadId,
+  spawnedThreadId,
+  realtime,
+  save,
+}: WorkBindingReadyFinalization) {
+  const binding = await save(
+    bindExecutionOwner(pending, mode, ownerThreadId, "ready", null),
+  );
+  publishWorkBindingReady(realtime, rootThreadId);
+  return { binding, spawnedThreadId };
+}
+
 /** Durable outcome/execution ownership, dispatch recovery, and legacy adoption. */
 export function createWorkBindingsService(
   bb: BbPluginApi,
@@ -524,11 +551,15 @@ export function createWorkBindingsService(
           spawnedThreadId: null,
         };
       }
-      const ready = await save(
-        bindExecutionOwner(pending, "direct", root.id, "ready", null),
-      );
-      publishWorkBindingReady(bb.realtime, root.id);
-      return { binding: ready, spawnedThreadId: null };
+      return finalizeWorkBindingOwner({
+        pending,
+        mode: "direct",
+        ownerThreadId: root.id,
+        rootThreadId: root.id,
+        spawnedThreadId: null,
+        realtime: bb.realtime,
+        save,
+      });
     }
     if (!input.prompt) throw new Error("Delegated execution requires a prompt");
     const pendingSpawn = await save(
@@ -591,17 +622,15 @@ export function createWorkBindingsService(
         spawnedThreadId: spawned.id,
       };
     }
-    const ready = await save(
-      bindExecutionOwner(
-        pendingAttachment,
-        "delegated",
-        spawned.id,
-        "ready",
-        null,
-      ),
-    );
-    publishWorkBindingReady(bb.realtime, root.id);
-    return { binding: ready, spawnedThreadId: spawned.id };
+    return finalizeWorkBindingOwner({
+      pending: pendingAttachment,
+      mode: "delegated",
+      ownerThreadId: spawned.id,
+      rootThreadId: root.id,
+      spawnedThreadId: spawned.id,
+      realtime: bb.realtime,
+      save,
+    });
   };
   return {
     read,
