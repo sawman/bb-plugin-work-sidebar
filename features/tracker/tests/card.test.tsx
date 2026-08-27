@@ -67,4 +67,21 @@ describe("registered tracker card", () => {
     fireEvent.click(slot.getAllByText("LIN-1")[0]!); fireEvent.click(slot.container.querySelector(".ws-linear-issue")!);
     expect(slot.inspection.navigateCalls).toEqual([{ method: "openUrl", url: linked.item.url }, { method: "openUrl", url: linked.item.url }]); slot.lifecycle.unmount();
   });
+
+  it("shows a retry:1 search failure and recovers through the search retry button", async () => {
+    const app = await loadPluginApp(() => import("../../../app"));
+    const searchLinearIssues = vi.fn().mockRejectedValueOnce(new Error("search down")).mockRejectedValueOnce(new Error("search down")).mockResolvedValue({ items: [{ key: "LIN-9", title: "Recovered", url: "https://linear.app/issue/LIN-9" }] });
+    const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_search", params: null }, { rpc: fixture({ searchLinearIssues }) });
+    await waitFor(() => expect(slot.getByLabelText("Search Linear issues")).toBeTruthy()); fireEvent.change(slot.getByLabelText("Search Linear issues"), { target: { value: "LIN-9" } });
+    await waitFor(() => expect(slot.getByRole("alert").textContent).toContain("search down"), { timeout: 3_000 }); expect(searchLinearIssues).toHaveBeenCalledTimes(2);
+    fireEvent.click(slot.getByRole("button", { name: "Try again" })); await waitFor(() => expect(slot.getByRole("option", { name: /Recovered/ })).toBeTruthy(), { timeout: 3_000 }); expect(searchLinearIssues).toHaveBeenCalledTimes(3); slot.lifecycle.unmount();
+  });
+
+  it("uses only the server realtime event when a mutation publishes before resolving", async () => {
+    const app = await loadPluginApp(() => import("../../../app")); const getWorkTracker = vi.fn(() => linked); let slot!: ReturnType<typeof renderSlot>;
+    const updateLinearIssueStatus = vi.fn(async () => { await slot.behavior.emitRealtime("work-sidebar:changed", { threadId: "thr_collision" }); return { key: "LIN-1", status: "Done" }; });
+    slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_collision", params: null }, { rpc: fixture({ getWorkTracker, updateLinearIssueStatus }) });
+    await waitFor(() => expect(slot.getByLabelText("Linear issue status")).toBeTruthy()); expect(getWorkTracker).toHaveBeenCalledTimes(1); fireEvent.change(slot.getByLabelText("Linear issue status"), { target: { value: "done" } });
+    await waitFor(() => expect(getWorkTracker).toHaveBeenCalledTimes(2)); await new Promise((resolve) => window.setTimeout(resolve, 20)); expect(getWorkTracker).toHaveBeenCalledTimes(2); slot.lifecycle.unmount();
+  });
 });
