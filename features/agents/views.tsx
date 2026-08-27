@@ -83,7 +83,7 @@ export function AgentsView({ threadId }: { threadId: string }) {
       {children.map((child) => {
         const taskLink = taskLinks.data?.links[child.thread.id]?.[0];
         const binding = outcome.data?.bindings.find((candidate) => candidate.ownerThreadId === child.thread.id);
-        return <AgentRow key={child.thread.id} child={child} annotation={{ taskKey: taskLink?.task.key ?? null, taskStatus: taskLink?.task.status ?? null, dispatchState: binding?.dispatchState ?? taskLink?.dispatchState ?? null, recoveryMessage: binding?.recoveryMessage ?? null }} />;
+        return <AgentRow key={child.thread.id} child={child} annotation={{ taskKey: taskLink?.task.key ?? null, taskStatus: taskLink?.task.status ?? null, dispatchState: binding?.dispatchState ?? null, recoveryMessage: binding?.recoveryMessage ?? null }} />;
       })}
       {children.length === 0 ? (
         <div className="ws-empty">No active delegated child threads are attached to this thread.</div>

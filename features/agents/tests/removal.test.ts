@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 
 describe("R15 Agents removal boundary", () => {
   it("keeps the legacy Agents implementation out of the Work composition entry", () => {
-    const source = readFileSync(new URL("../../../app.tsx", import.meta.url), "utf8");
-    expect(source).not.toContain("WorkAgentRow");
-    expect(source).not.toContain("context.children");
-    expect(source).not.toContain("agentProjectionState");
+    const appSource = readFileSync(new URL("../../../app.tsx", import.meta.url), "utf8");
+    const modelSource = readFileSync(new URL("../../../work-model.ts", import.meta.url), "utf8");
+    expect(appSource).not.toContain("WorkAgentRow");
+    expect(appSource).not.toContain("context.children");
+    expect(appSource).not.toContain("agentProjectionState");
+    expect(modelSource).not.toContain("agentProjectionState");
   });
 });

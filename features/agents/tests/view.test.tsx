@@ -164,6 +164,20 @@ describe("R15 registered Agents Work slot", () => {
     slot.lifecycle.unmount();
   });
 
+  it("does not render dispatch state from an unbound task link", async () => {
+    const slot = await agentsSlot(
+      { status: "ready", threads: [thread("thr_root", null), thread("thr_unbound", "thr_root", { indicator: "runtime" })] },
+      rpcFixture({
+        sidebarTaskLinks: () => ({ available: true, links: { thr_unbound: [{ task: { id: "task_2", projectId: "project", projectName: "Work", key: "WORK-2", title: "Unbound task", status: "in_review", priority: "none", dueDate: null, parentTaskId: null }, threadId: "thr_unbound", liveStatus: "working", role: "execution", mode: "delegated", idempotencyKey: "unbound-1", dispatchState: "recovery_required" }] }, error: null }),
+      }),
+    );
+    await waitFor(() => expect(slot.getByRole("link", { name: "Open thr_unbound" })).toBeTruthy());
+    await waitFor(() => expect(slot.getByText("Working · WORK-2")).toBeTruthy());
+    expect(slot.getByRole("article").classList.contains("ws-agent-review")).toBe(true);
+    expect(slot.queryByText("Recovery Required")).toBeNull();
+    slot.lifecycle.unmount();
+  });
+
   it("keeps host Agents visible when task metadata queries fail", async () => {
     const slot = await agentsSlot(
       { status: "ready", threads: [thread("thr_root", null), thread("thr_child", "thr_root")] },
