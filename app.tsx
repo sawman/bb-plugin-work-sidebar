@@ -122,6 +122,7 @@ function WorkThreadList(props: PluginThreadListProps) {
   const [selectedPullRequestIds, setSelectedPullRequestIds] = useState<Set<string>>(() => new Set());
   const [pullRequestSelectionAnchorId, setPullRequestSelectionAnchorId] = useState<string | null>(null);
   const [subtextRefreshKey, setSubtextRefreshKey] = useState(0);
+  const draftMutationInFlight = useRef(false);
   const authoredPullRequestQuery = useAuthoredPullRequests(rpc, { intervalMs: Number(pluginSettings?.githubLeftListRefreshSeconds ?? "300") * 1_000 });
   const authoredPullRequestDraft = useSetAuthoredPullRequestDraft(rpc);
   const githubHealthQuery = useGitHubApiHealth(rpc, { poll: true });
@@ -359,11 +360,14 @@ function WorkThreadList(props: PluginThreadListProps) {
     return [...groups.values()].map((group) => ({ ...group, stacks: [...group.stacks.values()] }));
   }, [visibleAuthoredPullRequests]);
   const toggleAuthoredPullRequestDraft = useCallback((pullRequest: Omit<AuthoredPullRequest, "stack">) => {
-    if (authoredPullRequestDraft.isPending) return;
+    if (draftMutationInFlight.current) return;
+    draftMutationInFlight.current = true;
     authoredPullRequestDraft.mutate({ url: pullRequest.url, draft: !pullRequest.draft }, { onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : "Could not update pull request state");
+    }, onSettled: () => {
+      draftMutationInFlight.current = false;
     }});
-  }, [authoredPullRequestDraft]);
+  }, [authoredPullRequestDraft.mutate]);
   const visibleTaskIds = taskQueue.flatMap((node) => [node.task.id, ...node.children.map((child) => child.id)]);
   const selectTask = (taskId: string, event: ReactMouseEvent<HTMLButtonElement>): boolean => {
     const toggle = event.ctrlKey || event.metaKey;
