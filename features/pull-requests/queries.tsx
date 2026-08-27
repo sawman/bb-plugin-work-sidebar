@@ -18,30 +18,76 @@ export const pullRequestKeys = {
 } as const;
 
 export const pullRequestPolicies = {
-  authored: { staleTime: 60_000, gcTime: 15 * 60_000, retry: false, refetchOnWindowFocus: false, refetchInterval: (polling: AuthoredPullRequestPolling): number => polling.intervalMs },
-  authoredStacks: { staleTime: 60_000, gcTime: 15 * 60_000, retry: false, refetchOnWindowFocus: false, refetchInterval: (polling: AuthoredPullRequestPolling): number => polling.intervalMs },
-  health: { staleTime: 15_000, gcTime: 2 * 60_000, retry: false, refetchOnWindowFocus: false, refetchInterval: 30_000 },
+  authored: {
+    staleTime: 60_000,
+    gcTime: 15 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchInterval: (polling: AuthoredPullRequestPolling): number =>
+      polling.intervalMs,
+  },
+  authoredStacks: {
+    staleTime: 60_000,
+    gcTime: 15 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchInterval: (polling: AuthoredPullRequestPolling): number =>
+      polling.intervalMs,
+  },
+  health: {
+    staleTime: 15_000,
+    gcTime: 2 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchInterval: 30_000,
+  },
 } as const;
 
-
 async function authoredPullRequests(rpc: PullRequestRpc, force = false) {
-  const base = await rpc.call("sidebarAuthoredPullRequests", force ? { force: true } : {});
-  if (!base.available) throw new Error(base.error ?? "GitHub authored pull requests are unavailable.");
+  const base = await rpc.call(
+    "sidebarAuthoredPullRequests",
+    force ? { force: true } : {},
+  );
+  if (!base.available)
+    throw new Error(
+      base.error ?? "GitHub authored pull requests are unavailable.",
+    );
   return base.pullRequests;
 }
 
 async function authoredPullRequestStacks(rpc: PullRequestRpc) {
   const stacks = await rpc.call("sidebarAuthoredPullRequestStacks", null);
-  if (!stacks.available) throw new Error(stacks.error ?? "GitHub pull-request stacks are unavailable.");
+  if (!stacks.available)
+    throw new Error(
+      stacks.error ?? "GitHub pull-request stacks are unavailable.",
+    );
   return stacks.pullRequests;
 }
 
-export function useAuthoredPullRequests(rpc: PullRequestRpc, polling: AuthoredPullRequestPolling = { intervalMs: 300_000 }) {
+export function useAuthoredPullRequests(
+  rpc: PullRequestRpc,
+  polling: AuthoredPullRequestPolling = { intervalMs: 300_000 },
+) {
   const client = useQueryClient();
   const forceRefresh = useRef(false);
-  const base = useQuery({ queryKey: pullRequestKeys.authored(), queryFn: () => authoredPullRequests(rpc, forceRefresh.current), ...pullRequestPolicies.authored, refetchInterval: pullRequestPolicies.authored.refetchInterval(polling) });
-  const stacks = useQuery({ queryKey: pullRequestKeys.authoredStacks(), queryFn: () => authoredPullRequestStacks(rpc), enabled: base.isSuccess, ...pullRequestPolicies.authoredStacks, refetchInterval: pullRequestPolicies.authoredStacks.refetchInterval(polling) });
-  const enriched = stacks.data && stacks.dataUpdatedAt >= base.dataUpdatedAt ? stacks.data : base.data;
+  const base = useQuery({
+    queryKey: pullRequestKeys.authored(),
+    queryFn: () => authoredPullRequests(rpc, forceRefresh.current),
+    ...pullRequestPolicies.authored,
+    refetchInterval: pullRequestPolicies.authored.refetchInterval(polling),
+  });
+  const stacks = useQuery({
+    queryKey: pullRequestKeys.authoredStacks(),
+    queryFn: () => authoredPullRequestStacks(rpc),
+    enabled: base.isSuccess,
+    ...pullRequestPolicies.authoredStacks,
+    refetchInterval:
+      pullRequestPolicies.authoredStacks.refetchInterval(polling),
+  });
+  const enriched =
+    stacks.data && stacks.dataUpdatedAt >= base.dataUpdatedAt
+      ? stacks.data
+      : base.data;
   const refresh = async () => {
     await Promise.all([
       client.cancelQueries({ queryKey: pullRequestKeys.authored() }),
@@ -55,10 +101,19 @@ export function useAuthoredPullRequests(rpc: PullRequestRpc, polling: AuthoredPu
       forceRefresh.current = false;
     }
   };
-  return { ...base, data: enriched, isFetching: base.isFetching || stacks.isFetching, stackError: stacks.error, refresh };
+  return {
+    ...base,
+    data: enriched,
+    isFetching: base.isFetching || stacks.isFetching,
+    stackError: stacks.error,
+    refresh,
+  };
 }
 
-export function useGitHubApiHealth(rpc: PullRequestRpc, { poll = false }: { poll?: boolean } = {}) {
+export function useGitHubApiHealth(
+  rpc: PullRequestRpc,
+  { poll = false }: { poll?: boolean } = {},
+) {
   return useQuery({
     queryKey: pullRequestKeys.health(),
     queryFn: () => rpc.call("getGitHubApiHealth", null),
@@ -67,17 +122,28 @@ export function useGitHubApiHealth(rpc: PullRequestRpc, { poll = false }: { poll
   });
 }
 
+export function invalidateGitHubApiHealth(client: {
+  invalidateQueries(filters: {
+    queryKey: QueryKey;
+  }): Promise<unknown> | unknown;
+}) {
+  return client.invalidateQueries({ queryKey: pullRequestKeys.health() });
+}
+
 export function useSetAuthoredPullRequestDraft(rpc: PullRequestRpc) {
   const client = useQueryClient();
   return useMutation({
     // The control can be invoked twice before React paints its disabled state.
     // A shared Query scope serializes that work without a duplicate React ref.
     scope: { id: "authored-pull-request-draft" },
-    mutationFn: ({ url, draft }: { url: string; draft: boolean }) => rpc.call("setAuthoredPullRequestDraft", { url, draft }),
+    mutationFn: ({ url, draft }: { url: string; draft: boolean }) =>
+      rpc.call("setAuthoredPullRequestDraft", { url, draft }),
     onSettled: async () => {
       await Promise.all([
         client.invalidateQueries({ queryKey: pullRequestKeys.authored() }),
-        client.invalidateQueries({ queryKey: pullRequestKeys.authoredStacks() }),
+        client.invalidateQueries({
+          queryKey: pullRequestKeys.authoredStacks(),
+        }),
       ]);
     },
   });

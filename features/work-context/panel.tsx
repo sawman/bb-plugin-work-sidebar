@@ -10,11 +10,12 @@ import { ChangesPanel } from "../changes/panel";
 import { invalidateChanges } from "../changes/queries";
 import { changesInteractionStore } from "../changes/store";
 import { AgentsView } from "../agents/views";
+import { invalidateGitHubApiHealth } from "../pull-requests/queries";
 import { threadInteractionStore, type WorkTab } from "../threads/store";
 import { TrackerCard, TrackerHeaderBadge } from "../tracker/card";
 import { invalidateTracker } from "../tracker/queries";
 import { invalidateWorkContextCards, useWorkStatus } from "./queries";
-import { parseWorkSidebarRealtimeEvent } from "./realtime";
+import { parseWorkSidebarRealtimeEvent } from "../../shared/work-realtime";
 import { WorkContextCards } from "./views";
 
 const WORK_TABS: readonly {
@@ -96,6 +97,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
             void invalidateWorkContextCards(queryClient, threadId);
             void invalidateTracker(queryClient, threadId);
             void invalidateChanges(queryClient, threadId);
+            void invalidateGitHubApiHealth(queryClient);
           }}
           disabled={tab === "work" && status.isPending}
         >

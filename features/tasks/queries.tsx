@@ -3,7 +3,7 @@ import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
 import { queryKeys, queryPolicies } from "../../query-runtime";
 import { invalidateTaskQueries } from "./mutations";
-import { parseWorkSidebarRealtimeEvent } from "../work-context/realtime";
+import { parseWorkSidebarRealtimeEvent } from "../../shared/work-realtime";
 
 export function useTasksRead() {
   const rpc = useRpc<typeof rpcContract>();

@@ -367,9 +367,12 @@ export function ChangesStackBranchRow({
           onClick={() => {
             if (hasFiles) onToggle();
           }}
-          aria-disabled={!hasFiles}
-          aria-expanded={expanded}
-          aria-label={`${visibleTitle} — ${filesLabel}`}
+          {...(hasFiles
+            ? {
+                "aria-expanded": expanded,
+                "aria-label": `${visibleTitle} — ${filesLabel}`,
+              }
+            : { "aria-disabled": true, "aria-label": visibleTitle })}
         >
           <strong>{visibleTitle}</strong>
           <small>

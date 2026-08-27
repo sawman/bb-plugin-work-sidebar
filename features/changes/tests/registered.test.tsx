@@ -87,6 +87,7 @@ type ChangesFixture = {
   getChanges: () => Promise<ChangesResult> | ChangesResult;
   getWorkContext?: () => typeof context;
   getWorkStatus?: () => unknown;
+  getGitHubApiHealth?: () => unknown;
   githubHealth?: "available" | "rate_limited";
   checkoutStackBranch?: (input: {
     threadId: string;
@@ -105,6 +106,7 @@ function rpc({
     children: [],
   }),
   githubHealth = "available",
+  getGitHubApiHealth,
   checkoutStackBranch = () => ({
     ok: true,
     message: "Checked out",
@@ -120,12 +122,14 @@ function rpc({
   return {
     getWorkContext,
     getChanges,
-    getGitHubApiHealth: () => ({
-      state: githubHealth,
-      scope: githubHealth === "available" ? "unknown" : "rest",
-      message: githubHealth === "available" ? null : "limited",
-      retryAt: null,
-    }),
+    getGitHubApiHealth:
+      getGitHubApiHealth ??
+      (() => ({
+        state: githubHealth,
+        scope: githubHealth === "available" ? "unknown" : "rest",
+        message: githubHealth === "available" ? null : "limited",
+        retryAt: null,
+      })),
     getWorkProviderStatus: () => ({
       tone: "green",
       providerId: "codex",
@@ -327,11 +331,22 @@ describe("R13 registered Changes Work slot", () => {
   it("refreshes Changes exactly once without calling the legacy aggregate on manual refresh", async () => {
     const getChanges = vi.fn(() => changesResult());
     const getWorkContext = vi.fn(() => context);
-    const slot = await changesSlot({ getChanges, getWorkContext });
+    const getGitHubApiHealth = vi.fn(() => ({
+      state: "available",
+      scope: "unknown",
+      message: null,
+      retryAt: null,
+    }));
+    const slot = await changesSlot({
+      getChanges,
+      getWorkContext,
+      getGitHubApiHealth,
+    });
     await waitFor(() => expect(getChanges).toHaveBeenCalledTimes(1));
     expect(getWorkContext).not.toHaveBeenCalled();
     fireEvent.click(slot.getByRole("button", { name: "Refresh work context" }));
     await waitFor(() => expect(getChanges).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(getGitHubApiHealth).toHaveBeenCalledTimes(2));
     expect(getChanges).toHaveBeenCalledTimes(2);
     expect(getWorkContext).not.toHaveBeenCalled();
     slot.lifecycle.unmount();

@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { changesHeaderLabel } from "../model";
-import { ChangesError } from "../views";
+import { ChangesError, ChangesStackBranchRow } from "../views";
 
 describe("R13 Changes error presentation", () => {
   it("renders an accessible Changes failure and retries only the Changes query", () => {
@@ -37,5 +37,42 @@ describe("R13 Changes error presentation", () => {
         false,
       ),
     ).toBe("#12");
+  });
+
+  it("keeps a zero-file stack label focusable without exposing a disclosure", () => {
+    render(
+      createElement(ChangesStackBranchRow, {
+        branch: {
+          name: "feature/empty",
+          isCurrent: false,
+          isMerged: false,
+          isQueued: false,
+          needsRebase: false,
+          hasStash: false,
+          stashCount: null,
+          pr: {
+            number: 8,
+            url: "https://github.com/acme/repo/pull/8",
+            state: "open",
+            title: "Empty",
+            isDraft: false,
+            metadataStale: false,
+          },
+          diff: { additions: 0, deletions: 0, files: [], truncated: false },
+          aheadOfRemote: 0,
+          behindRemote: 0,
+        },
+        expanded: false,
+        checkingOut: false,
+        onToggle: () => undefined,
+        onCheckout: () => undefined,
+      } as never),
+    );
+    const label = screen.getByRole("button", { name: "#8 Empty" });
+    expect(label.getAttribute("aria-disabled")).toBe("true");
+    expect(label.hasAttribute("aria-expanded")).toBe(false);
+    expect(label.getAttribute("aria-label")).not.toContain(
+      "Show changed files",
+    );
   });
 });

@@ -520,6 +520,10 @@ export function createWorkBindingsService(
         family: "work",
         threadId: root.id,
       });
+      bb.realtime.publish("work-sidebar:changed", {
+        family: "tasks",
+        threadId: root.id,
+      });
       return { binding: ready, spawnedThreadId: null };
     }
     if (!input.prompt) throw new Error("Delegated execution requires a prompt");
@@ -594,6 +598,10 @@ export function createWorkBindingsService(
     );
     bb.realtime.publish("work-sidebar:changed", {
       family: "work",
+      threadId: root.id,
+    });
+    bb.realtime.publish("work-sidebar:changed", {
+      family: "tasks",
       threadId: root.id,
     });
     return { binding: ready, spawnedThreadId: spawned.id };
