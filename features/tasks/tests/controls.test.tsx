@@ -23,14 +23,14 @@ const workContext = {
 } satisfies Awaited<ReturnType<RpcHandlers["getWorkContext"]>>;
 
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (error: Error) => void; const promise = new Promise<T>((ok, bad) => { resolve = ok; reject = bad; }); return { promise, resolve, reject }; }
-function rpcFixtures(sidebarTasks: RpcHandlers["sidebarTasks"], call: RpcCall = () => Promise.resolve({})) {
-  return { sidebarTasks, sidebarTaskLinks: () => ({ available: true, links: {}, error: null }), getWorkContext: () => workContext, getChanges: () => ({ currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null, repository: { outcome: "absent", message: null, branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFileCount: 0, changedInsertions: 0, changedDeletions: 0, changedFiles: [] } }), getWorkTracker: () => ({ visible: false, available: false, message: null, suggestions: [], item: null, statusOptions: [] }), getWorkProviderStatus: () => ({ tone: "green", providerId: "codex", providerName: "Codex", statusUrl: null, status: "ready", message: null }), getGitHubApiHealth: () => ({ state: "available", scope: "unknown", message: null, retryAt: null }),
+function rpcFixtures(sidebarTasks: RpcHandlers["sidebarTasks"], call: RpcCall = () => Promise.resolve({}), links: Awaited<ReturnType<RpcHandlers["sidebarTaskLinks"]>>["links"] = {}) {
+  return { sidebarTasks, sidebarTaskLinks: () => ({ available: true, links, error: null }), getWorkContext: () => workContext, getChanges: () => ({ currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null, repository: { outcome: "absent", message: null, branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFileCount: 0, changedInsertions: 0, changedDeletions: 0, changedFiles: [] } }), getWorkTracker: () => ({ visible: false, available: false, message: null, suggestions: [], item: null, statusOptions: [] }), getWorkProviderStatus: () => ({ tone: "green", providerId: "codex", providerName: "Codex", statusUrl: null, status: "ready", message: null }), getGitHubApiHealth: () => ({ state: "available", scope: "unknown", message: null, retryAt: null }),
     createSidebarTask: (input: unknown) => call("createSidebarTask", input), deleteSidebarTask: (input: unknown) => call("deleteSidebarTask", input), attachTaskToThread: (input: unknown) => call("attachTaskToThread", input), detachTaskFromThread: (input: unknown) => call("detachTaskFromThread", input), updateTaskStatus: (input: unknown) => call("updateTaskStatus", input), updateTaskAssignee: (input: unknown) => call("updateTaskAssignee", input), reorderTask: (input: unknown) => call("reorderTask", input),
   } as unknown as RpcHandlers;
 }
 async function app() { return loadPluginApp(() => import("../../../app")); }
 function leftProps(searchQuery = "") { return { activeThreadId: "thr_test", activeProjectId: null, isCompactViewport: false, onNavigate: () => undefined, searchQuery, Original: () => null }; }
-async function leftSlot(items = [task], call: RpcCall = vi.fn(() => Promise.resolve({}))) { const captured = await app(); const rendered = renderSlot(captured.threadLists[0]!, leftProps(), { rpc: rpcFixtures(() => tasks(items), call) }); fireEvent.click(rendered.getByRole("button", { name: "Tasks" })); await waitFor(() => expect(rendered.getByText(items[0]!.title)).toBeTruthy()); return { rendered, call }; }
+async function leftSlot(items = [task], call: RpcCall = vi.fn(() => Promise.resolve({})), links: Awaited<ReturnType<RpcHandlers["sidebarTaskLinks"]>>["links"] = {}) { const captured = await app(); const rendered = renderSlot(captured.threadLists[0]!, leftProps(), { rpc: rpcFixtures(() => tasks(items), call, links) }); fireEvent.click(rendered.getByRole("button", { name: "Tasks" })); await waitFor(() => expect(rendered.getByText(items[0]!.title)).toBeTruthy()); return { rendered, call }; }
 
 async function expectNoAriaViolations(container: HTMLElement) {
   const results = await axe(container);
@@ -132,6 +132,49 @@ describe("Tasks registered controls", () => {
     rendered.lifecycle.unmount(); getPluginQueryClient().clear();
     const attached = await leftSlot([{ ...task, linkedThreadIds: ["thr_test"] }]); fireEvent.click(attached.rendered.getByRole("button", { name: task.title }));
     await waitFor(() => expect(attached.call).toHaveBeenCalledWith("detachTaskFromThread", { taskId: "task_1", threadId: "thr_test" })); attached.rendered.lifecycle.unmount();
+  });
+
+  it("keeps a binding-owned Queue row selectable while clearly preventing a destructive detach", async () => {
+    const bound = { ...task, linkedThreadIds: ["thr_test"] };
+    const { rendered, call } = await leftSlot([bound], vi.fn(() => Promise.resolve({})), {
+      thr_test: [{
+        task: bound,
+        threadId: "thr_test",
+        liveStatus: "working",
+        role: "outcome",
+        mode: null,
+        idempotencyKey: null,
+        dispatchState: null,
+      }],
+    });
+    const row = rendered.getByRole("button", { name: bound.title });
+    expect(rendered.getByText("Bound outcome task")).toBeTruthy();
+    expect(row.getAttribute("aria-describedby")).toBeTruthy();
+    fireEvent.click(row);
+    expect(call).not.toHaveBeenCalled();
+    rendered.lifecycle.unmount();
+  });
+
+  it("does not offer deletion for a durable binding owned by another thread", async () => {
+    const { rendered } = await leftSlot([task], vi.fn(() => Promise.resolve({})), {
+      thr_owner: [{
+        task,
+        threadId: "thr_owner",
+        liveStatus: "working",
+        role: "outcome",
+        mode: null,
+        idempotencyKey: null,
+        dispatchState: null,
+      }],
+    });
+    const row = rendered.getByRole("button", { name: task.title });
+    expect(rendered.getByText("Bound outcome task")).toBeTruthy();
+    expect(row.getAttribute("aria-describedby")).toBeTruthy();
+    fireEvent.contextMenu(rendered.getByText(task.title));
+    expect(
+      rendered.getByRole("menuitem", { name: "Delete task" }),
+    ).toHaveProperty("disabled", true);
+    rendered.lifecycle.unmount();
   });
 
   it("reorders from context-menu keyboard controls with exact RPC and rollback", async () => {

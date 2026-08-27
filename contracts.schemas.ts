@@ -4,7 +4,6 @@ import { sidebarTaskProjectSchema, sidebarTaskSchema, taskLinkSchema, taskPriori
 import { threadArchiveSchemas, threadPreferenceSchemas } from "./features/threads/schemas.js";
 import { trackerRpcSchemas } from "./features/tracker/schemas.js";
 import { changesRpcSchemas, githubStackBranchSchema } from "./features/changes/schemas.js";
-
 const taskStatus = taskStatusSchema;
 const taskPriority = taskPrioritySchema;
 const taskSummary = taskSummarySchema;
@@ -52,10 +51,15 @@ const workStatus = z.object({
     }).nullable(),
   })),
 });
-const workOutcome = z.object({ tasksAvailable: z.boolean(), outcome: taskSummary.nullable(), executionTasks: z.array(taskSummary), bindings: z.array(binding) });
+const workOutcome = z.object({
+  tasksAvailable: z.boolean(),
+  outcome: taskSummary.nullable(),
+  executionTasks: z.array(taskSummary),
+  bindings: z.array(binding),
+  legacy: legacyContext.optional(),
+});
 const workGoal = z.object({ objective: z.string(), status: z.enum(["active", "budgetLimited", "complete", "paused"]), tokensUsed: z.number(), tokenBudget: z.number().nullable(), timeUsedSeconds: z.number() }).nullable();
 const workPlan = z.object({ items: z.array(z.object({ id: z.string(), text: z.string(), status: z.enum(["completed", "in_progress", "pending"]) })) });
-
 export type GitHubStackBranch = z.infer<typeof githubStackBranchSchema>;
 export type GitHubStackSignal = z.infer<typeof sidebarStackLayer>;
 

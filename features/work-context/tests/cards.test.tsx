@@ -263,6 +263,30 @@ describe("registered Work context cards", () => {
           position: 2,
         },
       ],
+      bindings: [
+        {
+          rootThreadId: "thr_one",
+          outcomeTaskId: "task_1",
+          taskProjectId: "project_1",
+          executionTaskId: null,
+          ownerThreadId: null,
+          mode: null,
+          idempotencyKey: null,
+          dispatchState: "ready" as const,
+          recoveryMessage: null,
+        },
+        {
+          rootThreadId: "thr_one",
+          outcomeTaskId: "task_1",
+          taskProjectId: "project_1",
+          executionTaskId: "task_execution",
+          ownerThreadId: "thr_one",
+          mode: "direct" as const,
+          idempotencyKey: "validation",
+          dispatchState: "ready" as const,
+          recoveryMessage: null,
+        },
+      ],
     };
     const slot = renderSlot(
       app.threadPanelActions[0]!,
@@ -314,6 +338,253 @@ describe("registered Work context cards", () => {
       slot.lifecycle.unmount();
       getPluginQueryClient().clear();
     }
+  });
+
+  it("counts and offers tasks from each binding owner, not the work root", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const directExecution = {
+      id: "task_direct",
+      projectId: "project_1",
+      projectName: "Work",
+      key: "WORK-2",
+      title: "Run root validation",
+      status: "in_progress" as const,
+      priority: "medium" as const,
+      dueDate: null,
+      parentTaskId: "task_1",
+      position: 2,
+    };
+    const delegatedExecution = {
+      id: "task_delegated",
+      projectId: "project_1",
+      projectName: "Work",
+      key: "WORK-3",
+      title: "Review child result",
+      status: "todo" as const,
+      priority: "medium" as const,
+      dueDate: null,
+      parentTaskId: "task_1",
+      position: 3,
+    };
+    const ownerScopedOutcome = {
+      ...populatedOutcome,
+      executionTasks: [directExecution, delegatedExecution],
+      bindings: [
+        {
+          rootThreadId: "thr_root",
+          outcomeTaskId: "task_1",
+          taskProjectId: "project_1",
+          executionTaskId: null,
+          ownerThreadId: null,
+          mode: null,
+          idempotencyKey: null,
+          dispatchState: "ready" as const,
+          recoveryMessage: null,
+        },
+        {
+          rootThreadId: "thr_root",
+          outcomeTaskId: "task_1",
+          taskProjectId: "project_1",
+          executionTaskId: "task_direct",
+          ownerThreadId: "thr_root",
+          mode: "direct" as const,
+          idempotencyKey: "direct",
+          dispatchState: "ready" as const,
+          recoveryMessage: null,
+        },
+        {
+          rootThreadId: "thr_root",
+          outcomeTaskId: "task_1",
+          taskProjectId: "project_1",
+          executionTaskId: "task_delegated",
+          ownerThreadId: "thr_child",
+          mode: "delegated" as const,
+          idempotencyKey: "delegated",
+          dispatchState: "ready" as const,
+          recoveryMessage: null,
+        },
+      ],
+      legacy: { state: "none" as const, taskIds: [], message: null },
+    };
+    const genericRoot = {
+      id: "task_generic_root",
+      projectId: "project_1",
+      projectName: "Work",
+      key: "WORK-4",
+      title: "Unbound root task",
+      status: "todo" as const,
+      priority: "none" as const,
+      dueDate: null,
+      parentTaskId: null,
+      position: 4,
+      linkedThreadIds: ["thr_root"],
+      assignee: "human" as const,
+    };
+    const genericChild = {
+      ...genericRoot,
+      id: "task_generic_child",
+      key: "WORK-5",
+      title: "Unbound child task",
+      position: 5,
+      linkedThreadIds: ["thr_child"],
+    };
+    const sidebarTasks = () => ({
+      ...taskResult,
+      tasks: [
+        { ...populatedOutcome.outcome!, linkedThreadIds: ["thr_root"], assignee: "human" as const },
+        { ...directExecution, linkedThreadIds: ["thr_root"], assignee: "agent" as const },
+        { ...delegatedExecution, linkedThreadIds: ["thr_child"], assignee: "agent" as const },
+        genericRoot,
+        genericChild,
+      ],
+    });
+    const root = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_root", params: null },
+      { rpc: fixture({ sidebarTasks, getWorkOutcome: () => ownerScopedOutcome }) },
+    );
+    try {
+      await waitFor(() => expect(root.getByText("Unbound root task")).toBeTruthy());
+      expect(root.container.querySelector(".ws-section-count")?.textContent).toBe("3");
+      expect(root.getByText("2 work tasks are bound to this thread.")).toBeTruthy();
+    } finally {
+      root.lifecycle.unmount();
+      getPluginQueryClient().clear();
+    }
+
+    const child = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_child", params: null },
+      { rpc: fixture({ sidebarTasks, getWorkOutcome: () => ownerScopedOutcome }) },
+    );
+    try {
+      await waitFor(() => expect(child.getByText("Unbound child task")).toBeTruthy());
+      expect(child.container.querySelector(".ws-section-count")?.textContent).toBe("2");
+      expect(child.getByText("1 work task is bound to this thread.")).toBeTruthy();
+      const picker = child.getByRole("combobox", { name: "Add task to this thread" });
+      fireEvent.focus(picker);
+      await waitFor(() => expect(child.getByRole("option", { name: /WORK-4/ })).toBeTruthy());
+      for (const key of ["WORK-1", "WORK-2", "WORK-3"])
+        expect(child.queryByRole("option", { name: new RegExp(key) })).toBeNull();
+    } finally {
+      child.lifecycle.unmount();
+      getPluginQueryClient().clear();
+    }
+  });
+
+  it("adopts one legacy Outcome with typed pending, error, success, and unsafe-state feedback", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const adoptedBinding = {
+      rootThreadId: "thr_one",
+      outcomeTaskId: "task_1",
+      taskProjectId: "project_1",
+      executionTaskId: null,
+      ownerThreadId: null,
+      mode: null,
+      idempotencyKey: null,
+      dispatchState: "ready" as const,
+      recoveryMessage: null,
+    };
+    let resolveAdoption!: (value: { task: NonNullable<typeof populatedOutcome.outcome>; binding: typeof adoptedBinding }) => void;
+    const pendingAdoption = new Promise<{ task: NonNullable<typeof populatedOutcome.outcome>; binding: typeof adoptedBinding }>((resolve) => {
+      resolveAdoption = resolve;
+    });
+    const getWorkOutcome = vi
+      .fn()
+      .mockReturnValueOnce({
+        ...outcome,
+        legacy: {
+          state: "adoptable" as const,
+          taskIds: ["task_legacy"],
+          message: "One legacy top-level attachment can be explicitly adopted.",
+        },
+      })
+      .mockReturnValue({ ...populatedOutcome, legacy: { state: "none" as const, taskIds: [], message: null } });
+    const adoptLegacyOutcome = vi.fn(() => pendingAdoption);
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      { rpc: fixture({ getWorkOutcome, adoptLegacyOutcome }) },
+    );
+    await waitFor(() => expect(slot.getByText("One legacy top-level attachment can be explicitly adopted.")).toBeTruthy());
+    const adopt = slot.getByRole("button", { name: "Adopt legacy outcome" }) as HTMLButtonElement;
+    fireEvent.click(adopt);
+    await waitFor(() => expect(adoptLegacyOutcome).toHaveBeenCalledWith({ rootThreadId: "thr_one", taskId: "task_legacy" }));
+    expect(adopt.disabled).toBe(true);
+    resolveAdoption({ task: populatedOutcome.outcome!, binding: adoptedBinding });
+    await waitFor(() => expect(slot.getByText("Legacy outcome adopted.")).toBeTruthy());
+    await slot.behavior.emitRealtime("work-sidebar:changed", { family: "work", threadId: "thr_one" });
+    await waitFor(() => expect(getWorkOutcome).toHaveBeenCalledTimes(3));
+    slot.lifecycle.unmount();
+    getPluginQueryClient().clear();
+
+    const rejected = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      {
+        rpc: fixture({
+          getWorkOutcome: () => ({
+            ...outcome,
+            legacy: {
+              state: "adoptable",
+              taskIds: ["task_legacy"],
+              message: "One legacy top-level attachment can be explicitly adopted.",
+            },
+          }),
+          adoptLegacyOutcome: () => Promise.reject(new Error("Adoption failed")),
+        }),
+      },
+    );
+    await waitFor(() => expect(rejected.getByRole("button", { name: "Adopt legacy outcome" })).toBeTruthy());
+    fireEvent.click(rejected.getByRole("button", { name: "Adopt legacy outcome" }));
+    await waitFor(() => expect(rejected.getByRole("alert").textContent).toContain("Adoption failed"));
+    expect((rejected.getByRole("button", { name: "Adopt legacy outcome" }) as HTMLButtonElement).disabled).toBe(false);
+    rejected.lifecycle.unmount();
+    getPluginQueryClient().clear();
+
+    const unsafe = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      {
+        rpc: fixture({
+          getWorkOutcome: () => ({
+            ...outcome,
+            legacy: {
+              state: "ambiguous",
+              taskIds: ["task_a", "task_b"],
+              message: "Several legacy top-level tasks are attached; select one explicitly to adopt.",
+            },
+          }),
+        }),
+      },
+    );
+    await waitFor(() => expect(unsafe.getByText("Several legacy top-level tasks are attached; select one explicitly to adopt.")).toBeTruthy());
+    expect(unsafe.queryByRole("button", { name: "Adopt legacy outcome" })).toBeNull();
+    unsafe.lifecycle.unmount();
+    getPluginQueryClient().clear();
+
+    const mismatch = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      {
+        rpc: fixture({
+          getWorkOutcome: () => ({
+            ...outcome,
+            legacy: {
+              state: "project_mismatch",
+              taskIds: ["task_elsewhere"],
+              message: "Legacy attachment is linked to a different BB project and cannot be adopted.",
+            },
+          }),
+        }),
+      },
+    );
+    await waitFor(() => expect(mismatch.getByText("Legacy attachment is linked to a different BB project and cannot be adopted.")).toBeTruthy());
+    expect(mismatch.queryByRole("button", { name: "Adopt legacy outcome" })).toBeNull();
+    mismatch.lifecycle.unmount();
+    getPluginQueryClient().clear();
   });
 
   it("retries only the failed card and uses Query mutation busy/success state", async () => {

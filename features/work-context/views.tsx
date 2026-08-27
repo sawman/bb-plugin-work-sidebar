@@ -17,7 +17,10 @@ import {
 } from "../../work-model";
 import { useTasksMutations } from "../tasks/mutations";
 import { useTasksRead } from "../tasks/queries";
-import { nextOutcomeStatus } from "./model";
+import {
+  nextOutcomeStatus,
+  projectWorkTaskBindingOwnership,
+} from "./model";
 import {
   useLatestActivity,
   useWorkGoal,
@@ -207,8 +210,13 @@ function OutcomeCard({ threadId }: { threadId: string }) {
   const query = useWorkOutcome(threadId);
   const mutation = useWorkOutcomeMutation(threadId);
   const outcome = query.data?.outcome;
+  const legacy = query.data?.legacy;
   const next = outcome ? nextOutcomeStatus(outcome.status) : null;
   const [title, setTitle] = useState("");
+  const [adoptionNotice, setAdoptionNotice] = useState<{
+    message: string;
+    tone: "error" | "success";
+  } | null>(null);
   const report = async (
     operation: Promise<unknown>,
     success: string,
@@ -219,6 +227,20 @@ function OutcomeCard({ threadId }: { threadId: string }) {
       toast.success(success);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : failure);
+    }
+  };
+  const adoptLegacy = async () => {
+    const taskId = legacy?.state === "adoptable" ? legacy.taskIds[0] : null;
+    if (!taskId) return;
+    setAdoptionNotice(null);
+    try {
+      await mutation.adopt.mutateAsync({ taskId });
+      setAdoptionNotice({ message: "Legacy outcome adopted.", tone: "success" });
+      toast.success("Legacy outcome adopted");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not adopt legacy outcome";
+      setAdoptionNotice({ message, tone: "error" });
+      toast.error(message);
     }
   };
   return (
@@ -266,13 +288,40 @@ function OutcomeCard({ threadId }: { threadId: string }) {
       ) : (
         <>
           <p className="ws-card-note">No current outcome.</p>
+          {legacy?.state === "adoptable" ? (
+            <div className="ws-outcome-form">
+              <p className="ws-card-note" role="status">
+                {legacy.message ?? "One legacy outcome can be adopted."}
+              </p>
+              <button
+                type="button"
+                disabled={
+                  !query.data?.tasksAvailable ||
+                  !legacy.taskIds[0] ||
+                  mutation.adopt.isPending ||
+                  mutation.create.isPending
+                }
+                onClick={() => void adoptLegacy()}
+              >
+                {mutation.adopt.isPending
+                  ? "Adopting legacy outcome…"
+                  : "Adopt legacy outcome"}
+              </button>
+            </div>
+          ) : legacy && legacy.state !== "none" ? (
+            <p className="ws-card-note" role="status">
+              {legacy.message ?? "Legacy outcome adoption needs attention."}
+            </p>
+          ) : null}
           <div className="ws-outcome-form">
             <Input
               aria-label="Outcome-oriented task title"
               placeholder="Outcome-oriented task title"
               value={title}
               disabled={
-                !query.data?.tasksAvailable || mutation.create.isPending
+                !query.data?.tasksAvailable ||
+                mutation.create.isPending ||
+                mutation.adopt.isPending
               }
               onChange={(event) => setTitle(event.target.value)}
             />
@@ -282,7 +331,8 @@ function OutcomeCard({ threadId }: { threadId: string }) {
               disabled={
                 !title.trim() ||
                 !query.data?.tasksAvailable ||
-                mutation.create.isPending
+                mutation.create.isPending ||
+                mutation.adopt.isPending
               }
               aria-label="Create and attach outcome task"
               onClick={() =>
@@ -300,6 +350,14 @@ function OutcomeCard({ threadId }: { threadId: string }) {
           </div>
         </>
       )}
+      {adoptionNotice ? (
+        <p
+          className="ws-card-note"
+          role={adoptionNotice.tone === "error" ? "alert" : "status"}
+        >
+          {adoptionNotice.message}
+        </p>
+      ) : null}
     </CardState>
   );
 }
@@ -378,16 +436,17 @@ function TasksCard({ threadId }: { threadId: string }) {
   const outcome = useWorkOutcome(threadId);
   const mutations = useTasksMutations(rpc);
   const [selection, setSelection] = useState("");
-  const bindingOwnedTaskIds = new Set([
-    ...(outcome.data?.outcome ? [outcome.data.outcome.id] : []),
-    ...(outcome.data?.executionTasks.map((task) => task.id) ?? []),
-  ]);
+  const { bindingOwnedTaskIds, currentThreadBindingTaskIds } =
+    projectWorkTaskBindingOwnership(threadId, outcome.data?.bindings ?? []);
   const attached = (tasks.data?.tasks ?? []).filter((task) =>
     task.linkedThreadIds.includes(threadId) && !bindingOwnedTaskIds.has(task.id),
   );
   const available = (tasks.data?.tasks ?? []).filter(
-    (task) => !task.linkedThreadIds.includes(threadId),
+    (task) =>
+      !task.linkedThreadIds.includes(threadId) &&
+      !bindingOwnedTaskIds.has(task.id),
   );
+  const boundTaskCount = currentThreadBindingTaskIds.size;
   const busy = mutations.attachment.isPending || mutations.assignment.isPending;
   const report = (operation: Promise<unknown>, fallback: string) =>
     void operation.catch((error) =>
@@ -402,8 +461,14 @@ function TasksCard({ threadId }: { threadId: string }) {
     >
       <div className="ws-thread-task-card">
         <p className="ws-section-count">
-          {attached.length + bindingOwnedTaskIds.size}
+          {attached.length + boundTaskCount}
         </p>
+        {boundTaskCount ? (
+          <p className="ws-card-note" role="status">
+            {boundTaskCount} work task{boundTaskCount === 1 ? "" : "s"}{" "}
+            {boundTaskCount === 1 ? "is" : "are"} bound to this thread.
+          </p>
+        ) : null}
         {attached.length ? (
           <div className="ws-work-card-list">
             {attached.map((task) => (
@@ -444,7 +509,11 @@ function TasksCard({ threadId }: { threadId: string }) {
             ))}
           </div>
         ) : (
-          <p className="ws-card-note">No tasks are attached to this thread.</p>
+          <p className="ws-card-note">
+            {boundTaskCount
+              ? "No additional tasks are attached to this thread."
+              : "No tasks are attached to this thread."}
+          </p>
         )}
         <div className="ws-work-card-control">
           <Combobox

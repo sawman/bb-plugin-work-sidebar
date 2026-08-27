@@ -20,6 +20,12 @@ const PROVIDER_STATUS_URLS: Readonly<Record<string, string>> = {
   "acp-cursor": "https://status.cursor.com/",
 };
 
+const emptyLegacyContext = () => ({
+  state: "none" as const,
+  taskIds: [],
+  message: null,
+});
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -101,7 +107,13 @@ export function createWorkContextRegistration(
   };
   const readOutcome = async (threadId: string) => {
     if (!(await tasks.available())) {
-      return { tasksAvailable: false, outcome: null, executionTasks: [], bindings: [] };
+      return {
+        tasksAvailable: false,
+        outcome: null,
+        executionTasks: [],
+        bindings: [],
+        legacy: emptyLegacyContext(),
+      };
     }
     const [root, saved, byId, projects] = await Promise.all([
       tasks.rootThread(threadId),
@@ -111,6 +123,9 @@ export function createWorkContextRegistration(
     ]);
     const names = new Map(projects.map((project) => [project.id, project.name]));
     const outcomeBinding = saved.outcomes.find((binding) => binding.rootThreadId === root.id) ?? null;
+    const legacy = outcomeBinding
+      ? emptyLegacyContext()
+      : await tasks.legacy(root.id, root.projectId);
     const executions = saved.executions.filter((binding) => binding.rootThreadId === root.id);
     const outcome = outcomeBinding ? byId.get(outcomeBinding.outcomeTaskId) ?? null : null;
     return {
@@ -127,6 +142,7 @@ export function createWorkContextRegistration(
         ...(outcomeBinding ? [tasks.summarize(outcomeBinding)] : []),
         ...executions.map(tasks.summarize),
       ],
+      legacy,
     };
   };
   const readGoal = async (threadId: string) => {
@@ -155,6 +171,9 @@ export function createWorkContextRegistration(
     ]);
     const links = available ? await tasks.links() : {};
     const outcomeBinding = saved.outcomes.find((binding) => binding.rootThreadId === root.id) ?? null;
+    const legacy = available && !outcomeBinding
+      ? await tasks.legacy(root.id, root.projectId)
+      : emptyLegacyContext();
     const [byId, projects] = available
       ? await Promise.all([tasks.allTasksById(), tasks.projects()])
       : [new Map(), []];
@@ -181,7 +200,7 @@ export function createWorkContextRegistration(
         ...(outcomeBinding ? [tasks.summarize(outcomeBinding)] : []),
         ...executions.map(tasks.summarize),
       ],
-      legacy: { state: "none" as const, taskIds: [], message: null },
+      legacy,
       goal: timeline.goal ? {
         objective: timeline.goal.objective,
         status: timeline.goal.status,

@@ -163,6 +163,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
         active={view === "queue"}
         activeThreadId={props.activeThreadId}
         activeThreadTitle={activeThread ? threadTitle(activeThread) : null}
+        taskLinks={taskLinks}
         onOpenThread={navigateToThread}
         searchQuery={props.searchQuery}
       />
