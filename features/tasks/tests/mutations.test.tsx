@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import { type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { invalidateTaskQueries, useTasksMutations } from "../mutations";
+import { invalidateTaskQueries, taskOptimisticMutationKey, useTasksMutations } from "../mutations";
 import { queryKeys } from "../../../query-runtime";
 
 const task = { id: "task_1", projectId: "project_1", projectName: "Work", key: "WORK-1", title: "Task", status: "todo" as const, priority: "none" as const, dueDate: null, parentTaskId: null, position: 1, linkedThreadIds: [], assignee: "human" as const };
@@ -31,10 +31,10 @@ describe("Tasks mutations", () => {
     const assign = deferred<unknown>(); const reorder = deferred<unknown>();
     const rpc = { call: vi.fn((method: string) => method === "updateTaskAssignee" ? assign.promise : method === "reorderTask" ? reorder.promise : Promise.resolve({})) };
     const { client, hook } = setup(rpc); client.setQueryData(queryKeys.sidebar.tasks.list(), { tasks: [task, { ...task, id: "task_2", position: 2 }] });
-    const invalidations: string[] = []; vi.spyOn(client, "invalidateQueries").mockImplementation(async (filters) => { invalidations.push(((filters?.queryKey ?? []) as string[]).at(-1)!); });
+    const invalidations: string[] = []; const isMutating = vi.spyOn(client, "isMutating"); vi.spyOn(client, "invalidateQueries").mockImplementation(async (filters) => { invalidations.push(((filters?.queryKey ?? []) as string[]).at(-1)!); });
     const a = hook.result.current.assignment.mutateAsync({ taskId: task.id, assignee: "agent" }); const r = hook.result.current.reorder.mutateAsync({ taskId: task.id, beforeTaskId: "task_2", afterTaskId: null });
-    await waitFor(() => expect(rpc.call).toHaveBeenCalledTimes(2)); await invalidateTaskQueries(client, ["list", "links"]); expect(invalidations).toEqual([]);
-    assign.resolve({}); await a; expect(invalidations).toEqual([]);
-    reorder.resolve({}); await r; expect(invalidations.sort()).toEqual(["links", "list"]);
+    await waitFor(() => expect(rpc.call).toHaveBeenCalledTimes(2)); expect(client.isMutating({ mutationKey: taskOptimisticMutationKey })).toBe(2); await invalidateTaskQueries(client, ["list", "links"]); expect(invalidations).toEqual([]);
+    expect(isMutating).toHaveBeenCalledWith({ mutationKey: taskOptimisticMutationKey }); assign.resolve({}); await a; expect(client.isMutating({ mutationKey: taskOptimisticMutationKey })).toBe(1); expect(invalidations).toEqual([]);
+    reorder.resolve({}); await r; expect(client.isMutating({ mutationKey: taskOptimisticMutationKey })).toBe(0); expect(invalidations.sort()).toEqual(["links", "list"]);
   });
 });

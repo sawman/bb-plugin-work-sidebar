@@ -78,7 +78,7 @@ describe("Tasks registered controls", () => {
 
   it("attaches and detaches the active thread, but modifier selection never attaches", async () => {
     const { rendered, call } = await leftSlot(); const assign = rendered.getByRole("button", { name: task.title });
-    fireEvent.click(assign, { ctrlKey: true }); expect(call).not.toHaveBeenCalled();
+    fireEvent.click(assign, { ctrlKey: true }); fireEvent.click(assign, { metaKey: true }); expect(call).not.toHaveBeenCalled();
     fireEvent.click(assign); await waitFor(() => expect(call).toHaveBeenCalledWith("attachTaskToThread", { taskId: "task_1", threadId: "thr_test" }));
     rendered.lifecycle.unmount(); getPluginQueryClient().clear();
     const attached = await leftSlot([{ ...task, linkedThreadIds: ["thr_test"] }]); fireEvent.click(attached.rendered.getByRole("button", { name: task.title }));
@@ -87,10 +87,10 @@ describe("Tasks registered controls", () => {
 
   it("reorders from context-menu keyboard controls with exact RPC and rollback", async () => {
     const pending = deferred<unknown>(); const { rendered, call } = await leftSlot([task, taskTwo], vi.fn((method) => method === "reorderTask" ? pending.promise : Promise.resolve({})));
-    fireEvent.contextMenu(rendered.getByText(taskTwo.title)); fireEvent.click(rendered.getByRole("menuitem", { name: "Move up" }));
+    fireEvent.contextMenu(rendered.getByText(taskTwo.title)); fireEvent.keyDown(rendered.getByRole("menuitem", { name: "Move up" }), { key: "Enter" });
     await waitFor(() => expect(call).toHaveBeenCalledWith("reorderTask", { taskId: "task_2", beforeTaskId: null, afterTaskId: "task_1" }));
     pending.reject(new Error("reorder failed")); await waitFor(() => expect(rendered.getByText(task.title)).toBeTruthy());
-    fireEvent.contextMenu(rendered.getByText(task.title)); fireEvent.click(rendered.getByRole("menuitem", { name: "Move down" }));
+    fireEvent.contextMenu(rendered.getByText(task.title)); fireEvent.keyDown(rendered.getByRole("menuitem", { name: "Move down" }), { key: " " });
     await waitFor(() => expect(call).toHaveBeenCalledWith("reorderTask", { taskId: "task_1", beforeTaskId: "task_2", afterTaskId: null })); rendered.lifecycle.unmount();
   });
 
@@ -105,8 +105,8 @@ describe("Tasks registered controls", () => {
 
     const successfulAssignment = deferred<unknown>(); const successfulCall = vi.fn((method) => method === "updateTaskAssignee" ? successfulAssignment.promise : Promise.resolve({})); const successful = renderSlot(captured.threadPanelActions[0]!, { threadId: "thr_test", params: null }, { rpc: rpcFixtures(() => tasks([{ ...task, linkedThreadIds: ["thr_test"] }]), successfulCall) });
     await waitFor(() => expect(successful.getByLabelText("Human assigned")).toBeTruthy()); fireEvent.click(successful.getByLabelText("Human assigned")); fireEvent.click(successful.getByRole("option", { name: "Agent" }));
-    await waitFor(() => expect(successfulCall).toHaveBeenCalledWith("updateTaskAssignee", { taskId: "task_1", assignee: "agent" })); expect(successful.getByLabelText("Agent assigned")).toBeTruthy(); successful.lifecycle.unmount(); getPluginQueryClient().clear();
-    successfulAssignment.resolve({});
+    await waitFor(() => expect(successfulCall).toHaveBeenCalledWith("updateTaskAssignee", { taskId: "task_1", assignee: "agent" })); expect(successful.getByLabelText("Agent assigned")).toBeTruthy(); successfulAssignment.resolve({});
+    await waitFor(() => expect(successful.getByLabelText("Human assigned")).toBeTruthy()); successful.lifecycle.unmount(); getPluginQueryClient().clear();
 
     const assignment = deferred<unknown>(); const detach = deferred<unknown>(); const rightCall = vi.fn((method) => method === "updateTaskAssignee" ? assignment.promise : method === "detachTaskFromThread" ? detach.promise : Promise.resolve({}));
     const right = renderSlot(captured.threadPanelActions[0]!, { threadId: "thr_test", params: null }, { rpc: rpcFixtures(() => tasks([{ ...task, linkedThreadIds: ["thr_test"] }]), rightCall) });

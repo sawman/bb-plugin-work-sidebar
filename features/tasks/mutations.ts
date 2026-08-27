@@ -7,15 +7,35 @@ import { queryKeys } from "../../query-runtime";
 type TaskList = { tasks: SidebarTask[] };
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 type TaskScope = "list" | "links";
-const invalidationState = new WeakMap<QueryClient, { pending: number; deferred: Set<TaskScope> }>();
-function stateFor(queryClient: QueryClient) { let state = invalidationState.get(queryClient); if (!state) { state = { pending: 0, deferred: new Set() }; invalidationState.set(queryClient, state); } return state; }
 
-export function invalidateTaskQueries(queryClient: QueryClient, scopes: readonly TaskScope[]) {
+export const taskOptimisticMutationKey = ["tasks", "optimistic"] as const;
+
+const invalidationState = new WeakMap<QueryClient, { deferred: Set<TaskScope> }>();
+
+function stateFor(queryClient: QueryClient) {
+  let state = invalidationState.get(queryClient);
+  if (!state) {
+    state = { deferred: new Set() };
+    invalidationState.set(queryClient, state);
+  }
+  return state;
+}
+
+function hasOtherOptimisticMutation(queryClient: QueryClient, settlingOptimistic: boolean) {
+  return queryClient.isMutating({ mutationKey: taskOptimisticMutationKey }) > (settlingOptimistic ? 1 : 0);
+}
+
+export function invalidateTaskQueries(queryClient: QueryClient, scopes: readonly TaskScope[], settlingOptimistic = false) {
   const state = stateFor(queryClient);
-  if (state.pending > 0) { scopes.forEach((scope) => state.deferred.add(scope)); return Promise.resolve(); }
+  if (hasOtherOptimisticMutation(queryClient, settlingOptimistic)) {
+    scopes.forEach((scope) => state.deferred.add(scope));
+    return Promise.resolve();
+  }
   const finalScopes = [...new Set([...state.deferred, ...scopes])];
   state.deferred.clear();
-  return Promise.all(finalScopes.map((scope) => queryClient.invalidateQueries({ queryKey: scope === "list" ? queryKeys.sidebar.tasks.list() : queryKeys.sidebar.tasks.links() })));
+  return Promise.all(finalScopes.map((scope) => queryClient.invalidateQueries({
+    queryKey: scope === "list" ? queryKeys.sidebar.tasks.list() : queryKeys.sidebar.tasks.links(),
+  })));
 }
 
 export const taskMutationPlan = {
@@ -32,15 +52,66 @@ export function useTasksMutations(rpc: Rpc) {
   const queryClient = useQueryClient();
   const key = (scope: TaskScope) => scope === "list" ? queryKeys.sidebar.tasks.list() : queryKeys.sidebar.tasks.links();
   const cancel = async (scopes: readonly TaskScope[]) => Promise.all(scopes.map((scope) => queryClient.cancelQueries({ queryKey: key(scope) })));
-  const settle = (scopes: readonly TaskScope[]) => invalidateTaskQueries(queryClient, scopes);
+  const settle = (scopes: readonly TaskScope[], settlingOptimistic = false) => invalidateTaskQueries(queryClient, scopes, settlingOptimistic);
   const snapshot = () => queryClient.getQueryData<TaskList>(key("list"));
   const rollback = (previous: TaskList | undefined) => queryClient.setQueryData(key("list"), previous);
 
-  const create = useMutation({ mutationFn: (input: { projectId: string; title: string; assignee: SidebarTask["assignee"] }) => rpc.call("createSidebarTask", input), onMutate: async () => { await cancel(taskMutationPlan.create.cancel); }, onSettled: () => settle(taskMutationPlan.create.invalidate) });
-  const remove = useMutation({ mutationFn: async (input: { taskId: string }) => { const result = await rpc.call("deleteSidebarTask", input) as { deleted: boolean }; if (!result.deleted) throw new Error("Task was not found."); return result; }, onMutate: async () => { await cancel(taskMutationPlan.delete.cancel); }, onSettled: () => settle(taskMutationPlan.delete.invalidate) });
-  const attachment = useMutation({ mutationFn: ({ taskId, threadId, attached }: { taskId: string; threadId: string; attached: boolean }) => rpc.call(attached ? "attachTaskToThread" : "detachTaskFromThread", { taskId, threadId }), onMutate: async ({ attached }) => { await cancel(attached ? taskMutationPlan.attach.cancel : taskMutationPlan.detach.cancel); }, onSettled: (_data, _error, { attached }) => settle(attached ? taskMutationPlan.attach.invalidate : taskMutationPlan.detach.invalidate) });
-  const status = useMutation({ mutationFn: (input: { taskId: string; status: SidebarTask["status"] }) => rpc.call("updateTaskStatus", input), onMutate: async () => { await cancel(taskMutationPlan.status.cancel); }, onSettled: () => settle(taskMutationPlan.status.invalidate) });
-  const assignment = useMutation({ mutationFn: (input: { taskId: string; assignee: SidebarTask["assignee"] }) => rpc.call("updateTaskAssignee", input), onMutate: async ({ taskId, assignee }) => { await cancel(taskMutationPlan.assignment.cancel); stateFor(queryClient).pending += 1; const previous = snapshot(); queryClient.setQueryData<TaskList>(key("list"), (current) => current && { ...current, tasks: current.tasks.map((task) => task.id === taskId ? { ...task, assignee } : task) }); return { previous }; }, onError: (_error, _input, context) => rollback(context?.previous), onSettled: () => { const state = stateFor(queryClient); state.pending = Math.max(0, state.pending - 1); return settle(taskMutationPlan.assignment.invalidate); } });
-  const reorder = useMutation({ mutationFn: (input: { taskId: string; beforeTaskId: string | null; afterTaskId: string | null }) => rpc.call("reorderTask", input), onMutate: async ({ taskId, beforeTaskId, afterTaskId }) => { await cancel(taskMutationPlan.reorder.cancel); stateFor(queryClient).pending += 1; const previous = snapshot(); if (previous) { const targetId = beforeTaskId ?? afterTaskId; if (targetId) queryClient.setQueryData<TaskList>(key("list"), { ...previous, tasks: reorderTaskSiblings(previous.tasks, taskId, targetId, beforeTaskId ? "before" : "after") }); } return { previous }; }, onError: (_error, _input, context) => rollback(context?.previous), onSettled: () => { const state = stateFor(queryClient); state.pending = Math.max(0, state.pending - 1); return settle(taskMutationPlan.reorder.invalidate); } });
+  const create = useMutation({
+    mutationFn: (input: { projectId: string; title: string; assignee: SidebarTask["assignee"] }) => rpc.call("createSidebarTask", input),
+    onMutate: () => cancel(taskMutationPlan.create.cancel),
+    onSettled: () => settle(taskMutationPlan.create.invalidate),
+  });
+  const remove = useMutation({
+    mutationFn: async (input: { taskId: string }) => {
+      const result = await rpc.call("deleteSidebarTask", input);
+      if (!result.deleted) throw new Error("Task was not found.");
+      return result;
+    },
+    onMutate: () => cancel(taskMutationPlan.delete.cancel),
+    onSettled: () => settle(taskMutationPlan.delete.invalidate),
+  });
+  const attachment = useMutation({
+    mutationFn: ({ taskId, threadId, attached }: { taskId: string; threadId: string; attached: boolean }) => rpc.call(attached ? "attachTaskToThread" : "detachTaskFromThread", { taskId, threadId }),
+    onMutate: ({ attached }) => cancel(attached ? taskMutationPlan.attach.cancel : taskMutationPlan.detach.cancel),
+    onSettled: (_data, _error, { attached }) => settle(attached ? taskMutationPlan.attach.invalidate : taskMutationPlan.detach.invalidate),
+  });
+  const status = useMutation({
+    mutationFn: (input: { taskId: string; status: SidebarTask["status"] }) => rpc.call("updateTaskStatus", input),
+    onMutate: () => cancel(taskMutationPlan.status.cancel),
+    onSettled: () => settle(taskMutationPlan.status.invalidate),
+  });
+  const assignment = useMutation({
+    mutationKey: taskOptimisticMutationKey,
+    mutationFn: (input: { taskId: string; assignee: SidebarTask["assignee"] }) => rpc.call("updateTaskAssignee", input),
+    onMutate: async ({ taskId, assignee }) => {
+      await cancel(taskMutationPlan.assignment.cancel);
+      const previous = snapshot();
+      queryClient.setQueryData<TaskList>(key("list"), (current) => current && {
+        ...current,
+        tasks: current.tasks.map((task) => task.id === taskId ? { ...task, assignee } : task),
+      });
+      return { previous };
+    },
+    onError: (_error, _input, context) => rollback(context?.previous),
+    onSettled: () => settle(taskMutationPlan.assignment.invalidate, true),
+  });
+  const reorder = useMutation({
+    mutationKey: taskOptimisticMutationKey,
+    mutationFn: (input: { taskId: string; beforeTaskId: string | null; afterTaskId: string | null }) => rpc.call("reorderTask", input),
+    onMutate: async ({ taskId, beforeTaskId, afterTaskId }) => {
+      await cancel(taskMutationPlan.reorder.cancel);
+      const previous = snapshot();
+      if (previous) {
+        const targetId = beforeTaskId ?? afterTaskId;
+        if (targetId) queryClient.setQueryData<TaskList>(key("list"), {
+          ...previous,
+          tasks: reorderTaskSiblings(previous.tasks, taskId, targetId, beforeTaskId ? "before" : "after"),
+        });
+      }
+      return { previous };
+    },
+    onError: (_error, _input, context) => rollback(context?.previous),
+    onSettled: () => settle(taskMutationPlan.reorder.invalidate, true),
+  });
   return { create, remove, attachment, status, assignment, reorder };
 }
