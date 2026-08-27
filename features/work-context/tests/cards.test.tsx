@@ -244,6 +244,78 @@ describe("registered Work context cards", () => {
     getPluginQueryClient().clear();
   });
 
+  it("keeps binding-owned tasks out of the generic attached-task presentation", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const boundOutcome = {
+      ...populatedOutcome,
+      executionTasks: [
+        {
+          id: "task_execution",
+          projectId: "project_1",
+          projectName: "Work",
+          key: "WORK-2",
+          title: "Run validation",
+          status: "in_progress" as const,
+          priority: "medium" as const,
+          dueDate: null,
+          parentTaskId: "task_1",
+          position: 2,
+        },
+      ],
+    };
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      {
+        rpc: fixture({
+          sidebarTasks: () => ({
+            ...taskResult,
+            tasks: [
+              {
+                ...populatedOutcome.outcome!,
+                linkedThreadIds: ["thr_one"],
+                assignee: "human",
+              },
+              {
+                ...boundOutcome.executionTasks[0]!,
+                linkedThreadIds: ["thr_one"],
+                assignee: "agent",
+              },
+              {
+                id: "task_linked",
+                projectId: "project_1",
+                projectName: "Work",
+                key: "WORK-3",
+                title: "Unrelated linked task",
+                status: "todo",
+                priority: "none",
+                dueDate: null,
+                parentTaskId: null,
+                position: 3,
+                linkedThreadIds: ["thr_one"],
+                assignee: "human",
+              },
+            ],
+          }),
+          getWorkOutcome: () => boundOutcome,
+        }),
+      },
+    );
+    try {
+      await waitFor(() => expect(slot.getByText("Unrelated linked task")).toBeTruthy());
+      expect(slot.container.querySelector(".ws-section-count")?.textContent).toBe("3");
+      for (const title of ["Ship cards", "Run validation", "Unrelated linked task"])
+        expect(slot.getAllByText(title)).toHaveLength(1);
+      expect(slot.queryByRole("button", { name: "Detach WORK-1 from this thread" })).toBeNull();
+      expect(slot.queryByRole("button", { name: "Detach WORK-2 from this thread" })).toBeNull();
+      expect(slot.getByRole("button", { name: "Detach WORK-3 from this thread" })).toBeTruthy();
+    } finally {
+      slot.lifecycle.unmount();
+      getPluginQueryClient().clear();
+    }
+  });
+
   it("retries only the failed card and uses Query mutation busy/success state", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));

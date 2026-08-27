@@ -378,8 +378,12 @@ function TasksCard({ threadId }: { threadId: string }) {
   const outcome = useWorkOutcome(threadId);
   const mutations = useTasksMutations(rpc);
   const [selection, setSelection] = useState("");
+  const bindingOwnedTaskIds = new Set([
+    ...(outcome.data?.outcome ? [outcome.data.outcome.id] : []),
+    ...(outcome.data?.executionTasks.map((task) => task.id) ?? []),
+  ]);
   const attached = (tasks.data?.tasks ?? []).filter((task) =>
-    task.linkedThreadIds.includes(threadId),
+    task.linkedThreadIds.includes(threadId) && !bindingOwnedTaskIds.has(task.id),
   );
   const available = (tasks.data?.tasks ?? []).filter(
     (task) => !task.linkedThreadIds.includes(threadId),
@@ -398,7 +402,7 @@ function TasksCard({ threadId }: { threadId: string }) {
     >
       <div className="ws-thread-task-card">
         <p className="ws-section-count">
-          {attached.length + (outcome.data?.executionTasks.length ?? 0)}
+          {attached.length + bindingOwnedTaskIds.size}
         </p>
         {attached.length ? (
           <div className="ws-work-card-list">
