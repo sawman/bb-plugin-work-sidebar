@@ -10,5 +10,6 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["*.ts", "*.tsx"]
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["tests/fixtures/**/*.ts"]
 }

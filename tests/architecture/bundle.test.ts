@@ -1,0 +1,23 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+
+const repositoryRoot = resolve(fileURLToPath(import.meta.url), "../../..");
+
+describe("R1 app bundle ownership", () => {
+  it("externalizes BB-owned React/SDK app runtime and bundles Query/Zustand", () => {
+    const bundlePath = resolve(repositoryRoot, "dist/app.js");
+    expect(existsSync(bundlePath), "run npm run build before bundle inspection").toBe(true);
+    const bundle = readFileSync(bundlePath, "utf8");
+
+    expect(bundle).toContain("react/jsx-runtime");
+    expect(bundle).toContain("@get-bb/plugin-sdk/app");
+    expect(bundle).not.toMatch(/react(?:\.production|\.development)?\.min?\.js/);
+    expect(bundle).not.toContain("REACT_ELEMENT_TYPE");
+    expect(bundle).not.toContain("ReactCurrentDispatcher");
+    expect(bundle).not.toContain("react-dom/client");
+    expect(bundle).toMatch(/QueryClient|QueryObserver/);
+    expect(bundle).toMatch(/zustand|createStore|subscribeWithSelector/);
+  });
+});
