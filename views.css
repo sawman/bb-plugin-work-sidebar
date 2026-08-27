@@ -1335,19 +1335,12 @@
 .ws-task-link small {
   flex: none;
 }
-.ws-thread-pr-open {
-  color: #22c55e;
-}
-.ws-thread-pr-draft {
-  color: var(--muted-foreground);
-}
-.ws-thread-pr-problem,
-.ws-thread-pr-closed {
-  color: var(--destructive);
-}
-.ws-thread-pr-merged {
-  color: #a855f7;
-}
+.ws-thread-pr-token[data-tone="open"],
+.ws-thread-pr-token[data-tone="success"] { color: var(--success); }
+.ws-thread-pr-token[data-tone="draft"] { color: var(--muted-foreground); }
+.ws-thread-pr-token[data-tone="destructive"],
+.ws-thread-pr-token[data-tone="closed"] { color: var(--destructive); }
+.ws-thread-pr-token[data-tone="merged"] { color: var(--primary); }
 .ws-thread-agent-count svg {
   transform: translateY(0.35px);
 }

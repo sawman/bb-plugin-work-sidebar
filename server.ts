@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { normalizePullRequestSignal } from "./features/pull-requests/presentation.js";
+import { isVisibleAuthoredPullRequest } from "./features/pull-requests/presentation.js";
 import { rpcContract } from "./contracts.js";
 import { sanitizeThreadOrder, type SidebarStack } from "./work-model.js";
 import { createServerLifecycle, type GitHubApiHealth, type ServerLifecycle } from "./server-lifecycle.js";
@@ -1372,7 +1373,7 @@ export default async function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle
     const stdout = await runCachedGitHubRead(["search", "prs", "--author", "@me", "--state", "open", "--limit", "1000", "--json", "number,title,url,repository,state,isDraft"], 12_000_000, GITHUB_SEARCH_CACHE_MS);
     const search = parseAuthoredPullRequestSearch(JSON.parse(stdout));
     const archivedRepositories = await archivedGitHubRepositories(search.flatMap((item) => item.repository.nameWithOwner ? [item.repository.nameWithOwner] : []));
-    const activeSearch = search.filter((item) => Boolean(item.repository.nameWithOwner) && !archivedRepositories.has(item.repository.nameWithOwner!));
+    const activeSearch = search.filter((item) => isVisibleAuthoredPullRequest({ repository: item.repository.nameWithOwner ?? "", archivedRepositories }));
     const signals = await authoredPullRequestSignals(activeSearch);
     const result: AuthoredPullRequestEntry[] = activeSearch.map((item) => {
       const repository = item.repository.nameWithOwner!;

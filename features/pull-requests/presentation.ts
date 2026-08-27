@@ -1,4 +1,4 @@
-import type { IconName } from "../../components/ui/icon";
+import type { StatusPresentation } from "../../components/ui/status";
 
 export type PullRequestCheckState = "failed" | "passing" | "pending" | "none" | "unknown";
 export type PullRequestReviewState = "approved" | "changes_requested" | "changes_requested_review_requested" | "review_requested" | "review_required" | "none";
@@ -11,19 +11,22 @@ export type PullRequestSignal = {
   reviewCommentCount: number;
 };
 
-export type StatusPresentation = {
-  icon: IconName;
-  label: string;
-  tone: StatusTone;
-  overlayIcon?: IconName;
-  count?: number;
-};
+export type { StatusPresentation } from "../../components/ui/status";
 
-export function pullRequestPresentation(input: { state: PullRequestState; draft: boolean; mergedLayer?: boolean; archivedRepository?: boolean }): StatusPresentation {
+export function pullRequestPresentation(input: { state: PullRequestState; draft: boolean; attention?: string; mergedLayer?: boolean }): StatusPresentation {
   if (input.mergedLayer || input.state === "merged") return { icon: "GitMerge", label: "Merged", tone: "merged" };
   if (input.state === "closed") return { icon: "X", label: "Closed", tone: "closed" };
   if (input.draft || input.state === "draft") return { icon: "GitPullRequest", label: "Draft", tone: "draft" };
+  if (input.attention === "ready_to_merge") return { icon: "Check", label: "Ready to merge", tone: "success" };
+  if (input.attention === "blocked") return { icon: "X", label: "Blocked", tone: "destructive" };
+  if (input.attention === "conflicts") return { icon: "X", label: "Conflicts", tone: "destructive" };
+  if (input.attention === "checks_failed") return { icon: "X", label: "Checks failed", tone: "destructive" };
+  if (input.attention === "changes_requested") return { icon: "X", label: "Changes requested", tone: "destructive" };
   return { icon: "GitPullRequest", label: "Open", tone: "open" };
+}
+
+export function isVisibleAuthoredPullRequest(input: { repository: string; archivedRepositories: ReadonlySet<string> }): boolean {
+  return input.repository.length > 0 && !input.archivedRepositories.has(input.repository);
 }
 
 export function pullRequestSignalPresentation(signal: PullRequestSignal): { checks: StatusPresentation; review: StatusPresentation } {

@@ -63,7 +63,7 @@ import {
   type SidebarStack,
 } from "./work-model";
 import { Icon } from "@/components/ui/icon";
-import { githubHealthPresentation } from "@/features/pull-requests/presentation";
+import { githubHealthPresentation, pullRequestPresentation } from "@/features/pull-requests/presentation";
 import "./app.css";
 import "./scrollbar.css";
 import "./views.css";
@@ -92,13 +92,6 @@ function indicatorGlyph(value: string): string {
 function threadIsWorking(thread: PluginSidebarThread): boolean {
   const indicator = normalizeIndicator(String(thread.indicator));
   return indicator === "runtime" || indicator === "workflow" || indicator === "background-agent" || indicator === "background-command" || indicator === "goal" || indicator === "plan-mode" || indicator === "working-draft";
-}
-
-function threadPullRequestTone(pullRequest: { state: string; attention: string }): "open" | "draft" | "problem" | "merged" | "closed" {
-  if (pullRequest.state === "closed") return "closed";
-  if (pullRequest.state === "merged") return "merged";
-  if (pullRequest.state === "draft") return "draft";
-  return pullRequest.attention === "changes_requested" || pullRequest.attention === "checks_failed" || pullRequest.attention === "conflicts" ? "problem" : "open";
 }
 
 function visibleThreadTreeIds(roots: readonly PluginSidebarThread[], childrenByThread: ReadonlyMap<string, readonly PluginSidebarThread[]>): string[] {
@@ -177,7 +170,7 @@ function ThreadRow({
   // Match the native row's precedence: running work wins; otherwise an
   // unsent draft owns the one trailing status slot.
   const hasComposerDraft = composerView.scope.kind === "thread" && composerView.scope.threadId === thread.id && !composerView.draft.isEmpty;
-  const pullRequestTone = pullRequest ? threadPullRequestTone(pullRequest) : null;
+  const pullRequestStatus = pullRequest ? pullRequestPresentation({ state: pullRequest.state, draft: pullRequest.state === "draft", attention: pullRequest.attention }) : null;
 
   const open = (split = false) => {
     actions.open(thread.id, { split });
@@ -315,7 +308,7 @@ function ThreadRow({
               <span className="ws-thread-main">
                 <span className={`ws-thread-title ${thread.isUnread ? "ws-unread" : ""}`}>{title}</span>
                 <span className="ws-thread-meta">
-                  {pullRequest && <span className={`ws-pr-meta ws-thread-token ws-thread-pr-token ws-thread-pr-${pullRequestTone}`} title={`PR #${pullRequest.number} · ${pullRequest.attention === "ready_to_merge" ? "Ready to merge" : pullRequest.state}`}><Icon name={pullRequestTone === "closed" ? "X" : pullRequest.attention === "ready_to_merge" ? "Check" : "GitPullRequest"} aria-hidden /><span>#{pullRequest.number}</span></span>}
+                  {pullRequest && pullRequestStatus && <span className="ws-pr-meta ws-thread-token ws-thread-pr-token" data-tone={pullRequestStatus.tone} title={`PR #${pullRequest.number} · ${pullRequestStatus.label}`}><Icon name={pullRequestStatus.icon} aria-hidden /><span>#{pullRequest.number}</span></span>}
                   <span className="ws-thread-worktree" title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${thread.environment?.branchName || (project?.isPersonal ? "Personal" : projectLabel)}`}><Icon name={project?.isPersonal ? "Laptop" : "FolderGit"} aria-hidden /><span>{thread.environment?.branchName || (project?.isPersonal ? "Personal" : projectLabel)}</span></span>
                   {orderTaskLinksByRelevance(taskLinks ?? []).map((taskLink) => <span className="ws-task-link" key={`${taskLink.task.id}:${taskLink.role}`} title={`${taskLink.task.title} · ${taskLink.task.key}`}><Icon name="ListTodo" aria-hidden /><small className="ws-task-key">{taskLink.task.key}</small></span>)}
                   {pullRequestLoading && <span className="ws-pr-meta" aria-label="Pull request loading">PR loading…</span>}

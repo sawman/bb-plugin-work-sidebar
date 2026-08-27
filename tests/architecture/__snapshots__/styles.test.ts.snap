@@ -12,8 +12,6 @@ exports[`stylesheet architecture baseline > every plugin stylesheet parses, stay
   "views.css: .ws-pr-stack-layer-item: undocumented !important",
   "views.css: .ws-pr-stack-layer-item > .ws-pr-row: undocumented !important",
   "views.css: .ws-pr-stack-layer-item::before: undocumented !important",
-  "views.css: .ws-thread-pr-open: hardcoded palette #22c55e",
-  "views.css: .ws-thread-pr-merged: hardcoded palette #a855f7",
   "views.css: .ws-focus-state-active, .ws-focus-state-starting: hardcoded palette #22c55e",
   "views.css: .ws-linear-issue b: hardcoded palette #8b5cf6",
   "views.css: .ws-priority-medium: hardcoded palette #eab308",

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
+import { createElement } from "react";
+import { Status } from "../../../components/ui/status";
 import {
   githubHealthPresentation,
+  isVisibleAuthoredPullRequest,
   pullRequestPresentation,
   pullRequestSignalPresentation,
 } from "../presentation";
@@ -39,11 +43,29 @@ describe("pull-request presentation semantics", () => {
   it("keeps comment counts, merged layers, archived repositories, and GitHub health semantic", () => {
     expect(pullRequestSignalPresentation({ checks: "passing", review: "approved", reviewCommentCount: 2 }).review.count).toBe(2);
     expect(pullRequestPresentation({ state: "closed", draft: false, mergedLayer: true })).toEqual({ icon: "GitMerge", label: "Merged", tone: "merged" });
-    expect(pullRequestPresentation({ state: "open", draft: false, archivedRepository: true })).toEqual({ icon: "GitPullRequest", label: "Open", tone: "open" });
     expect(githubHealthPresentation({ state: "available", scope: "unknown", message: null, retryAt: null })).toBeNull();
     expect(githubHealthPresentation({ state: "rate_limited", scope: "graphql", message: "limited", retryAt: 1_000 }))
       .toEqual({ icon: "AlertCircle", label: "GraphQL limited", tone: "warning" });
     expect(githubHealthPresentation({ state: "unavailable", scope: "rest", message: "offline", retryAt: null }))
       .toEqual({ icon: "AlertCircle", label: "GitHub unavailable", tone: "destructive" });
+  });
+
+  it.each([
+    ["ready_to_merge", { icon: "Check", label: "Ready to merge", tone: "success" }],
+    ["checks_failed", { icon: "X", label: "Checks failed", tone: "destructive" }],
+    ["conflicts", { icon: "X", label: "Conflicts", tone: "destructive" }],
+    ["changes_requested", { icon: "X", label: "Changes requested", tone: "destructive" }],
+    ["blocked", { icon: "X", label: "Blocked", tone: "destructive" }],
+  ] as const)("preserves open attention %s after state precedence", (attention, expected) => {
+    expect(pullRequestPresentation({ state: "open", draft: false, attention })).toEqual(expected);
+    expect(pullRequestPresentation({ state: "merged", draft: false, attention })).toEqual({ icon: "GitMerge", label: "Merged", tone: "merged" });
+  });
+
+  it("excludes archived repositories and exposes review counts to assistive technology", () => {
+    expect(isVisibleAuthoredPullRequest({ repository: "owner/archived", archivedRepositories: new Set(["owner/archived"]) })).toBe(false);
+    expect(isVisibleAuthoredPullRequest({ repository: "owner/active", archivedRepositories: new Set(["owner/archived"]) })).toBe(true);
+    const markup = renderToStaticMarkup(createElement(Status, { presentation: { icon: "Eye", label: "Review requested", tone: "warning", count: 1 } }));
+    expect(markup).toContain('data-tone="warning"');
+    expect(markup).toContain('aria-label="Review requested, 1 review comment"');
   });
 });
