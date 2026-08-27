@@ -76,6 +76,7 @@ describe("Tasks read slots", () => {
 
     const populated = renderSlot(captured.threadPanelActions[0]!, { threadId: "thr_test", params: null }, { rpc: rpcFixtures(() => populatedTasks) });
     await waitFor(() => expect(populated.getByText("Ship mounted fixtures")).toBeTruthy());
+    expect(populated.container.querySelector(".ws-thread-task-card > .ws-work-card-list > .ws-work-card-row")).toBeTruthy();
     populated.lifecycle.unmount();
     getPluginQueryClient().clear();
 
