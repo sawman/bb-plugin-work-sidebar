@@ -7,7 +7,6 @@ import {
   pullRequestKeys,
   pullRequestPolicies,
   useAuthoredPullRequests,
-  useAuthoredPullRequestRefresh,
   useSetAuthoredPullRequestDraft,
   useThreadPullRequestChanges,
   useGitHubApiHealth,
@@ -79,15 +78,40 @@ describe("R5 pull-request queries", () => {
     expect(pullRequestPolicies.authored.refetchInterval({ intervalMs: 7_000 })).toBe(7_000);
 
     version = "forced";
-    const refresh = renderHook(() => useAuthoredPullRequestRefresh(rpc), { wrapper: wrapper(client) });
-    await act(async () => { await refresh.result.current(); });
+    await act(async () => { await left.result.current.refresh(); });
     await waitFor(() => expect(reads).toBe(2));
     expect(rpc.call).toHaveBeenCalledWith("sidebarAuthoredPullRequests", { force: true });
     await waitFor(() => expect(left.result.current.data?.[0]?.title).toBe("forced stack"));
     left.unmount();
     right.unmount();
-    refresh.unmount();
     client.clear();
+  });
+
+  it("revalidates base and stack enrichment at the configured interval", async () => {
+    vi.useFakeTimers();
+    let revision = "first";
+    const rpc = {
+      call: vi.fn(async (method: string) => {
+        if (method === "sidebarAuthoredPullRequests") return { available: true, pullRequests: [{ ...authored[0]!, title: `${revision} base` }], error: null };
+        if (method === "sidebarAuthoredPullRequestStacks") return { available: true, pullRequests: [{ ...authored[0]!, title: `${revision} stack` }], error: null };
+        throw new Error(`unexpected ${method}`);
+      }),
+    } as unknown as PullRequestRpc;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderHook(() => useAuthoredPullRequests(rpc, { intervalMs: 1_000 }), { wrapper: wrapper(client) });
+    await act(async () => { await vi.advanceTimersByTimeAsync(10); await Promise.resolve(); await Promise.resolve(); });
+    expect(view.result.current.data?.[0]?.title).toBe("first stack");
+    revision = "second";
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); await Promise.resolve(); });
+    expect(view.result.current.data?.[0]?.title).toBe("second stack");
+    revision = "third";
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); await Promise.resolve(); });
+    expect(view.result.current.data?.[0]?.title).toBe("third stack");
+    expect(pullRequestPolicies.authored).toMatchObject({ staleTime: 60_000, gcTime: 15 * 60_000, retry: false });
+    expect(pullRequestPolicies.authoredStacks).toMatchObject({ staleTime: 60_000, gcTime: 15 * 60_000, retry: false });
+    view.unmount();
+    client.clear();
+    await act(async () => { await vi.runAllTimersAsync(); });
   });
 
   it("cancels stale stack enrichment before a manual forced rebuild", async () => {
@@ -110,10 +134,9 @@ describe("R5 pull-request queries", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = renderHook(() => ({
       list: useAuthoredPullRequests(rpc),
-      refresh: useAuthoredPullRequestRefresh(rpc),
     }), { wrapper: wrapper(client) });
     await waitFor(() => expect(view.result.current.list.data?.[0]?.title).toBe("old base"));
-    await act(async () => { await view.result.current.refresh(); });
+    await act(async () => { await view.result.current.list.refresh(); });
     await waitFor(() => expect(view.result.current.list.data?.[0]?.title).toBe("new stack"));
     oldStack.resolve({ available: true, pullRequests: [{ ...authored[0]!, title: "old stack" }], error: null });
     await act(async () => { await Promise.resolve(); });
@@ -160,29 +183,65 @@ describe("R5 pull-request queries", () => {
     else delete (document as { visibilityState?: string }).visibilityState;
   });
 
-  it("polls shared GitHub health every 30 seconds and releases its timer after unmount", async () => {
+  it("gives the stable left surface the only Query-owned visible health interval", async () => {
     vi.useFakeTimers();
     expect(vi.getTimerCount()).toBe(0);
+    const previousVisibility = Object.getOwnPropertyDescriptor(document, "visibilityState");
     Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
     const rpc = { call: vi.fn(async (method: string) => {
       if (method === "getGitHubApiHealth") return { state: "available", scope: "unknown", message: null, retryAt: null };
       throw new Error(`unexpected ${method}`);
     }) } as unknown as PullRequestRpc;
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const setInterval = vi.spyOn(globalThis, "setInterval");
-    const clearInterval = vi.spyOn(globalThis, "clearInterval");
-    const left = renderHook(() => useGitHubApiHealth(rpc), { wrapper: wrapper(client) });
-    const right = renderHook(() => useGitHubApiHealth(rpc), { wrapper: wrapper(client) });
+    const left = renderHook(() => useGitHubApiHealth(rpc, { poll: true }), { wrapper: wrapper(client) });
+    const right = renderHook(() => useGitHubApiHealth(rpc, { poll: false }), { wrapper: wrapper(client) });
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(rpc.call).toHaveBeenCalledTimes(1);
-    expect(setInterval).toHaveBeenCalledTimes(1);
+    expect(pullRequestPolicies.health).toMatchObject({ staleTime: 15_000, gcTime: 2 * 60_000, retry: false, refetchInterval: 30_000 });
     await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
     expect(rpc.call).toHaveBeenCalledTimes(2);
-    await act(async () => { left.unmount(); right.unmount(); await Promise.resolve(); });
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(rpc.call).toHaveBeenCalledTimes(2);
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(rpc.call).toHaveBeenCalledTimes(3);
+    left.unmount();
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(rpc.call).toHaveBeenCalledTimes(3);
+    await act(async () => { right.unmount(); await Promise.resolve(); });
     client.clear();
     await act(async () => { await vi.runAllTimersAsync(); });
-    expect(clearInterval).toHaveBeenCalledTimes(1);
     expect(vi.getTimerCount()).toBe(0);
+    if (previousVisibility) Object.defineProperty(document, "visibilityState", previousVisibility);
+    else delete (document as { visibilityState?: string }).visibilityState;
+  });
+
+  it("records a forced authored refresh failure in the base query and recovers on retry", async () => {
+    let failForce = true;
+    const rpc = {
+      call: vi.fn(async (method: string, input: unknown) => {
+        if (method === "sidebarAuthoredPullRequests") {
+          if ((input as { force?: boolean }).force && failForce) throw new Error("forced GitHub failure");
+          return { available: true, pullRequests: authored, error: null };
+        }
+        if (method === "sidebarAuthoredPullRequestStacks") return { available: true, pullRequests: authored, error: null };
+        throw new Error(`unexpected ${method}`);
+      }),
+    } as unknown as PullRequestRpc;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderHook(() => useAuthoredPullRequests(rpc), { wrapper: wrapper(client) });
+    await waitFor(() => expect(view.result.current.data).toEqual(authored));
+    await expect(view.result.current.refresh()).rejects.toThrow("forced GitHub failure");
+    await waitFor(() => expect(view.result.current.isError).toBe(true));
+    expect(rpc.call).toHaveBeenCalledWith("sidebarAuthoredPullRequests", { force: true });
+    failForce = false;
+    await act(async () => { await view.result.current.refresh(); });
+    await waitFor(() => expect(view.result.current.isSuccess).toBe(true));
+    view.unmount();
+    client.clear();
   });
 
   it("exposes draft mutation busy/error state and invalidates only the authored PR family after settlement", async () => {
