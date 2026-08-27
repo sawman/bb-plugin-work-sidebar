@@ -2,6 +2,7 @@ import { z } from "zod";
 import { authoredPullRequest, pullRequest, pullRequestSignal, sidebarStack, sidebarStackLayer } from "./features/pull-requests/schemas.js";
 import { sidebarTaskProjectSchema, sidebarTaskSchema, taskLinkSchema, taskPrioritySchema, taskStatusSchema, taskSummarySchema } from "./features/tasks/schemas.js";
 import { threadArchiveSchemas, threadPreferenceSchemas } from "./features/threads/schemas.js";
+import { trackerRpcSchemas } from "./features/tracker/schemas.js";
 
 const taskStatus = taskStatusSchema;
 const taskPriority = taskPrioritySchema;
@@ -47,7 +48,6 @@ const workChanges = z.object({
   repository: z.object({ outcome: z.enum(["available", "not_applicable", "unavailable", "absent"]), message: z.string().nullable(), branch: z.string().nullable(), base: z.string().nullable(), ahead: z.number(), behind: z.number(), worktreeState: z.string().nullable(), hasUncommittedChanges: z.boolean(), changedFileCount: z.number().int().nonnegative(), changedInsertions: z.number().int().nonnegative(), changedDeletions: z.number().int().nonnegative(), changedFiles: z.array(z.object({ path: z.string(), status: z.string(), insertions: z.number().nullable(), deletions: z.number().nullable() })) }),
 });
 const threadPullRequestChanges = workChanges.pick({ currentPullRequest: true, stack: true, stackUnavailableReason: true, githubStack: true });
-const workTracker = z.object({ visible: z.boolean(), available: z.boolean(), message: z.string().nullable(), suggestions: z.array(z.object({ key: z.string(), title: z.string(), url: z.string().url() })), item: z.object({ key: z.string(), title: z.string(), url: z.string().url(), status: z.string(), stateCategory: z.enum(["backlog", "todo", "in_progress", "done", "canceled"]), priority: z.string().nullable(), assignee: z.string().nullable(), project: z.string().nullable() }).nullable(), statusOptions: z.array(z.object({ id: z.string(), name: z.string(), current: z.boolean() })) });
 const workProviderStatus = z.object({
   tone: z.enum(["green", "amber", "red"]),
   providerId: z.string(),
@@ -179,18 +179,6 @@ export const rpcSchemas = {
         changedDeletions: z.number().int().nonnegative(),
         changedFiles: z.array(z.object({ path: z.string(), status: z.string(), insertions: z.number().nullable(), deletions: z.number().nullable() })),
       }),
-      tracker: z.object({
-        visible: z.boolean(),
-        available: z.boolean(),
-        message: z.string().nullable(),
-        suggestions: z.array(z.object({ key: z.string(), title: z.string(), url: z.string().url() })),
-        item: z.object({
-          key: z.string(), title: z.string(), url: z.string().url(), status: z.string(),
-          stateCategory: z.enum(["backlog", "todo", "in_progress", "done", "canceled"]),
-          priority: z.string().nullable(), assignee: z.string().nullable(), project: z.string().nullable(),
-        }).nullable(),
-        statusOptions: z.array(z.object({ id: z.string(), name: z.string(), current: z.boolean() })),
-      }),
     }),
   },
   getWorkStatus: { input: workCardInput, output: workStatus },
@@ -201,20 +189,12 @@ export const rpcSchemas = {
   getThreadPullRequestChanges: { input: z.object({ threadId: z.string().startsWith("thr_") }).strict(), output: threadPullRequestChanges },
   getPullRequestFingerprint: { input: z.object({ url: z.string().url() }).strict(), output: z.object({ fingerprint: z.string().nullable() }) },
   getGitHubPollingPolicy: { input: z.null(), output: z.object({ activePollMs: z.number().int().positive(), backgroundPollMs: z.number().int().positive(), maxRestPollsPerMinute: z.number().int().positive() }) },
-  getWorkTracker: { input: z.object({ threadId: z.string() }).strict(), output: workTracker },
+  ...trackerRpcSchemas,
   getWorkProviderStatus: { input: z.object({ threadId: z.string() }).strict(), output: workProviderStatus },
   getGitHubApiHealth: { input: z.null(), output: z.object({ state: z.enum(["available", "rate_limited", "unavailable"]), scope: z.enum(["graphql", "rest", "unknown"]), message: z.string().nullable(), retryAt: z.number().nullable() }) },
   checkoutStackBranch: {
     input: z.object({ threadId: z.string().startsWith("thr_"), branch: z.string().min(1).max(255) }).strict(),
     output: z.object({ ok: z.boolean(), message: z.string(), tone: z.enum(["success", "warning", "error"]).optional(), detail: z.string().nullable() }),
-  },
-  linkLinearIssue: {
-    input: z.object({ threadId: z.string().startsWith("thr_"), key: z.string().trim().min(2).max(64) }).strict(),
-    output: z.object({ key: z.string(), title: z.string() }),
-  },
-  searchLinearIssues: {
-    input: z.object({ threadId: z.string().startsWith("thr_"), query: z.string().trim().max(160) }).strict(),
-    output: z.object({ items: z.array(z.object({ key: z.string(), title: z.string(), url: z.string().url() })) }),
   },
   getLatestActivity: {
     input: z.object({ threadId: z.string().startsWith("thr_") }).strict(),
@@ -231,14 +211,6 @@ export const rpcSchemas = {
   getWorkingTreeFileDiff: {
     input: z.object({ threadId: z.string().startsWith("thr_"), path: z.string().min(1) }).strict(),
     output: z.object({ available: z.boolean(), patch: z.string().nullable(), message: z.string().nullable() }).strict(),
-  },
-  unlinkLinearIssue: {
-    input: z.object({ threadId: z.string().startsWith("thr_") }).strict(),
-    output: z.object({ ok: z.literal(true) }).strict(),
-  },
-  updateLinearIssueStatus: {
-    input: z.object({ threadId: z.string().startsWith("thr_"), statusId: z.string().min(1) }).strict(),
-    output: z.object({ key: z.string(), status: z.string() }),
   },
   createWorkTask: {
     input: z.object({
