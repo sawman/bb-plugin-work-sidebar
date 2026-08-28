@@ -6,6 +6,7 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { threadTitle } from "@/work-model";
+import { threadNeedsAttention } from "./thread-attention";
 import { ThreadRowMenu } from "./thread-row-menu";
 import { ThreadMetadata, ThreadStatus } from "./thread-row-presentation";
 import { ThreadProviderLogo } from "./thread-provider-logo";
@@ -185,7 +186,7 @@ export function ThreadRow({
             </span>
             <span className="ws-thread-main">
               <span
-                className={`ws-thread-title ${thread.isUnread ? "ws-unread" : ""}`}
+                className={`ws-thread-title ${threadNeedsAttention(thread) ? "ws-thread-attention" : ""}`}
               >
                 <ThreadProviderLogo
                   providerId={thread.providerId}

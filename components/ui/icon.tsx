@@ -16,6 +16,12 @@ const paths: Record<string, React.ReactNode> = {
   ),
   Check: <path d="m5 12 4 4L19 6" />,
   Circle: <circle cx="12" cy="12" r="8" />,
+  Clock: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
   Columns2: (
     <>
       <rect x="3" y="4" width="18" height="16" rx="2" />

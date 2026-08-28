@@ -6,37 +6,18 @@ import type {
 import { Icon } from "@/components/ui/icon";
 import { normalizeIndicator } from "@/work-model";
 import { pullRequestPresentation } from "@/features/pull-requests/presentation";
+import { threadIsWorking, useStaleWorking } from "./thread-attention";
 import type { ThreadProject } from "./thread-row-types";
 
 function indicatorGlyph(value: string): string {
   switch (normalizeIndicator(value)) {
-    case "runtime":
-    case "workflow":
-    case "background-agent":
-    case "background-command":
-      return "●";
     case "unread-error":
       return "!";
-    case "unread-success":
-      return "•";
     case "waiting-for-input":
       return "?";
     default:
       return "";
   }
-}
-
-export function threadIsWorking(thread: PluginSidebarThread): boolean {
-  const indicator = normalizeIndicator(String(thread.indicator));
-  return (
-    indicator === "runtime" ||
-    indicator === "workflow" ||
-    indicator === "background-agent" ||
-    indicator === "background-command" ||
-    indicator === "goal" ||
-    indicator === "plan-mode" ||
-    indicator === "working-draft"
-  );
 }
 
 export function ThreadMetadata({
@@ -102,6 +83,11 @@ export function ThreadStatus({
 }) {
   const indicator = normalizeIndicator(String(thread.indicator));
   const working = threadIsWorking(thread);
+  const staleWorking = useStaleWorking(thread);
+  const glyph = indicatorGlyph(String(thread.indicator));
+  const statusLabel = staleWorking
+    ? `${thread.indicatorLabel ?? "Thread is working"}; no agent update for 30 minutes`
+    : thread.indicatorLabel;
   return (
     <span className="ws-thread-trailing">
       {hasComposerDraft && (
@@ -111,26 +97,37 @@ export function ThreadStatus({
           aria-label="Unsent draft"
         />
       )}
-      <span
-        className={`ws-status ws-status-${indicator} ${working ? "ws-status-working" : ""}`}
-        role={thread.indicatorLabel ? "img" : undefined}
-        aria-label={thread.indicatorLabel ?? undefined}
-      >
-        {working ? (
-          <span className="ws-status-dots" aria-hidden>
-            <i />
-            <i />
-            <i />
-          </span>
-        ) : (
-          indicatorGlyph(String(thread.indicator))
-        )}
-      </span>
+      {(working || glyph) && (
+        <span
+          className={`ws-status ws-status-${indicator} ${working ? "ws-status-working" : ""}`}
+          role={statusLabel ? "img" : undefined}
+          aria-label={statusLabel ?? undefined}
+        >
+          {working ? (
+            <>
+              <span className="ws-status-dots" aria-hidden>
+                <i />
+                <i />
+                <i />
+              </span>
+              {staleWorking && (
+                <Icon
+                  name="Clock"
+                  className="ws-status-stale-clock"
+                  aria-hidden
+                />
+              )}
+            </>
+          ) : (
+            glyph
+          )}
+        </span>
+      )}
+      {indicator === "unread-success" && thread.indicatorLabel && (
+        <span className="ws-sr-only">{thread.indicatorLabel}</span>
+      )}
       {thread.isPinned && (
         <Icon name="Pin" className="ws-thread-pin" aria-label="Pinned" />
-      )}
-      {thread.isUnread && !working && indicator !== "unread-success" && (
-        <span className="ws-unread-dot" title="Unread" />
       )}
     </span>
   );

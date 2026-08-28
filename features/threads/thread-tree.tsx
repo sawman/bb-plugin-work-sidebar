@@ -1,7 +1,7 @@
 import { useStore } from "zustand";
 import { threadInteractionStore } from "./store";
 import { ThreadRow } from "./thread-row";
-import { threadIsWorking } from "./thread-row-presentation";
+import { threadIsWorking } from "./thread-attention";
 import type { WorkThreadTreeProps } from "./thread-row-types";
 
 export function WorkThreadTree({

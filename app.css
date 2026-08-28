@@ -64,7 +64,7 @@
   white-space: nowrap;
   font-size: 0.8rem;
 }
-.ws-unread {
+.ws-thread-attention {
   font-weight: 700;
 }
 .ws-thread-meta {
@@ -80,12 +80,6 @@
 }
 .ws-pr-changes_requested {
   color: var(--destructive);
-}
-.ws-unread-dot {
-  width: 0.38rem;
-  height: 0.38rem;
-  border-radius: 50%;
-  background: var(--primary);
 }
 .ws-rename {
   padding: 0.35rem;

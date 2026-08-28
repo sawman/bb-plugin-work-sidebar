@@ -69,11 +69,14 @@ function renderRow({
   onSelect = () => false,
   groupId = "later",
   groups = [{ id: "later", name: "Later", threadIds: [] }],
+  threadOverrides = {},
 }: {
   onSelect?: ThreadRowProps["onSelect"];
   groupId?: string | null;
   groups?: { id: string; name: string; threadIds: string[] }[];
+  threadOverrides?: Partial<PluginSidebarThread>;
 } = {}) {
+  const renderedThread = { ...thread, ...threadOverrides };
   const props = {
     onSelect: vi.fn(onSelect),
     onToggleChildren: vi.fn(),
@@ -114,7 +117,7 @@ function renderRow({
   const view = render(
     <QueryClientProvider client={client}>
       <ThreadRow
-        thread={thread}
+        thread={renderedThread}
         active={false}
         children={1}
         activeChildren={1}
@@ -151,6 +154,39 @@ afterEach(() => {
 });
 
 describe("R21D ThreadRow characterization", () => {
+  it("bolds only attention states instead of generic unread updates", () => {
+    const genericUnread = renderRow({
+      threadOverrides: {
+        indicator: "none",
+        indicatorLabel: null,
+        isUnread: true,
+      },
+    });
+    expect(
+      genericUnread.container.querySelector(".ws-thread-title")?.classList,
+    ).not.toContain("ws-thread-attention");
+    genericUnread.unmount();
+
+    for (const indicator of [
+      "waiting-for-input",
+      "unread-error",
+      "unread-success",
+    ] as const) {
+      const actionable = renderRow({
+        threadOverrides: {
+          indicator,
+          indicatorLabel: indicator,
+          isUnread: true,
+        },
+      });
+      expect(
+        actionable.container.querySelector(".ws-thread-title")?.classList,
+      ).toContain("ws-thread-attention");
+      expect(actionable.container.textContent).not.toContain("•");
+      actionable.unmount();
+    }
+  });
+
   it("keeps status and PR metadata without duplicating task mappings", async () => {
     host.pullRequest = {
       number: 42,

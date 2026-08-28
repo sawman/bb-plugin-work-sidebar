@@ -883,6 +883,7 @@
   margin-top: 0.3rem;
 }
 .ws-status-working {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -906,6 +907,15 @@
 }
 .ws-status-dots i:nth-child(3) {
   animation-delay: 0.28s;
+}
+.ws-status-stale-clock {
+  position: absolute;
+  top: -0.48rem;
+  right: -0.36rem;
+  width: 0.52rem;
+  height: 0.52rem;
+  color: var(--foreground);
+  stroke-width: 2.2;
 }
 @keyframes ws-thread-pulse {
   0%,
