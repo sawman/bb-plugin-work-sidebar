@@ -7,6 +7,7 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M12 8v4m0 4h.01" />
     </>
   ),
+  ArrowLeft: <path d="M19 12H5m5-5-5 5 5 5" />,
   ArrowRight: <path d="M5 12h14m-5-5 5 5-5 5" />,
   Bot: (
     <>

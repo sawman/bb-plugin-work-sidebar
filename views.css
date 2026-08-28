@@ -1689,21 +1689,45 @@
 .ws-outcome-heading-meta {
   gap: 0.28rem;
 }
-.ws-outcome-status {
+.ws-outcome-status-controls {
+  display: grid;
+  grid-template-columns: 1.55rem minmax(0, 1fr) 1.55rem;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.18rem;
+}
+.ws-outcome-status-step {
   display: grid;
   place-items: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  flex: none;
-  border: 0;
+  width: 1.55rem;
+  height: 1.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0.28rem;
   padding: 0;
   background: transparent;
   color: var(--muted-foreground);
-}
-button.ws-outcome-status {
   cursor: pointer;
 }
-.ws-outcome-status svg {
+.ws-outcome-status-step:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--foreground);
+}
+.ws-outcome-status-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.ws-outcome-status-current {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  gap: 0.25rem;
+  color: var(--muted-foreground);
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+.ws-outcome-status-step svg,
+.ws-outcome-status-current svg {
   width: 0.68rem;
   height: 0.68rem;
 }
@@ -1717,7 +1741,7 @@ button.ws-outcome-status {
 .ws-outcome-status-canceled {
   color: var(--destructive);
 }
-.ws-outcome-status-in_progress svg,
+.ws-outcome-status-current.ws-outcome-status-in_progress svg,
 .ws-outcome-status-updating svg {
   animation: ws-status-runtime-spin 1.2s linear infinite;
 }

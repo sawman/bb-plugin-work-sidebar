@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { queryKeys, queryPolicies } from "../../../query-runtime";
 import {
+  nextOutcomeStatus,
+  previousOutcomeStatus,
   projectWorkTaskBindingOwnership,
   shouldPollWorkActivity,
 } from "../model";
@@ -56,6 +58,17 @@ describe("work-context card model", () => {
       retry: false,
       refetchOnWindowFocus: false,
     });
+  });
+
+  it("moves outcome statuses backward and forward through the workflow", () => {
+    expect(previousOutcomeStatus("backlog")).toBeNull();
+    expect(nextOutcomeStatus("backlog")).toBe("todo");
+    expect(previousOutcomeStatus("in_progress")).toBe("todo");
+    expect(nextOutcomeStatus("in_progress")).toBe("in_review");
+    expect(previousOutcomeStatus("done")).toBe("in_review");
+    expect(nextOutcomeStatus("done")).toBeNull();
+    expect(previousOutcomeStatus("canceled")).toBeNull();
+    expect(nextOutcomeStatus("canceled")).toBeNull();
   });
 
   it("projects root, direct, and delegated binding ownership from owner fields", () => {

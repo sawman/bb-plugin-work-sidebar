@@ -32,15 +32,26 @@ export function shouldPollWorkActivity(status: string | undefined): boolean {
   return status === "active" || status === "starting";
 }
 
+const outcomeStatusWorkflow: readonly TaskStatus[] = [
+  "backlog",
+  "todo",
+  "in_progress",
+  "in_review",
+  "done",
+];
+
+function adjacentOutcomeStatus(
+  status: TaskStatus,
+  offset: -1 | 1,
+): TaskStatus | null {
+  const index = outcomeStatusWorkflow.indexOf(status);
+  return index < 0 ? null : (outcomeStatusWorkflow[index + offset] ?? null);
+}
+
+export function previousOutcomeStatus(status: TaskStatus): TaskStatus | null {
+  return adjacentOutcomeStatus(status, -1);
+}
+
 export function nextOutcomeStatus(status: TaskStatus): TaskStatus | null {
-  return (
-    (
-      {
-        backlog: "todo",
-        todo: "in_progress",
-        in_progress: "in_review",
-        in_review: "done",
-      } as Partial<Record<TaskStatus, TaskStatus>>
-    )[status] ?? null
-  );
+  return adjacentOutcomeStatus(status, 1);
 }

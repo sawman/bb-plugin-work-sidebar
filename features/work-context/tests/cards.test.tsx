@@ -419,12 +419,22 @@ describe("registered Work context cards", () => {
     );
     expect(outcomeInfo?.contains(taskId)).toBe(true);
     expect(slot.getByRole("img", { name: "High priority" })).toBeTruthy();
-    const status = slot.getByRole("button", {
-      name: "To do; move Ship cards to In Progress",
+    const controls = slot.getByRole("group", {
+      name: "Outcome status: To do",
     });
-    expect(outcomeInfo?.contains(status)).toBe(true);
-    expect(status.querySelector("svg")).toBeTruthy();
-    expect(slot.queryByText("Move to In Progress")).toBeNull();
+    expect(outcomeInfo?.contains(controls)).toBe(false);
+    expect(controls.querySelectorAll("button")).toHaveLength(2);
+    expect(
+      slot.getByRole("button", { name: "Move Ship cards back to Backlog" }),
+    ).toBeTruthy();
+    expect(
+      slot.getByRole("button", {
+        name: "Move Ship cards forward to In Progress",
+      }),
+    ).toBeTruthy();
+    expect(
+      slot.getByRole("img", { name: "Current outcome status: To do" }),
+    ).toBeTruthy();
     expect(slot.container.querySelector(".ws-outcome-key")).toBeNull();
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();
@@ -806,7 +816,7 @@ describe("registered Work context cards", () => {
     await waitFor(() => expect(slot.getByText("Ship cards")).toBeTruthy());
     fireEvent.click(
       slot.getByRole("button", {
-        name: "To do; move Ship cards to In Progress",
+        name: "Move Ship cards forward to In Progress",
       }),
     );
     await waitFor(() =>
@@ -818,7 +828,7 @@ describe("registered Work context cards", () => {
     expect(
       (
         slot.getByRole("button", {
-          name: "To do; move Ship cards to In Progress",
+          name: "Move Ship cards forward to In Progress",
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
@@ -839,7 +849,7 @@ describe("registered Work context cards", () => {
     );
     await waitFor(() => expect(rejected.getByText("Ship cards")).toBeTruthy());
     const rejectedButton = rejected.getByRole("button", {
-      name: "To do; move Ship cards to In Progress",
+      name: "Move Ship cards forward to In Progress",
     }) as HTMLButtonElement;
     fireEvent.click(rejectedButton);
     await waitFor(() => expect(rejectedButton.disabled).toBe(false));
@@ -847,7 +857,7 @@ describe("registered Work context cards", () => {
     getPluginQueryClient().clear();
   });
 
-  it("shows the current outcome status icon and advances it to the next state", async () => {
+  it("moves the outcome status backward and forward from the below-content controls", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));
     const updateWorkTask = vi.fn(() =>
@@ -872,17 +882,76 @@ describe("registered Work context cards", () => {
       },
     );
     try {
-      const status = await slot.findByRole("button", {
-        name: "In Progress; move Ship cards to In Review",
+      const previous = await slot.findByRole("button", {
+        name: "Move Ship cards back to To do",
       });
-      expect(status.querySelector("svg")).toBeTruthy();
-      fireEvent.click(status);
+      const next = slot.getByRole("button", {
+        name: "Move Ship cards forward to In Review",
+      });
+      const controls = slot.getByRole("group", {
+        name: "Outcome status: In Progress",
+      });
+      expect(
+        slot.container
+          .querySelector('[data-card="outcome"] .ws-card-heading-info')
+          ?.contains(controls),
+      ).toBe(false);
+      expect(previous.querySelector("svg")).toBeTruthy();
+      expect(next.querySelector("svg")).toBeTruthy();
+      fireEvent.click(previous);
+      await waitFor(() =>
+        expect(updateWorkTask).toHaveBeenCalledWith({
+          taskId: "task_1",
+          status: "todo",
+        }),
+      );
+      fireEvent.click(next);
       await waitFor(() =>
         expect(updateWorkTask).toHaveBeenCalledWith({
           taskId: "task_1",
           status: "in_review",
         }),
       );
+    } finally {
+      slot.lifecycle.unmount();
+      getPluginQueryClient().clear();
+    }
+  });
+
+  it("keeps both status directions visible and disables only the missing boundary", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      {
+        rpc: fixture({
+          getWorkOutcome: () => ({
+            ...populatedOutcome,
+            outcome: { ...populatedOutcome.outcome!, status: "done" as const },
+          }),
+        }),
+      },
+    );
+    try {
+      const controls = await slot.findByRole("group", {
+        name: "Outcome status: Done",
+      });
+      expect(controls.querySelectorAll("button")).toHaveLength(2);
+      expect(
+        (
+          slot.getByRole("button", {
+            name: "Move Ship cards back to In Review",
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(false);
+      expect(
+        (
+          slot.getByRole("button", {
+            name: "No next outcome status for Ship cards",
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(true);
     } finally {
       slot.lifecycle.unmount();
       getPluginQueryClient().clear();

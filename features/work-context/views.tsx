@@ -17,6 +17,7 @@ import { taskStatusPresentation, type TaskStatus } from "../tasks/model";
 import { useTasksRead } from "../tasks/queries";
 import {
   nextOutcomeStatus,
+  previousOutcomeStatus,
   projectWorkTaskBindingOwnership,
 } from "./model";
 import {
@@ -216,6 +217,7 @@ function OutcomeCard({ threadId }: { threadId: string }) {
   const mutation = useWorkOutcomeMutation(threadId);
   const outcome = query.data?.outcome;
   const legacy = query.data?.legacy;
+  const previous = outcome ? previousOutcomeStatus(outcome.status) : null;
   const next = outcome ? nextOutcomeStatus(outcome.status) : null;
   const [title, setTitle] = useState("");
   const [adoptionNotice, setAdoptionNotice] = useState<{
@@ -256,22 +258,7 @@ function OutcomeCard({ threadId }: { threadId: string }) {
         outcome ? (
           <OutcomeHeading
             taskKey={outcome.key}
-            title={outcome.title}
-            status={outcome.status}
             priority={outcome.priority}
-            next={next}
-            updating={mutation.update.isPending}
-            onAdvance={() => {
-              if (!next) return;
-              void report(
-                mutation.update.mutateAsync({
-                  taskId: outcome.id,
-                  status: next,
-                }),
-                "Outcome updated",
-                "Could not update outcome",
-              );
-            }}
           />
         ) : undefined
       }
@@ -285,6 +272,20 @@ function OutcomeCard({ threadId }: { threadId: string }) {
           {outcome.dueDate ? (
             <p className="ws-card-note">Due {outcome.dueDate}</p>
           ) : null}
+          <OutcomeStatusControls
+            title={outcome.title}
+            status={outcome.status}
+            previous={previous}
+            next={next}
+            updating={mutation.update.isPending}
+            onMove={(status) =>
+              void report(
+                mutation.update.mutateAsync({ taskId: outcome.id, status }),
+                "Outcome updated",
+                "Could not update outcome",
+              )
+            }
+          />
         </>
       ) : (
         <>
@@ -365,25 +366,11 @@ function OutcomeCard({ threadId }: { threadId: string }) {
 
 function OutcomeHeading({
   taskKey,
-  title,
-  status,
   priority,
-  next,
-  updating,
-  onAdvance,
 }: {
   taskKey: string;
-  title: string;
-  status: TaskStatus;
   priority: "urgent" | "high" | "medium" | "low" | "none";
-  next: TaskStatus | null;
-  updating: boolean;
-  onAdvance(): void;
 }) {
-  const current = taskStatusPresentation(status);
-  const actionLabel = next
-    ? `${current.label}; move ${title} to ${taskStatusPresentation(next).label}`
-    : current.label;
   return (
     <span className="ws-outcome-heading-meta">
       <CopyBadge
@@ -403,28 +390,72 @@ function OutcomeHeading({
           <Icon name="AlertCircle" aria-hidden />
         </span>
       ) : null}
-      {next ? (
-        <button
-          type="button"
-          className={`ws-outcome-status ws-outcome-status-${status}${updating ? " ws-outcome-status-updating" : ""}`}
-          disabled={updating}
-          aria-label={actionLabel}
-          title={actionLabel}
-          onClick={onAdvance}
-        >
-          <Icon name={current.icon} aria-hidden />
-        </button>
-      ) : (
-        <span
-          className={`ws-outcome-status ws-outcome-status-${status}`}
-          role="img"
-          aria-label={actionLabel}
-          title={actionLabel}
-        >
-          <Icon name={current.icon} aria-hidden />
-        </span>
-      )}
     </span>
+  );
+}
+
+function OutcomeStatusControls({
+  title,
+  status,
+  previous,
+  next,
+  updating,
+  onMove,
+}: {
+  title: string;
+  status: TaskStatus;
+  previous: TaskStatus | null;
+  next: TaskStatus | null;
+  updating: boolean;
+  onMove(status: TaskStatus): void;
+}) {
+  const current = taskStatusPresentation(status);
+  const previousLabel = previous
+    ? `Move ${title} back to ${taskStatusPresentation(previous).label}`
+    : `No previous outcome status for ${title}`;
+  const nextLabel = next
+    ? `Move ${title} forward to ${taskStatusPresentation(next).label}`
+    : `No next outcome status for ${title}`;
+  return (
+    <div
+      className="ws-outcome-status-controls"
+      role="group"
+      aria-label={`Outcome status: ${current.label}`}
+    >
+      <button
+        type="button"
+        className="ws-outcome-status-step"
+        disabled={!previous || updating}
+        aria-label={previousLabel}
+        title={previousLabel}
+        onClick={() => {
+          if (previous) onMove(previous);
+        }}
+      >
+        <Icon name="ArrowLeft" aria-hidden />
+      </button>
+      <span
+        className={`ws-outcome-status-current ws-outcome-status-${status}${updating ? " ws-outcome-status-updating" : ""}`}
+        role="img"
+        aria-label={`Current outcome status: ${current.label}`}
+        title={current.label}
+      >
+        <Icon name={current.icon} aria-hidden />
+        <span aria-hidden>{current.label}</span>
+      </span>
+      <button
+        type="button"
+        className="ws-outcome-status-step"
+        disabled={!next || updating}
+        aria-label={nextLabel}
+        title={nextLabel}
+        onClick={() => {
+          if (next) onMove(next);
+        }}
+      >
+        <Icon name="ArrowRight" aria-hidden />
+      </button>
+    </div>
   );
 }
 
