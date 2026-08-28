@@ -108,7 +108,7 @@ export function SidebarThreadGroups({
     <>
       <section className="ws-thread-statuses" aria-label="Thread status groups">
         <details
-          className="ws-later ws-active-threads"
+          className="ws-thread-group ws-active-threads"
           data-ws-thread-drop-zone="active"
           data-drop-target={dropTargetId === "active" || undefined}
           open={activeOpen}
@@ -149,7 +149,7 @@ export function SidebarThreadGroups({
           return (
             <details
               key={group.id}
-              className="ws-later"
+              className="ws-thread-group"
               data-ws-thread-drop-zone={group.id}
               data-drop-target={dropTargetId === group.id || undefined}
               open
@@ -184,7 +184,7 @@ export function SidebarThreadGroups({
                   label={`${group.name} threads`}
                 />
               ) : (
-                <div className="ws-later-empty">
+                <div className="ws-thread-group-empty">
                   Right-click a thread to move it here.
                 </div>
               )}

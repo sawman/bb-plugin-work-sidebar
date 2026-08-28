@@ -98,7 +98,7 @@ export function ArchivedThreads({
       );
   return (
     <details
-      className="ws-later ws-archived"
+      className="ws-thread-group ws-archived"
       data-ws-thread-drop-zone="archive"
       data-drop-target={dropTarget?.threadId === "archive" || undefined}
       open={open}
@@ -123,7 +123,7 @@ export function ArchivedThreads({
         Archive <span>{state === "ready" ? archived.length : ""}</span>
       </summary>
       {state === "idle" || state === "loading" ? (
-        <div className="ws-later-empty">Loading archive threads…</div>
+        <div className="ws-thread-group-empty">Loading archive threads…</div>
       ) : state === "error" ? (
         <div className="ws-callout">
           {query.archive.error?.message ?? "Could not load archive threads."}
@@ -150,7 +150,7 @@ export function ArchivedThreads({
           ))}
         </section>
       ) : (
-        <div className="ws-later-empty">No archive threads.</div>
+        <div className="ws-thread-group-empty">No archive threads.</div>
       )}
     </details>
   );

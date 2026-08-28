@@ -616,6 +616,12 @@ describe("shared surface and list-row architecture", () => {
     const actions = rules.find(
       ({ selector }) => selector === ".ws-work-toolbar-actions",
     );
+    const threadGroup = rules.find(
+      ({ selector }) => selector === ".ws-thread-group",
+    );
+    const legacyGroupSources = [...productionSourcePaths(), ...stylesheetPaths()]
+      .map((file) => relative(root, file))
+      .filter((file) => readFileSync(join(root, file), "utf8").includes("ws-later"));
 
     expect(list?.declarations).toContain("margin: 0 !important");
     expect(list?.declarations).toContain("width: 100%");
@@ -625,6 +631,9 @@ describe("shared surface and list-row architecture", () => {
     expect(toolbar?.declarations).toContain("max-width: 100%");
     expect(toolbar?.declarations).toContain("padding-block: 0.35rem !important");
     expect(toolbar?.declarations).not.toContain("padding-top: 0 !important");
+    expect(threadGroup?.declarations).toContain("margin: 0 0.15rem 0.55rem");
+    expect(threadGroup?.declarations).toContain("padding-top: 0.3rem");
+    expect(legacyGroupSources).toEqual([]);
     expect(actions?.declarations).toContain("flex-wrap: wrap");
     expect(actions?.declarations).toContain("min-width: 0");
   });
