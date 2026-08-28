@@ -77,7 +77,7 @@ export function ArchivedThreadRow({
   return (
     <article
       className={`ws-thread ws-archived-thread ${dragging ? "ws-thread-dragging" : ""}`}
-      onPointerDown={startPointerDrag}
+      onPointerDownCapture={startPointerDrag}
     >
       <ContextMenu>
         <ContextMenuTrigger asChild>
