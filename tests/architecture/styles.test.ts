@@ -398,6 +398,18 @@ describe("shared surface and list-row architecture", () => {
     expect(chevron?.declarations).toContain("color: var(--muted-foreground)");
   });
 
+  test("renders the Changes pull request number as a compact header badge", () => {
+    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const badge = rules.find(
+      ({ selector }) => selector === ".ws-pr-number-badge",
+    );
+
+    expect(badge?.declarations).toContain("display: inline-flex");
+    expect(badge?.declarations).toContain("align-items: center");
+    expect(badge?.declarations).toContain("border: 1px solid var(--border)");
+    expect(badge?.declarations).toContain("white-space: nowrap");
+  });
+
   test("associates each important declaration with its immediately preceding R17 comment", () => {
     expect(undocumentedImportantDeclarations(`
       /* R17 important: a former blanket comment. */

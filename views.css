@@ -550,6 +550,23 @@
 .ws-pr-number {
   font-weight: 650;
 }
+.ws-pr-number-badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.18rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.05rem 0.3rem;
+  color: var(--foreground);
+  font-size: 0.58rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+.ws-pr-number-badge svg {
+  width: 0.62rem;
+  height: 0.62rem;
+}
 .ws-stack-number {
   display: inline-flex;
   flex: none;
@@ -1818,6 +1835,11 @@ button.ws-outcome-status {
 }
 .ws-section-count {
   font-size: 0.58rem;
+}
+.ws-changes-header-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 .ws-outcome-empty,
 .ws-empty-state-card {

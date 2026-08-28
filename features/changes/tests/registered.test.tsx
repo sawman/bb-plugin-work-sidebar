@@ -7,6 +7,7 @@ import { changesInteractionStore } from "../store";
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
+const clipboardWrite = vi.fn(() => Promise.resolve());
 
 const repository = (
   outcome: "available" | "absent" | "unavailable",
@@ -190,6 +191,7 @@ afterEach(() => {
   changesInteractionStore.setState({ byThread: new Map() });
   toast.success.mockReset();
   toast.error.mockReset();
+  clipboardWrite.mockReset();
 });
 
 describe("R13 registered Changes Work slot", () => {
@@ -225,6 +227,10 @@ describe("R13 registered Changes Work slot", () => {
     slot.lifecycle.unmount();
   });
   it("renders the non-stack Current PR and discloses stack branch files through the PR row", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: clipboardWrite },
+    });
     const currentPullRequest = {
       number: 42,
       title: "Current PR",
@@ -255,6 +261,12 @@ describe("R13 registered Changes Work slot", () => {
     await waitFor(() =>
       expect(nonStack.getByText(/#42 Current PR/)).toBeTruthy(),
     );
+    const currentPrNumber = nonStack.getByRole("button", {
+      name: "Copy PR number #42",
+    });
+    expect(currentPrNumber.classList.contains("ws-pr-number-badge")).toBe(true);
+    fireEvent.click(currentPrNumber);
+    await waitFor(() => expect(clipboardWrite).toHaveBeenCalledWith("#42"));
     fireEvent.click(
       nonStack.getByRole("button", {
         name: "Show details for pull request #42",
@@ -328,6 +340,13 @@ describe("R13 registered Changes Work slot", () => {
     const stackNumber = stack.getByLabelText("Copy stack number #17");
     expect(stackNumber.textContent).toBe("#17");
     expect(stackNumber.querySelector("svg")).toBeTruthy();
+    const stackPrNumber = stack.getByRole("button", {
+      name: "Copy PR number #43",
+    });
+    expect(stackPrNumber.textContent).toBe("#43");
+    expect(stackPrNumber.compareDocumentPosition(stackNumber)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     const disclosure = stack.getByRole("button", {
       name: /#43 Stack branch.*Show changed files for pull request #43/,
     });

@@ -2,6 +2,7 @@ import { useSettings, useRpc } from "@get-bb/plugin-sdk/app";
 import { useStore } from "zustand";
 import { toast } from "sonner";
 import type { rpcContract } from "../../contracts";
+import { CopyBadge } from "../../components/ui/copy-badge";
 import { Icon } from "../../components/ui/icon";
 import { useGitHubApiHealth } from "../pull-requests/queries";
 import { StackNumberBadge } from "../pull-requests/stack-number";
@@ -63,6 +64,9 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
     });
   };
   const stack = changesQuery.data?.githubStack?.stack;
+  const currentPullRequestNumber =
+    changesQuery.data?.currentPullRequest?.number ??
+    changesQuery.data?.stack?.currentPullRequest;
   const healthClass =
     githubApiHealth.state === "rate_limited"
       ? "ws-github-api-rate_limited"
@@ -73,7 +77,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
         <div>
           <h2>Changes</h2>
         </div>
-        <span className="ws-section-count">
+        <span className="ws-section-count ws-changes-header-meta">
           {githubApiHealth.state !== "available" && (
             <span
               className={`ws-github-api-indicator ${healthClass}`}
@@ -85,10 +89,22 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
                 : "GitHub unavailable"}
             </span>
           )}
-          {changesHeaderLabel(
-            changesQuery.data,
-            changesQuery.isPending,
-            changesQuery.isError,
+          {currentPullRequestNumber != null ? (
+            <CopyBadge
+              value={`#${currentPullRequestNumber}`}
+              label="PR number"
+              className="ws-pr-number ws-pr-number-badge"
+              title={`PR #${currentPullRequestNumber}`}
+            >
+              <Icon name="GitPullRequest" aria-hidden />
+              <span aria-hidden>#{currentPullRequestNumber}</span>
+            </CopyBadge>
+          ) : (
+            changesHeaderLabel(
+              changesQuery.data,
+              changesQuery.isPending,
+              changesQuery.isError,
+            )
           )}
           {changesQuery.data?.stack?.number != null && (
             <StackNumberBadge number={changesQuery.data.stack.number} />
