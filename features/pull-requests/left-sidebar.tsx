@@ -1,10 +1,7 @@
 import {
   useCallback,
-  useEffect,
   useMemo,
-  type MouseEvent as ReactMouseEvent,
 } from "react";
-import { useStore } from "zustand";
 import { useRpc, useSettings } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Icon } from "@/components/ui/icon";
@@ -14,8 +11,7 @@ import {
   type AuthoredPullRequest,
 } from "./authored-pull-requests";
 import type { rpcContract } from "../../contracts";
-import { orderStackLayers, type SidebarStack } from "../../work-model";
-import { pullRequestsSidebarStore } from "./store";
+import type { SidebarStack } from "../../work-model";
 import { githubHealthPresentation } from "./presentation";
 import {
   useAuthoredPullRequests,
@@ -44,14 +40,6 @@ export function PullRequestsLeftSidebar({
   });
   const draft = useSetAuthoredPullRequestDraft(rpc);
   const healthQuery = useGitHubApiHealth(rpc, { poll: active, enabled: active });
-  const selectedIds = useStore(
-    pullRequestsSidebarStore,
-    (state) => state.selectedIds,
-  );
-  const anchorId = useStore(
-    pullRequestsSidebarStore,
-    (state) => state.selectionAnchorId,
-  );
   const pullRequests = (list.data ?? EMPTY_PULL_REQUESTS) as AuthoredPullRequest[];
   const visible = useMemo(
     () =>
@@ -99,54 +87,6 @@ export function PullRequestsLeftSidebar({
       stacks: [...group.stacks.values()],
     }));
   }, [visible]);
-  const visibleIds = useMemo(
-    () => [
-      ...new Set([
-        ...groups.flatMap((group) =>
-          group.stacks.flatMap((stack) =>
-            orderStackLayers(stack.pullRequests, stack.base).map(
-              (layer) => layer.url,
-            ),
-          ),
-        ),
-        ...groups.flatMap((group) =>
-          group.ordinary.map((pullRequest) => pullRequest.url),
-        ),
-      ]),
-    ],
-    [groups],
-  );
-  useEffect(() => {
-    pullRequestsSidebarStore
-      .getState()
-      .reconcileRoster(pullRequests.map((pullRequest) => pullRequest.url));
-  }, [pullRequests]);
-  const select = useCallback(
-    (url: string, event: ReactMouseEvent<HTMLAnchorElement>) => {
-      const state = pullRequestsSidebarStore.getState();
-      if (event.shiftKey && anchorId) {
-        const first = visibleIds.indexOf(anchorId);
-        const last = visibleIds.indexOf(url);
-        state.setSelected(
-          first >= 0 && last >= 0 ? anchorId : url,
-          first >= 0 && last >= 0
-            ? visibleIds.slice(Math.min(first, last), Math.max(first, last) + 1)
-            : [url],
-        );
-        return true;
-      }
-      if (event.ctrlKey || event.metaKey) {
-        const next = new Set(state.selectedIds);
-        if (next.has(url)) next.delete(url);
-        else next.add(url);
-        state.setSelected(url, next);
-        return true;
-      }
-      state.setSelected(url, [url]);
-      return false;
-    },
-    [anchorId, visibleIds],
-  );
   const toggleDraft = useCallback(
     (pullRequest: Omit<AuthoredPullRequest, "stack">) => {
       draft.mutate(
@@ -191,11 +131,6 @@ export function PullRequestsLeftSidebar({
               {health.label}
             </span>
           )}
-          {selectedIds.size > 1 && (
-            <span className="ws-selection-count" role="status">
-              {selectedIds.size} selected
-            </span>
-          )}
           <button
             className="ws-icon-button"
             title="Refresh pull requests"
@@ -229,9 +164,7 @@ export function PullRequestsLeftSidebar({
                   <AuthoredPullRequestStack
                     key={stack.id}
                     stack={stack}
-                    selectedIds={selectedIds}
                     changingDraftUrl={changingDraftUrl}
-                    onSelect={select}
                     onToggleDraft={toggleDraft}
                   />
                 ))}
@@ -242,9 +175,7 @@ export function PullRequestsLeftSidebar({
                   >
                     <AuthoredPullRequestRow
                       pullRequest={pullRequest}
-                      selected={selectedIds.has(pullRequest.url)}
                       changingDraft={changingDraftUrl === pullRequest.url}
-                      onSelect={select}
                       onToggleDraft={toggleDraft}
                     />
                   </section>

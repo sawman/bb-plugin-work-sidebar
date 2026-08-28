@@ -1,9 +1,4 @@
-import {
-  useRef,
-  useState,
-  type MouseEvent as ReactMouseEvent,
-  type ReactNode,
-} from "react";
+import { useState, type ReactNode } from "react";
 import { Icon } from "../../components/ui/icon";
 import { Status } from "../../components/ui/status";
 import {
@@ -35,50 +30,29 @@ export function AuthoredPullRequestRow({
   pullRequest,
   stackControl,
   stackNumber,
-  selected,
   changingDraft,
-  onSelect,
   onToggleDraft,
 }: {
   pullRequest: AuthoredRow;
   stackControl?: ReactNode;
   stackNumber?: number | null;
-  selected: boolean;
   changingDraft: boolean;
-  onSelect(id: string, event: ReactMouseEvent<HTMLAnchorElement>): boolean;
   onToggleDraft(pullRequest: AuthoredRow): void;
 }) {
-  const controlClick = useRef(false);
   const signal = pullRequestSignalPresentation(pullRequest);
   const state = pullRequestPresentation({
     state: pullRequest.state,
     draft: pullRequest.draft,
   });
   return (
-    <article
-      className={`ws-pr-row ws-pr-compact-row ${selected ? "ws-pr-row-selected" : ""}`}
-      data-selected={selected || undefined}
-    >
+    <article className="ws-pr-row ws-pr-compact-row">
       <span className="ws-pr-stack-slot">{stackControl}</span>
       <a
         className="ws-pr-target"
         href={pullRequest.url}
         target="_blank"
         rel="noreferrer"
-        aria-current={selected ? "true" : undefined}
         aria-label={`Open pull request #${pullRequest.number}: ${pullRequest.title}`}
-        onMouseDown={(event) => {
-          controlClick.current = event.ctrlKey && event.button === 0;
-        }}
-        onClick={(event) => {
-          if (onSelect(pullRequest.url, event)) event.preventDefault();
-        }}
-        onContextMenu={(event) => {
-          if (!controlClick.current && !event.ctrlKey) return;
-          controlClick.current = false;
-          event.preventDefault();
-          onSelect(pullRequest.url, event);
-        }}
       >
         <span className="ws-pr-title ws-pr-target-title">
           {pullRequest.title}
@@ -133,15 +107,11 @@ export function AuthoredPullRequestRow({
 
 export function AuthoredPullRequestStack({
   stack,
-  selectedIds,
   changingDraftUrl,
-  onSelect,
   onToggleDraft,
 }: {
   stack: SidebarStack;
-  selectedIds: ReadonlySet<string>;
   changingDraftUrl: string | null;
-  onSelect(id: string, event: ReactMouseEvent<HTMLAnchorElement>): boolean;
   onToggleDraft(pullRequest: AuthoredRow): void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -157,9 +127,7 @@ export function AuthoredPullRequestStack({
       key={layer.number}
       stackControl={stackControl}
       stackNumber={stackNumber}
-      selected={selectedIds.has(layer.url)}
       changingDraft={changingDraftUrl === layer.url}
-      onSelect={onSelect}
       onToggleDraft={onToggleDraft}
       pullRequest={{
         ...layer,

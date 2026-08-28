@@ -476,7 +476,7 @@ describe("R18 registered left sidebar parity", () => {
     slot.lifecycle.unmount();
   });
 
-  it("keeps authored stacks collapsed, supports modifier selection, and preserves draft mutation busy/error recovery", async () => {
+  it("keeps authored stacks collapsed, preserves native PR navigation, and recovers draft mutations", async () => {
     const update = deferred<{ ok: boolean }>();
     const layers = [
       { number: 1, title: "Base", url: "https://github.com/acme/repo/pull/1", head: "feature/base", base: "main", draft: false, checks: "passing", review: "approved", reviewCommentCount: 2 },
@@ -501,11 +501,19 @@ describe("R18 registered left sidebar parity", () => {
     expect(slot.queryByRole("link", { name: /Child/ })).toBeNull();
     expect(slot.getByTitle("Checks passing")).toBeTruthy();
     expect(slot.getByTitle("Approved")).toBeTruthy();
-    fireEvent.click(slot.getByRole("link", { name: /Base/ }), { ctrlKey: true });
-    const selectedRow = slot.getByRole("link", { name: /Base/ }).closest("article")!;
-    expect(selectedRow.getAttribute("data-selected")).toBe("true");
-    expect(selectedRow.hasAttribute("aria-selected")).toBe(false);
-    expect(slot.getByRole("link", { name: /Base/ }).getAttribute("aria-current")).toBe("true");
+    const baseLink = slot.getByRole("link", { name: /Base/ });
+    expect(baseLink.getAttribute("href")).toBe("https://github.com/acme/repo/pull/1");
+    expect(baseLink.getAttribute("target")).toBe("_blank");
+    const modifiedClick = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      ctrlKey: true,
+    });
+    expect(baseLink.dispatchEvent(modifiedClick)).toBe(true);
+    expect(modifiedClick.defaultPrevented).toBe(false);
+    fireEvent.click(baseLink);
+    expect(baseLink.closest("article")?.hasAttribute("data-selected")).toBe(false);
+    expect(baseLink.hasAttribute("aria-current")).toBe(false);
     fireEvent.click(slot.getByRole("button", { name: "Expand stack layers" }));
     expect(slot.getByRole("link", { name: /Child/ })).toBeTruthy();
     fireEvent.click(slot.getAllByRole("button", { name: "Mark draft" })[0]!);

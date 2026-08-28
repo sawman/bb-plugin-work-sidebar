@@ -845,13 +845,11 @@
 }
 
 
-/* Modifier-selected rows stay visible without changing their normal layout. */
-.ws-task-row-selected,
-.ws-pr-row-selected {
+/* Modifier-selected task rows stay visible without changing their normal layout. */
+.ws-task-row-selected {
   background: color-mix(in srgb, var(--accent) 82%, var(--primary) 18%);
 }
-.ws-task-row-selected:hover,
-.ws-pr-row-selected:hover {
+.ws-task-row-selected:hover {
   background: color-mix(in srgb, var(--accent) 72%, var(--primary) 28%);
 }
 

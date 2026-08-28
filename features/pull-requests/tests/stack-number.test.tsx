@@ -54,9 +54,7 @@ describe("pull-request stack number presentation", () => {
     render(
       <AuthoredPullRequestStack
         stack={stack}
-        selectedIds={new Set()}
         changingDraftUrl={null}
-        onSelect={() => false}
         onToggleDraft={vi.fn()}
       />,
     );
@@ -85,13 +83,10 @@ describe("pull-request stack number presentation", () => {
   });
 
   it("copies PR, stack, and branch values without selecting or opening the row", async () => {
-    const onSelect = vi.fn(() => false);
     render(
       <AuthoredPullRequestStack
         stack={stack}
-        selectedIds={new Set()}
         changingDraftUrl={null}
-        onSelect={onSelect}
         onToggleDraft={vi.fn()}
       />,
     );
@@ -132,7 +127,6 @@ describe("pull-request stack number presentation", () => {
         ["Branch feature/stack-number"],
       ]),
     );
-    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it("uses one quiet branch-name presentation in PR and thread metadata", () => {
@@ -173,9 +167,7 @@ describe("pull-request stack number presentation", () => {
           review: "none",
           reviewCommentCount: 0,
         }}
-        selected={false}
         changingDraft={false}
-        onSelect={() => false}
         onToggleDraft={vi.fn()}
       />,
     );
@@ -200,9 +192,7 @@ describe("pull-request stack number presentation", () => {
           review: "approved",
           reviewCommentCount: 0,
         }}
-        selected={false}
         changingDraft={false}
-        onSelect={() => false}
         onToggleDraft={vi.fn()}
       />,
     );
