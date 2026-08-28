@@ -91,7 +91,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
             changesQuery.isError,
           )}
           {changesQuery.data?.stack?.number != null && (
-            <StackNumberBadge number={changesQuery.data.stack.number} icon />
+            <StackNumberBadge number={changesQuery.data.stack.number} />
           )}
         </span>
       </header>

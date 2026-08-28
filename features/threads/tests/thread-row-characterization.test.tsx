@@ -169,7 +169,7 @@ describe("R21D ThreadRow characterization", () => {
     expect(view.getByText("feature/m7")).toBeTruthy();
     expect(view.queryByText("WORK-1")).toBeNull();
     expect(view.getByText("#42")).toBeTruthy();
-    expect((await view.findByLabelText("Stack #17")).textContent).toBe("S#17");
+    expect((await view.findByLabelText("Stack #17")).textContent).toBe("#17");
     expect(view.getByTitle("PR #42 · Open")).toBeTruthy();
     expect(view.getByRole("img", { name: "Thread is running" })).toBeTruthy();
     expect(view.getByRole("img", { name: "Unsent draft" })).toBeTruthy();

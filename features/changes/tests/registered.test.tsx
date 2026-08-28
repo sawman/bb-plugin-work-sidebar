@@ -326,7 +326,7 @@ describe("R13 registered Changes Work slot", () => {
       ).toBeTruthy(),
     );
     const stackNumber = stack.getByLabelText("Stack #17");
-    expect(stackNumber.textContent).toContain("Stack #17");
+    expect(stackNumber.textContent).toBe("#17");
     expect(stackNumber.querySelector("svg")).toBeTruthy();
     const disclosure = stack.getByRole("button", {
       name: /#43 Stack branch.*Show changed files for pull request #43/,

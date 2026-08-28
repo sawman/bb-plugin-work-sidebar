@@ -40,16 +40,17 @@ describe("pull-request stack number presentation", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Stack #17").textContent).toBe("Stack #17");
+    expect(screen.getByLabelText("Stack #17").textContent).toBe("#17");
+    expect(screen.getByLabelText("Stack #17").querySelector("svg")).toBeTruthy();
   });
 
-  it("supports compact thread metadata and the icon-bearing Changes form", () => {
+  it("uses the same compact stack icon and number across surfaces", () => {
     const { rerender } = render(<StackNumberBadge number={17} compact />);
-    expect(screen.getByLabelText("Stack #17").textContent).toBe("S#17");
-    expect(screen.getByLabelText("Stack #17").querySelector("svg")).toBeNull();
+    expect(screen.getByLabelText("Stack #17").textContent).toBe("#17");
+    expect(screen.getByLabelText("Stack #17").querySelector("svg")).toBeTruthy();
 
-    rerender(<StackNumberBadge number={17} icon />);
-    expect(screen.getByLabelText("Stack #17").textContent).toBe("Stack #17");
+    rerender(<StackNumberBadge number={17} />);
+    expect(screen.getByLabelText("Stack #17").textContent).toBe("#17");
     expect(screen.getByLabelText("Stack #17").querySelector("svg")).toBeTruthy();
   });
 });

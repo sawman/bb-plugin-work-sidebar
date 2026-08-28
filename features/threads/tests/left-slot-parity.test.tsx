@@ -230,7 +230,7 @@ describe("R18 registered left sidebar parity", () => {
     });
 
     await waitFor(() =>
-      expect(slot.getByLabelText("Stack #17").textContent).toBe("S#17"),
+      expect(slot.getByLabelText("Stack #17").textContent).toBe("#17"),
     );
     expect(stacks).toHaveBeenCalledWith({ threadIds: ["thr_one"] });
     expect(slot.getByRole("link", { name: /Two/ }).querySelector(".ws-stack-number")).toBeNull();
@@ -391,7 +391,8 @@ describe("R18 registered left sidebar parity", () => {
     } });
     fireEvent.click(slot.getByRole("button", { name: "PRs" }));
     await waitFor(() => expect(slot.getByRole("link", { name: /Base/ })).toBeTruthy());
-    expect(slot.getByLabelText("Stack #17").textContent).toBe("Stack #17");
+    expect(slot.getByLabelText("Stack #17").textContent).toBe("#17");
+    expect(slot.getByLabelText("Stack #17").querySelector("svg")).toBeTruthy();
     expect(slot.queryByRole("link", { name: /Child/ })).toBeNull();
     expect(slot.getByTitle("Checks passing")).toBeTruthy();
     expect(slot.getByTitle("Approved")).toBeTruthy();
