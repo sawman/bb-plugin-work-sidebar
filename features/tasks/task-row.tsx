@@ -135,7 +135,7 @@ export function TaskRow(props: TaskRowProps) {
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <article
-          className={`ws-task-row ws-task-row-${node.role} ${selectedTaskIds.has(task.id) ? "ws-task-row-selected" : ""} ${dragTaskId === task.id ? "ws-task-dragging" : ""}`}
+          className={`ws-task-row ws-sidebar-row ws-task-row-${node.role} ${selectedTaskIds.has(task.id) ? "ws-task-row-selected" : ""} ${dragTaskId === task.id ? "ws-task-dragging" : ""}`}
           data-selected={selectedTaskIds.has(task.id) || undefined}
           data-task-role={node.role}
           data-task-id={task.id}
@@ -179,7 +179,7 @@ export function TaskRow(props: TaskRowProps) {
             onDragTargetChange(null);
           }}
         >
-          <div className="ws-task-row-main">
+          <div className="ws-sidebar-row-main">
             <button
               className={`ws-task-assign ${assigned ? "ws-task-assigned" : ""}`}
               type="button"
@@ -198,11 +198,11 @@ export function TaskRow(props: TaskRowProps) {
                   : "Select a thread to assign this task"
               }
             >
-              <strong className="ws-task-title" title={task.title}>
+              <span className="ws-task-title ws-sidebar-row-title" title={task.title}>
                 {task.title}
-              </strong>
+              </span>
             </button>
-            <div className="ws-task-meta">
+            <div className="ws-task-meta ws-sidebar-row-meta">
               <span className="ws-task-key-badge">{task.key}</span>
               <TaskPriorityIcon priority={task.priority} />
               {task.dueDate && (
@@ -222,7 +222,7 @@ export function TaskRow(props: TaskRowProps) {
             </div>
           </div>
           <label
-            className={`ws-task-status-picker ws-task-status-${task.status}`}
+            className={`ws-task-status-picker ws-sidebar-row-trailing ws-task-status-${task.status}`}
             title={status.label}
           >
             <Icon name={status.icon} aria-hidden />

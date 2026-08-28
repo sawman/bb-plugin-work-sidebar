@@ -199,7 +199,7 @@ describe("pull-request stack number presentation", () => {
 
     const title = screen.getByText("Regular weight title");
     expect(title.tagName).toBe("SPAN");
-    expect(title.classList.contains("ws-pr-title")).toBe(true);
+    expect(title.classList.contains("ws-sidebar-row-title")).toBe(true);
   });
 
   it("gives custom tooltips only to interactive controls with text", () => {

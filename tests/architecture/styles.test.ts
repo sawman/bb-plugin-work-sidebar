@@ -523,11 +523,62 @@ describe("shared surface and list-row architecture", () => {
     }
   });
 
-  test("keeps authored pull request titles at regular weight", () => {
+  test("shares one left-sidebar row rhythm across Threads, Tasks, and PRs", () => {
     const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
-    const title = rules.find(({ selector }) => selector === ".ws-pr-title");
+    const declarations = (selector: string) =>
+      rules.find((rule) => rule.selector === selector)?.declarations;
 
-    expect(title?.declarations).toContain("font-weight: 400");
+    expect(declarations(".ws-sidebar-row")).toMatch(
+      /min-height:\s*2\.35rem/,
+    );
+    expect(declarations(".ws-sidebar-row-main")).toMatch(
+      /row-gap:\s*0\.1rem/,
+    );
+    expect(declarations(".ws-sidebar-row-title")).toMatch(
+      /font-size:\s*0\.74rem/,
+    );
+    expect(declarations(".ws-sidebar-row-title")).toMatch(
+      /font-weight:\s*400/,
+    );
+    expect(declarations(".ws-sidebar-row-title")).toMatch(
+      /line-height:\s*1\.2/,
+    );
+    expect(declarations(".ws-sidebar-row-meta")).toMatch(
+      /font-size:\s*0\.59rem/,
+    );
+    expect(declarations(".ws-sidebar-row-meta")).toMatch(
+      /line-height:\s*1\.1/,
+    );
+
+    for (const [path, hooks] of [
+      [
+        "components/threads/thread-row-content.tsx",
+        ["ws-sidebar-row-main", "ws-sidebar-row-title"],
+      ],
+      [
+        "features/tasks/task-row.tsx",
+        [
+          "ws-sidebar-row",
+          "ws-sidebar-row-main",
+          "ws-sidebar-row-title",
+          "ws-sidebar-row-meta",
+          "ws-sidebar-row-trailing",
+        ],
+      ],
+      [
+        "features/pull-requests/authored-pull-requests.tsx",
+        [
+          "ws-sidebar-row",
+          "ws-sidebar-row-main",
+          "ws-sidebar-row-title",
+          "ws-sidebar-row-meta",
+          "ws-sidebar-row-trailing",
+        ],
+      ],
+    ] as const) {
+      const source = readFileSync(join(root, path), "utf8");
+      for (const hook of hooks) expect(source, `${path}: ${hook}`).toContain(hook);
+    }
   });
 
   test("associates each important declaration with its immediately preceding R17 comment", () => {
@@ -749,9 +800,11 @@ describe("shared surface and list-row architecture", () => {
     expect(branch?.declarations).toContain("max-width: 100%");
   });
 
-  test("spaces the shared thread title and subtitle rows", () => {
+  test("spaces the shared left-sidebar title and subtitle rows", () => {
     const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
-    const main = rules.find(({ selector }) => selector === ".ws-thread-main");
+    const main = rules.find(
+      ({ selector }) => selector === ".ws-sidebar-row-main",
+    );
 
     expect(main?.declarations).toContain("display: grid");
     expect(main?.declarations).toContain("row-gap: 0.1rem");

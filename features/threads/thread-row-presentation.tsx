@@ -45,7 +45,7 @@ export function ThreadMetadata({
       })
     : null;
   return (
-    <span className="ws-thread-meta">
+    <span className="ws-thread-meta ws-sidebar-row-meta">
       {pullRequest && pullRequestStatus && (
         <CopyBadge
           value={`#${pullRequest.number}`}
@@ -95,7 +95,7 @@ export function ThreadStatus({
     ? `${thread.indicatorLabel ?? "Thread is working"}; no agent update for 30 minutes`
     : thread.indicatorLabel;
   return (
-    <span className="ws-thread-trailing">
+    <span className="ws-thread-trailing ws-sidebar-row-trailing">
       {hasComposerDraft && (
         <Icon
           name="Pencil"

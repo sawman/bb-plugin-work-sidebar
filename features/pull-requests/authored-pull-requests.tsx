@@ -45,19 +45,19 @@ export function AuthoredPullRequestRow({
     draft: pullRequest.draft,
   });
   return (
-    <article className="ws-pr-row ws-pr-compact-row">
+    <article className="ws-pr-row ws-pr-compact-row ws-sidebar-row">
       <span className="ws-pr-stack-slot">{stackControl}</span>
       <a
-        className="ws-pr-target"
+        className="ws-pr-target ws-sidebar-row-main"
         href={pullRequest.url}
         target="_blank"
         rel="noreferrer"
         aria-label={`Open pull request #${pullRequest.number}: ${pullRequest.title}`}
       >
-        <span className="ws-pr-title ws-pr-target-title">
+        <span className="ws-pr-target-title ws-sidebar-row-title">
           {pullRequest.title}
         </span>
-        <span className="ws-pr-context ws-pr-target-context">
+        <span className="ws-pr-context ws-pr-target-context ws-sidebar-row-meta">
           {stackNumber != null && <StackNumberBadge number={stackNumber} />}
           <PullRequestIdentifierBadge
             kind="pull-request"
@@ -66,7 +66,7 @@ export function AuthoredPullRequestRow({
           <PullRequestIdentifierBadge kind="branch" name={pullRequest.head} />
         </span>
       </a>
-      <span className="ws-pr-status-icons">
+      <span className="ws-pr-status-icons ws-sidebar-row-trailing">
         <button
           type="button"
           className="ws-pr-state-toggle ws-pr-tooltip"

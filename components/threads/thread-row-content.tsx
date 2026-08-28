@@ -28,8 +28,8 @@ export function ThreadRowContent({
           <span className="ws-thread-agent-placeholder" aria-hidden />
         )}
       </span>
-      <span className="ws-thread-main">
-        <span className={`ws-thread-title ${attention ? "ws-thread-attention" : ""}`}>
+      <span className="ws-thread-main ws-sidebar-row-main">
+        <span className={`ws-thread-title ws-sidebar-row-title ${attention ? "ws-thread-attention" : ""}`}>
           <ThreadProviderLogo providerId={providerId} provider={provider} />
           <span className="ws-thread-title-copy">{title}</span>
         </span>

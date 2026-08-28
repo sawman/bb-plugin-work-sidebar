@@ -84,7 +84,7 @@ export function ArchivedThreadRow({
           <a
             href="#"
             {...splitProps}
-            className="ws-thread-anchor"
+            className="ws-thread-anchor ws-sidebar-row"
             onClick={(event) => {
               event.preventDefault();
               actions.open(thread.id);
@@ -112,7 +112,7 @@ export function ArchivedThreadRow({
               provider={provider}
               title={title}
               metadata={
-                <span className="ws-thread-meta">
+                <span className="ws-thread-meta ws-sidebar-row-meta">
                   <ThreadWorkspaceBadge
                     branchName={thread.environmentBranchName}
                     environmentName={thread.environmentName}
@@ -125,7 +125,7 @@ export function ArchivedThreadRow({
                 </span>
               }
               trailing={
-                <span className="ws-thread-trailing">
+                <span className="ws-thread-trailing ws-sidebar-row-trailing">
                   {duration ? (
                     <time
                       className="ws-thread-archive-age"

@@ -119,7 +119,7 @@ export function ThreadRow({
             data-sidebar-thread-shortcut-target=""
             data-sidebar-thread-id={thread.id}
             data-sidebar-thread-parent-id={thread.parentThreadId ?? ""}
-            className={`ws-thread-anchor ${children > 0 ? "ws-thread-has-children" : ""}`}
+            className={`ws-thread-anchor ws-sidebar-row ${children > 0 ? "ws-thread-has-children" : ""}`}
             title={
               isAvailable
                 ? "Drag into the main area to open; drop at an edge to split"
