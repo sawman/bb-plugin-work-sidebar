@@ -90,6 +90,7 @@ const dynamicClassFamilies = [
   { prefix: "ws-agent-state-", file: "features/agents/agent-row.tsx", suffixes: ["working", "waiting", "blocked", "complete", "idle"] },
   { prefix: "ws-file-", file: "features/changes/views.tsx", suffixes: ["added", "deleted", "modified", "renamed", "untracked"] },
   { prefix: "ws-github-api-", file: "features/changes/panel.tsx", suffixes: ["available", "rate_limited", "unavailable"] },
+  { prefix: "ws-outcome-status-", file: "features/work-context/views.tsx", suffixes: ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] },
   { prefix: "ws-plan-", file: "features/work-context/views.tsx", suffixes: ["completed", "in_progress", "pending"] },
   { prefix: "ws-provider-health-", file: "features/work-context/views.tsx", suffixes: ["green", "amber", "red"] },
   { prefix: "ws-runtime-state-", file: "features/work-context/views.tsx", suffixes: ["working", "waiting", "blocked", "complete", "idle"] },

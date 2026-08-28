@@ -407,6 +407,25 @@ describe("registered Work context cards", () => {
     expect(slot.getByText("Ship cards")).toBeTruthy();
     expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(6);
     expect(slot.container.querySelector(".ws-thread-task-card")).toBeTruthy();
+    const tasksInfo = slot.container.querySelector(
+      '[data-card="tasks"] .ws-card-heading-info',
+    );
+    expect(tasksInfo?.querySelector("[aria-hidden]")?.textContent).toBe("1");
+    const taskId = slot.getByRole("button", {
+      name: "Copy task ID WORK-1",
+    });
+    const outcomeInfo = slot.container.querySelector(
+      '[data-card="outcome"] .ws-card-heading-info',
+    );
+    expect(outcomeInfo?.contains(taskId)).toBe(true);
+    expect(slot.getByRole("img", { name: "High priority" })).toBeTruthy();
+    const status = slot.getByRole("button", {
+      name: "To do; move Ship cards to In Progress",
+    });
+    expect(outcomeInfo?.contains(status)).toBe(true);
+    expect(status.querySelector("svg")).toBeTruthy();
+    expect(slot.queryByText("Move to In Progress")).toBeNull();
+    expect(slot.container.querySelector(".ws-outcome-key")).toBeNull();
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();
   });
@@ -495,7 +514,11 @@ describe("registered Work context cards", () => {
     );
     try {
       await waitFor(() => expect(slot.getByText("Unrelated linked task")).toBeTruthy());
-      expect(slot.container.querySelector(".ws-section-count")?.textContent).toBe("3");
+      expect(
+        slot.container.querySelector(
+          '[data-card="tasks"] .ws-card-heading-info [aria-hidden]',
+        )?.textContent,
+      ).toBe("3");
       for (const title of ["Ship cards", "Run validation", "Unrelated linked task"])
         expect(slot.getAllByText(title)).toHaveLength(1);
       expect(slot.queryByRole("button", { name: "Detach WORK-1 from this thread" })).toBeNull();
@@ -613,7 +636,11 @@ describe("registered Work context cards", () => {
     );
     try {
       await waitFor(() => expect(root.getByText("Unbound root task")).toBeTruthy());
-      expect(root.container.querySelector(".ws-section-count")?.textContent).toBe("3");
+    expect(
+      root.container.querySelector(
+        '[data-card="tasks"] .ws-card-heading-info [aria-hidden]',
+      )?.textContent,
+    ).toBe("3");
       expect(root.getByText("2 work tasks are bound to this thread.")).toBeTruthy();
     } finally {
       root.lifecycle.unmount();
@@ -627,7 +654,11 @@ describe("registered Work context cards", () => {
     );
     try {
       await waitFor(() => expect(child.getByText("Unbound child task")).toBeTruthy());
-      expect(child.container.querySelector(".ws-section-count")?.textContent).toBe("2");
+      expect(
+        child.container.querySelector(
+          '[data-card="tasks"] .ws-card-heading-info [aria-hidden]',
+        )?.textContent,
+      ).toBe("2");
       expect(child.getByText("1 work task is bound to this thread.")).toBeTruthy();
       const picker = child.getByRole("combobox", { name: "Add task to this thread" });
       fireEvent.focus(picker);
@@ -774,7 +805,9 @@ describe("registered Work context cards", () => {
     );
     await waitFor(() => expect(slot.getByText("Ship cards")).toBeTruthy());
     fireEvent.click(
-      slot.getByRole("button", { name: /Move Ship cards to In Progress/ }),
+      slot.getByRole("button", {
+        name: "To do; move Ship cards to In Progress",
+      }),
     );
     await waitFor(() =>
       expect(updateWorkTask).toHaveBeenCalledWith({
@@ -785,7 +818,7 @@ describe("registered Work context cards", () => {
     expect(
       (
         slot.getByRole("button", {
-          name: /Move Ship cards to In Progress/,
+          name: "To do; move Ship cards to In Progress",
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
@@ -806,12 +839,54 @@ describe("registered Work context cards", () => {
     );
     await waitFor(() => expect(rejected.getByText("Ship cards")).toBeTruthy());
     const rejectedButton = rejected.getByRole("button", {
-      name: /Move Ship cards to In Progress/,
+      name: "To do; move Ship cards to In Progress",
     }) as HTMLButtonElement;
     fireEvent.click(rejectedButton);
     await waitFor(() => expect(rejectedButton.disabled).toBe(false));
     rejected.lifecycle.unmount();
     getPluginQueryClient().clear();
+  });
+
+  it("shows the current outcome status icon and advances it to the next state", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const updateWorkTask = vi.fn(() =>
+      Promise.resolve({
+        task: { ...populatedOutcome.outcome!, status: "in_review" as const },
+      }),
+    );
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      {
+        rpc: fixture({
+          getWorkOutcome: () => ({
+            ...populatedOutcome,
+            outcome: {
+              ...populatedOutcome.outcome!,
+              status: "in_progress" as const,
+            },
+          }),
+          updateWorkTask,
+        }),
+      },
+    );
+    try {
+      const status = await slot.findByRole("button", {
+        name: "In Progress; move Ship cards to In Review",
+      });
+      expect(status.querySelector("svg")).toBeTruthy();
+      fireEvent.click(status);
+      await waitFor(() =>
+        expect(updateWorkTask).toHaveBeenCalledWith({
+          taskId: "task_1",
+          status: "in_review",
+        }),
+      );
+    } finally {
+      slot.lifecycle.unmount();
+      getPluginQueryClient().clear();
+    }
   });
 
   it("keeps cached A visible across A-to-B-to-A registered slot switches while revalidating", async () => {

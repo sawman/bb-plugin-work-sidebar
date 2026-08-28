@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Icon, type IconName } from "../../components/ui/icon";
+import { CopyBadge } from "../../components/ui/copy-badge";
 import { Input } from "../../components/ui/input";
 import { Combobox } from "../../components/ui/combobox";
 import { AssigneePicker } from "./assignee-picker";
@@ -12,6 +13,7 @@ import {
   runtimeStatusPresentation,
 } from "../../work-model";
 import { useTasksMutations } from "../tasks/mutations";
+import { taskStatusPresentation, type TaskStatus } from "../tasks/model";
 import { useTasksRead } from "../tasks/queries";
 import {
   nextOutcomeStatus,
@@ -250,42 +252,38 @@ function OutcomeCard({ threadId }: { threadId: string }) {
     <CardState
       title="Outcome"
       className={outcome ? "ws-outcome-card" : "ws-outcome-empty"}
+      trailing={
+        outcome ? (
+          <OutcomeHeading
+            taskKey={outcome.key}
+            title={outcome.title}
+            status={outcome.status}
+            priority={outcome.priority}
+            next={next}
+            updating={mutation.update.isPending}
+            onAdvance={() => {
+              if (!next) return;
+              void report(
+                mutation.update.mutateAsync({
+                  taskId: outcome.id,
+                  status: next,
+                }),
+                "Outcome updated",
+                "Could not update outcome",
+              );
+            }}
+          />
+        ) : undefined
+      }
       pending={query.isPending}
       error={query.error}
       onRetry={() => void query.refetch()}
     >
       {outcome ? (
         <>
-          <p className="ws-card-note ws-outcome-key">{outcome.key}</p>
           <h3 className="ws-card-title">{outcome.title}</h3>
-          {outcome.priority !== "none" ? (
-            <p className="ws-card-note">
-              {readableStatus(outcome.priority)} priority
-            </p>
-          ) : null}
           {outcome.dueDate ? (
             <p className="ws-card-note">Due {outcome.dueDate}</p>
-          ) : null}
-          {next ? (
-            <button
-              type="button"
-              disabled={mutation.update.isPending}
-              aria-label={`Move ${outcome.title} to ${readableStatus(next)}`}
-              onClick={() =>
-                void report(
-                  mutation.update.mutateAsync({
-                    taskId: outcome.id,
-                    status: next,
-                  }),
-                  "Outcome updated",
-                  "Could not update outcome",
-                )
-              }
-            >
-              {mutation.update.isPending
-                ? "Updating…"
-                : `Move to ${readableStatus(next)}`}
-            </button>
           ) : null}
         </>
       ) : (
@@ -362,6 +360,71 @@ function OutcomeCard({ threadId }: { threadId: string }) {
         </p>
       ) : null}
     </CardState>
+  );
+}
+
+function OutcomeHeading({
+  taskKey,
+  title,
+  status,
+  priority,
+  next,
+  updating,
+  onAdvance,
+}: {
+  taskKey: string;
+  title: string;
+  status: TaskStatus;
+  priority: "urgent" | "high" | "medium" | "low" | "none";
+  next: TaskStatus | null;
+  updating: boolean;
+  onAdvance(): void;
+}) {
+  const current = taskStatusPresentation(status);
+  const actionLabel = next
+    ? `${current.label}; move ${title} to ${taskStatusPresentation(next).label}`
+    : current.label;
+  return (
+    <span className="ws-outcome-heading-meta">
+      <CopyBadge
+        value={taskKey}
+        label="task ID"
+        className="ws-work-header-badge"
+      >
+        {taskKey}
+      </CopyBadge>
+      {priority !== "none" ? (
+        <span
+          className={`ws-task-priority-icon ws-task-priority-${priority}`}
+          role="img"
+          aria-label={`${readableStatus(priority)} priority`}
+          title={`${readableStatus(priority)} priority`}
+        >
+          <Icon name="AlertCircle" aria-hidden />
+        </span>
+      ) : null}
+      {next ? (
+        <button
+          type="button"
+          className={`ws-outcome-status ws-outcome-status-${status}${updating ? " ws-outcome-status-updating" : ""}`}
+          disabled={updating}
+          aria-label={actionLabel}
+          title={actionLabel}
+          onClick={onAdvance}
+        >
+          <Icon name={current.icon} aria-hidden />
+        </button>
+      ) : (
+        <span
+          className={`ws-outcome-status ws-outcome-status-${status}`}
+          role="img"
+          aria-label={actionLabel}
+          title={actionLabel}
+        >
+          <Icon name={current.icon} aria-hidden />
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -450,6 +513,7 @@ function TasksCard({ threadId }: { threadId: string }) {
       !bindingOwnedTaskIds.has(task.id),
   );
   const boundTaskCount = currentThreadBindingTaskIds.size;
+  const taskCount = attached.length + boundTaskCount;
   const busy = mutations.attachment.isPending || mutations.assignment.isPending;
   const report = (operation: Promise<unknown>, fallback: string) =>
     void operation.catch((error) =>
@@ -458,14 +522,21 @@ function TasksCard({ threadId }: { threadId: string }) {
   return (
     <CardState
       title="Tasks"
+      trailing={
+        tasks.data ? (
+          <span title={`${taskCount} task${taskCount === 1 ? "" : "s"}`}>
+            <span aria-hidden>{taskCount}</span>
+            <span className="ws-sr-only">
+              {taskCount} task{taskCount === 1 ? "" : "s"}
+            </span>
+          </span>
+        ) : undefined
+      }
       pending={tasks.isPending}
       error={tasks.error}
       onRetry={() => void tasks.refetch()}
     >
       <div className="ws-thread-task-card">
-        <p className="ws-section-count">
-          {attached.length + boundTaskCount}
-        </p>
         {boundTaskCount ? (
           <p className="ws-card-note" role="status">
             {boundTaskCount} work task{boundTaskCount === 1 ? "" : "s"}{" "}

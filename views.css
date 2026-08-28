@@ -1618,6 +1618,52 @@
   font: inherit;
   font-weight: 700;
 }
+.ws-card-heading-info,
+.ws-card-heading-info > span,
+.ws-outcome-heading-meta {
+  display: inline-flex;
+  align-items: center;
+}
+.ws-card-heading-info {
+  min-width: 0;
+  justify-content: flex-end;
+  color: var(--muted-foreground);
+}
+.ws-outcome-heading-meta {
+  gap: 0.28rem;
+}
+.ws-outcome-status {
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+}
+button.ws-outcome-status {
+  cursor: pointer;
+}
+.ws-outcome-status svg {
+  width: 0.68rem;
+  height: 0.68rem;
+}
+.ws-outcome-status-in_progress,
+.ws-outcome-status-in_review {
+  color: var(--primary);
+}
+.ws-outcome-status-done {
+  color: var(--success);
+}
+.ws-outcome-status-canceled {
+  color: var(--destructive);
+}
+.ws-outcome-status-in_progress svg,
+.ws-outcome-status-updating svg {
+  animation: ws-status-runtime-spin 1.2s linear infinite;
+}
 .ws-card-title {
   margin: 0;
   font-size: 0.72rem;
@@ -1999,9 +2045,6 @@ button.ws-provider-health:focus-visible {
   white-space: pre-wrap;
   word-break: break-word;
   -webkit-line-clamp: unset;
-}
-.ws-outcome-key {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 .ws-work-header-badges {
   display: flex;

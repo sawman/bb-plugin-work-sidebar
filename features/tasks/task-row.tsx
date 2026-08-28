@@ -7,7 +7,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "../../components/ui/context-menu";
-import { Icon, type IconName } from "../../components/ui/icon";
+import { Icon } from "../../components/ui/icon";
 import type {
   SidebarTask,
   TaskQueueNode,
@@ -23,26 +23,8 @@ const TASK_STATUSES: readonly SidebarTask["status"][] = [
   "done",
   "canceled",
 ];
-const taskStatus = (
-  status: SidebarTask["status"],
-): { label: string; icon: IconName } =>
-  ({
-    backlog: {
-      label: taskStatusPresentation("backlog").label,
-      icon: "ListTodo",
-    },
-    todo: { label: taskStatusPresentation("todo").label, icon: "Circle" },
-    in_progress: {
-      label: taskStatusPresentation("in_progress").label,
-      icon: "LoaderCircle",
-    },
-    in_review: {
-      label: taskStatusPresentation("in_review").label,
-      icon: "Eye",
-    },
-    done: { label: taskStatusPresentation("done").label, icon: "Check" },
-    canceled: { label: taskStatusPresentation("canceled").label, icon: "X" },
-  })[status];
+const taskStatus = (status: SidebarTask["status"]) =>
+  taskStatusPresentation(status);
 
 export type TaskRowProps = {
   node: TaskQueueNode;
