@@ -14,7 +14,7 @@ import {
 } from "./queries";
 import { changesInteractionStore } from "./store";
 import {
-  ChangesCurrentPullRequestCard,
+  ChangesCurrentPullRequestRow,
   ChangesError,
   ChangesRepositoryCard,
   ChangesStackBranchRow,
@@ -171,7 +171,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
             ))}
           </ol>
         ) : changesQuery.data?.currentPullRequest ? (
-          <ChangesCurrentPullRequestCard
+          <ChangesCurrentPullRequestRow
             pullRequest={changesQuery.data.currentPullRequest}
             branch={standaloneBranch}
             expanded={presentation?.currentPullRequestExpanded ?? false}

@@ -57,7 +57,6 @@ const RED_DEAD_SELECTORS = [
   ".ws-pr-stack-layer-item::before",
   ".ws-pr-stack-layer-item > .ws-pr-row",
   ".ws-new-thread",
-  ".ws-current-pr-summary",
   ".ws-thread-settings-menu",
   ".ws-thread-task-card",
 ] as const;
@@ -347,14 +346,6 @@ const EXPECTED_EFFECTIVE_STYLES: Record<string, Record<string, string>> = {
     display: "block",
     margin: "0",
   },
-  ".ws-current-pr-summary": {
-    display: "grid",
-    "grid-template-columns": "0.75rem minmax(0, 1fr) auto",
-    width: "100%",
-    "align-items": "center",
-    gap: "0.35rem",
-    padding: "0.45rem 3.25rem 0.45rem 0.45rem",
-  },
   ".ws-thread-settings-menu": {
     position: "absolute",
     "z-index": "100 !important",
@@ -601,7 +592,7 @@ describe("protected stylesheet duplicate ownership", () => {
     const rules = parseRules(readFileSync(stylesheetPath, "utf8"));
     const inventory = overlappingProperties(rules);
 
-    expect(RED_DEAD_SELECTORS).toHaveLength(34);
+    expect(RED_DEAD_SELECTORS).toHaveLength(33);
     expect(STATE_SHAPED_RED_SELECTORS.every((selector) => RED_DEAD_SELECTORS.includes(selector))).toBe(true);
     expect(inventory, "all RED same-cascade overlaps must be consolidated").toEqual([]);
     expect(emptyRules(rules), "empty CSS rules must be removed").toEqual([]);

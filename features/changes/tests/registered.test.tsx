@@ -270,11 +270,15 @@ describe("R13 registered Changes Work slot", () => {
     await waitFor(() =>
       expect(clipboardWrite).toHaveBeenCalledWith("PR #42"),
     );
-    fireEvent.click(
-      nonStack.getByRole("button", {
-        name: "Show changed files for pull request #42",
-      }),
-    );
+    const nonStackDisclosure = nonStack.getByRole("button", {
+      name: "Show changed files for pull request #42",
+    });
+    expect(nonStackDisclosure.closest(".ws-stack-layer")).toBeTruthy();
+    expect(
+      (nonStack.getByRole("button", { name: "Current branch" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    fireEvent.click(nonStackDisclosure);
     expect(nonStack.getByText("Review: Approved")).toBeTruthy();
     expect(nonStack.getByText("Changed files are unavailable.")).toBeTruthy();
     nonStack.lifecycle.unmount();
@@ -458,12 +462,17 @@ describe("R13 registered Changes Work slot", () => {
     expect(
       slot.queryByRole("list", { name: "GitHub Stack based on main" }),
     ).toBeNull();
-    expect(
-      slot.queryByRole("button", { name: "Current branch" }),
-    ).toBeNull();
     const disclosure = slot.getByRole("button", {
       name: "Show changed files for pull request #1279",
     });
+    const row = disclosure.closest(".ws-stack-layer");
+    expect(row).toBeTruthy();
+    expect(slot.container.querySelector(".ws-current-pr-card")).toBeNull();
+    expect(row?.querySelectorAll(".ws-stack-action-slot")).toHaveLength(3);
+    expect(
+      (slot.getByRole("button", { name: "Current branch" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
     expect(disclosure.querySelector("svg path")?.getAttribute("d")).toBe(
       "m9 18 6-6-6-6",
     );

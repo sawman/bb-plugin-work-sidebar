@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import type { GitHubStackBranch } from "../../contracts.js";
 import { Icon } from "../../components/ui/icon.js";
 import { Status } from "../../components/ui/status.js";
@@ -239,7 +239,54 @@ function readableStatus(status: string): string {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-export function ChangesCurrentPullRequestCard({
+function currentPullRequestBranch(
+  pullRequest: CurrentPullRequestView,
+  branch?: GitHubStackBranch | null,
+): GitHubStackBranch {
+  return {
+    name: branch?.name ?? pullRequest.head,
+    isCurrent: true,
+    isMerged: pullRequest.state === "merged",
+    isQueued: branch?.isQueued ?? false,
+    needsRebase: branch?.needsRebase ?? false,
+    hasStash: branch?.hasStash ?? false,
+    stashCount: branch?.stashCount ?? null,
+    pr: {
+      number: pullRequest.number,
+      url: pullRequest.url,
+      state: pullRequest.state,
+      title: pullRequest.title,
+      isDraft: pullRequest.state === "draft",
+      metadataStale: branch?.pr?.metadataStale ?? false,
+    },
+    diff: branch?.diff ?? null,
+    aheadOfRemote: branch?.aheadOfRemote ?? null,
+    behindRemote: branch?.behindRemote ?? null,
+    checks: pullRequest.signal.checks,
+    review: pullRequest.signal.review,
+  };
+}
+
+function CurrentPullRequestDetails({
+  pullRequest,
+}: {
+  pullRequest: CurrentPullRequestView;
+}) {
+  const signal = pullRequestSignalPresentation(pullRequest.signal);
+  return (
+    <div className="ws-current-pr-details">
+      <span>Review: {signal.review.label}</span>
+      <span>
+        Checks: {pullRequest.checks.passedCount} passed ·{" "}
+        {pullRequest.checks.pendingCount} pending ·{" "}
+        {pullRequest.checks.failedCount} failed
+      </span>
+      <span>Merge: {readableStatus(pullRequest.mergeability.state)}</span>
+    </div>
+  );
+}
+
+export function ChangesCurrentPullRequestRow({
   pullRequest,
   branch,
   expanded,
@@ -250,77 +297,25 @@ export function ChangesCurrentPullRequestCard({
   expanded: boolean;
   onToggle(): void;
 }) {
-  const signal = pullRequestSignalPresentation(pullRequest.signal);
-  const status = pullRequestPresentation({
-    state: pullRequest.state,
-    draft: pullRequest.state === "draft",
-    attention: pullRequest.attention,
-  });
+  const rowBranch = currentPullRequestBranch(pullRequest, branch);
   return (
-    <article className="ws-current-pr-card">
-      <div className="ws-current-pr-summary">
-        <Status presentation={status} />
-        <span>
-          <strong>
-            #{pullRequest.number} {pullRequest.title}
-          </strong>
-          <small>
-            {pullRequest.head} · {readableStatus(pullRequest.review.state)} ·{" "}
-            {pullRequest.checks.passedCount}/{pullRequest.checks.totalCount}{" "}
-            checks
-            {branch?.diff ? (
-              <>
-                {" "}· <b>+{branch.diff.additions}</b>{" "}
-                <i>−{branch.diff.deletions}</i>
-              </>
-            ) : null}
-          </small>
-        </span>
-        <span
-          className="ws-current-pr-signals"
-          role="group"
-          aria-label="Pull request signals"
-        >
-          <Status presentation={signal.checks} />
-          <Status presentation={signal.review} />
-        </span>
-      </div>
-      <a
-        className="ws-current-pr-open ws-pr-tooltip"
-        data-tooltip="Open on GitHub"
-        href={pullRequest.url}
-        target="_blank"
-        rel="noreferrer"
-        aria-label={`Open pull request #${pullRequest.number} on GitHub`}
-      >
-        ↗
-      </a>
-      <button
-        type="button"
-        className="ws-current-pr-expand ws-pr-tooltip"
-        data-tooltip={expanded ? "Hide changed files" : "Show changed files"}
-        onClick={onToggle}
-        aria-expanded={expanded}
-        aria-label={`${expanded ? "Hide" : "Show"} changed files for pull request #${pullRequest.number}`}
-      >
-        <Icon
-          className="ws-changes-disclosure-icon"
-          name={expanded ? "ChevronDown" : "ChevronRight"}
-        />
-      </button>
-      {expanded && (
-        <div className="ws-current-pr-details">
-          <span>Review: {signal.review.label}</span>
-          <span>
-            Checks: {pullRequest.checks.passedCount} passed ·{" "}
-            {pullRequest.checks.pendingCount} pending ·{" "}
-            {pullRequest.checks.failedCount} failed
-          </span>
-          <span>Merge: {readableStatus(pullRequest.mergeability.state)}</span>
-          <PullRequestFiles diff={branch?.diff ?? null} />
-        </div>
-      )}
-    </article>
+    <ol className="ws-stack-rail" aria-label={`Pull request #${pullRequest.number}`}>
+      <ChangesStackBranchRow
+        branch={rowBranch}
+        signals={{
+          state: pullRequest.state,
+          draft: pullRequest.state === "draft",
+          checks: pullRequest.signal.checks,
+          review: pullRequest.signal.review,
+          reviewCommentCount: pullRequest.signal.reviewCommentCount,
+        }}
+        expanded={expanded}
+        checkingOut={false}
+        onToggle={onToggle}
+        onCheckout={() => undefined}
+        expandedDetails={<CurrentPullRequestDetails pullRequest={pullRequest} />}
+      />
+    </ol>
   );
 }
 
@@ -371,6 +366,7 @@ export function ChangesStackBranchRow({
   checkingOut,
   onToggle,
   onCheckout,
+  expandedDetails,
 }: {
   branch: GitHubStackBranch;
   signals?: StackBranchSignals;
@@ -378,6 +374,7 @@ export function ChangesStackBranchRow({
   checkingOut: boolean;
   onToggle(): void;
   onCheckout(): void;
+  expandedDetails?: ReactNode;
 }) {
   const pr = branch.pr;
   const title = pr?.title ?? branch.name;
@@ -466,7 +463,12 @@ export function ChangesStackBranchRow({
           onToggle={onToggle}
         />
       </div>
-      {expanded && <PullRequestFiles diff={branch.diff} />}
+      {expanded && (
+        <>
+          {expandedDetails}
+          <PullRequestFiles diff={branch.diff} />
+        </>
+      )}
     </li>
   );
 }
