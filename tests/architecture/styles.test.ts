@@ -398,31 +398,34 @@ describe("shared surface and list-row architecture", () => {
     expect(chevron?.declarations).toContain("color: var(--muted-foreground)");
   });
 
-  test("renders the Changes pull request number as a compact header badge", () => {
+  test("uses one atomic visual contract for copyable identifier badges", () => {
     const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
     const badge = rules.find(
-      ({ selector }) => selector === ".ws-pr-number-badge",
+      ({ selector }) => selector === ".ws-identifier-badge",
     );
 
     expect(badge?.declarations).toContain("display: inline-flex");
     expect(badge?.declarations).toContain("align-items: center");
     expect(badge?.declarations).toContain("border: 1px solid var(--border)");
+    expect(badge?.declarations).toContain(
+      "font-family: ui-monospace, SFMono-Regular, Menlo, monospace",
+    );
+    expect(badge?.declarations).toContain("font-size: 0.58rem");
+    expect(badge?.declarations).toContain("font-weight: 600");
     expect(badge?.declarations).toContain("white-space: nowrap");
-  });
 
-  test("uses one neutral badge tone for Changes pull request and stack identifiers", () => {
-    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
-    const pullRequestBadge = rules.find(
-      ({ selector }) => selector === ".ws-pr-number-badge",
-    );
-    const stackBadge = rules.find(
-      ({ selector }) => selector === ".ws-stack-number",
-    );
-
-    for (const badge of [pullRequestBadge, stackBadge]) {
-      expect(badge?.declarations).toContain("border: 1px solid var(--border)");
-      expect(badge?.declarations).toContain("color: var(--foreground)");
-      expect(badge?.declarations).not.toContain("var(--primary)");
+    for (const selector of [
+      ".ws-pr-identifier-badge",
+      ".ws-pr-number-badge",
+      ".ws-stack-number",
+      ".ws-work-header-badge",
+      ".ws-agent-workspace-badge",
+      ".ws-thread-meta .ws-thread-worktree",
+    ]) {
+      const variant = rules.find((rule) => rule.selector === selector);
+      expect(variant?.declarations, selector).not.toMatch(
+        /(?:border(?:-radius)?|color|font-(?:family|size|weight)|padding|line-height|white-space):/,
+      );
     }
   });
 
@@ -622,19 +625,16 @@ describe("shared surface and list-row architecture", () => {
     expect(branch?.declarations).toContain("max-width: 100%");
   });
 
-  test("uses one neutral identifier badge contract for authored PRs and branches", () => {
+  test("keeps authored PR and branch badges bounded within their rows", () => {
     const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
     const badges = rules.filter(
       ({ selector }) => selector === ".ws-pr-identifier-badge",
     );
 
     expect(badges).toHaveLength(1);
-    expect(badges[0]?.declarations).toContain("border: 1px solid var(--border)");
-    expect(badges[0]?.declarations).toContain("color: var(--foreground)");
     expect(badges[0]?.declarations).toContain("flex: 0 1 auto");
-    expect(badges[0]?.declarations).not.toContain("var(--success)");
-    expect(badges[0]?.declarations).not.toContain("var(--destructive)");
-    expect(badges[0]?.declarations).not.toContain("var(--primary)");
+    expect(badges[0]?.declarations).toContain("max-width: 100%");
+    expect(badges[0]?.declarations).toContain("overflow: hidden");
   });
 
   test("keeps archived-thread context menus outside the dimmed stacking context", () => {

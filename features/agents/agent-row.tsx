@@ -106,7 +106,7 @@ export function AgentRow({
               value={workspace.label}
               copyValue={workspace.copyValue}
               label="agent workspace"
-              className="ws-agent-fact"
+              className="ws-agent-workspace-badge"
               title={`${workspace.detail}: ${workspace.label}`}
               data-workspace-kind={workspace.kind}
             >

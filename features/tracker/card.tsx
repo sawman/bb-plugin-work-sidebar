@@ -36,7 +36,7 @@ export function TrackerHeaderBadge({ threadId }: { threadId: string }) {
     <button
       key={item.key}
       type="button"
-      className="ws-work-header-badge ws-linear-header-badge"
+      className="ws-identifier-badge ws-work-header-badge ws-linear-header-badge"
       title={`${item.key} · ${item.title}`}
       onClick={() => navigate.openUrl(item.url)}
     >

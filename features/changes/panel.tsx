@@ -103,7 +103,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
               value={`#${currentPullRequestNumber}`}
               copyValue={`PR #${currentPullRequestNumber}`}
               label="PR number"
-              className="ws-pr-number ws-pr-number-badge"
+              className="ws-pr-number-badge"
               title={`PR #${currentPullRequestNumber}`}
             >
               <Icon name="GitPullRequest" aria-hidden />

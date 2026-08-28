@@ -265,6 +265,7 @@ describe("R13 registered Changes Work slot", () => {
       name: "Copy PR number #42",
     });
     expect(currentPrNumber.classList.contains("ws-pr-number-badge")).toBe(true);
+    expect(currentPrNumber.classList.contains("ws-identifier-badge")).toBe(true);
     fireEvent.click(currentPrNumber);
     await waitFor(() =>
       expect(clipboardWrite).toHaveBeenCalledWith("PR #42"),

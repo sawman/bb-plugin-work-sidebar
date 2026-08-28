@@ -257,6 +257,7 @@ describe("R15 registered Agents Work slot", () => {
     const workspace = slot.getByRole("button", {
       name: "Copy agent workspace bb/agents-details",
     });
+    expect(workspace.classList).toContain("ws-identifier-badge");
     fireEvent.click(workspace);
     await waitFor(() =>
       expect(clipboardWrite).toHaveBeenCalledWith(

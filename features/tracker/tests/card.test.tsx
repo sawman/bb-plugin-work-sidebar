@@ -443,7 +443,9 @@ describe("registered tracker card", () => {
     await waitFor(() =>
       expect(slot.getByLabelText("LIN-1 status")).toBeTruthy(),
     );
-    fireEvent.click(slot.getAllByText("LIN-1")[0]!);
+    const headerBadge = slot.getByRole("button", { name: "LIN-1" });
+    expect(headerBadge.classList).toContain("ws-identifier-badge");
+    fireEvent.click(headerBadge);
     fireEvent.click(slot.container.querySelector(".ws-linear-issue")!);
     expect(slot.inspection.navigateCalls).toEqual([
       { method: "openUrl", url: linked.items[0].item.url },

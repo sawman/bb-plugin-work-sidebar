@@ -178,6 +178,7 @@ describe("R21D ThreadRow characterization", () => {
       "Copy branch name feature/m7",
     ]) {
       const badge = await view.findByRole("button", { name });
+      expect(badge.classList).toContain("ws-identifier-badge");
       fireEvent.pointerDown(badge, { button: 0, pointerId: 9 });
       fireEvent.click(badge);
       fireEvent.contextMenu(badge, { ctrlKey: true });

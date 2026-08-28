@@ -535,32 +535,32 @@
   outline: 2px solid var(--ring);
   outline-offset: 1px;
 }
-.ws-pr-number {
-  font-weight: 650;
-}
-.ws-pr-identifier-badge {
+.ws-identifier-badge {
   display: inline-flex;
-  min-width: 0;
-  max-width: 100%;
-  flex: 0 1 auto;
   align-items: center;
   gap: 0.18rem;
-  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.05rem 0.3rem;
+  background: transparent;
   color: var(--foreground);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.58rem;
   font-weight: 600;
   line-height: 1;
+  text-decoration: none;
   white-space: nowrap;
 }
-.ws-pr-identifier-badge svg {
+.ws-identifier-badge svg {
   width: 0.62rem;
   height: 0.62rem;
   flex: none;
-  color: var(--muted-foreground);
+}
+.ws-pr-identifier-badge {
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
+  overflow: hidden;
 }
 .ws-pr-identifier-badge > span {
   min-width: 0;
@@ -568,40 +568,10 @@
   text-overflow: ellipsis;
 }
 .ws-pr-number-badge {
-  display: inline-flex;
   flex: none;
-  align-items: center;
-  gap: 0.18rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0.05rem 0.3rem;
-  color: var(--foreground);
-  font-size: 0.58rem;
-  line-height: 1;
-  white-space: nowrap;
-}
-.ws-pr-number-badge svg {
-  width: 0.62rem;
-  height: 0.62rem;
 }
 .ws-stack-number {
-  display: inline-flex;
   flex: none;
-  align-items: center;
-  gap: 0.18rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0.05rem 0.3rem;
-  color: var(--foreground);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.58rem;
-  font-weight: 650;
-  line-height: 1;
-  white-space: nowrap;
-}
-.ws-stack-number svg {
-  width: 0.62rem;
-  height: 0.62rem;
 }
 .ws-thread-meta .ws-stack-number-compact {
   padding: 0.04rem 0.24rem;
@@ -2150,16 +2120,7 @@ button.ws-provider-health:focus-visible {
 .ws-work-header-badge {
   max-width: 5.5rem;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0.08rem 0.28rem;
-  color: var(--muted-foreground);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.55rem;
-  line-height: 1.15;
-  text-decoration: none;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .ws-linear-header-badge {
   color: var(--primary);
@@ -2273,6 +2234,20 @@ button.ws-provider-health:focus-visible {
   color: var(--muted-foreground);
   font-size: 0.6rem;
   line-height: 1.2;
+}
+.ws-agent-workspace-badge {
+  max-width: 100%;
+  justify-self: start;
+  overflow: hidden;
+}
+.ws-agent-workspace-badge > span,
+.ws-agent-workspace-badge > small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-agent-workspace-badge > small {
+  opacity: 0.78;
 }
 .ws-agent-fact svg {
   width: 0.64rem;

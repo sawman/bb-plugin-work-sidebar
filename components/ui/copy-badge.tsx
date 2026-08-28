@@ -62,7 +62,7 @@ export function CopyBadge({
   return (
     <span
       {...spanProps}
-      className={`ws-copy-badge${className ? ` ${className}` : ""}`}
+      className={`ws-copy-badge ws-identifier-badge${className ? ` ${className}` : ""}`}
       role="button"
       tabIndex={0}
       aria-label={`Copy ${label} ${value}`}
