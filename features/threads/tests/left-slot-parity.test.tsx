@@ -212,26 +212,30 @@ describe("R18 registered left sidebar parity", () => {
     const codex = slot.getByRole("img", { name: "Codex provider" });
     const claude = slot.getByRole("img", { name: "Claude Code provider" });
     await waitFor(() =>
-      expect(codex.querySelector("img")?.getAttribute("src")).toMatch(
-        /^data:image\/svg\+xml/,
-      ),
+      expect(
+        codex
+          .querySelector<HTMLElement>(".ws-thread-provider-mark")
+          ?.style.getPropertyValue("--ws-thread-provider-logo"),
+      ).toMatch(/^url\("data:image\/svg\+xml/),
     );
     await waitFor(() =>
-      expect(claude.querySelector("img")?.getAttribute("src")).toMatch(
-        /^data:image\/svg\+xml/,
-      ),
+      expect(
+        claude
+          .querySelector<HTMLElement>(".ws-thread-provider-mark")
+          ?.style.getPropertyValue("--ws-thread-provider-logo"),
+      ).toMatch(/^url\("data:image\/svg\+xml/),
     );
+    expect(codex.querySelector("img")).toBeNull();
+    expect(claude.querySelector("img")).toBeNull();
     expect(fetchLogo).toHaveBeenCalledTimes(2);
     expect(fetchLogo.mock.calls.map(([url]) => url)).toEqual([
       "/api/v1/system/providers/codex/logo",
       "/api/v1/system/providers/claude-code/logo",
     ]);
-    const codexImage = codex.querySelector("img")!;
-    fireEvent.error(codexImage);
-    expect(codexImage.hidden).toBe(true);
-    expect(
-      slot.getByRole("img", { name: "future-agent provider" }),
-    ).toBeTruthy();
+    const fallback = slot.getByRole("img", {
+      name: "future-agent provider",
+    });
+    expect(fallback.querySelector('[data-icon="Bot"]')).toBeTruthy();
     slot.lifecycle.unmount();
   });
 

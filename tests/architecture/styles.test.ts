@@ -523,6 +523,22 @@ describe("shared surface and list-row architecture", () => {
     }
   });
 
+  test("renders cached provider artwork through the current theme color", () => {
+    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const mark = rules.find(
+      ({ selector }) => selector === ".ws-thread-provider-mark",
+    );
+
+    expect(mark?.declarations).toContain("background: currentColor");
+    expect(mark?.declarations).toContain(
+      "mask-image: var(--ws-thread-provider-logo)",
+    );
+    expect(mark?.declarations).toContain("mask-size: contain");
+    expect(
+      rules.some(({ selector }) => selector === ".ws-thread-provider img"),
+    ).toBe(false);
+  });
+
   test("shares one left-sidebar row rhythm across Threads, Tasks, and PRs", () => {
     const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
     const declarations = (selector: string) =>

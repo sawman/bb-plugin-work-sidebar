@@ -1,5 +1,6 @@
 import type { PluginProvidersState } from "@get-bb/plugin-sdk/app";
 import { useQuery } from "@tanstack/react-query";
+import type { CSSProperties } from "react";
 import { queryKeys, queryPolicies } from "@/query-runtime";
 import { Icon } from "../ui/icon";
 
@@ -39,14 +40,14 @@ function CachedProviderImage({ logoUrl }: { logoUrl: string }) {
   });
   if (!logo.data) return null;
   return (
-    <img
-      src={logo.data}
-      alt=""
+    <span
+      className="ws-thread-provider-mark"
       aria-hidden
-      draggable={false}
-      onError={(event) => {
-        event.currentTarget.hidden = true;
-      }}
+      style={
+        {
+          "--ws-thread-provider-logo": `url("${logo.data}")`,
+        } as CSSProperties
+      }
     />
   );
 }

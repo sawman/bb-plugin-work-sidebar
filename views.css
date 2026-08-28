@@ -63,14 +63,20 @@
   width: 0.68rem;
   height: 0.68rem;
 }
-.ws-thread-provider img {
+.ws-thread-provider-mark {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+  background: currentColor;
+  -webkit-mask-image: var(--ws-thread-provider-logo);
+  mask-image: var(--ws-thread-provider-logo);
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
 }
-.ws-thread-provider img:not([hidden]) + svg {
+.ws-thread-provider-mark + svg {
   visibility: hidden;
 }
 .ws-thread[data-depth="child"] {
