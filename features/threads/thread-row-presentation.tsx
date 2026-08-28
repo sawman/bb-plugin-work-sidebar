@@ -67,7 +67,10 @@ export function ThreadMetadata({
           className="ws-thread-worktree"
           title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${thread.environment.branchName}`}
         >
-          <Icon name={project?.isPersonal ? "Laptop" : "FolderGit"} aria-hidden />
+          <Icon
+            name={project?.isPersonal ? "Laptop" : "FolderGit"}
+            aria-hidden
+          />
           <span>{thread.environment.branchName}</span>
         </CopyBadge>
       ) : (
@@ -75,12 +78,19 @@ export function ThreadMetadata({
           className="ws-thread-worktree"
           title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${project?.isPersonal ? "Personal" : projectLabel}`}
         >
-          <Icon name={project?.isPersonal ? "Laptop" : "FolderGit"} aria-hidden />
+          <Icon
+            name={project?.isPersonal ? "Laptop" : "FolderGit"}
+            aria-hidden
+          />
           <span>{project?.isPersonal ? "Personal" : projectLabel}</span>
         </span>
       )}
       {pullRequestLoading && (
-        <span className="ws-pr-meta" role="status" aria-label="Pull request loading">
+        <span
+          className="ws-pr-meta"
+          role="status"
+          aria-label="Pull request loading"
+        >
           PR loading…
         </span>
       )}
@@ -111,6 +121,15 @@ export function ThreadStatus({
           aria-label="Unsent draft"
         />
       )}
+      {thread.isPinned && (
+        <Icon name="Pin" className="ws-thread-pin" aria-label="Pinned" />
+      )}
+      {staleWorking && (
+        <Icon name="Clock" className="ws-status-stale-clock" aria-hidden />
+      )}
+      {indicator === "unread-success" && thread.indicatorLabel && (
+        <span className="ws-sr-only">{thread.indicatorLabel}</span>
+      )}
       {(working || glyph) && (
         <span
           className={`ws-status ws-status-${indicator} ${working ? "ws-status-working" : ""}`}
@@ -118,30 +137,15 @@ export function ThreadStatus({
           aria-label={statusLabel ?? undefined}
         >
           {working ? (
-            <>
-              <span className="ws-status-dots" aria-hidden>
-                <i />
-                <i />
-                <i />
-              </span>
-              {staleWorking && (
-                <Icon
-                  name="Clock"
-                  className="ws-status-stale-clock"
-                  aria-hidden
-                />
-              )}
-            </>
+            <span className="ws-status-dots" aria-hidden>
+              <i />
+              <i />
+              <i />
+            </span>
           ) : (
             glyph
           )}
         </span>
-      )}
-      {indicator === "unread-success" && thread.indicatorLabel && (
-        <span className="ws-sr-only">{thread.indicatorLabel}</span>
-      )}
-      {thread.isPinned && (
-        <Icon name="Pin" className="ws-thread-pin" aria-label="Pinned" />
       )}
     </span>
   );

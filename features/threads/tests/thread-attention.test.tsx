@@ -94,7 +94,7 @@ describe("thread attention presentation", () => {
     expect(complete.container.textContent).not.toContain("•");
   });
 
-  it("adds a clock over working dots at the 30-minute no-update boundary", () => {
+  it("adds an inline clock before the far-right activity indicator at the 30-minute boundary", () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     const view = render(
@@ -102,11 +102,12 @@ describe("thread attention presentation", () => {
         thread={thread({
           indicator: "runtime",
           indicatorLabel: "Thread is running",
+          isPinned: true,
           createdAt: NOW - STALE_WORKING_MS + 1_000,
           updatedAt: NOW - STALE_WORKING_MS + 1_000,
           latestAttentionAt: NOW - STALE_WORKING_MS + 1_000,
         })}
-        hasComposerDraft={false}
+        hasComposerDraft
       />,
     );
 
@@ -116,5 +117,15 @@ describe("thread attention presentation", () => {
     act(() => vi.advanceTimersByTime(1));
     expect(view.getByLabelText(/no agent update for 30 minutes/i)).toBeTruthy();
     expect(view.container.querySelector(".ws-status-dots")).toBeTruthy();
+    const trailing = view.container.querySelector(".ws-thread-trailing")!;
+    expect(
+      [...trailing.children].map((element) => element.classList[0]),
+    ).toEqual([
+      "ws-composer-draft",
+      "ws-thread-pin",
+      "ws-status-stale-clock",
+      "ws-status",
+    ]);
+    expect(trailing.lastElementChild?.classList).toContain("ws-status");
   });
 });

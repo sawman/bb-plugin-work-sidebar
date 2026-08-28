@@ -355,10 +355,13 @@ describe("R18 registered left sidebar parity", () => {
     slot.lifecycle.unmount();
   });
 
-  it("restores an archived thread with Enter or Space on its drag handle", async () => {
+  it("uses the same whole-row drag gesture for custom groups and archived threads", async () => {
     const archivedAt = Date.now() - 3 * 3_600_000;
     const unarchive = vi.fn(({ threadId }: { threadId: string }) => ({ threadId }));
+    const saveGroups = vi.fn(({ groups: next }: { groups: unknown[] }) => ({ groups: next }));
     const slot = await leftSlot({
+      threads: [thread("thr_active", "Active thread"), thread("thr_grouped", "Grouped thread")],
+      groups: [{ id: "group_later", name: "Later", threadIds: ["thr_grouped"] }],
       rpc: {
         sidebarArchivedThreads: () => ({
           available: true,
@@ -378,21 +381,55 @@ describe("R18 registered left sidebar parity", () => {
           }],
         }),
         unarchiveSidebarThread: unarchive,
+        saveThreadGroups: saveGroups,
       },
     });
+    await waitFor(() => expect(slot.getByRole("link", { name: /Grouped thread/ })).toBeTruthy());
+    const activeZone = slot.container.querySelector<HTMLElement>('[data-ws-thread-drop-zone="active"]')!;
+    const groupedRow = await waitFor(() => {
+      const row = slot.container.querySelector<HTMLElement>('[data-ws-thread-group="group_later"][data-ws-thread-id="thr_grouped"]');
+      expect(row).toBeTruthy();
+      return row!;
+    });
+    expect(groupedRow.dataset.wsThreadGroup).toBe("group_later");
+    const elementAt = mockElementAt(activeZone);
+    fireEvent.pointerDown(groupedRow, { button: 0, pointerId: 21, clientX: 0, clientY: 0 });
+    fireEvent.pointerMove(window, { pointerId: 21, clientX: 10, clientY: 20 });
+    expect(activeZone.dataset.dropTarget).toBe("true");
+    fireEvent.pointerUp(window, { pointerId: 21, clientX: 10, clientY: 20 });
+    await waitFor(() => expect(saveGroups).toHaveBeenCalledWith({
+      groups: [{ id: "group_later", name: "Later", threadIds: [] }],
+    }));
+
     fireEvent.click(slot.container.querySelector(".ws-archived summary")!);
     const archivedLink = await slot.findByRole("link", { name: /Archived thread/ });
     const duration = archivedLink.querySelector("time");
     expect(duration?.textContent).toBe("3h");
     expect(duration?.getAttribute("aria-label")).toBe("Archived 3h ago");
-    expect(archivedLink.firstElementChild).toBe(duration);
-    const restore = await slot.findByRole("button", { name: "Restore Archived thread" });
-    fireEvent.keyDown(restore, { key: "Enter" });
+    expect(duration?.parentElement?.classList).toContain("ws-thread-trailing");
+    expect(archivedLink.querySelector(".ws-thread-drag-handle")).toBeNull();
+    fireEvent.keyDown(archivedLink, { key: "F10", shiftKey: true });
+    expect(slot.getByRole("menuitem", { name: "Active" })).toBeTruthy();
+    expect(slot.getByRole("menuitem", { name: "Later" })).toBeTruthy();
+    fireEvent.keyDown(window, { key: "Escape" });
+    const archivedRow = archivedLink.closest<HTMLElement>(".ws-thread")!;
+    const activeRow = slot.container.querySelector<HTMLElement>('[data-ws-thread-group="active"][data-ws-thread-id="thr_active"]')!;
+    elementAt.mockReturnValue(archivedRow);
+    fireEvent.pointerDown(activeRow, { button: 0, pointerId: 23, clientX: 0, clientY: 0 });
+    fireEvent.pointerMove(window, { pointerId: 23, clientX: 10, clientY: 20 });
+    fireEvent.pointerUp(window, { pointerId: 23, clientX: 10, clientY: 20 });
+    expect(slot.inspection.sidebarActionCalls).toContainEqual({ method: "archive", threadId: "thr_active" });
+    const groupZone = slot.container.querySelector<HTMLElement>('[data-ws-thread-drop-zone="group_later"]')!;
+    elementAt.mockReturnValue(groupZone);
+    fireEvent.pointerDown(archivedRow, { button: 0, pointerId: 22, clientX: 0, clientY: 0 });
+    fireEvent.pointerMove(window, { pointerId: 22, clientX: 10, clientY: 20 });
+    fireEvent.pointerUp(window, { pointerId: 22, clientX: 10, clientY: 20 });
     await waitFor(() =>
       expect(unarchive).toHaveBeenCalledWith({ threadId: "thr_archived" }),
     );
-    fireEvent.keyDown(restore, { key: " " });
-    await waitFor(() => expect(unarchive).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(saveGroups).toHaveBeenLastCalledWith({
+      groups: [{ id: "group_later", name: "Later", threadIds: ["thr_archived"] }],
+    }));
     slot.lifecycle.unmount();
   });
 

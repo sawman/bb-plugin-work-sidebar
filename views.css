@@ -901,32 +901,19 @@
   padding-left: 0;
 }
 .ws-archived-thread > .ws-thread-anchor {
-  grid-template-columns: 2.15rem 0.8rem minmax(0, 1fr) auto;
   opacity: 0.8;
 }
 .ws-archived-thread .ws-thread-archive-age {
-  grid-column: 1;
-  justify-self: start;
   color: var(--muted-foreground);
   font-size: 0.52rem;
   font-variant-numeric: tabular-nums;
   line-height: 1;
   white-space: nowrap;
 }
-.ws-archived-thread .ws-project-icon {
-  grid-column: 2;
-}
-.ws-archived-thread .ws-thread-main {
-  grid-column: 3;
-}
-.ws-archived-thread .ws-thread-trailing {
-  grid-column: 4;
-}
 .ws-active-threads {
   margin-top: 0.3rem;
 }
 .ws-status-working {
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -952,12 +939,9 @@
   animation-delay: 0.28s;
 }
 .ws-status-stale-clock {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0.52rem;
-  height: 0.52rem;
+  flex: none;
+  width: 0.68rem;
+  height: 0.68rem;
   color: var(--foreground);
   stroke-width: 2.2;
 }
@@ -1019,7 +1003,8 @@
 .ws-thread-meta .ws-thread-worktree {
   display: inline-flex;
   min-width: 2.75rem;
-  flex: 1 1 4rem;
+  max-width: 100%;
+  flex: 0 1 auto;
   align-items: center;
   gap: 0.16rem;
 }
@@ -2162,29 +2147,6 @@ button.ws-provider-health:focus-visible {
 .ws-thread-selected:hover,
 .ws-thread-agent-badge-expanded {
   background: var(--accent);
-}
-.ws-thread-drag-handle {
-  display: grid;
-  place-items: center;
-  width: 0.78rem;
-  height: 1.18rem;
-  border-radius: 3px;
-  color: var(--muted-foreground);
-  cursor: grab;
-  touch-action: none;
-}
-.ws-thread-drag-handle svg {
-  width: 0.66rem;
-  height: 0.66rem;
-}
-.ws-thread-drag-handle:hover,
-.ws-thread-drag-handle:focus-visible {
-  background: var(--accent);
-  color: var(--foreground);
-  outline: none;
-}
-.ws-thread-drag-handle:active {
-  cursor: grabbing;
 }
 .ws-thread-dragging > .ws-thread-anchor {
   background: var(--accent);

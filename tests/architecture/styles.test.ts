@@ -589,18 +589,21 @@ describe("shared surface and list-row architecture", () => {
     expect(workCards?.declarations).toContain("gap: 0.58rem");
   });
 
-  test("centers the stale clock over the left thread activity indicator", () => {
+  test("keeps branch copy targets content-sized and stale clocks inline", () => {
     const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
     const working = rules.find(({ selector }) => selector === ".ws-status-working");
     const clock = rules.find(
       ({ selector }) => selector === ".ws-status-stale-clock",
     );
+    const branch = rules.find(
+      ({ selector }) => selector === ".ws-thread-meta .ws-thread-worktree",
+    );
 
-    expect(working?.declarations).toContain("position: relative");
-    expect(clock?.declarations).toContain("position: absolute");
-    expect(clock?.declarations).toContain("bottom: 100%");
-    expect(clock?.declarations).toContain("left: 50%");
-    expect(clock?.declarations).toContain("transform: translateX(-50%)");
+    expect(working?.declarations).not.toContain("position: relative");
+    expect(clock?.declarations).not.toContain("position: absolute");
+    expect(clock?.declarations).toContain("flex: none");
+    expect(branch?.declarations).toContain("flex: 0 1 auto");
+    expect(branch?.declarations).toContain("max-width: 100%");
   });
 
   test("keeps archived-thread context menus outside the dimmed stacking context", () => {
@@ -621,10 +624,8 @@ describe("shared surface and list-row architecture", () => {
       archivedAnchor?.declarations,
       "only the archived thread anchor should be visually dimmed",
     ).toContain("opacity: 0.8");
-    expect(archivedAnchor?.declarations).toContain(
-      "grid-template-columns: 2.15rem 0.8rem minmax(0, 1fr) auto",
-    );
-    expect(archivedAge?.declarations).toContain("grid-column: 1");
+    expect(archivedAnchor?.declarations).not.toContain("grid-template-columns");
+    expect(archivedAge?.declarations).not.toContain("grid-column");
     expect(archivedAge?.declarations).toContain(
       "font-variant-numeric: tabular-nums",
     );

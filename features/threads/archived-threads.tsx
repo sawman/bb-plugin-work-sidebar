@@ -49,7 +49,8 @@ export function ArchivedThreads({
     [threads],
   );
   const query = useArchivedThreads(open, fingerprint);
-  const archived = (query.archive.data ?? EMPTY_ARCHIVED_THREADS) as ArchivedThread[];
+  const archived = (query.archive.data ??
+    EMPTY_ARCHIVED_THREADS) as ArchivedThread[];
   const ids = useMemo(
     () => new Set(archived.map((thread) => thread.id)),
     [archived],
@@ -138,8 +139,9 @@ export function ArchivedThreads({
               groups={groups}
               onUnarchive={unarchive}
               onNavigate={onNavigate}
+              dragging={dragThreadId === thread.id}
               onDragThreadChange={onDragThreadChange}
-              onDropTargetChange={() => onDropTargetChange(null)}
+              onDropTargetChange={onDropTargetChange}
             />
           ))}
         </section>

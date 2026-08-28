@@ -11,6 +11,7 @@ import {
   ContextMenuTrigger,
 } from "../ui/context-menu";
 import { Icon } from "../ui/icon";
+import { useArchivedThreadPointerDrag } from "./use-archived-thread-pointer-drag";
 
 export type ArchivedThread = {
   id: string;
@@ -33,6 +34,7 @@ export function ArchivedThreadRow({
   groups,
   onUnarchive,
   onNavigate,
+  dragging,
   onDragThreadChange,
   onDropTargetChange,
 }: {
@@ -42,8 +44,11 @@ export function ArchivedThreadRow({
   groups: readonly { id: string; name: string }[];
   onUnarchive(threadId: string, destination: string | null): void;
   onNavigate(): void;
+  dragging: boolean;
   onDragThreadChange(threadId: string | null): void;
-  onDropTargetChange(): void;
+  onDropTargetChange(
+    target: { threadId: string; placement: "before" | "after" } | null,
+  ): void;
 }) {
   const actions = experimental_useSidebarThreadActions();
   const { splitProps, isAvailable } = experimental_useSidebarThreadSplit(
@@ -53,8 +58,17 @@ export function ArchivedThreadRow({
   const projectLabel = project?.isPersonal
     ? "Personal"
     : (project?.name ?? "Project");
+  const startPointerDrag = useArchivedThreadPointerDrag({
+    threadId: thread.id,
+    onDragThreadChange,
+    onDropTargetChange,
+    onRestore: (destination) => onUnarchive(thread.id, destination),
+  });
   return (
-    <article className="ws-thread ws-archived-thread">
+    <article
+      className={`ws-thread ws-archived-thread ${dragging ? "ws-thread-dragging" : ""}`}
+      onPointerDown={startPointerDrag}
+    >
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <a
@@ -66,22 +80,30 @@ export function ArchivedThreadRow({
               actions.open(thread.id);
               onNavigate();
             }}
+            onKeyDown={(event) => {
+              if (
+                event.key !== "ContextMenu" &&
+                !(event.key === "F10" && event.shiftKey)
+              )
+                return;
+              event.preventDefault();
+              const bounds = event.currentTarget.getBoundingClientRect();
+              event.currentTarget.dispatchEvent(
+                new MouseEvent("contextmenu", {
+                  bubbles: true,
+                  clientX: bounds.left + Math.min(bounds.width, 12),
+                  clientY: bounds.bottom,
+                }),
+              );
+            }}
           >
-            {duration ? (
-              <time
-                className="ws-thread-archive-age"
-                dateTime={new Date(thread.archivedAt).toISOString()}
-                aria-label={`Archived ${duration} ago`}
-                title={`Archived ${duration} ago`}
-              >
-                {duration}
-              </time>
-            ) : null}
-            <Icon
-              name={project?.isPersonal ? "Laptop" : "FolderGit"}
-              className="ws-project-icon"
-              aria-label={projectLabel}
-            />
+            <span className="ws-thread-leading">
+              <Icon
+                name={project?.isPersonal ? "Laptop" : "FolderGit"}
+                className="ws-project-icon"
+                aria-label={projectLabel}
+              />
+            </span>
             <span className="ws-thread-main">
               <span className="ws-thread-title">{title}</span>
               <span className="ws-thread-meta">
@@ -90,37 +112,16 @@ export function ArchivedThreadRow({
               </span>
             </span>
             <span className="ws-thread-trailing">
-              <span
-                className="ws-thread-drag-handle"
-                role="button"
-                tabIndex={0}
-                draggable
-                aria-label={`Restore ${title}`}
-                title="Drag to Active or a custom group"
-                onDragStart={(event) => {
-                  event.stopPropagation();
-                  event.dataTransfer.effectAllowed = "move";
-                  event.dataTransfer.setData("text/plain", thread.id);
-                  onDragThreadChange(thread.id);
-                }}
-                onDragEnd={(event) => {
-                  event.stopPropagation();
-                  onDragThreadChange(null);
-                  onDropTargetChange();
-                }}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                }}
-                onKeyDown={(event) => {
-                  if (event.key !== "Enter" && event.key !== " ") return;
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onUnarchive(thread.id, null);
-                }}
-              >
-                <Icon name="GripVertical" aria-hidden />
-              </span>
+              {duration ? (
+                <time
+                  className="ws-thread-archive-age"
+                  dateTime={new Date(thread.archivedAt).toISOString()}
+                  aria-label={`Archived ${duration} ago`}
+                  title={`Archived ${duration} ago`}
+                >
+                  {duration}
+                </time>
+              ) : null}
             </span>
           </a>
         </ContextMenuTrigger>
