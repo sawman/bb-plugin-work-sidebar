@@ -1389,6 +1389,11 @@
   line-height: 1;
   cursor: pointer;
 }
+.ws-changes-disclosure-icon {
+  display: block;
+  width: 0.72rem;
+  height: 0.72rem;
+}
 .ws-stack-trailing-actions {
   display: grid;
   grid-template-columns: repeat(3, 1.15rem);

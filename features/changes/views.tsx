@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import type { GitHubStackBranch } from "../../contracts.js";
+import { Icon } from "../../components/ui/icon.js";
 import { Status } from "../../components/ui/status.js";
 import {
   SurfaceCard,
@@ -105,7 +106,11 @@ function RepositoryDetails({
             <b>{repository.changedFileCount}</b> file
             {repository.changedFileCount === 1 ? "" : "s"}{" "}
             <i>+{repository.changedInsertions}</i>{" "}
-            <em>−{repository.changedDeletions}</em> {expanded ? "⌄" : "›"}
+            <em>−{repository.changedDeletions}</em>
+            <Icon
+              className="ws-changes-disclosure-icon"
+              name={expanded ? "ChevronDown" : "ChevronRight"}
+            />
           </button>
         )}
       </div>
@@ -298,7 +303,10 @@ export function ChangesCurrentPullRequestCard({
         aria-expanded={expanded}
         aria-label={`${expanded ? "Hide" : "Show"} changed files for pull request #${pullRequest.number}`}
       >
-        {expanded ? "⌄" : "›"}
+        <Icon
+          className="ws-changes-disclosure-icon"
+          name={expanded ? "ChevronDown" : "ChevronRight"}
+        />
       </button>
       {expanded && (
         <div className="ws-current-pr-details">

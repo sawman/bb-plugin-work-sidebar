@@ -16,6 +16,8 @@ const paths: Record<string, React.ReactNode> = {
     </>
   ),
   Check: <path d="m5 12 4 4L19 6" />,
+  ChevronDown: <path d="m6 9 6 6 6-6" />,
+  ChevronRight: <path d="m9 18 6-6-6-6" />,
   Circle: <circle cx="12" cy="12" r="8" />,
   Clock: (
     <>

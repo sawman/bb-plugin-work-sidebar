@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import type { GitHubStackBranch } from "../../contracts.js";
+import { Icon } from "../../components/ui/icon.js";
 
 type StackBranchActionsProps = {
   pullRequest: GitHubStackBranch["pr"];
@@ -72,7 +73,10 @@ export function StackBranchActions({
             data-state={expanded ? "open" : "closed"}
             onClick={onToggle}
           >
-            <span aria-hidden>{expanded ? "⌄" : "›"}</span>
+            <Icon
+              className="ws-changes-disclosure-icon"
+              name={expanded ? "ChevronDown" : "ChevronRight"}
+            />
           </button>
         )}
       </span>

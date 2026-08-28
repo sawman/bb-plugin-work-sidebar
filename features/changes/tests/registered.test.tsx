@@ -460,11 +460,21 @@ describe("R13 registered Changes Work slot", () => {
     expect(
       slot.queryByRole("button", { name: "Current branch" }),
     ).toBeNull();
-    fireEvent.click(
-      slot.getByRole("button", {
-        name: "Show changed files for pull request #1279",
-      }),
+    const disclosure = slot.getByRole("button", {
+      name: "Show changed files for pull request #1279",
+    });
+    expect(disclosure.querySelector("svg path")?.getAttribute("d")).toBe(
+      "m9 18 6-6-6-6",
     );
+    fireEvent.click(disclosure);
+    expect(
+      slot
+        .getByRole("button", {
+          name: "Hide changed files for pull request #1279",
+        })
+        .querySelector("svg path")
+        ?.getAttribute("d"),
+    ).toBe("m6 9 6 6 6-6");
     expect(slot.getByText("infra/pyproject.toml")).toBeTruthy();
     slot.lifecycle.unmount();
   });

@@ -213,6 +213,41 @@ describe("R13 Changes error presentation", () => {
     expect(onToggle).toHaveBeenCalledOnce();
   });
 
+  it("uses aligned icons for both stack disclosure states", () => {
+    const { rerender } = render(
+      <ChangesStackBranchRow
+        branch={stackBranch()}
+        expanded={false}
+        checkingOut={false}
+        onToggle={() => undefined}
+        onCheckout={() => undefined}
+      />,
+    );
+
+    const collapsed = screen.getByRole("button", {
+      name: "Show changed files for pull request #8",
+    });
+    expect(collapsed.querySelector("svg path")?.getAttribute("d")).toBe(
+      "m9 18 6-6-6-6",
+    );
+
+    rerender(
+      <ChangesStackBranchRow
+        branch={stackBranch()}
+        expanded
+        checkingOut={false}
+        onToggle={() => undefined}
+        onCheckout={() => undefined}
+      />,
+    );
+    const expanded = screen.getByRole("button", {
+      name: "Hide changed files for pull request #8",
+    });
+    expect(expanded.querySelector("svg path")?.getAttribute("d")).toBe(
+      "m6 9 6 6 6-6",
+    );
+  });
+
   it("keeps title, checkout, and trailing disclosure interactions isolated", () => {
     const onToggle = vi.fn();
     const onCheckout = vi.fn();
