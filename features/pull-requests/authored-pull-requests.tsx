@@ -80,9 +80,9 @@ export function AuthoredPullRequestRow({
           onSelect(pullRequest.url, event);
         }}
       >
-        <strong className="ws-pr-title ws-pr-target-title">
+        <span className="ws-pr-title ws-pr-target-title">
           {pullRequest.title}
-        </strong>
+        </span>
         <span className="ws-pr-context ws-pr-target-context">
           {stackNumber != null && <StackNumberBadge number={stackNumber} />}
           <PullRequestIdentifierBadge

@@ -183,4 +183,32 @@ describe("pull-request stack number presentation", () => {
     expect(screen.queryByText("Authored by you")).toBeNull();
     expect(screen.getByText("Branch unavailable")).toBeTruthy();
   });
+
+  it("renders authored pull request titles at regular weight", () => {
+    render(
+      <AuthoredPullRequestRow
+        pullRequest={{
+          number: 92,
+          title: "Regular weight title",
+          url: "https://github.com/acme/repo/pull/92",
+          repository: "acme/repo",
+          state: "open",
+          draft: false,
+          head: "feature/regular-title",
+          base: "main",
+          checks: "passing",
+          review: "approved",
+          reviewCommentCount: 0,
+        }}
+        selected={false}
+        changingDraft={false}
+        onSelect={() => false}
+        onToggleDraft={vi.fn()}
+      />,
+    );
+
+    const title = screen.getByText("Regular weight title");
+    expect(title.tagName).toBe("SPAN");
+    expect(title.classList.contains("ws-pr-title")).toBe(true);
+  });
 });

@@ -482,6 +482,13 @@ describe("shared surface and list-row architecture", () => {
     }
   });
 
+  test("keeps authored pull request titles at regular weight", () => {
+    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const title = rules.find(({ selector }) => selector === ".ws-pr-title");
+
+    expect(title?.declarations).toContain("font-weight: 400");
+  });
+
   test("associates each important declaration with its immediately preceding R17 comment", () => {
     expect(undocumentedImportantDeclarations(`
       /* R17 important: a former blanket comment. */
