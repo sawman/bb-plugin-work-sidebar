@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "../../components/ui/icon";
 import type { SidebarTask } from "../../work-model";
 
@@ -12,10 +12,32 @@ export function AssigneePicker({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLSpanElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const label = value === "agent" ? "Agent assigned" : "Human assigned";
+
+  useEffect(() => {
+    if (!open) return;
+    const dismissOutside = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const dismissWithEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    document.addEventListener("pointerdown", dismissOutside, true);
+    document.addEventListener("keydown", dismissWithEscape);
+    return () => {
+      document.removeEventListener("pointerdown", dismissOutside, true);
+      document.removeEventListener("keydown", dismissWithEscape);
+    };
+  }, [open]);
+
   return (
-    <span className="ws-assignee-picker">
+    <span className="ws-assignee-picker" ref={rootRef}>
       <button
+        ref={triggerRef}
         type="button"
         disabled={disabled}
         className="ws-assignee-trigger"

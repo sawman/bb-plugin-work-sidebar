@@ -146,7 +146,7 @@ function createBindingsFixture(options: {
                 taskId,
                 threadId,
                 presetName: "Attached",
-                title: tasks.get(taskId)?.title ?? "Task",
+                title: threadId === CHILD_THREAD_ID ? "Child" : "Root",
                 liveStatus: "working",
                 attachedAt: "2026-08-28T00:00:00.000Z",
                 updatedAt: "2026-08-28T00:00:00.000Z",
@@ -385,6 +385,68 @@ describe("durable Work/Tasks binding parity", () => {
       "This task is part of a durable work binding and cannot be detached from its bound owner.",
     );
     expect(bound.harness.inspection.realtimeSignals).toEqual([]);
+  });
+
+  it("projects the bound owner thread title for left Tasks presentation", async () => {
+    const { host, taskThreads } = createBindingsFixture();
+    taskThreads.set(OUTCOME_TASK_ID, new Set([ROOT_THREAD_ID]));
+    taskThreads.set(DIRECT_TASK_ID, new Set([ROOT_THREAD_ID]));
+    taskThreads.set(DELEGATED_TASK_ID, new Set([CHILD_THREAD_ID]));
+    await host.bb.storage.kv.set(WORK_BINDINGS_KEY, {
+      outcomes: [{
+        kind: "outcome",
+        rootThreadId: ROOT_THREAD_ID,
+        outcomeTaskId: OUTCOME_TASK_ID,
+        taskProjectId: TASK_PROJECT_ID,
+        createdAt: "2026-08-28T00:00:00.000Z",
+        updatedAt: "2026-08-28T00:00:00.000Z",
+      }],
+      executions: [
+        {
+          kind: "execution",
+          rootThreadId: ROOT_THREAD_ID,
+          outcomeTaskId: OUTCOME_TASK_ID,
+          taskProjectId: TASK_PROJECT_ID,
+          executionTaskId: DIRECT_TASK_ID,
+          ownerThreadId: ROOT_THREAD_ID,
+          mode: "direct",
+          idempotencyKey: "direct-title",
+          dispatchState: "ready",
+          recoveryMessage: null,
+          createdAt: "2026-08-28T00:00:00.000Z",
+          updatedAt: "2026-08-28T00:00:00.000Z",
+        },
+        {
+          kind: "execution",
+          rootThreadId: ROOT_THREAD_ID,
+          outcomeTaskId: OUTCOME_TASK_ID,
+          taskProjectId: TASK_PROJECT_ID,
+          executionTaskId: DELEGATED_TASK_ID,
+          ownerThreadId: CHILD_THREAD_ID,
+          mode: "delegated",
+          idempotencyKey: "delegated-title",
+          dispatchState: "ready",
+          recoveryMessage: null,
+          createdAt: "2026-08-28T00:00:00.000Z",
+          updatedAt: "2026-08-28T00:00:00.000Z",
+        },
+      ],
+    });
+    await plugin(host.bb);
+
+    await expect(
+      host.harness.behavior.callRpc("sidebarTaskLinks", null),
+    ).resolves.toMatchObject({
+      links: {
+        [ROOT_THREAD_ID]: [
+          { task: { id: OUTCOME_TASK_ID }, threadTitle: "Root", role: "outcome" },
+          { task: { id: DIRECT_TASK_ID }, threadTitle: "Root", role: "execution" },
+        ],
+        [CHILD_THREAD_ID]: [
+          { task: { id: DELEGATED_TASK_ID }, threadTitle: "Child", role: "execution" },
+        ],
+      },
+    });
   });
 
   it("bounds parallel legacy discovery, caches it per root/project, expires it, and clears it after adoption", async () => {

@@ -6,6 +6,7 @@ import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { rpcContract } from "../../../contracts";
 import { getPluginQueryClient } from "../../../query-runtime";
+import type { SidebarTask } from "../../../work-model";
 
 type RpcHandlers = NonNullable<RenderSlotOptions<typeof rpcContract>["rpc"]>;
 type TasksResult = Awaited<ReturnType<RpcHandlers["sidebarTasks"]>>;
@@ -19,7 +20,7 @@ const scrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
   "scrollIntoView",
 );
 
-const task = { id: "task_1", projectId: "project_1", projectName: "Work", key: "WORK-1", title: "Ship mounted fixtures", status: "todo" as const, priority: "none" as const, dueDate: null, parentTaskId: null, position: 1024, linkedThreadIds: [] as string[], assignee: "human" as const };
+const task: SidebarTask = { id: "task_1", projectId: "project_1", projectName: "Work", key: "WORK-1", title: "Ship mounted fixtures", status: "todo", priority: "none", dueDate: null, parentTaskId: null, position: 1024, linkedThreadIds: [], assignee: "human" };
 const taskTwo = { ...task, id: "task_2", key: "WORK-2", title: "Second task", position: 2048 };
 const tasks = (items = [task]): TasksResult => ({ available: true, tasks: items, projects: [{ id: "project_1", name: "Work" }], error: null });
 const workContext = {
@@ -274,6 +275,48 @@ describe("Tasks registered controls", () => {
     await waitFor(() => expect(call).toHaveBeenCalledWith("updateTaskStatus", { taskId: "task_1", status: "done" }));
     expect(status.disabled).toBe(true); pending.reject(new Error("status failed"));
     await waitFor(() => expect(status.disabled).toBe(false));
+    rendered.lifecycle.unmount();
+  });
+
+  it("changes a left-row assignee and keeps priority above status", async () => {
+    const pending = deferred<unknown>();
+    const { rendered, call } = await leftSlot(
+      [{ ...task, priority: "high" }],
+      vi.fn((method) =>
+        method === "updateTaskAssignee" ? pending.promise : Promise.resolve({}),
+      ),
+    );
+    const row = rendered.getByText(task.title).closest(".ws-task-row")!;
+    const trailing = row.querySelector(".ws-task-row-actions")!;
+    expect(trailing.firstElementChild?.classList).toContain(
+      "ws-task-priority-slot",
+    );
+    expect(
+      trailing.querySelector('[aria-label="Change status for WORK-1: To do"]'),
+    ).toBeTruthy();
+
+    const assignee = rendered.getByLabelText("Human assigned");
+    fireEvent.click(assignee);
+    expect(rendered.getByRole("listbox", { name: "Task assignee" })).toBeTruthy();
+    await expectNoAriaViolations(rendered.container);
+    fireEvent.pointerDown(document.body);
+    await waitFor(() =>
+      expect(rendered.queryByRole("listbox", { name: "Task assignee" })).toBeNull(),
+    );
+    fireEvent.click(assignee);
+    fireEvent.click(rendered.getByRole("option", { name: "Agent" }));
+    await waitFor(() =>
+      expect(call).toHaveBeenCalledWith("updateTaskAssignee", {
+        taskId: "task_1",
+        assignee: "agent",
+      }),
+    );
+    expect(rendered.getByLabelText("Agent assigned")).toBeTruthy();
+    expect((rendered.getByLabelText("Agent assigned") as HTMLButtonElement).disabled).toBe(true);
+    pending.resolve({ taskId: "task_1", assignee: "agent" });
+    await waitFor(() =>
+      expect((rendered.getByLabelText("Human assigned") as HTMLButtonElement).disabled).toBe(false),
+    );
     rendered.lifecycle.unmount();
   });
 

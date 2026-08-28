@@ -539,6 +539,21 @@ describe("shared surface and list-row architecture", () => {
     ).toBe(false);
   });
 
+  test("keeps left task titles regular and stacks priority over row controls", () => {
+    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const declarations = (selector: string) =>
+      rules.find((rule) => rule.selector === selector)?.declarations ?? "";
+
+    expect(declarations(".ws-task-title")).toContain("font-weight: 400");
+    expect(declarations(".ws-task-row-actions")).toContain("display: grid");
+    expect(declarations(".ws-task-row-actions")).toContain(
+      "grid-template-rows: auto auto",
+    );
+    expect(declarations(".ws-task-row-controls")).toContain(
+      "display: inline-flex",
+    );
+  });
+
   test("shares one left-sidebar row rhythm across Threads, Tasks, and PRs", () => {
     const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
     const declarations = (selector: string) =>

@@ -5,7 +5,7 @@ import { Icon, type IconName } from "../../components/ui/icon";
 import { CopyBadge } from "../../components/ui/copy-badge";
 import { Input } from "../../components/ui/input";
 import { Combobox } from "../../components/ui/combobox";
-import { AssigneePicker } from "./assignee-picker";
+import { AssigneePicker } from "../tasks/assignee-picker";
 import type { rpcContract } from "../../contracts";
 import {
   goalProgressPercent,

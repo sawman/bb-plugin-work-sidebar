@@ -12,6 +12,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Icon } from "@/components/ui/icon";
 import { SidebarListActions } from "@/components/ui/sidebar-list-actions";
+import type { ThreadProvider } from "../../components/threads/thread-provider-logo";
 import { TaskRow } from "./task-row";
 import type { rpcContract } from "../../contracts";
 import {
@@ -33,6 +34,10 @@ export interface TasksLeftSidebarProps {
   activeThreadId: string | null;
   activeThreadTitle: string | null;
   taskLinks: Readonly<Record<string, readonly ThreadTaskLink[]>>;
+  ownerThreads: ReadonlyMap<
+    string,
+    { title: string; providerId: string; provider?: ThreadProvider }
+  >;
   onOpenThread: (threadId: string, split?: boolean) => void;
   searchQuery: string;
 }
@@ -43,6 +48,7 @@ export function TasksLeftSidebar({
   activeThreadId,
   activeThreadTitle,
   taskLinks,
+  ownerThreads,
   onOpenThread,
   searchQuery,
 }: TasksLeftSidebarProps) {
@@ -415,6 +421,7 @@ export function TasksLeftSidebar({
               activeThreadTitle={activeThreadTitle}
               bindingLinks={bindingLinks}
               bindingOwnerLinks={bindingOwnerLinks}
+              ownerThreads={ownerThreads}
               onAttachToThread={(taskId, threadId) =>
                 updateAttachment(taskId, threadId, true)
               }
@@ -424,6 +431,11 @@ export function TasksLeftSidebar({
               updatingTaskId={
                 mutations.status.isPending
                   ? (mutations.status.variables?.taskId ?? null)
+                  : null
+              }
+              updatingAssigneeTaskId={
+                mutations.assignment.isPending
+                  ? (mutations.assignment.variables?.taskId ?? null)
                   : null
               }
               selectedTaskIds={selectedIds}

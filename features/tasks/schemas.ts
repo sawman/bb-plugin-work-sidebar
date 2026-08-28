@@ -38,6 +38,7 @@ export const sidebarTaskProjectSchema = z.object({
 export const taskLinkSchema = z.object({
   task: taskSummarySchema,
   threadId: z.string(),
+  threadTitle: z.string().nullable().optional(),
   liveStatus: z.enum(["starting", "working", "idle", "completed", "failed"]),
   role: z.enum(["outcome", "execution"]),
   mode: z.enum(["direct", "delegated"]).nullable(),

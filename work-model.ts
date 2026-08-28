@@ -316,6 +316,7 @@ export function matchesPullRequestSearch(
 export interface ThreadTaskLink {
   task: TaskSummary;
   threadId: string;
+  threadTitle?: string | null;
   liveStatus: "starting" | "working" | "idle" | "completed" | "failed";
   role: "outcome" | "execution";
   mode: "direct" | "delegated" | null;

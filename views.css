@@ -418,9 +418,35 @@
 }
 .ws-task-title {
   display: block;
+  font-weight: 400;
 }
 .ws-task-meta {
   flex-wrap: wrap;
+}
+.ws-task-owner-badge {
+  min-width: 0;
+  max-width: 100%;
+}
+.ws-task-owner-badge > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ws-task-row-actions {
+  display: grid;
+  grid-template-rows: auto auto;
+  justify-items: end;
+  gap: 0.08rem;
+}
+.ws-task-priority-slot {
+  display: grid;
+  width: 1rem;
+  min-height: 0.8rem;
+  place-items: center;
+}
+.ws-task-row-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.08rem;
 }
 .ws-task-key-badge,
 .ws-task-badge {

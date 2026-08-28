@@ -136,6 +136,11 @@ describe("R18 registered left sidebar parity", () => {
   });
 
   it("keeps task mappings in Tasks without duplicating badges on thread rows", async () => {
+    const clipboardWrite = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: clipboardWrite },
+    });
     const task = {
       id: "task_one",
       projectId: "task_project",
@@ -151,6 +156,7 @@ describe("R18 registered left sidebar parity", () => {
       assignee: "agent" as const,
     };
     const slot = await leftSlot({
+      providers: [provider("codex", "Codex", null)],
       rpc: {
         sidebarTasks: () => ({
           available: true,
@@ -183,6 +189,16 @@ describe("R18 registered left sidebar parity", () => {
     fireEvent.click(slot.getByRole("button", { name: "Tasks" }));
     await waitFor(() => expect(slot.getByText("WORK-1")).toBeTruthy());
     expect(slot.getByText("Keep task mapping in Tasks")).toBeTruthy();
+    expect(slot.queryByText("Bound direct execution task")).toBeNull();
+    const owner = slot.getByRole("button", {
+      name: "Copy working thread One",
+    });
+    expect(
+      owner.querySelector('[role="img"][aria-label="Codex provider"]'),
+    ).toBeTruthy();
+    fireEvent.click(owner);
+    await waitFor(() => expect(clipboardWrite).toHaveBeenCalledWith("One"));
+    expect(slot.inspection.sidebarActionCalls).toEqual([]);
     slot.lifecycle.unmount();
   });
 

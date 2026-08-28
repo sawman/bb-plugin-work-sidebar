@@ -50,6 +50,7 @@ export type BindingSummary = {
 export type TaskLink = {
   task: TaskSummary;
   threadId: string;
+  threadTitle: string;
   liveStatus: z.infer<typeof taskThreadSchema>["liveStatus"];
   role: "outcome" | "execution";
   mode: BindingMode | null;
@@ -198,6 +199,7 @@ export function createWorkBindingsService(
     const output: Record<string, TaskLink[]> = {};
     const add = (
       threadId: string,
+      threadTitle: string,
       task: Task,
       liveStatus: TaskLink["liveStatus"],
       role: TaskLink["role"],
@@ -208,6 +210,7 @@ export function createWorkBindingsService(
       (output[threadId] ??= []).push({
         task: summarizeTask(task, names.get(task.projectId) ?? "Work"),
         threadId,
+        threadTitle,
         liveStatus,
         role,
         mode,
@@ -226,7 +229,16 @@ export function createWorkBindingsService(
       for (const row of rows.taskThreads.filter(
         (row) => row.threadId === outcome.rootThreadId,
       ))
-        add(row.threadId, task, row.liveStatus, "outcome", null, null, null);
+        add(
+          row.threadId,
+          row.title,
+          task,
+          row.liveStatus,
+          "outcome",
+          null,
+          null,
+          null,
+        );
     }
     for (const execution of saved.executions) {
       const task = byId.get(execution.executionTaskId);
@@ -241,6 +253,7 @@ export function createWorkBindingsService(
       ))
         add(
           row.threadId,
+          row.title,
           task,
           row.liveStatus,
           "execution",

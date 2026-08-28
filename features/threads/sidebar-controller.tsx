@@ -59,6 +59,20 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
       ),
     [providerDirectory.providers],
   );
+  const taskOwnerThreads = useMemo(
+    () =>
+      new Map(
+        threads.map((thread) => [
+          thread.id,
+          {
+            title: threadTitle(thread),
+            providerId: thread.providerId,
+            provider: providersById.get(thread.providerId),
+          },
+        ]),
+      ),
+    [providersById, threads],
+  );
   const [view, setView] = useState<SidebarView>("work");
   const [subtextRefreshKey, setSubtextRefreshKey] = useState(0);
   const threadCount = useMemo(
@@ -182,6 +196,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
         activeThreadId={props.activeThreadId}
         activeThreadTitle={activeThread ? threadTitle(activeThread) : null}
         taskLinks={taskLinks}
+        ownerThreads={taskOwnerThreads}
         onOpenThread={navigateToThread}
         searchQuery={props.searchQuery}
       />

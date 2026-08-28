@@ -7,13 +7,19 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "../../components/ui/context-menu";
+import { CopyBadge } from "../../components/ui/copy-badge";
 import { Icon } from "../../components/ui/icon";
+import {
+  ThreadProviderLogo,
+  type ThreadProvider,
+} from "../../components/threads/thread-provider-logo";
 import type {
   SidebarTask,
   TaskQueueNode,
   ThreadTaskLink,
 } from "../../work-model";
 import { taskStatusPresentation } from "./model";
+import { AssigneePicker } from "./assignee-picker";
 import { TaskPriorityIcon } from "./priority";
 
 const TASK_STATUSES: readonly SidebarTask["status"][] = [
@@ -56,9 +62,18 @@ export type TaskRowProps = {
   activeThreadTitle: string | null;
   bindingLinks: ReadonlyMap<string, ThreadTaskLink>;
   bindingOwnerLinks: ReadonlyMap<string, ThreadTaskLink>;
+  ownerThreads: ReadonlyMap<
+    string,
+    {
+      title: string;
+      providerId: string;
+      provider?: ThreadProvider;
+    }
+  >;
   onAttachToThread(taskId: string, threadId: string): Promise<void>;
   onDetachFromThread(taskId: string, threadId: string): Promise<void>;
   updatingTaskId: string | null;
+  updatingAssigneeTaskId: string | null;
   selectedTaskIds: ReadonlySet<string>;
   onSelect(taskId: string, event: ReactMouseEvent<HTMLButtonElement>): boolean;
 };
@@ -89,6 +104,7 @@ export function TaskRow(props: TaskRowProps) {
     activeThreadTitle,
     bindingLinks,
     bindingOwnerLinks,
+    ownerThreads,
     onAttachToThread,
     onDetachFromThread,
     updatingTaskId,
@@ -99,8 +115,17 @@ export function TaskRow(props: TaskRowProps) {
   const bindingLink = bindingLinks.get(task.id) ?? null;
   const bindingOwnerLink = bindingOwnerLinks.get(task.id) ?? null;
   const bindingOwned = Boolean(bindingOwnerLink);
+  const ownerThread = bindingOwnerLink
+    ? (ownerThreads.get(bindingOwnerLink.threadId) ?? null)
+    : null;
+  const ownerThreadTitle =
+    ownerThread?.title ?? bindingOwnerLink?.threadTitle ?? null;
   const bindingDescriptionId = `ws-task-binding-${task.id}`;
-  const bindingState = bindingOwnerLink ? bindingLabel(bindingOwnerLink) : null;
+  const bindingState = bindingOwnerLink
+    ? bindingOwnerLink.role === "execution" && ownerThreadTitle
+      ? `Working thread ${ownerThreadTitle}`
+      : bindingLabel(bindingOwnerLink)
+    : null;
   const assigned = Boolean(
     bindingLink || (activeThreadId && task.linkedThreadIds.includes(activeThreadId)),
   );
@@ -115,7 +140,7 @@ export function TaskRow(props: TaskRowProps) {
   const interactive = (event: DragEvent<HTMLElement>) =>
     Boolean(
       (event.target as HTMLElement).closest(
-        "button,a,select,summary,[role=menu],[role=menuitem]",
+        "button,a,select,summary,[role=button],[role=menu],[role=menuitem]",
       ),
     );
   const placement = (event: DragEvent<HTMLElement>): "before" | "after" => {
@@ -204,47 +229,78 @@ export function TaskRow(props: TaskRowProps) {
             </button>
             <div className="ws-task-meta ws-sidebar-row-meta">
               <span className="ws-task-key-badge">{task.key}</span>
-              <TaskPriorityIcon priority={task.priority} />
               {task.dueDate && (
                 <span className="ws-task-badge">Due {task.dueDate}</span>
               )}
               {showProject && (
                 <span className="ws-task-badge">{task.projectName}</span>
               )}
-              {bindingState && (
+              {bindingOwnerLink?.role === "execution" && ownerThreadTitle ? (
+                <>
+                  <span id={bindingDescriptionId} className="ws-sr-only">
+                    {bindingState}
+                  </span>
+                  <CopyBadge
+                    className="ws-task-owner-badge"
+                    value={ownerThreadTitle}
+                    label="working thread"
+                    typography="context"
+                  >
+                    <ThreadProviderLogo
+                      providerId={ownerThread?.providerId ?? "agent"}
+                      provider={ownerThread?.provider}
+                    />
+                    <span>{ownerThreadTitle}</span>
+                  </CopyBadge>
+                </>
+              ) : bindingState ? (
                 <span
                   id={bindingDescriptionId}
                   className="ws-task-badge"
                 >
                   {bindingState}
                 </span>
-              )}
+              ) : null}
             </div>
           </div>
-          <label
-            className={`ws-task-status-picker ws-sidebar-row-trailing ws-task-status-${task.status}`}
-            title={status.label}
-          >
-            <Icon name={status.icon} aria-hidden />
-            <span className="ws-sr-only">Change status for {task.key}</span>
-            <select
-              value={task.status}
-              disabled={updatingTaskId === task.id}
-              aria-label={`Change status for ${task.key}: ${status.label}`}
-              onChange={(event) =>
-                void onUpdateStatus(
-                  task.id,
-                  event.target.value as SidebarTask["status"],
-                )
-              }
-            >
-              {TASK_STATUSES.map((next) => (
-                <option key={next} value={next}>
-                  {taskStatus(next).label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="ws-task-row-actions ws-sidebar-row-trailing">
+            <span className="ws-task-priority-slot">
+              <TaskPriorityIcon priority={task.priority} />
+            </span>
+            <span className="ws-task-row-controls">
+              <AssigneePicker
+                value={task.assignee}
+                disabled={props.updatingAssigneeTaskId === task.id}
+                onChange={(assignee) =>
+                  void props.onUpdateAssignee(task.id, assignee)
+                }
+              />
+              <label
+                className={`ws-task-status-picker ws-task-status-${task.status}`}
+                title={status.label}
+              >
+                <Icon name={status.icon} aria-hidden />
+                <span className="ws-sr-only">Change status for {task.key}</span>
+                <select
+                  value={task.status}
+                  disabled={updatingTaskId === task.id}
+                  aria-label={`Change status for ${task.key}: ${status.label}`}
+                  onChange={(event) =>
+                    void onUpdateStatus(
+                      task.id,
+                      event.target.value as SidebarTask["status"],
+                    )
+                  }
+                >
+                  {TASK_STATUSES.map((next) => (
+                    <option key={next} value={next}>
+                      {taskStatus(next).label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </span>
+          </div>
           {node.children.length > 0 && (
             <div
               className="ws-task-children"
