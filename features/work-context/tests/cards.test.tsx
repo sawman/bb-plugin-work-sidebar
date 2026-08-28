@@ -446,7 +446,9 @@ describe("registered Work context cards", () => {
       '[data-card="outcome"] .ws-card-heading-info',
     );
     expect(outcomeInfo?.contains(taskId)).toBe(true);
-    expect(slot.getByRole("img", { name: "High priority" })).toBeTruthy();
+    const priority = slot.getByRole("img", { name: "High priority" });
+    expect(priority.getAttribute("data-priority")).toBe("high");
+    expect(priority.querySelectorAll('[data-priority-bar="active"]')).toHaveLength(3);
     const controls = slot.getByRole("group", {
       name: "Outcome status: To do",
     });

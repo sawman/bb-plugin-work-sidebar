@@ -104,6 +104,27 @@ const paths: Record<string, React.ReactNode> = {
   ),
   LoaderCircle: <path d="M12 3a9 9 0 1 0 9 9" />,
   Plus: <path d="M12 5v14M5 12h14" />,
+  PriorityHigh: (
+    <>
+      <rect x="4" y="14" width="3" height="6" rx="1" fill="currentColor" stroke="none" data-priority-bar="active" />
+      <rect x="10.5" y="10" width="3" height="10" rx="1" fill="currentColor" stroke="none" data-priority-bar="active" />
+      <rect x="17" y="6" width="3" height="14" rx="1" fill="currentColor" stroke="none" data-priority-bar="active" />
+    </>
+  ),
+  PriorityLow: (
+    <>
+      <rect x="4" y="14" width="3" height="6" rx="1" fill="currentColor" stroke="none" data-priority-bar="active" />
+      <rect x="10.5" y="10" width="3" height="10" rx="1" fill="currentColor" stroke="none" opacity=".24" />
+      <rect x="17" y="6" width="3" height="14" rx="1" fill="currentColor" stroke="none" opacity=".24" />
+    </>
+  ),
+  PriorityMedium: (
+    <>
+      <rect x="4" y="14" width="3" height="6" rx="1" fill="currentColor" stroke="none" data-priority-bar="active" />
+      <rect x="10.5" y="10" width="3" height="10" rx="1" fill="currentColor" stroke="none" data-priority-bar="active" />
+      <rect x="17" y="6" width="3" height="14" rx="1" fill="currentColor" stroke="none" opacity=".24" />
+    </>
+  ),
   RefreshCw: (
     <>
       <path d="M20 11a8 8 0 0 0-14.8-4.2L3 9" />

@@ -14,6 +14,7 @@ import {
 } from "../../work-model";
 import { useTasksMutations } from "../tasks/mutations";
 import { taskStatusPresentation, type TaskStatus } from "../tasks/model";
+import { TaskPriorityIcon } from "../tasks/priority";
 import { useTasksRead } from "../tasks/queries";
 import {
   nextOutcomeStatus,
@@ -380,16 +381,7 @@ function OutcomeHeading({
       >
         {taskKey}
       </CopyBadge>
-      {priority !== "none" ? (
-        <span
-          className={`ws-task-priority-icon ws-task-priority-${priority}`}
-          role="img"
-          aria-label={`${readableStatus(priority)} priority`}
-          title={`${readableStatus(priority)} priority`}
-        >
-          <Icon name="AlertCircle" aria-hidden />
-        </span>
-      ) : null}
+      <TaskPriorityIcon priority={priority} />
     </span>
   );
 }

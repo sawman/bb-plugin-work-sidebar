@@ -96,7 +96,7 @@ const dynamicClassFamilies = [
   { prefix: "ws-runtime-state-", file: "features/work-context/views.tsx", suffixes: ["working", "waiting", "blocked", "complete", "idle"] },
   { prefix: "ws-status-dot-", file: "features/work-context/views.tsx", suffixes: ["in_progress", "running", "done"] },
   { prefix: "ws-status-", file: "features/threads/thread-row-presentation.tsx", suffixes: ["none", "runtime", "workflow", "background-agent", "background-command", "goal", "plan-mode", "working-draft", "unread-error", "unread-success", "waiting-for-input"] },
-  { prefix: "ws-task-priority-", file: "features/tasks/task-row.tsx", suffixes: ["urgent", "high", "medium", "low"] },
+  { prefix: "ws-task-priority-", file: "features/tasks/priority.tsx", suffixes: ["urgent", "high", "medium", "low"] },
   { prefix: "ws-task-row-", file: "features/tasks/task-row.tsx", suffixes: ["outcome", "execution"] },
   { prefix: "ws-task-status-", file: "features/tasks/task-row.tsx", suffixes: ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] },
   { prefix: "ws-thread-child-depth-", file: "features/threads/thread-tree.tsx", suffixes: ["1", "2", "3", "4"] },

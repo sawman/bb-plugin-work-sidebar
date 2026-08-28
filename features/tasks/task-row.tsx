@@ -14,6 +14,7 @@ import type {
   ThreadTaskLink,
 } from "../../work-model";
 import { taskStatusPresentation } from "./model";
+import { TaskPriorityIcon } from "./priority";
 
 const TASK_STATUSES: readonly SidebarTask["status"][] = [
   "backlog",
@@ -203,14 +204,7 @@ export function TaskRow(props: TaskRowProps) {
             </button>
             <div className="ws-task-meta">
               <span className="ws-task-key-badge">{task.key}</span>
-              {task.priority !== "none" && (
-                <span
-                  className={`ws-task-priority-icon ws-task-priority-${task.priority}`}
-                  title={`${task.priority} priority`}
-                >
-                  <Icon name="AlertCircle" aria-hidden />
-                </span>
-              )}
+              <TaskPriorityIcon priority={task.priority} />
               {task.dueDate && (
                 <span className="ws-task-badge">Due {task.dueDate}</span>
               )}
