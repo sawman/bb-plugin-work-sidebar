@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { SidebarThreadOrganization } from "./sidebar-organization";
 import { SidebarThreadGroups } from "./sidebar-group-tree";
-import type { ThreadProviderDirectory } from "./thread-provider-logo";
+import type { ThreadProviderDirectory } from "@/components/threads/thread-provider-logo";
 
 type SidebarWorkViewProps = {
   toolbar: ReactNode;

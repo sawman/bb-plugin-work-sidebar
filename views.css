@@ -48,12 +48,6 @@
   font-size: 0.59rem;
   line-height: 1.1;
 }
-.ws-project-icon {
-  width: 0.78rem;
-  height: 0.78rem;
-  flex: none;
-  color: var(--muted-foreground);
-}
 .ws-thread[data-depth="child"] {
   margin-left: 0;
   border-left: 0;
@@ -296,9 +290,6 @@
 .ws-thread > .ws-rename {
   grid-column: 2;
   grid-row: 1;
-}
-.ws-project-icon {
-  grid-column: 1;
 }
 .ws-thread-main {
   grid-column: 2;

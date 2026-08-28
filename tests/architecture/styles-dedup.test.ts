@@ -76,7 +76,6 @@ const STATE_SHAPED_RED_SELECTORS = [
 // These exact selectors intentionally remain split because each repeated rule
 // owns disjoint declarations; the overlap gate below still inspects every one.
 const EXPECTED_DISJOINT_REPEATED_SELECTORS = [
-  ".ws-project-icon",
   ".ws-thread-child-depth-1, .ws-thread-child-depth-2, .ws-thread-child-depth-3, .ws-thread-child-depth-4",
   ".ws-section-count",
   ".ws-callout button",

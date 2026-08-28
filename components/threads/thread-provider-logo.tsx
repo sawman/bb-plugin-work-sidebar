@@ -1,5 +1,5 @@
 import type { PluginProvidersState } from "@get-bb/plugin-sdk/app";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "../ui/icon";
 
 export type ThreadProvider = Pick<
   PluginProvidersState["providers"][number],

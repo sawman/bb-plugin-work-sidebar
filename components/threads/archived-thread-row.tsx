@@ -10,7 +10,9 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "../ui/context-menu";
-import { Icon } from "../ui/icon";
+import type { ThreadProvider } from "./thread-provider-logo";
+import { ThreadRowContent } from "./thread-row-content";
+import { ThreadWorkspaceBadge } from "./thread-workspace-badge";
 import { useArchivedThreadPointerDrag } from "./use-archived-thread-pointer-drag";
 
 export type ArchivedThread = {
@@ -19,7 +21,13 @@ export type ArchivedThread = {
   title: string | null;
   titleFallback: string | null;
   parentThreadId: string | null;
+  providerId: string;
   environmentBranchName: string | null;
+  environmentName: string | null;
+  environmentWorkspaceDisplayKind:
+    | "managed-worktree"
+    | "unmanaged-worktree"
+    | "other";
   isPinned: boolean;
   isUnread: boolean;
   createdAt: number;
@@ -31,6 +39,7 @@ export function ArchivedThreadRow({
   thread,
   duration,
   project,
+  provider,
   groups,
   onUnarchive,
   onNavigate,
@@ -41,6 +50,7 @@ export function ArchivedThreadRow({
   thread: ArchivedThread;
   duration: string | null;
   project?: { name: string; isPersonal: boolean };
+  provider?: ThreadProvider;
   groups: readonly { id: string; name: string }[];
   onUnarchive(threadId: string, destination: string | null): void;
   onNavigate(): void;
@@ -97,32 +107,38 @@ export function ArchivedThreadRow({
               );
             }}
           >
-            <span className="ws-thread-leading">
-              <Icon
-                name={project?.isPersonal ? "Laptop" : "FolderGit"}
-                className="ws-project-icon"
-                aria-label={projectLabel}
-              />
-            </span>
-            <span className="ws-thread-main">
-              <span className="ws-thread-title">{title}</span>
-              <span className="ws-thread-meta">
-                <span>{thread.environmentBranchName || projectLabel}</span>
-                <span>Archive</span>
-              </span>
-            </span>
-            <span className="ws-thread-trailing">
-              {duration ? (
-                <time
-                  className="ws-thread-archive-age"
-                  dateTime={new Date(thread.archivedAt).toISOString()}
-                  aria-label={`Archived ${duration} ago`}
-                  title={`Archived ${duration} ago`}
-                >
-                  {duration}
-                </time>
-              ) : null}
-            </span>
+            <ThreadRowContent
+              providerId={thread.providerId}
+              provider={provider}
+              title={title}
+              metadata={
+                <span className="ws-thread-meta">
+                  <ThreadWorkspaceBadge
+                    branchName={thread.environmentBranchName}
+                    environmentName={thread.environmentName}
+                    workspaceDisplayKind={
+                      thread.environmentWorkspaceDisplayKind
+                    }
+                    project={project}
+                    projectLabel={projectLabel}
+                  />
+                </span>
+              }
+              trailing={
+                <span className="ws-thread-trailing">
+                  {duration ? (
+                    <time
+                      className="ws-thread-archive-age"
+                      dateTime={new Date(thread.archivedAt).toISOString()}
+                      aria-label={`Archived ${duration} ago`}
+                      title={`Archived ${duration} ago`}
+                    >
+                      {duration}
+                    </time>
+                  ) : null}
+                </span>
+              }
+            />
           </a>
         </ContextMenuTrigger>
         <ContextMenuContent aria-label={`Actions for ${title}`}>

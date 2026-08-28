@@ -2,7 +2,7 @@ import { useState, type DragEvent } from "react";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { ArchivedThreads } from "./archived-threads";
 import type { SidebarThreadOrganization } from "./sidebar-organization";
-import type { ThreadProviderDirectory } from "./thread-provider-logo";
+import type { ThreadProviderDirectory } from "@/components/threads/thread-provider-logo";
 import { WorkThreadTree } from "./thread-tree";
 
 type SidebarGroupTreeProps = {
@@ -194,6 +194,7 @@ export function SidebarThreadGroups({
         <ArchivedThreads
           threads={organization.threads}
           projectsById={organization.projectsById}
+          providersById={providersById}
           groups={organization.groups}
           onSaveGroups={organization.saveGroups}
           onNavigate={onNavigate}

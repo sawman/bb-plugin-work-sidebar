@@ -362,6 +362,7 @@ describe("R18 registered left sidebar parity", () => {
     const slot = await leftSlot({
       threads: [thread("thr_active", "Active thread"), thread("thr_grouped", "Grouped thread")],
       groups: [{ id: "group_later", name: "Later", threadIds: ["thr_grouped"] }],
+      providers: [provider("codex", "Codex", null), provider("claude-code", "Claude Code", null)],
       rpc: {
         sidebarArchivedThreads: () => ({
           available: true,
@@ -372,7 +373,25 @@ describe("R18 registered left sidebar parity", () => {
             title: "Archived thread",
             titleFallback: null,
             parentThreadId: null,
+            providerId: "codex",
+            environmentBranchName: "feature/archive",
+            environmentName: "Archive worktree",
+            environmentWorkspaceDisplayKind: "managed-worktree",
+            isPinned: false,
+            isUnread: false,
+            createdAt: 0,
+            updatedAt: 0,
+            archivedAt,
+          }, {
+            id: "thr_archived_worktree",
+            projectId: project.id,
+            title: "Archived worktree thread",
+            titleFallback: null,
+            parentThreadId: null,
+            providerId: "claude-code",
             environmentBranchName: null,
+            environmentName: "Managed checkout",
+            environmentWorkspaceDisplayKind: "managed-worktree",
             isPinned: false,
             isUnread: false,
             createdAt: 0,
@@ -407,6 +426,15 @@ describe("R18 registered left sidebar parity", () => {
     expect(duration?.textContent).toBe("3h");
     expect(duration?.getAttribute("aria-label")).toBe("Archived 3h ago");
     expect(duration?.parentElement?.classList).toContain("ws-thread-trailing");
+    expect(archivedLink.querySelector(".ws-thread-leading .ws-thread-agent-placeholder")).toBeTruthy();
+    expect(archivedLink.querySelector('.ws-thread-provider[data-provider-id="codex"]')).toBeTruthy();
+    expect(archivedLink.querySelector(".ws-thread-worktree")?.textContent).toBe("feature/archive");
+    expect(archivedLink.querySelector(".ws-thread-worktree svg")).toBeTruthy();
+    expect(archivedLink.querySelector(".ws-thread-meta")?.textContent).toBe("feature/archive");
+    const worktreeLink = slot.getByRole("link", { name: /Archived worktree thread/ });
+    expect(worktreeLink.querySelector('.ws-thread-provider[data-provider-id="claude-code"]')).toBeTruthy();
+    expect(worktreeLink.querySelector(".ws-thread-worktree")?.textContent).toBe("Managed checkout");
+    expect(worktreeLink.querySelector(".ws-thread-meta")?.textContent).toBe("Managed checkout");
     expect(archivedLink.querySelector(".ws-thread-drag-handle")).toBeNull();
     fireEvent.keyDown(archivedLink, { key: "F10", shiftKey: true });
     expect(slot.getByRole("menuitem", { name: "Active" })).toBeTruthy();

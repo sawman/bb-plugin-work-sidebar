@@ -5,11 +5,11 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
+import { ThreadRowContent } from "@/components/threads/thread-row-content";
 import { threadTitle } from "@/work-model";
 import { threadNeedsAttention } from "./thread-attention";
 import { ThreadRowMenu } from "./thread-row-menu";
 import { ThreadMetadata, ThreadStatus } from "./thread-row-presentation";
-import { ThreadProviderLogo } from "./thread-provider-logo";
 import { ThreadRowStackNumber } from "./thread-row-stack-number";
 import type { ThreadRowProps } from "./thread-row-types";
 import { useThreadRowActions } from "./use-thread-row-actions";
@@ -157,57 +157,56 @@ export function ThreadRow({
               );
             }}
           >
-            <span className="ws-thread-leading">
-              {children > 0 ? (
-                <button
-                  type="button"
-                  className={`ws-thread-agent-badge ${childrenExpanded ? "ws-thread-agent-badge-expanded" : ""}`}
-                  aria-label={`${children} child agent${children === 1 ? "" : "s"}${childrenExpanded ? ", expanded" : ", collapsed"}`}
-                  aria-expanded={childrenExpanded}
-                  onPointerDown={(event) => event.stopPropagation()}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onToggleChildren();
-                  }}
-                >
-                  <Icon
-                    name="Bot"
-                    className={
-                      activeChildren ? "ws-child-agent-working" : undefined
-                    }
-                    aria-hidden
-                  />
-                  <small>{children}</small>
-                </button>
-              ) : (
-                <span className="ws-thread-agent-placeholder" aria-hidden />
-              )}
-            </span>
-            <span className="ws-thread-main">
-              <span
-                className={`ws-thread-title ${threadNeedsAttention(thread) ? "ws-thread-attention" : ""}`}
-              >
-                <ThreadProviderLogo
-                  providerId={thread.providerId}
-                  provider={provider}
+            <ThreadRowContent
+              leading={
+                children > 0 ? (
+                  <button
+                    type="button"
+                    className={`ws-thread-agent-badge ${childrenExpanded ? "ws-thread-agent-badge-expanded" : ""}`}
+                    aria-label={`${children} child agent${children === 1 ? "" : "s"}${childrenExpanded ? ", expanded" : ", collapsed"}`}
+                    aria-expanded={childrenExpanded}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onToggleChildren();
+                    }}
+                  >
+                    <Icon
+                      name="Bot"
+                      className={
+                        activeChildren ? "ws-child-agent-working" : undefined
+                      }
+                      aria-hidden
+                    />
+                    <small>{children}</small>
+                  </button>
+                ) : undefined
+              }
+              providerId={thread.providerId}
+              provider={provider}
+              title={title}
+              attention={threadNeedsAttention(thread)}
+              metadata={
+                <ThreadMetadata
+                  thread={thread}
+                  project={project}
+                  projectLabel={projectLabel}
+                  stackNumber={
+                    pullRequest ? (
+                      <ThreadRowStackNumber threadId={thread.id} />
+                    ) : null
+                  }
+                  pullRequest={pullRequest}
+                  pullRequestLoading={pullRequestLoading}
                 />
-                <span className="ws-thread-title-copy">{title}</span>
-              </span>
-              <ThreadMetadata
-                thread={thread}
-                project={project}
-                projectLabel={projectLabel}
-                stackNumber={
-                  pullRequest ? <ThreadRowStackNumber threadId={thread.id} /> : null
-                }
-                pullRequest={pullRequest}
-                pullRequestLoading={pullRequestLoading}
-              />
-            </span>
-            <ThreadStatus
-              thread={thread}
-              hasComposerDraft={hasComposerDraft}
+              }
+              trailing={
+                <ThreadStatus
+                  thread={thread}
+                  hasComposerDraft={hasComposerDraft}
+                />
+              }
             />
           </a>
         </ThreadRowMenu>

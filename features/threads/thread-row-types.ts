@@ -4,7 +4,7 @@ import type { SidebarThreadGroup } from "./model";
 import type {
   ThreadProvider,
   ThreadProviderDirectory,
-} from "./thread-provider-logo";
+} from "@/components/threads/thread-provider-logo";
 
 export type ThreadDropTarget = {
   threadId: string;

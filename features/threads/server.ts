@@ -33,7 +33,13 @@ type ArchivedThreadRow = {
   title: string | null;
   titleFallback: string | null;
   parentThreadId: string | null;
+  providerId: string;
   environmentBranchName: string | null;
+  environmentName: string | null;
+  environmentWorkspaceDisplayKind:
+    | "managed-worktree"
+    | "unmanaged-worktree"
+    | "other";
   pinnedAt: number | null;
   createdAt: number;
   updatedAt: number;
@@ -60,7 +66,13 @@ export type ArchivedThreadProjection = {
   title: string | null;
   titleFallback: string | null;
   parentThreadId: string | null;
+  providerId: string;
   environmentBranchName: string | null;
+  environmentName: string | null;
+  environmentWorkspaceDisplayKind:
+    | "managed-worktree"
+    | "unmanaged-worktree"
+    | "other";
   isPinned: boolean;
   isUnread: false;
   createdAt: number;
@@ -78,7 +90,10 @@ function projectArchivedThread(
     title: row.title,
     titleFallback: row.titleFallback,
     parentThreadId: row.parentThreadId,
+    providerId: row.providerId,
     environmentBranchName: row.environmentBranchName,
+    environmentName: row.environmentName,
+    environmentWorkspaceDisplayKind: row.environmentWorkspaceDisplayKind,
     isPinned: row.pinnedAt !== null,
     isUnread: false,
     createdAt: row.createdAt,

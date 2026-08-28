@@ -8,6 +8,7 @@ import {
 import type { SidebarThreadGroup } from "./model";
 import { archiveDurationLabel } from "./model";
 import { useArchivedThreads } from "./queries";
+import type { ThreadProviderDirectory } from "@/components/threads/thread-provider-logo";
 
 type Project = { id: string; name: string; isPersonal: boolean };
 type DropTarget = { threadId: string; placement: "before" | "after" } | null;
@@ -16,6 +17,7 @@ const EMPTY_ARCHIVED_THREADS: ArchivedThread[] = [];
 export function ArchivedThreads({
   threads,
   projectsById,
+  providersById,
   groups,
   onSaveGroups,
   onNavigate,
@@ -28,6 +30,7 @@ export function ArchivedThreads({
 }: {
   threads: readonly PluginSidebarThread[];
   projectsById: ReadonlyMap<string, Project>;
+  providersById: ThreadProviderDirectory;
   groups: readonly SidebarThreadGroup[];
   onSaveGroups(next: SidebarThreadGroup[]): void;
   onNavigate(): void;
@@ -136,6 +139,7 @@ export function ArchivedThreads({
               thread={thread}
               duration={archiveDurationLabel(thread.archivedAt, now)}
               project={projectsById.get(thread.projectId)}
+              provider={providersById.get(thread.providerId)}
               groups={groups}
               onUnarchive={unarchive}
               onNavigate={onNavigate}

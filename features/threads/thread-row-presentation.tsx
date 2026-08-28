@@ -5,6 +5,7 @@ import type {
 } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
 import { CopyBadge } from "@/components/ui/copy-badge";
+import { ThreadWorkspaceBadge } from "@/components/threads/thread-workspace-badge";
 import { normalizeIndicator } from "@/work-model";
 import { pullRequestPresentation } from "@/features/pull-requests/presentation";
 import { threadIsWorking, useStaleWorking } from "./thread-attention";
@@ -59,32 +60,13 @@ export function ThreadMetadata({
         </CopyBadge>
       )}
       {stackNumber}
-      {thread.environment?.branchName ? (
-        <CopyBadge
-          value={thread.environment.branchName}
-          copyValue={`Branch ${thread.environment.branchName}`}
-          label="branch name"
-          className="ws-thread-worktree"
-          title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${thread.environment.branchName}`}
-        >
-          <Icon
-            name={project?.isPersonal ? "Laptop" : "FolderGit"}
-            aria-hidden
-          />
-          <span>{thread.environment.branchName}</span>
-        </CopyBadge>
-      ) : (
-        <span
-          className="ws-thread-worktree"
-          title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${project?.isPersonal ? "Personal" : projectLabel}`}
-        >
-          <Icon
-            name={project?.isPersonal ? "Laptop" : "FolderGit"}
-            aria-hidden
-          />
-          <span>{project?.isPersonal ? "Personal" : projectLabel}</span>
-        </span>
-      )}
+      <ThreadWorkspaceBadge
+        branchName={thread.environment?.branchName ?? null}
+        environmentName={thread.environment?.name}
+        workspaceDisplayKind={thread.environment?.workspaceDisplayKind}
+        project={project}
+        projectLabel={projectLabel}
+      />
       {pullRequestLoading && (
         <span
           className="ws-pr-meta"
