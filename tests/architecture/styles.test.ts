@@ -328,6 +328,29 @@ describe("stylesheet architecture baseline", () => {
 });
 
 describe("shared surface and list-row architecture", () => {
+  test("reserves scrollbar space at both shared tab scrollports", () => {
+    const rules = stylesheetPaths().flatMap((path) =>
+      stylesheetRules(readFileSync(path, "utf8")),
+    );
+    const declarationsFor = (target: string) =>
+      rules
+        .filter(({ selector }) =>
+          selector.split(",").some((part) => part.trim() === target),
+        )
+        .map(({ declarations }) => declarations)
+        .join("\n");
+    const leftTabs = declarationsFor(".ws-list.ws-list");
+    const rightTabs = [
+      declarationsFor(".ws-panel-body"),
+      declarationsFor(".ws-panel-body.ws-panel-body"),
+    ].join("\n");
+
+    expect(leftTabs).toContain("overflow-y: auto");
+    expect(leftTabs).toContain("scrollbar-gutter: stable");
+    expect(rightTabs).toContain("overflow: auto");
+    expect(rightTabs).toContain("scrollbar-gutter: stable");
+  });
+
   test("gives the semantic active combobox option a host-token highlight", () => {
     const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
     const activeOption = rules.find(({ selector }) =>

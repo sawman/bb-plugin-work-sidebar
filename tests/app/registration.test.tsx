@@ -89,6 +89,21 @@ describe("R2 app registration and Query lifecycle", () => {
       threadId: "thr_test",
       params: null,
     });
+    expect(
+      ["Threads", "Tasks", "PRs"].map((name) =>
+        Boolean(left.getByRole("button", { name }).closest(".ws-list")),
+      ),
+    ).toEqual([true, true, true]);
+    expect(
+      ["Work", "Changes", "Agents"].map((name) =>
+        right.getByRole("tab", { name }).getAttribute("aria-controls"),
+      ),
+    ).toEqual([
+      "ws-work-thr_test-panel-work",
+      "ws-work-thr_test-panel-changes",
+      "ws-work-thr_test-panel-agents",
+    ]);
+    expect(right.container.querySelectorAll(".ws-panel-body")).toHaveLength(3);
     expect(mount).toHaveBeenCalledTimes(2);
     // Changes owns no cache entries until its tab mounts the panel; once
     // selected, the file query remains hook-stable and disabled until opened.

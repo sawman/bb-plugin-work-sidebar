@@ -6,3 +6,9 @@
   overflow-y: auto;
   scrollbar-gutter: stable;
 }
+
+/* Work, Changes, and Agents each mount in one of these sibling scrollports.
+   Reserve the same vertical gutter before an expansion makes a tab overflow. */
+.ws-panel-body.ws-panel-body {
+  scrollbar-gutter: stable;
+}
