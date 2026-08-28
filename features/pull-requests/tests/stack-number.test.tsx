@@ -106,6 +106,9 @@ describe("pull-request stack number presentation", () => {
       true,
     );
     expect(branch.classList.contains("ws-pr-identifier-badge")).toBe(true);
+    expect(branch.getAttribute("data-variant")).toBe("text");
+    expect(pullRequest.getAttribute("data-variant")).toBe("badge");
+    expect(stackNumber.getAttribute("data-variant")).toBe("badge");
     for (const badge of [pullRequest, stackNumber, branch]) {
       expect(badge.classList.contains("ws-identifier-badge")).toBe(true);
     }

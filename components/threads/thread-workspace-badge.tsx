@@ -40,6 +40,7 @@ export function ThreadWorkspaceBadge({
       copyValue={copyValue}
       label={label}
       className="ws-thread-worktree"
+      variant="text"
       title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${value}`}
     >
       <Icon name={project?.isPersonal ? "Laptop" : "FolderGit"} aria-hidden />

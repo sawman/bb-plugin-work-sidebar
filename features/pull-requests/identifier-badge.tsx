@@ -19,6 +19,7 @@ export function PullRequestIdentifierBadge(
       copyValue={copyValue}
       label={label}
       className="ws-pr-identifier-badge"
+      variant={pullRequest ? "badge" : "text"}
       title={copyValue}
     >
       <Icon name={pullRequest ? "GitPullRequest" : "GitBranch"} aria-hidden />

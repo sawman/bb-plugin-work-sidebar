@@ -258,6 +258,7 @@ describe("R15 registered Agents Work slot", () => {
       name: "Copy agent workspace bb/agents-details",
     });
     expect(workspace.classList).toContain("ws-identifier-badge");
+    expect(workspace.getAttribute("data-variant")).toBe("text");
     fireEvent.click(workspace);
     await waitFor(() =>
       expect(clipboardWrite).toHaveBeenCalledWith(

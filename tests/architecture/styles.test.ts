@@ -455,8 +455,17 @@ describe("shared surface and list-row architecture", () => {
       "font-family: ui-monospace, SFMono-Regular, Menlo, monospace",
     );
     expect(badge?.declarations).toContain("font-size: 0.58rem");
-    expect(badge?.declarations).toContain("font-weight: 600");
+    expect(badge?.declarations).toContain("font-weight: 400");
     expect(badge?.declarations).toContain("white-space: nowrap");
+
+    const text = rules.find(
+      ({ selector }) =>
+        selector === '.ws-identifier-badge[data-variant="text"]',
+    );
+    expect(text?.declarations).toContain("border: 0");
+    expect(text?.declarations).toContain("border-radius: 0");
+    expect(text?.declarations).toContain("padding: 0");
+    expect(text?.declarations).toContain("color: inherit");
 
     for (const selector of [
       ".ws-pr-identifier-badge",

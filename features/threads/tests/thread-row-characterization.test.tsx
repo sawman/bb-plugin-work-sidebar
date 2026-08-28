@@ -184,6 +184,12 @@ describe("R21D ThreadRow characterization", () => {
       fireEvent.contextMenu(badge, { ctrlKey: true });
     }
 
+    expect(
+      view
+        .getByRole("button", { name: "Copy branch name feature/m7" })
+        .getAttribute("data-variant"),
+    ).toBe("text");
+
     await waitFor(() =>
       expect(clipboardWrite.mock.calls).toEqual([
         ["PR #42"],

@@ -539,10 +539,16 @@
   color: var(--foreground);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.58rem;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1;
   text-decoration: none;
   white-space: nowrap;
+}
+.ws-identifier-badge[data-variant="text"] {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  color: inherit;
 }
 .ws-identifier-badge svg {
   width: 0.62rem;
