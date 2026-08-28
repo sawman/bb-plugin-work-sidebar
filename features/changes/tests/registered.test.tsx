@@ -266,7 +266,9 @@ describe("R13 registered Changes Work slot", () => {
     });
     expect(currentPrNumber.classList.contains("ws-pr-number-badge")).toBe(true);
     fireEvent.click(currentPrNumber);
-    await waitFor(() => expect(clipboardWrite).toHaveBeenCalledWith("#42"));
+    await waitFor(() =>
+      expect(clipboardWrite).toHaveBeenCalledWith("PR #42"),
+    );
     fireEvent.click(
       nonStack.getByRole("button", {
         name: "Show details for pull request #42",

@@ -1,4 +1,5 @@
 import type {
+  HTMLAttributes,
   KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
   PointerEvent as ReactPointerEvent,
@@ -6,26 +7,45 @@ import type {
 } from "react";
 import { toast } from "sonner";
 
-export function CopyBadge({
-  value,
-  label,
-  className,
-  children,
-  title,
-  tone,
-}: {
+type CopyBadgeProps = {
   value: string;
+  copyValue?: string;
   label: string;
   className?: string;
   children: ReactNode;
   title?: string;
   tone?: string;
-}) {
+} & Omit<
+  HTMLAttributes<HTMLSpanElement>,
+  | "children"
+  | "className"
+  | "title"
+  | "role"
+  | "tabIndex"
+  | "onPointerDown"
+  | "onMouseDown"
+  | "onContextMenu"
+  | "onClick"
+  | "onKeyDown"
+  | "aria-label"
+>;
+
+export function CopyBadge({
+  value,
+  copyValue,
+  label,
+  className,
+  children,
+  title,
+  tone,
+  ...spanProps
+}: CopyBadgeProps) {
+  const clipboardValue = copyValue ?? value;
   const copy = () => {
     void (async () => {
       try {
-        await navigator.clipboard.writeText(value);
-        toast.success(`Copied ${value}`);
+        await navigator.clipboard.writeText(clipboardValue);
+        toast.success(`Copied ${clipboardValue}`);
       } catch {
         toast.error(`Could not copy ${label}`);
       }
@@ -41,6 +61,7 @@ export function CopyBadge({
 
   return (
     <span
+      {...spanProps}
       className={`ws-copy-badge${className ? ` ${className}` : ""}`}
       role="button"
       tabIndex={0}

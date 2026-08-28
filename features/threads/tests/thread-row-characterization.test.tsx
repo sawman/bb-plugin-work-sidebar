@@ -185,9 +185,9 @@ describe("R21D ThreadRow characterization", () => {
 
     await waitFor(() =>
       expect(clipboardWrite.mock.calls).toEqual([
-        ["#42"],
-        ["#17"],
-        ["feature/m7"],
+        ["PR #42"],
+        ["Stack #17"],
+        ["Branch feature/m7"],
       ]),
     );
     expect(view.onSelect).not.toHaveBeenCalled();

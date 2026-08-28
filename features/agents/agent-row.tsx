@@ -3,6 +3,7 @@ import {
   experimental_useSidebarThreadActions,
   experimental_useSidebarThreadSplit,
 } from "@get-bb/plugin-sdk/app";
+import { CopyBadge } from "../../components/ui/copy-badge";
 import { Icon, type IconName } from "../../components/ui/icon";
 import {
   agentDurationLabel,
@@ -101,7 +102,10 @@ export function AgentRow({
             <span>{model ?? "Model unavailable"}</span>
           </span>
           {workspace ? (
-            <span
+            <CopyBadge
+              value={workspace.label}
+              copyValue={workspace.copyValue}
+              label="agent workspace"
               className="ws-agent-fact"
               title={`${workspace.detail}: ${workspace.label}`}
               data-workspace-kind={workspace.kind}
@@ -109,7 +113,7 @@ export function AgentRow({
               <Icon name={workspaceIcons[workspace.kind]} aria-hidden />
               <span>{workspace.label}</span>
               <small>{workspace.detail}</small>
-            </span>
+            </CopyBadge>
           ) : null}
           {annotation.taskKey ? (
             <span className="ws-agent-fact ws-agent-task" title="Assigned task">

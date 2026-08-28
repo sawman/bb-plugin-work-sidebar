@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { getPluginQueryClient } from "../../../query-runtime";
 
+const clipboardWrite = vi.fn(() => Promise.resolve());
+
 const context = {
   tasksAvailable: true,
   currentThread: {
@@ -115,6 +117,7 @@ async function agentsSlot(sidebarThreads: Partial<PluginSidebarThreadsState>, rp
 afterEach(() => {
   cleanup();
   getPluginQueryClient().clear();
+  clipboardWrite.mockReset();
 });
 
 describe("R15 registered Agents Work slot", () => {
@@ -196,6 +199,10 @@ describe("R15 registered Agents Work slot", () => {
   });
 
   it("shows each agent's resolved model, worktree and branch, and complete linked task", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: clipboardWrite },
+    });
     const slot = await agentsSlot(
       {
         status: "ready",
@@ -247,6 +254,16 @@ describe("R15 registered Agents Work slot", () => {
     await waitFor(() => expect(slot.getByText("claude-opus-5[1m]")).toBeTruthy());
     expect(slot.getByText("bb/agents-details")).toBeTruthy();
     expect(slot.getByText("Agents worktree")).toBeTruthy();
+    const workspace = slot.getByRole("button", {
+      name: "Copy agent workspace bb/agents-details",
+    });
+    fireEvent.click(workspace);
+    await waitFor(() =>
+      expect(clipboardWrite).toHaveBeenCalledWith(
+        "Branch bb/agents-details · Worktree Agents",
+      ),
+    );
+    expect(slot.inspection.sidebarActionCalls).toEqual([]);
     expect(slot.getByText("BBPLUG-52")).toBeTruthy();
     expect(slot.getByText("Enhance the sidebar Agents view")).toBeTruthy();
     expect(slot.getByRole("img", { name: "Working" }).classList).toContain(

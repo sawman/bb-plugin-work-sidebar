@@ -12,6 +12,7 @@ export function StackNumberBadge({
   return (
     <CopyBadge
       value={`#${number}`}
+      copyValue={`Stack #${number}`}
       label="stack number"
       className={`ws-stack-number${compact ? " ws-stack-number-compact" : ""}`}
       title={label}

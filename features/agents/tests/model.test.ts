@@ -101,6 +101,7 @@ describe("Agents projection model", () => {
       label: "bb/r24-agents",
       detail: "R24 Agents worktree",
       kind: "managed-worktree",
+      copyValue: "Branch bb/r24-agents · Worktree R24 Agents",
     });
 
     expect(agentWorkspacePresentation(thread("thr_workspace", "thr_root", {
@@ -114,6 +115,7 @@ describe("Agents projection model", () => {
       label: "Shared checkout",
       detail: "Workspace",
       kind: "workspace",
+      copyValue: "Workspace Shared checkout",
     });
 
     expect(agentWorkspacePresentation(thread("thr_host", "thr_root", {
@@ -122,6 +124,7 @@ describe("Agents projection model", () => {
       label: "Matthew's Mac",
       detail: "Host workspace",
       kind: "host",
+      copyValue: "Host workspace Matthew's Mac",
     });
     expect(agentWorkspacePresentation(thread("thr_unknown", "thr_root"))).toBeNull();
   });

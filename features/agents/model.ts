@@ -38,6 +38,7 @@ export type AgentRuntimePresentation = {
 export type AgentWorkspacePresentation = {
   label: string;
   detail: string;
+  copyValue: string;
   kind: "managed-worktree" | "unmanaged-worktree" | "workspace" | "host";
 };
 
@@ -67,10 +68,26 @@ export function agentWorkspacePresentation(
           ? name
           : `${name} worktree`
         : workspaceKind;
-    return { label: branch || name || workspaceKind, detail, kind };
+    const workspaceCopyValue =
+      kind === "workspace"
+        ? name
+          ? `Workspace ${name}`
+          : "Workspace"
+        : name
+          ? `Worktree ${name.replace(/\s+worktree$/i, "") || name}`
+          : workspaceKind;
+    const copyValue = branch
+      ? `Branch ${branch} · ${workspaceCopyValue}`
+      : workspaceCopyValue;
+    return { label: branch || name || workspaceKind, detail, copyValue, kind };
   }
   if (thread.host)
-    return { label: thread.host.name, detail: "Host workspace", kind: "host" };
+    return {
+      label: thread.host.name,
+      detail: "Host workspace",
+      copyValue: `Host workspace ${thread.host.name}`,
+      kind: "host",
+    };
   return null;
 }
 

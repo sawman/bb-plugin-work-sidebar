@@ -87,6 +87,7 @@ export function AuthoredPullRequestRow({
           {stackNumber != null && <StackNumberBadge number={stackNumber} />}
           <CopyBadge
             value={`#${pullRequest.number}`}
+            copyValue={`PR #${pullRequest.number}`}
             label="PR number"
             className="ws-pr-number"
           >
@@ -95,6 +96,7 @@ export function AuthoredPullRequestRow({
           {pullRequest.head ? (
             <CopyBadge
               value={pullRequest.head}
+              copyValue={`Branch ${pullRequest.head}`}
               label="branch name"
               className="ws-pr-branch"
             >

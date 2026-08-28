@@ -48,6 +48,7 @@ export function ThreadMetadata({
       {pullRequest && pullRequestStatus && (
         <CopyBadge
           value={`#${pullRequest.number}`}
+          copyValue={`PR #${pullRequest.number}`}
           label="PR number"
           className="ws-pr-meta ws-thread-token ws-thread-pr-token"
           tone={pullRequestStatus.tone}
@@ -61,6 +62,7 @@ export function ThreadMetadata({
       {thread.environment?.branchName ? (
         <CopyBadge
           value={thread.environment.branchName}
+          copyValue={`Branch ${thread.environment.branchName}`}
           label="branch name"
           className="ws-thread-worktree"
           title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${thread.environment.branchName}`}

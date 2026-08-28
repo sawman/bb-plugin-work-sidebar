@@ -105,10 +105,10 @@ describe("pull-request stack number presentation", () => {
 
     await waitFor(() =>
       expect(clipboardWrite.mock.calls).toEqual([
-        ["#42"],
-        ["#17"],
-        ["feature/stack-number"],
-        ["feature/stack-number"],
+        ["PR #42"],
+        ["Stack #17"],
+        ["Branch feature/stack-number"],
+        ["Branch feature/stack-number"],
       ]),
     );
     expect(onSelect).not.toHaveBeenCalled();
