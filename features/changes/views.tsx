@@ -236,10 +236,12 @@ function readableStatus(status: string): string {
 
 export function ChangesCurrentPullRequestCard({
   pullRequest,
+  branch,
   expanded,
   onToggle,
 }: {
   pullRequest: CurrentPullRequestView;
+  branch?: GitHubStackBranch | null;
   expanded: boolean;
   onToggle(): void;
 }) {
@@ -261,6 +263,12 @@ export function ChangesCurrentPullRequestCard({
             {pullRequest.head} · {readableStatus(pullRequest.review.state)} ·{" "}
             {pullRequest.checks.passedCount}/{pullRequest.checks.totalCount}{" "}
             checks
+            {branch?.diff ? (
+              <>
+                {" "}· <b>+{branch.diff.additions}</b>{" "}
+                <i>−{branch.diff.deletions}</i>
+              </>
+            ) : null}
           </small>
         </span>
         <span
@@ -285,10 +293,10 @@ export function ChangesCurrentPullRequestCard({
       <button
         type="button"
         className="ws-current-pr-expand ws-pr-tooltip"
-        data-tooltip={expanded ? "Hide PR details" : "Show PR details"}
+        data-tooltip={expanded ? "Hide changed files" : "Show changed files"}
         onClick={onToggle}
         aria-expanded={expanded}
-        aria-label={`${expanded ? "Hide" : "Show"} details for pull request #${pullRequest.number}`}
+        aria-label={`${expanded ? "Hide" : "Show"} changed files for pull request #${pullRequest.number}`}
       >
         {expanded ? "⌄" : "›"}
       </button>
@@ -301,9 +309,50 @@ export function ChangesCurrentPullRequestCard({
             {pullRequest.checks.failedCount} failed
           </span>
           <span>Merge: {readableStatus(pullRequest.mergeability.state)}</span>
+          <PullRequestFiles diff={branch?.diff ?? null} />
         </div>
       )}
     </article>
+  );
+}
+
+function PullRequestFiles({
+  diff,
+}: {
+  diff: GitHubStackBranch["diff"];
+}): ReactElement {
+  if (!diff)
+    return (
+      <div className="ws-stack-files">
+        <small>Changed files are unavailable.</small>
+      </div>
+    );
+  if (diff.files.length === 0)
+    return (
+      <div className="ws-stack-files">
+        <small>No changed files.</small>
+      </div>
+    );
+  return (
+    <div className="ws-stack-files">
+      {diff.files.map((file) => (
+        <span key={file.path}>
+          <b className={`ws-file-${file.status}`}>
+            {file.status[0]?.toUpperCase()}
+          </b>
+          <em>{file.path}</em>
+          <small>
+            {file.additions !== null ? `+${file.additions}` : ""}{" "}
+            {file.deletions !== null ? `−${file.deletions}` : ""}
+          </small>
+        </span>
+      ))}
+      {diff.truncated && (
+        <small className="ws-stack-files-truncated">
+          Only the first {diff.files.length} files are shown.
+        </small>
+      )}
+    </div>
   );
 }
 
@@ -353,7 +402,7 @@ export function ChangesStackBranchRow({
   });
   const visibleTitle = `${pr ? `#${pr.number} ` : ""}${title}`;
   const filesLabel = `${expanded ? "Hide" : "Show"} changed files for ${pr ? `pull request #${pr.number}` : branch.name}`;
-  const hasFiles = fileCount > 0;
+  const hasDisclosure = Boolean(pr || branch.diff);
   return (
     <li
       className={`ws-stack-layer-item ${branch.isCurrent ? "ws-stack-current" : ""} ${merged ? "ws-stack-merged" : ""} ${expanded ? "ws-stack-expanded" : ""}`}
@@ -367,9 +416,9 @@ export function ChangesStackBranchRow({
           type="button"
           className="ws-stack-layer-toggle"
           onClick={() => {
-            if (hasFiles) onToggle();
+            if (hasDisclosure) onToggle();
           }}
-          {...(hasFiles
+          {...(hasDisclosure
             ? {
                 "aria-expanded": expanded,
                 "aria-label": `${visibleTitle} — ${filesLabel}`,
@@ -402,34 +451,14 @@ export function ChangesStackBranchRow({
           merged={merged}
           current={branch.isCurrent}
           checkingOut={checkingOut}
-          hasFiles={hasFiles}
+          hasDisclosure={hasDisclosure}
           expanded={expanded}
           filesLabel={filesLabel}
           onCheckout={onCheckout}
           onToggle={onToggle}
         />
       </div>
-      {expanded && branch.diff && (
-        <div className="ws-stack-files">
-          {branch.diff.files.map((file) => (
-            <span key={file.path}>
-              <b className={`ws-file-${file.status}`}>
-                {file.status[0]?.toUpperCase()}
-              </b>
-              <em>{file.path}</em>
-              <small>
-                {file.additions !== null ? `+${file.additions}` : ""}{" "}
-                {file.deletions !== null ? `−${file.deletions}` : ""}
-              </small>
-            </span>
-          ))}
-          {branch.diff.truncated && (
-            <small className="ws-stack-files-truncated">
-              Only the first {branch.diff.files.length} files are shown.
-            </small>
-          )}
-        </div>
-      )}
+      {expanded && <PullRequestFiles diff={branch.diff} />}
     </li>
   );
 }

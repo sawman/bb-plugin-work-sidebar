@@ -1,3 +1,4 @@
+import type { GitHubStackBranch } from "../../contracts.js";
 import type { ServerLifecycle } from "../../server-lifecycle.js";
 import type { GitHubApiRunner, GitHubPullRequest, GitHubSignal } from "./server-types.js";
 
@@ -60,6 +61,49 @@ export function parseGitHubStackResponse(value: unknown): { number: number; base
     number: requiredNumber(first.number, "stack number"),
     base: requiredString(base, "stack base"),
     pullRequests: first.pull_requests.map(parseStackPullRequest),
+  };
+}
+
+export async function readGitHubPullRequestDiff(
+  owner: string,
+  repo: string,
+  pullRequest: number,
+  run: GitHubApiRunner,
+): Promise<NonNullable<GitHubStackBranch["diff"]>> {
+  const raw: unknown = JSON.parse(await run([
+    "api",
+    "--method",
+    "GET",
+    `repos/${owner}/${repo}/pulls/${pullRequest}/files?per_page=100`,
+    "-H",
+    `Accept: ${GITHUB_ACCEPT_HEADER}`,
+    "-H",
+    `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`,
+  ], 4_000_000));
+  if (!Array.isArray(raw)) throw new Error("GitHub pull request files response is invalid");
+  const files = raw.map((value) => {
+    if (!isRecord(value)) throw new Error("GitHub pull request files response contains an invalid file");
+    const remoteStatus = requiredString(value.status, "pull request file status");
+    const status = remoteStatus === "added"
+      ? "added"
+      : remoteStatus === "removed"
+        ? "deleted"
+        : remoteStatus === "renamed"
+          ? "renamed"
+          : "modified";
+    return {
+      path: requiredString(value.filename, "pull request file path"),
+      previousPath: typeof value.previous_filename === "string" ? value.previous_filename : null,
+      status,
+      additions: typeof value.additions === "number" ? value.additions : null,
+      deletions: typeof value.deletions === "number" ? value.deletions : null,
+    } satisfies NonNullable<GitHubStackBranch["diff"]>["files"][number];
+  });
+  return {
+    additions: files.reduce((total, file) => total + (file.additions ?? 0), 0),
+    deletions: files.reduce((total, file) => total + (file.deletions ?? 0), 0),
+    files,
+    truncated: files.length === 100,
   };
 }
 

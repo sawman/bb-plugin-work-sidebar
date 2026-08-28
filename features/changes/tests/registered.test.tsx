@@ -271,10 +271,11 @@ describe("R13 registered Changes Work slot", () => {
     );
     fireEvent.click(
       nonStack.getByRole("button", {
-        name: "Show details for pull request #42",
+        name: "Show changed files for pull request #42",
       }),
     );
     expect(nonStack.getByText("Review: Approved")).toBeTruthy();
+    expect(nonStack.getByText("Changed files are unavailable.")).toBeTruthy();
     nonStack.lifecycle.unmount();
 
     const branch = {
@@ -366,6 +367,106 @@ describe("R13 registered Changes Work slot", () => {
     expect(trailingDisclosure.getAttribute("aria-expanded")).toBe("true");
     expect(stack.getByText("renamed.ts")).toBeTruthy();
     stack.lifecycle.unmount();
+  });
+
+  it("treats a one-branch gh-stack projection as a standalone pull request with changed files", async () => {
+    const currentPullRequest = {
+      number: 1279,
+      title: "Upgrade Pulumi",
+      url: "https://github.com/acme/repo/pull/1279",
+      state: "open",
+      head: "deps/upgrade-pulumi",
+      base: "main",
+      checks: {
+        failedCount: 1,
+        passedCount: 99,
+        pendingCount: 0,
+        state: "failing",
+        totalCount: 100,
+      },
+      review: { reviewRequestCount: 0, state: "changes_requested" },
+      attention: "checks_failed",
+      mergeability: {
+        mergeStateStatus: "BLOCKED",
+        mergeable: "MERGEABLE",
+        state: "blocked",
+      },
+      signal: {
+        checks: "failed",
+        review: "changes_requested",
+        reviewCommentCount: 0,
+      },
+    };
+    const branch = {
+      name: "deps/upgrade-pulumi",
+      isCurrent: true,
+      isMerged: false,
+      isQueued: false,
+      needsRebase: false,
+      hasStash: false,
+      stashCount: null,
+      pr: {
+        number: 1279,
+        url: currentPullRequest.url,
+        state: "open",
+        title: currentPullRequest.title,
+        isDraft: false,
+        metadataStale: false,
+      },
+      diff: {
+        additions: 382,
+        deletions: 141,
+        files: [
+          {
+            path: "infra/pyproject.toml",
+            previousPath: null,
+            status: "modified",
+            additions: 1,
+            deletions: 1,
+          },
+        ],
+        truncated: true,
+      },
+      aheadOfRemote: 0,
+      behindRemote: 0,
+      checks: "failed",
+      review: "changes_requested",
+    };
+    const slot = await changesSlot({
+      getChanges: () =>
+        changesResult(repository("available"), {
+          currentPullRequest,
+          stack: null,
+          githubStack: {
+            stack: {
+              trunk: "main",
+              currentBranch: branch.name,
+              branches: [branch],
+              trunkBehind: 0,
+              prunableBranchCount: 0,
+            },
+            pending: null,
+            error: null,
+          },
+        }),
+    });
+
+    await waitFor(() =>
+      expect(slot.getByText(/#1279 Upgrade Pulumi/)).toBeTruthy(),
+    );
+    expect(
+      slot.queryByRole("list", { name: "GitHub Stack based on main" }),
+    ).toBeNull();
+    expect(
+      slot.queryByRole("button", { name: "Current branch" }),
+    ).toBeNull();
+    fireEvent.click(
+      slot.getByRole("button", {
+        name: "Show changed files for pull request #1279",
+      }),
+    );
+    expect(slot.getByText("infra/pyproject.toml")).toBeTruthy();
+    slot.lifecycle.unmount();
   });
   it("refreshes Changes exactly once without calling the legacy aggregate on manual refresh", async () => {
     const getChanges = vi.fn(() => changesResult());
@@ -475,6 +576,12 @@ describe("R13 registered Changes Work slot", () => {
     const slot = await changesSlot({
       getChanges: () =>
         changesResult(repository("available", true), {
+          stack: {
+            number: 72,
+            base: "main",
+            currentPullRequest: 0,
+            pullRequests: [],
+          },
           githubStack: {
             stack: {
               trunk: "main",

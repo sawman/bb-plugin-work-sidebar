@@ -87,7 +87,7 @@ describe("R13 Changes error presentation", () => {
     ).toBe("#12");
   });
 
-  it("keeps a zero-file stack label focusable without exposing a disclosure", () => {
+  it("keeps a zero-file pull request disclosure available", () => {
     render(
       createElement(ChangesStackBranchRow, {
         branch: {
@@ -116,13 +116,15 @@ describe("R13 Changes error presentation", () => {
         onCheckout: () => undefined,
       } as never),
     );
-    const label = screen.getByRole("button", { name: "#8 Empty" });
-    expect(label.getAttribute("aria-disabled")).toBe("true");
-    expect(label.hasAttribute("aria-expanded")).toBe(false);
-    expect(label.getAttribute("aria-label")).not.toContain(
-      "Show changed files",
+    const label = screen.getByRole("button", {
+      name: "#8 Empty — Show changed files for pull request #8",
+    });
+    expect(label.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Show changed files for pull request #8",
+      }),
     );
-    expect(label.querySelector(".ws-stack-expand")).toBeNull();
   });
 
   it.each([
@@ -166,7 +168,7 @@ describe("R13 Changes error presentation", () => {
     },
   );
 
-  it("leaves the disclosure slot empty when there are no files", () => {
+  it("keeps the disclosure in the final action slot for a zero-file pull request", () => {
     const { container } = render(
       <ChangesStackBranchRow
         branch={stackBranch({
@@ -185,10 +187,30 @@ describe("R13 Changes error presentation", () => {
     expect(actions).toBeTruthy();
     if (!actions) throw new Error("missing trailing actions");
     expect(actions.children).toHaveLength(3);
-    expect(actions.lastElementChild?.childElementCount).toBe(0);
+    expect(actions.lastElementChild?.childElementCount).toBe(1);
     expect(
-      within(actions).queryByRole("button", { name: /changed files/ }),
-    ).toBeNull();
+      within(actions).getByRole("button", { name: /changed files/ }),
+    ).toBeTruthy();
+  });
+
+  it("keeps a changed-files disclosure on a pull request while its diff is unavailable", () => {
+    const onToggle = vi.fn();
+    render(
+      <ChangesStackBranchRow
+        branch={stackBranch({ diff: null })}
+        expanded={false}
+        checkingOut={false}
+        onToggle={onToggle}
+        onCheckout={() => undefined}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Show changed files for pull request #8",
+      }),
+    );
+    expect(onToggle).toHaveBeenCalledOnce();
   });
 
   it("keeps title, checkout, and trailing disclosure interactions isolated", () => {

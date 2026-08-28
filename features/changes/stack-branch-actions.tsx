@@ -7,7 +7,7 @@ type StackBranchActionsProps = {
   merged: boolean;
   current: boolean;
   checkingOut: boolean;
-  hasFiles: boolean;
+  hasDisclosure: boolean;
   expanded: boolean;
   filesLabel: string;
   onCheckout(): void;
@@ -20,7 +20,7 @@ export function StackBranchActions({
   merged,
   current,
   checkingOut,
-  hasFiles,
+  hasDisclosure,
   expanded,
   filesLabel,
   onCheckout,
@@ -62,7 +62,7 @@ export function StackBranchActions({
         </button>
       </span>
       <span className="ws-stack-action-slot">
-        {hasFiles && (
+        {hasDisclosure && (
           <button
             type="button"
             className="ws-stack-expand ws-pr-tooltip"

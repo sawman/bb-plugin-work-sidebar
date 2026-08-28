@@ -1,15 +1,26 @@
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { rpcContract } from "../../contracts.js";
+import { rpcContract, type GitHubStackBranch } from "../../contracts.js";
 import type { ServerLifecycle } from "../../server-lifecycle.js";
 import type { PullRequestChangesAdapter } from "../../shared/server-composition-dependencies.js";
 import type { PluginRpcInput } from "../../shared/server-plugin-rpc.js";
 import type { SidebarStack } from "../../work-model.js";
 import { normalizePullRequestSignal } from "./presentation.js";
-import { fetchGitHubStack } from "./server-stack.js";
+import {
+  fetchGitHubStack,
+  readGitHubPullRequestDiff,
+} from "./server-stack.js";
 import type { CurrentPullRequest, GitHubReadRunner } from "./server-types.js";
 
 const GITHUB_STACK_PLUGIN_ID = "gh-stack";
+
+type GitHubStackProjection = {
+  trunk: string;
+  currentBranch: string | null;
+  branches: GitHubStackBranch[];
+  trunkBehind: number | null;
+  prunableBranchCount: number | null;
+};
 
 type ThreadStackHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
@@ -58,6 +69,75 @@ function projectCurrentPullRequest(pullRequest: CurrentPullRequest): CurrentPull
     review: { ...pullRequest.review },
     mergeability: { ...pullRequest.mergeability },
     signal: { ...pullRequest.signal },
+  };
+}
+
+function standalonePullRequestStack(
+  pullRequest: CurrentPullRequest,
+): GitHubStackProjection {
+  return {
+    trunk: pullRequest.base,
+    currentBranch: pullRequest.head,
+    branches: [
+      {
+        name: pullRequest.head,
+        isCurrent: true,
+        isMerged: pullRequest.state === "merged",
+        isQueued: false,
+        needsRebase: pullRequest.mergeability.mergeStateStatus === "BEHIND",
+        hasStash: false,
+        stashCount: null,
+        pr: {
+          number: pullRequest.number,
+          url: pullRequest.url,
+          state: pullRequest.state,
+          title: pullRequest.title,
+          isDraft: pullRequest.state === "draft",
+          metadataStale: false,
+        },
+        diff: null,
+        aheadOfRemote: null,
+        behindRemote: null,
+        checks: pullRequest.signal.checks,
+        review: pullRequest.signal.review,
+      },
+    ],
+    trunkBehind: null,
+    prunableBranchCount: null,
+  };
+}
+
+async function hydratePullRequestDiffs(
+  stack: GitHubStackProjection | null,
+  pullRequest: CurrentPullRequest | null,
+  read: GitHubReadRunner,
+): Promise<GitHubStackProjection | null> {
+  const projection = stack ??
+    (pullRequest ? standalonePullRequestStack(pullRequest) : null);
+  const repository = pullRequest?.url.match(
+    /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+/,
+  );
+  if (!projection || !repository) return projection;
+  return {
+    ...projection,
+    branches: await Promise.all(
+      projection.branches.map(async (branch) => {
+        if (branch.diff || !branch.pr) return branch;
+        try {
+          return {
+            ...branch,
+            diff: await readGitHubPullRequestDiff(
+              repository[1],
+              repository[2],
+              branch.pr.number,
+              (args, buffer) => read(args, buffer),
+            ),
+          };
+        } catch {
+          return branch;
+        }
+      }),
+    ),
   };
 }
 
@@ -119,19 +199,29 @@ export function createThreadStackService(
         trunkBehind: null,
         prunableBranchCount: null,
       } : null;
+      const stackWithChanges = await hydratePullRequestDiffs(
+        stack,
+        remote.currentPullRequest,
+        read,
+      );
       return {
         currentPullRequest: remote.currentPullRequest,
         stack: remote.stack,
         stackUnavailableReason: remote.reason,
-        githubStack: { stack, pending: payload.pending, error: payload.error?.message ?? null },
+        githubStack: { stack: stackWithChanges, pending: payload.pending, error: payload.error?.message ?? null },
       };
     } catch (error) {
+      const fallbackStack = await hydratePullRequestDiffs(
+        null,
+        remote.currentPullRequest,
+        read,
+      );
       return {
         currentPullRequest: remote.currentPullRequest,
         stack: remote.stack,
         stackUnavailableReason: remote.reason,
         githubStack: remote.stack ? null : {
-          stack: null,
+          stack: fallbackStack,
           pending: null,
           error: error instanceof Error ? error.message : "GitHub Stack is unavailable.",
         },

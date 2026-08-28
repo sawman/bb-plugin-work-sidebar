@@ -1259,6 +1259,14 @@
   color: var(--muted-foreground);
   font-size: 0.56rem;
 }
+.ws-current-pr-summary small b {
+  color: var(--success);
+  font-weight: 500;
+}
+.ws-current-pr-summary small i {
+  color: var(--destructive);
+  font-style: normal;
+}
 .ws-current-pr-open,
 .ws-current-pr-expand {
   position: absolute;

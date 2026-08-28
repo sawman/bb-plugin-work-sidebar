@@ -63,10 +63,19 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
         ),
     });
   };
-  const stack = changesQuery.data?.githubStack?.stack;
+  const githubStack = changesQuery.data?.githubStack?.stack;
+  const stack =
+    changesQuery.data?.stack || (githubStack?.branches.length ?? 0) > 1
+      ? githubStack
+      : null;
   const currentPullRequestNumber =
     changesQuery.data?.currentPullRequest?.number ??
     changesQuery.data?.stack?.currentPullRequest;
+  const standaloneBranch = changesQuery.data?.stack
+    ? null
+    : githubStack?.branches.find(
+        (branch) => branch.pr?.number === currentPullRequestNumber,
+      ) ?? null;
   const healthClass =
     githubApiHealth.state === "rate_limited"
       ? "ws-github-api-rate_limited"
@@ -164,6 +173,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
         ) : changesQuery.data?.currentPullRequest ? (
           <ChangesCurrentPullRequestCard
             pullRequest={changesQuery.data.currentPullRequest}
+            branch={standaloneBranch}
             expanded={presentation?.currentPullRequestExpanded ?? false}
             onToggle={() =>
               changesInteractionStore.getState().togglePullRequest(threadId)
