@@ -16,6 +16,7 @@ describe("Agents status icon presentation", () => {
   it("lays out explicit agent actions above the live duration", () => {
     expect(css).toMatch(/\.ws-agent-actions\s*\{[^}]*display:\s*grid/s);
     expect(css).toMatch(/\.ws-agent-action-buttons\s*\{[^}]*display:\s*flex/s);
-    expect(css).toContain(".ws-agent-duration");
+    expect(css).toMatch(/\.ws-agent-duration\s*\{[^}]*margin-top:\s*0\.1rem/s);
+    expect(css).not.toContain(".ws-agent-runtime-label");
   });
 });

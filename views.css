@@ -2136,9 +2136,6 @@ button.ws-provider-health:focus-visible {
 .ws-agent-target:hover strong {
   color: var(--primary);
 }
-.ws-agent-runtime-label {
-  color: var(--muted-foreground);
-}
 .ws-agent-facts {
   display: grid;
   gap: 0.14rem;
@@ -2207,6 +2204,7 @@ button.ws-provider-health:focus-visible {
   outline-offset: 1px;
 }
 .ws-agent-duration {
+  margin-top: 0.1rem;
   color: var(--muted-foreground);
   font-size: 0.52rem;
   font-variant-numeric: tabular-nums;

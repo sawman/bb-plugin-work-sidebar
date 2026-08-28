@@ -169,10 +169,10 @@ describe("R15 registered Agents Work slot", () => {
     await waitFor(() => expect(slot.getByRole("link", { name: "Open thr_direct" })).toBeTruthy());
     expect(slot.getByRole("link", { name: "Open thr_grandchild" })).toBeTruthy();
     expect(slot.queryByText("thr_archived")).toBeNull();
-    expect(slot.getByText("Working")).toBeTruthy();
-    expect(slot.getByText("Waiting")).toBeTruthy();
     expect(slot.getByRole("img", { name: "Working" }).querySelector("rect")).toBeTruthy();
     expect(slot.getByRole("img", { name: "Waiting for input" })).toBeTruthy();
+    expect(slot.queryByText("Working")).toBeNull();
+    expect(slot.queryByText("Waiting")).toBeNull();
     expect(slot.getByText("2")).toBeTruthy();
     slot.lifecycle.unmount();
   });
@@ -186,7 +186,8 @@ describe("R15 registered Agents Work slot", () => {
       }),
     );
     await waitFor(() => expect(slot.getByRole("link", { name: "Open thr_child" })).toBeTruthy());
-    await waitFor(() => expect(slot.getByText("Working · Recovery Required")).toBeTruthy());
+    await waitFor(() => expect(slot.getByRole("img", { name: "Working" })).toBeTruthy());
+    expect(slot.queryByText("Working · Recovery Required")).toBeNull();
     expect(slot.getByText("WORK-1")).toBeTruthy();
     expect(slot.getByText("Child task")).toBeTruthy();
     expect(slot.getByText("Recovery required before retry.")).toBeTruthy();
@@ -279,7 +280,8 @@ describe("R15 registered Agents Work slot", () => {
       }),
     );
     await waitFor(() => expect(slot.getByRole("link", { name: "Open thr_unbound" })).toBeTruthy());
-    await waitFor(() => expect(slot.getByText("Working")).toBeTruthy());
+    await waitFor(() => expect(slot.getByRole("img", { name: "Working" })).toBeTruthy());
+    expect(slot.queryByText("Working")).toBeNull();
     expect(slot.getByText("WORK-2")).toBeTruthy();
     expect(slot.getByText("Unbound task")).toBeTruthy();
     expect(slot.getByRole("article").classList.contains("ws-agent-review")).toBe(true);

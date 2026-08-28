@@ -4,7 +4,6 @@ import {
   experimental_useSidebarThreadSplit,
 } from "@get-bb/plugin-sdk/app";
 import { Icon, type IconName } from "../../components/ui/icon";
-import { readableStatus } from "../../work-model";
 import {
   agentDurationLabel,
   agentRuntimePresentation,
@@ -96,12 +95,6 @@ export function AgentRow({
         }}
       >
         <strong>{title}</strong>
-        <small className="ws-agent-runtime-label">
-          {runtime.label}
-          {annotation.dispatchState
-            ? ` · ${readableStatus(annotation.dispatchState)}`
-            : ""}
-        </small>
         <span className="ws-agent-facts">
           <span className="ws-agent-fact" title="Agent model">
             <Icon name="Bot" aria-hidden />
