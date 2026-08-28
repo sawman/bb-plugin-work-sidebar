@@ -54,7 +54,30 @@ function fixture() {
       projects: [{ id: "project_1", name: "Project" }],
       error: null,
     }),
-    sidebarTaskLinks: () => ({ available: true, links: {}, error: null }),
+    sidebarTaskLinks: () => ({
+      available: true,
+      links: {
+        thr_agent: [{
+          task: {
+            ...task,
+            id: "task_agent",
+            key: "PROJ-4",
+            title: "Accessible delegated task",
+            assignee: "agent",
+          },
+          threadId: "thr_agent",
+          liveStatus: "working",
+          role: "execution",
+          mode: "delegated",
+          idempotencyKey: "accessible-agent",
+          dispatchState: "ready",
+        }],
+      },
+      error: null,
+    }),
+    getAgentDetails: () => ({
+      agents: [{ threadId: "thr_agent", model: "gpt-5.6-terra" }],
+    }),
     sidebarAuthoredPullRequests: () => ({
       available: true,
       pullRequests: [
@@ -141,6 +164,7 @@ function fixture() {
     }),
     getWorkGoal: () => null,
     getWorkPlan: () => ({ items: [] }),
+    getWorkBackgroundJobs: () => ({ items: [] }),
     getWorkProviderStatus: () => ({
       tone: "green",
       providerId: "codex",
@@ -154,8 +178,7 @@ function fixture() {
       available: false,
       message: null,
       suggestions: [],
-      item: null,
-      statusOptions: [],
+      items: [],
     }),
     getChanges: () => ({
       currentPullRequest: null,
@@ -275,7 +298,65 @@ describe("R19D registered slot accessibility", () => {
   });
 
   it("keeps representative Work, Changes, and Agents slot states ARIA-valid", async () => {
-    host.sidebarThreads = { status: "ready", projects: [], threads: [] };
+    host.sidebarThreads = {
+      status: "ready",
+      projects: [],
+      threads: [
+        {
+          id: "thr_accessible",
+          projectId: "project_1",
+          title: "Accessible work",
+          titleFallback: null,
+          parentThreadId: null,
+          sectionId: null,
+          originKind: null,
+          originPluginId: null,
+          providerId: "codex",
+          hasPendingInteraction: false,
+          activity: { workflows: 0, backgroundAgents: 1, backgroundCommands: 0, planMode: 0, goals: 0 },
+          indicator: "runtime",
+          indicatorLabel: "Agent is working",
+          isUnread: false,
+          isPinned: false,
+          isArchived: false,
+          environment: null,
+          host: null,
+          createdAt: 0,
+          updatedAt: 0,
+          lastReadAt: null,
+          latestAttentionAt: 0,
+        },
+        {
+          id: "thr_agent",
+          projectId: "project_1",
+          title: "Accessible agent",
+          titleFallback: null,
+          parentThreadId: "thr_accessible",
+          sectionId: null,
+          originKind: "fork",
+          originPluginId: "work-sidebar",
+          providerId: "codex",
+          hasPendingInteraction: false,
+          activity: { workflows: 0, backgroundAgents: 1, backgroundCommands: 0, planMode: 0, goals: 0 },
+          indicator: "runtime",
+          indicatorLabel: "Agent is working",
+          isUnread: false,
+          isPinned: false,
+          isArchived: false,
+          environment: {
+            id: "env_agent",
+            name: "Accessible worktree",
+            branchName: "bb/accessible-agent",
+            workspaceDisplayKind: "managed-worktree",
+          },
+          host: { id: "host_1", name: "Accessible host" },
+          createdAt: 0,
+          updatedAt: 1,
+          lastReadAt: null,
+          latestAttentionAt: 0,
+        },
+      ],
+    };
     const app = await loadPluginApp(() => import("../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
@@ -304,8 +385,10 @@ describe("R19D registered slot accessibility", () => {
     await expectNoAriaViolations(slot.container);
     fireEvent.click(slot.getByRole("tab", { name: "Agents" }));
     await waitFor(() =>
-      expect(slot.getByText(/No active delegated child threads/)).toBeTruthy(),
+      expect(slot.getByText("gpt-5.6-terra")).toBeTruthy(),
     );
+    expect(slot.getByText("bb/accessible-agent")).toBeTruthy();
+    expect(slot.getByText("Accessible delegated task")).toBeTruthy();
     await expectNoAriaViolations(slot.container);
     slot.lifecycle.unmount();
   });

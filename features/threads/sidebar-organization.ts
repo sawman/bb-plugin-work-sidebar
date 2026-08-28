@@ -67,7 +67,7 @@ export type SidebarThreadOrganization = {
   archiveSelected(): Promise<void>;
   archiveThread(threadId: string): void;
   saveGroups(groups: SidebarThreadGroup[]): void;
-  addGroup(): void;
+  addGroup(name: string): boolean;
   renameGroup(group: SidebarThreadGroup): void;
   removeGroup(group: SidebarThreadGroup): void;
 };
@@ -295,11 +295,13 @@ export function useSidebarThreadOrganization({
     },
     [archive, groupIds, moveToGroup],
   );
-  const addGroup = useCallback(() => {
-    if (groups.length >= 12)
-      return toast.error("You can have up to 12 custom groups.");
-    const name = window.prompt("Name this thread group")?.trim().slice(0, 40);
-    if (!name) return;
+  const addGroup = useCallback((input: string) => {
+    if (groups.length >= 12) {
+      toast.error("You can have up to 12 custom groups.");
+      return false;
+    }
+    const name = input.trim().slice(0, 40);
+    if (!name) return false;
     if (
       groups.some(
         (group) =>
@@ -307,10 +309,13 @@ export function useSidebarThreadOrganization({
             sensitivity: "accent",
           }) === 0,
       )
-    )
-      return toast.error("A group with that name already exists.");
+    ) {
+      toast.error("A group with that name already exists.");
+      return false;
+    }
     const id = `group_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
     saveGroups([...groups, { id, name, threadIds: [] }]);
+    return true;
   }, [groups, saveGroups]);
   const renameGroup = useCallback(
     (group: SidebarThreadGroup) => {

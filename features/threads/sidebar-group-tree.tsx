@@ -1,14 +1,14 @@
 import { useState, type DragEvent } from "react";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
-import type { ThreadTaskLink } from "@/work-model";
 import { ArchivedThreads } from "./archived-threads";
 import type { SidebarThreadOrganization } from "./sidebar-organization";
+import type { ThreadProviderDirectory } from "./thread-provider-logo";
 import { WorkThreadTree } from "./thread-tree";
 
 type SidebarGroupTreeProps = {
   organization: SidebarThreadOrganization;
-  taskLinks: Readonly<Record<string, readonly ThreadTaskLink[]>>;
   activeThreadId: string | null;
+  providersById: ThreadProviderDirectory;
   onNavigate(): void;
   subtextRefreshKey: number;
   emptyMessage: string;
@@ -16,7 +16,10 @@ type SidebarGroupTreeProps = {
 
 type ThreadTreeProps = Pick<
   SidebarGroupTreeProps,
-  "taskLinks" | "activeThreadId" | "onNavigate" | "subtextRefreshKey"
+  | "activeThreadId"
+  | "providersById"
+  | "onNavigate"
+  | "subtextRefreshKey"
 > & {
   organization: SidebarThreadOrganization;
   roots: readonly PluginSidebarThread[];
@@ -28,8 +31,8 @@ function ThreadTree({
   organization,
   roots,
   childrenByThread,
-  taskLinks,
   activeThreadId,
+  providersById,
   onNavigate,
   subtextRefreshKey,
   label,
@@ -41,12 +44,12 @@ function ThreadTree({
           key={thread.id}
           thread={thread}
           childrenByThread={childrenByThread}
-          taskLinks={taskLinks}
           activeThreadId={activeThreadId}
           selectedThreadIds={organization.selectedThreadIds}
           groupIds={organization.groupIds}
           groups={organization.groups}
           projectsById={organization.projectsById}
+          providersById={providersById}
           onNavigate={onNavigate}
           onSelect={organization.selectThread}
           onMoveToGroup={organization.moveToGroup}
@@ -71,8 +74,8 @@ function sourceId(event: DragEvent<HTMLElement>, dragThreadId: string | null) {
 
 export function SidebarThreadGroups({
   organization,
-  taskLinks,
   activeThreadId,
+  providersById,
   onNavigate,
   subtextRefreshKey,
   emptyMessage,
@@ -133,8 +136,8 @@ export function SidebarThreadGroups({
             organization={organization}
             roots={organization.activeRoots}
             childrenByThread={organization.activeChildren}
-            taskLinks={taskLinks}
             activeThreadId={activeThreadId}
+            providersById={providersById}
             onNavigate={onNavigate}
             subtextRefreshKey={subtextRefreshKey}
             label="Work threads"
@@ -174,8 +177,8 @@ export function SidebarThreadGroups({
                   organization={organization}
                   roots={roots}
                   childrenByThread={tree?.children ?? new Map()}
-                  taskLinks={taskLinks}
                   activeThreadId={activeThreadId}
+                  providersById={providersById}
                   onNavigate={onNavigate}
                   subtextRefreshKey={subtextRefreshKey}
                   label={`${group.name} threads`}

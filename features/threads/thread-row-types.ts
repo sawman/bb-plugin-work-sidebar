@@ -1,7 +1,10 @@
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
-import type { ThreadTaskLink } from "@/work-model";
 import type { SidebarThreadGroup } from "./model";
+import type {
+  ThreadProvider,
+  ThreadProviderDirectory,
+} from "./thread-provider-logo";
 
 export type ThreadDropTarget = {
   threadId: string;
@@ -16,7 +19,6 @@ export type ThreadProject = {
 export type ThreadRowProps = {
   thread: PluginSidebarThread;
   active: boolean;
-  taskLinks?: readonly ThreadTaskLink[];
   children: number;
   activeChildren: number;
   childrenExpanded: boolean;
@@ -30,6 +32,7 @@ export type ThreadRowProps = {
   ): boolean;
   onMoveToGroup(threadId: string, groupId: string | null): void;
   project?: ThreadProject;
+  provider?: ThreadProvider;
   onNavigate(): void;
   reorderDisabled: boolean;
   canMoveUp: boolean;
@@ -50,7 +53,6 @@ export type ThreadRowProps = {
 export type WorkThreadTreeProps = Omit<
   ThreadRowProps,
   | "active"
-  | "taskLinks"
   | "children"
   | "activeChildren"
   | "childrenExpanded"
@@ -60,13 +62,14 @@ export type WorkThreadTreeProps = Omit<
   | "canMoveDown"
   | "canDropThread"
   | "onToggleChildren"
+  | "provider"
 > & {
   childrenByThread: ReadonlyMap<string, PluginSidebarThread[]>;
-  taskLinks?: Readonly<Record<string, readonly ThreadTaskLink[]>>;
   activeThreadId: string | null;
   selectedThreadIds: ReadonlySet<string>;
   groupIds: ReadonlyMap<string, string>;
   projectsById: ReadonlyMap<string, ThreadProject>;
+  providersById: ThreadProviderDirectory;
   orderedSiblings: readonly PluginSidebarThread[];
   subtextRefreshKey: number;
   depth?: number;

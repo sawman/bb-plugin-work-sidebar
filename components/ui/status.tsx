@@ -31,6 +31,7 @@ export function Status({
     <span
       className={["ws-status", className].filter(Boolean).join(" ")}
       data-tone={presentation.tone}
+      data-motion={presentation.icon === "LoaderCircle" ? "spin" : undefined}
       title={presentation.label}
       role="img"
       aria-label={`${presentation.label}${countLabel}`}

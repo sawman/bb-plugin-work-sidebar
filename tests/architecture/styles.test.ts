@@ -92,6 +92,7 @@ const dynamicClassFamilies = [
   { prefix: "ws-github-api-", file: "features/changes/panel.tsx", suffixes: ["available", "rate_limited", "unavailable"] },
   { prefix: "ws-plan-", file: "features/work-context/views.tsx", suffixes: ["completed", "in_progress", "pending"] },
   { prefix: "ws-provider-health-", file: "features/work-context/views.tsx", suffixes: ["green", "amber", "red"] },
+  { prefix: "ws-runtime-state-", file: "features/work-context/views.tsx", suffixes: ["working", "waiting", "blocked", "complete", "idle"] },
   { prefix: "ws-status-dot-", file: "features/work-context/views.tsx", suffixes: ["in_progress", "running", "done"] },
   { prefix: "ws-status-", file: "features/threads/thread-row-presentation.tsx", suffixes: ["none", "runtime", "workflow", "background-agent", "background-command", "goal", "plan-mode", "working-draft", "unread-error", "unread-success", "waiting-for-input"] },
   { prefix: "ws-task-priority-", file: "features/tasks/task-row.tsx", suffixes: ["urgent", "high", "medium", "low"] },
@@ -338,6 +339,35 @@ describe("shared surface and list-row architecture", () => {
     );
   });
 
+  test("presents existing tasks like the Linear issue list", () => {
+    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const picker = rules.find(
+      ({ selector }) =>
+        selector === ".ws-task-attachment-picker .ws-combobox-options",
+    );
+    const taskKey = rules.find(
+      ({ selector }) =>
+        selector ===
+        ".ws-task-attachment-picker .ws-combobox-options button > span",
+    );
+    const taskTitle = rules.find(
+      ({ selector }) =>
+        selector ===
+        ".ws-task-attachment-picker .ws-combobox-options button > small",
+    );
+
+    expect(picker?.declarations).toContain(
+      "border-radius: calc(var(--radius) - 3px)",
+    );
+    expect(picker?.declarations).toContain("background: var(--card)");
+    expect(taskKey?.declarations).toContain("color: var(--primary)");
+    expect(taskKey?.declarations).toContain(
+      "font-family: ui-monospace, SFMono-Regular, Menlo, monospace",
+    );
+    expect(taskKey?.declarations).toContain("font-weight: 600");
+    expect(taskTitle?.declarations).toContain("color: var(--muted-foreground)");
+  });
+
   test("preserves the Changes stack disclosure grid and chevron control", () => {
     const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
     const toggle = rules.find(({ selector }) => selector === ".ws-stack-layer-toggle");
@@ -396,6 +426,33 @@ describe("shared surface and list-row architecture", () => {
   test("gives every static production class an audited stylesheet owner", () => {
     expect(staticClassesWithoutStylesheetOwner()).toEqual([]);
     expect(styledProductionClasses()).toContain("ws-stack-expand");
+  });
+
+  test("rotates shared partial-circle status icons with a reduced-motion fallback", () => {
+    const source = readFileSync(join(root, "views.css"), "utf8");
+    const declarations = stylesheetRules(source)
+      .filter(({ selector }) => selector === '.ws-status[data-motion="spin"] > svg:first-child')
+      .map(({ declarations: ruleDeclarations }) => ruleDeclarations);
+
+    expect(declarations.some((rule) => rule.includes("animation: ws-status-spin 0.9s linear infinite"))).toBe(true);
+    expect(declarations.some((rule) => rule.includes("animation: none"))).toBe(true);
+    expect(source).toContain("@keyframes ws-status-spin");
+    expect(source).toContain("transform: rotate(360deg)");
+  });
+
+  test("places visible review-comment counts beside shared status icons", () => {
+    const source = readFileSync(join(root, "views.css"), "utf8");
+    const rules = stylesheetRules(source);
+    const status = rules.find(({ selector }) => selector === ".ws-status");
+    const count = rules.find(({ selector }) => selector === ".ws-status > b");
+    const overlay = rules.find(({ selector }) => selector === ".ws-status svg + svg");
+
+    expect(status?.declarations).toContain("grid-auto-flow: column");
+    expect(status?.declarations).toContain("width: auto");
+    expect(status?.declarations).toContain("min-width: 0.8rem");
+    expect(count?.declarations).toContain("font-variant-numeric: tabular-nums");
+    expect(overlay?.declarations).toContain("left: 0.45rem");
+    expect(overlay?.declarations).not.toContain("right:");
   });
 
   test("removes the unimplemented Button wrapper and its production imports", () => {
@@ -463,6 +520,58 @@ describe("shared surface and list-row architecture", () => {
     expect(toolbarRules[0]?.declarations).toContain("top: 2rem");
     expect(toolbarRules[0]?.declarations).toContain("isolation: isolate");
     expect(settingsDeclarations).toContain("z-index: 41");
+  });
+
+  test("contains the enhanced list toolbar inside the sidebar viewport", () => {
+    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const list = rules.find(({ selector }) => selector === ".ws-list");
+    const toolbar = rules.find(({ selector }) => selector === ".ws-list-toolbar");
+    const actions = rules.find(
+      ({ selector }) => selector === ".ws-work-toolbar-actions",
+    );
+
+    expect(list?.declarations).toContain("margin: 0 !important");
+    expect(list?.declarations).toContain("width: 100%");
+    expect(list?.declarations).toContain("max-width: 100%");
+    expect(toolbar?.declarations).toContain("box-sizing: border-box !important");
+    expect(toolbar?.declarations).toContain("width: 100%");
+    expect(toolbar?.declarations).toContain("max-width: 100%");
+    expect(actions?.declarations).toContain("flex-wrap: wrap");
+    expect(actions?.declarations).toContain("min-width: 0");
+  });
+
+  test("shares one tab contract across the left and right sidebars", () => {
+    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const tabs = rules.find(({ selector }) => selector === ".ws-tabs");
+    const buttons = rules.find(({ selector }) => selector === ".ws-tabs button");
+    const sticky = rules.find(({ selector }) => selector === ".ws-tabs-sticky");
+    const active = rules.find(
+      ({ selector }) =>
+        selector ===
+        '.ws-tabs button:hover, .ws-tabs button[aria-selected="true"], .ws-tabs button[aria-pressed="true"]',
+    );
+
+    expect(tabs?.declarations).toContain("grid-template-columns: repeat(3, 1fr)");
+    expect(buttons?.declarations).toContain("min-height: 2rem");
+    expect(sticky?.declarations).toContain("position: sticky !important");
+    expect(active?.declarations).toContain("background: var(--accent) !important");
+  });
+
+  test("keeps archived-thread context menus outside the dimmed stacking context", () => {
+    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const archivedRow = rules.find(({ selector }) => selector === ".ws-archived-thread");
+    const archivedAnchor = rules.find(
+      ({ selector }) => selector === ".ws-archived-thread > .ws-thread-anchor",
+    );
+
+    expect(
+      archivedRow?.declarations ?? "",
+      "the archived article contains the fixed context menu and must not create a translucent stacking context",
+    ).not.toMatch(/\bopacity\s*:/);
+    expect(
+      archivedAnchor?.declarations,
+      "only the archived thread anchor should be visually dimmed",
+    ).toContain("opacity: 0.8");
   });
 
   test("constructs card roots and headings only through the shared primitive", () => {

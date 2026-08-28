@@ -56,11 +56,11 @@ export function createTrackerRegistration(
     async searchLinearIssues({ threadId, query }) {
       return tracker.search(threadId, query);
     },
-    async unlinkLinearIssue({ threadId }) {
-      return tracker.unlink(threadId);
+    async unlinkLinearIssue({ threadId, key }) {
+      return tracker.unlink(threadId, key);
     },
-    async updateLinearIssueStatus({ threadId, statusId }) {
-      return tracker.updateStatus(threadId, statusId);
+    async updateLinearIssueStatus({ threadId, key, statusId }) {
+      return tracker.updateStatus(threadId, key, statusId);
     },
   };
 }

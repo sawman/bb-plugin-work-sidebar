@@ -7,10 +7,15 @@ import { getPluginQueryClient } from "../../../query-runtime";
 
 const project = { id: "project", name: "Project", isPersonal: false };
 
-function thread(id: string, title: string, parentThreadId: string | null = null): PluginSidebarThread {
+function thread(
+  id: string,
+  title: string,
+  parentThreadId: string | null = null,
+  providerId = "codex",
+): PluginSidebarThread {
   return {
     id, projectId: project.id, title, titleFallback: null, parentThreadId,
-    sectionId: null, originKind: null, originPluginId: null, providerId: "codex",
+    sectionId: null, originKind: null, originPluginId: null, providerId,
     hasPendingInteraction: false,
     activity: { workflows: 0, backgroundAgents: 0, backgroundCommands: 0, planMode: 0, goals: 0 },
     indicator: "none", indicatorLabel: null, isUnread: false, isPinned: false,
@@ -26,13 +31,45 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+function provider(id: string, displayName: string, logoUrl: string | null) {
+  return {
+    id,
+    pluginId: `provider-${id}`,
+    displayName,
+    available: true,
+    logoUrl,
+    capabilities: {
+      modelCatalogScope: "host",
+      permissionModes: ["accept-edits"],
+      supportsFork: true,
+      supportsNativeUserQuestion: false,
+      supportsServiceTier: false,
+      supportsSessionRewind: true,
+      supportsThreadArchive: true,
+      supportsThreadRename: true,
+    },
+    composerActions: [],
+    maintenance: { health: true, installation: true, usage: true },
+  };
+}
+
 async function leftSlot({
   threads = [thread("thr_one", "One"), thread("thr_two", "Two")],
   groups = [{ id: "group_later", name: "Later", threadIds: [] as string[] }],
+  sidebarPullRequests = {},
+  providers = [],
   rpc = {},
 }: {
   threads?: ReturnType<typeof thread>[];
   groups?: { id: string; name: string; threadIds: string[] }[];
+  sidebarPullRequests?: Record<string, {
+    number: number;
+    title: string;
+    url: string;
+    state: "closed" | "draft" | "merged" | "open";
+    attention: "none";
+  }>;
+  providers?: unknown[];
   rpc?: Record<string, unknown>;
 } = {}) {
   getPluginQueryClient().clear();
@@ -47,6 +84,12 @@ async function leftSlot({
     saveSiblingOrder: ({ threadIds }: { threadIds: string[] }) => ({ threadIds }),
     saveThreadListMode: ({ mode }: { mode: "enhanced" | "native" }) => ({ mode }),
     sidebarArchivedThreads: () => ({ available: true, threads: [], error: null }),
+    sidebarPullRequestStacks: () => ({
+      available: true,
+      stacks: {},
+      mergeTargets: {},
+      error: null,
+    }),
     sidebarAuthoredPullRequests: () => ({ available: true, pullRequests: [], error: null }),
     sidebarAuthoredPullRequestStacks: () => ({ available: true, pullRequests: [], error: null }),
     getGitHubApiHealth: () => ({ state: "available", scope: "unknown", message: null, retryAt: null }),
@@ -55,7 +98,12 @@ async function leftSlot({
   return renderSlot(
     app.threadLists[0]!,
     { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: vi.fn(), searchQuery: "", Original: () => <div>Native BB list</div>, experimental_Original: () => <div>Deprecated native BB list</div> },
-    { sidebarThreads: { status: "ready", projects: [project], threads }, rpc: defaults as never },
+    {
+      sidebarThreads: { status: "ready", projects: [project], threads },
+      providers: { status: "ready", providers: providers as never },
+      sidebarPullRequests,
+      rpc: defaults as never,
+    },
   );
 }
 
@@ -68,6 +116,127 @@ function mockElementAt(element: Element | null) {
 }
 
 describe("R18 registered left sidebar parity", () => {
+  it("keeps task mappings in Tasks without duplicating badges on thread rows", async () => {
+    const task = {
+      id: "task_one",
+      projectId: "task_project",
+      projectName: "Work",
+      key: "WORK-1",
+      title: "Keep task mapping in Tasks",
+      status: "in_progress" as const,
+      priority: "medium" as const,
+      dueDate: null,
+      parentTaskId: null,
+      position: 1024,
+      linkedThreadIds: ["thr_one"],
+      assignee: "agent" as const,
+    };
+    const slot = await leftSlot({
+      rpc: {
+        sidebarTasks: () => ({
+          available: true,
+          tasks: [task],
+          projects: [{ id: "task_project", name: "Work" }],
+          error: null,
+        }),
+        sidebarTaskLinks: () => ({
+          available: true,
+          links: {
+            thr_one: [
+              {
+                task,
+                threadId: "thr_one",
+                liveStatus: "working",
+                role: "execution",
+                mode: "direct",
+                idempotencyKey: null,
+                dispatchState: "ready",
+              },
+            ],
+          },
+          error: null,
+        }),
+      },
+    });
+
+    await waitFor(() => expect(slot.getByRole("link", { name: /One/ })).toBeTruthy());
+    expect(slot.queryByText("WORK-1")).toBeNull();
+    fireEvent.click(slot.getByRole("button", { name: "Tasks" }));
+    await waitFor(() => expect(slot.getByText("WORK-1")).toBeTruthy());
+    expect(slot.getByText("Keep task mapping in Tasks")).toBeTruthy();
+    slot.lifecycle.unmount();
+  });
+
+  it("shows host provider logos and an accessible fallback on thread rows", async () => {
+    const slot = await leftSlot({
+      threads: [
+        thread("thr_codex", "Codex thread"),
+        thread("thr_claude", "Claude thread", null, "claude-code"),
+        thread("thr_future", "Future thread", null, "future-agent"),
+      ],
+      providers: [
+        provider("codex", "Codex", "/api/v1/system/providers/codex/logo"),
+        provider(
+          "claude-code",
+          "Claude Code",
+          "/api/v1/system/providers/claude-code/logo",
+        ),
+      ],
+    });
+
+    const codex = slot.getByRole("img", { name: "Codex provider" });
+    const claude = slot.getByRole("img", { name: "Claude Code provider" });
+    expect(codex.querySelector("img")?.getAttribute("src")).toBe(
+      "/api/v1/system/providers/codex/logo",
+    );
+    expect(claude.querySelector("img")?.getAttribute("src")).toBe(
+      "/api/v1/system/providers/claude-code/logo",
+    );
+    const codexImage = codex.querySelector("img")!;
+    fireEvent.error(codexImage);
+    expect(codexImage.hidden).toBe(true);
+    expect(
+      slot.getByRole("img", { name: "future-agent provider" }),
+    ).toBeTruthy();
+    slot.lifecycle.unmount();
+  });
+
+  it("shows a compact stack-number badge only for threads returned by the stack projection", async () => {
+    const stacks = vi.fn(() => ({
+      available: true,
+      stacks: {
+        thr_one: {
+          id: "github-stack:thr_one:17",
+          number: 17,
+          base: "main",
+          currentPullRequest: 42,
+          pullRequests: [],
+        },
+      },
+      mergeTargets: {},
+      error: null,
+    }));
+    const slot = await leftSlot({
+      sidebarPullRequests: {
+        thr_one: {
+          number: 42,
+          title: "Stacked pull request",
+          url: "https://github.com/acme/repo/pull/42",
+          state: "open",
+          attention: "none",
+        },
+      },
+      rpc: { sidebarPullRequestStacks: stacks },
+    });
+
+    await waitFor(() =>
+      expect(slot.getByLabelText("Stack #17").textContent).toBe("S#17"),
+    );
+    expect(stacks).toHaveBeenCalledWith({ threadIds: ["thr_one"] });
+    expect(slot.getByRole("link", { name: /Two/ }).querySelector(".ws-stack-number")).toBeNull();
+    slot.lifecycle.unmount();
+  });
+
   it("keeps settings flow-safe and gives dialog dismissal the correct focus semantics", async () => {
     const slot = await leftSlot();
     const actions = slot.container.querySelector(".ws-work-toolbar-actions")!;
@@ -92,9 +261,37 @@ describe("R18 registered left sidebar parity", () => {
     slot.lifecycle.unmount();
   });
 
+  it("creates a custom group through the settings dialog without a browser prompt", async () => {
+    const saveGroups = vi.fn(({ groups }: { groups: unknown[] }) => ({ groups }));
+    const prompt = vi.spyOn(window, "prompt");
+    const slot = await leftSlot({ rpc: { saveThreadGroups: saveGroups } });
+
+    fireEvent.click(slot.getByRole("button", { name: "Thread list settings" }));
+    fireEvent.click(slot.getByRole("button", { name: "Add group" }));
+
+    const name = slot.getByRole("textbox", { name: "Group name" });
+    expect(document.activeElement).toBe(name);
+    fireEvent.change(name, { target: { value: "Soon" } });
+    fireEvent.click(slot.getByRole("button", { name: "Create" }));
+
+    await waitFor(() =>
+      expect(saveGroups).toHaveBeenCalledWith({
+        groups: expect.arrayContaining([
+          expect.objectContaining({ name: "Soon", threadIds: [] }),
+        ]),
+      }),
+    );
+    expect(prompt).not.toHaveBeenCalled();
+    expect(slot.queryByRole("textbox", { name: "Group name" })).toBeNull();
+    expect(
+      slot.getByRole("dialog", { name: "Thread list settings" }),
+    ).toBeTruthy();
+    slot.lifecycle.unmount();
+  });
+
   it("keeps the Later default editable only while empty and exposes a dismissible settings dialog", async () => {
     const saveGroups = vi.fn(({ groups }: { groups: unknown[] }) => ({ groups }));
-    const prompt = vi.spyOn(window, "prompt").mockReturnValueOnce("Soon").mockReturnValueOnce("Later renamed");
+    const prompt = vi.spyOn(window, "prompt").mockReturnValueOnce("Later renamed");
     const slot = await leftSlot({ rpc: { saveThreadGroups: saveGroups } });
     await waitFor(() => expect(slot.getByRole("link", { name: /One/ })).toBeTruthy());
     await waitFor(() => expect(slot.getByText("Later")).toBeTruthy());
@@ -103,6 +300,10 @@ describe("R18 registered left sidebar parity", () => {
     expect(menu.classList.contains("ws-thread-settings-menu")).toBe(true);
     expect(slot.getByLabelText("Remove Later").hasAttribute("disabled")).toBe(false);
     fireEvent.click(slot.getByRole("button", { name: "Add group" }));
+    fireEvent.change(slot.getByRole("textbox", { name: "Group name" }), {
+      target: { value: "Soon" },
+    });
+    fireEvent.click(slot.getByRole("button", { name: "Create" }));
     await waitFor(() => expect(saveGroups).toHaveBeenCalledWith({ groups: expect.arrayContaining([expect.objectContaining({ name: "Soon", threadIds: [] })]) }));
     fireEvent.click(slot.getByTitle("Rename Later"));
     await waitFor(() => expect(saveGroups).toHaveBeenCalledWith({ groups: expect.arrayContaining([expect.objectContaining({ name: "Later renamed" })]) }));
@@ -180,7 +381,7 @@ describe("R18 registered left sidebar parity", () => {
       { number: 1, title: "Base", url: "https://github.com/acme/repo/pull/1", head: "feature/base", base: "main", draft: false, checks: "passing", review: "approved", reviewCommentCount: 2 },
       { number: 2, title: "Child", url: "https://github.com/acme/repo/pull/2", head: "feature/child", base: "feature/base", draft: false, checks: "pending", review: "review_requested", reviewCommentCount: 0 },
     ];
-    const stack = { id: "stack", base: "main", pullRequests: layers };
+    const stack = { id: "stack", number: 17, currentPullRequest: 1, base: "main", pullRequests: layers };
     const pullRequests = layers.map((layer) => ({ ...layer, repository: "acme/repo", state: "open" as const, stack }));
     const setDraft = vi.fn().mockImplementationOnce(() => update.promise).mockImplementationOnce(() => Promise.resolve({ ok: true }));
     const slot = await leftSlot({ rpc: {
@@ -190,6 +391,7 @@ describe("R18 registered left sidebar parity", () => {
     } });
     fireEvent.click(slot.getByRole("button", { name: "PRs" }));
     await waitFor(() => expect(slot.getByRole("link", { name: /Base/ })).toBeTruthy());
+    expect(slot.getByLabelText("Stack #17").textContent).toBe("Stack #17");
     expect(slot.queryByRole("link", { name: /Child/ })).toBeNull();
     expect(slot.getByTitle("Checks passing")).toBeTruthy();
     expect(slot.getByTitle("Approved")).toBeTruthy();

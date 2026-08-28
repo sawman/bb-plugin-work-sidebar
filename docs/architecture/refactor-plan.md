@@ -678,6 +678,27 @@ than normalizing the difference.
   until its final report contains no valid finding, then rerun every R18 gate.
   Only that clean report plus final validation can move the outcome to review.
 
+#### Loop R24 — provider background jobs card
+
+- **Red:** add a Work-owned projection test for BB timeline
+  `activeBackgroundCommands`/`activeWorkflows`, plus registered-card tests for
+  loading, empty, error/retry, populated command/workflow status, thread
+  switching, five-second visible polling, realtime/manual invalidation, and
+  observer/timer cleanup when Work is inactive.
+- **Green:** expose one strict typed `getWorkBackgroundJobs` RPC backed by
+  `bb.sdk.threads.timeline({ summaryOnly: "true" })`; normalize and deduplicate
+  provider items on the server, then render an independent Background card
+  through a centrally keyed TanStack Query. Do not inspect OS processes or
+  infer daemons from command names.
+- **Refactor/removal:** share the Work card loading/error shell and existing
+  status semantics, keep provider records out of Zustand, and retain one
+  timeline projection path.
+- **Validation/evidence:** focused server/card/registration/accessibility tests
+  pass, the full serial suite passes twice, typecheck/SDK/build/bundle/source/
+  reload/diff gates pass, and the live Work card is checked in empty and
+  populated states at narrow/wide widths and light/dark themes where the host
+  exposes suitable background activity.
+
 ### BB child execution protocol
 
 G0 is complete. Each new code-editing loop receives one direct BB execution

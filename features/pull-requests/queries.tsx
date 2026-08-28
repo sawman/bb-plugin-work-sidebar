@@ -15,6 +15,11 @@ const root = ["work-sidebar", "pull-requests"] as const;
 export const pullRequestKeys = {
   authored: (): QueryKey => [...root, "authored"],
   authoredStacks: (): QueryKey => [...root, "authored", "stacks"],
+  sidebarStacks: (threadIds: readonly string[]): QueryKey => [
+    ...root,
+    "sidebar-stacks",
+    ...threadIds,
+  ],
   health: (): QueryKey => [...root, "health"],
 } as const;
 
@@ -34,6 +39,12 @@ export const pullRequestPolicies = {
     refetchOnWindowFocus: false,
     refetchInterval: (polling: AuthoredPullRequestPolling): number =>
       polling.intervalMs,
+  },
+  sidebarStacks: {
+    staleTime: 60_000,
+    gcTime: 15 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
   },
   health: {
     ...queryPolicies.health,
@@ -60,6 +71,40 @@ async function authoredPullRequestStacks(rpc: PullRequestRpc) {
       stacks.error ?? "GitHub pull-request stacks are unavailable.",
     );
   return stacks.pullRequests;
+}
+
+async function sidebarPullRequestStacks(
+  rpc: PullRequestRpc,
+  threadIds: readonly string[],
+) {
+  const result = await rpc.call("sidebarPullRequestStacks", {
+    threadIds: [...threadIds],
+  });
+  if (!result.available)
+    throw new Error(result.error ?? "GitHub pull-request stacks are unavailable.");
+  return result.stacks;
+}
+
+export function useSidebarPullRequestStacks(
+  rpc: PullRequestRpc,
+  threadIds: readonly string[],
+  enabled: boolean,
+) {
+  const normalizedThreadIds = [...new Set(threadIds)].sort().slice(0, 200);
+  return useQuery({
+    queryKey: pullRequestKeys.sidebarStacks(normalizedThreadIds),
+    queryFn: () => sidebarPullRequestStacks(rpc, normalizedThreadIds),
+    ...pullRequestPolicies.sidebarStacks,
+    enabled: enabled && normalizedThreadIds.length > 0,
+  });
+}
+
+export function invalidateSidebarPullRequestStacks(client: {
+  invalidateQueries(filters: { queryKey: QueryKey }): Promise<unknown> | unknown;
+}) {
+  return client.invalidateQueries({
+    queryKey: [...root, "sidebar-stacks"],
+  });
 }
 
 export function useAuthoredPullRequests(

@@ -87,14 +87,16 @@ function rpcFixture(overrides: Record<string, unknown> = {}) {
     }),
     getGitHubApiHealth: () => ({ state: "available", scope: "unknown", message: null, retryAt: null }),
     getWorkProviderStatus: () => ({ tone: "green", providerId: "codex", providerName: "Codex", statusUrl: null, status: "ready", message: null }),
-    getWorkTracker: () => ({ visible: false, available: false, message: null, suggestions: [], item: null, statusOptions: [] }),
+    getWorkTracker: () => ({ visible: false, available: false, message: null, suggestions: [], items: [] }),
     getWorkStatus: () => ({ currentThread: context.currentThread, children: [] }),
     getLatestActivity: () => ({ currentThread: { status: "idle", runtimeStatus: "idle" }, latest: null, lastUser: null, current: null }),
     getWorkOutcome: () => ({ tasksAvailable: true, outcome: null, executionTasks: [], bindings: [], legacy: { state: "none", taskIds: [], message: null } }),
     getWorkGoal: () => null,
     getWorkPlan: () => ({ items: [] }),
+    getWorkBackgroundJobs: () => ({ items: [] }),
     sidebarTasks: () => ({ available: true, tasks: [], projects: [], error: null }),
     sidebarTaskLinks: () => ({ available: true, links: {}, error: null }),
+    getAgentDetails: () => ({ agents: [] }),
     ...overrides,
   } as never;
 }
@@ -116,6 +118,31 @@ afterEach(() => {
 });
 
 describe("R15 registered Agents Work slot", () => {
+  it("loads model metadata only while the Agents tab is active", async () => {
+    getPluginQueryClient().clear();
+    const getAgentDetails = vi.fn(() => ({
+      agents: [{ threadId: "thr_child", model: "gpt-5.6-terra" }],
+    }));
+    const app = await loadPluginApp(() => import("../../../app"));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_root", params: null },
+      {
+        rpc: rpcFixture({ getAgentDetails }),
+        sidebarThreads: {
+          status: "ready",
+          threads: [thread("thr_root", null), thread("thr_child", "thr_root")],
+        },
+      },
+    );
+
+    expect(getAgentDetails).not.toHaveBeenCalled();
+    fireEvent.click(slot.getByRole("tab", { name: "Agents" }));
+    await waitFor(() => expect(slot.getByText("gpt-5.6-terra")).toBeTruthy());
+    expect(getAgentDetails).toHaveBeenCalledOnce();
+    slot.lifecycle.unmount();
+  });
+
   it.each([
     ["loading", { status: "loading" as const }],
     ["error", { status: "error" as const }],
@@ -158,9 +185,87 @@ describe("R15 registered Agents Work slot", () => {
       }),
     );
     await waitFor(() => expect(slot.getByRole("link", { name: "Open thr_child" })).toBeTruthy());
-    await waitFor(() => expect(slot.getByText("Working · WORK-1 · Recovery Required")).toBeTruthy());
+    await waitFor(() => expect(slot.getByText("Working · Recovery Required")).toBeTruthy());
+    expect(slot.getByText("WORK-1")).toBeTruthy();
+    expect(slot.getByText("Child task")).toBeTruthy();
     expect(slot.getByText("Recovery required before retry.")).toBeTruthy();
     expect(slot.getByRole("article").classList.contains("ws-agent-review")).toBe(true);
+    slot.lifecycle.unmount();
+  });
+
+  it("shows each agent's resolved model, worktree and branch, and complete linked task", async () => {
+    const slot = await agentsSlot(
+      {
+        status: "ready",
+        threads: [
+          thread("thr_root", null),
+          thread("thr_child", "thr_root", {
+            indicator: "runtime",
+            environment: {
+              id: "env_agents",
+              name: "Agents worktree",
+              branchName: "bb/agents-details",
+              workspaceDisplayKind: "managed-worktree",
+            },
+          }),
+        ],
+      },
+      rpcFixture({
+        getAgentDetails: () => ({
+          agents: [{ threadId: "thr_child", model: "claude-opus-5[1m]" }],
+        }),
+        sidebarTaskLinks: () => ({
+          available: true,
+          links: {
+            thr_child: [{
+              task: {
+                id: "task_1",
+                projectId: "project",
+                projectName: "bbplug",
+                key: "BBPLUG-52",
+                title: "Enhance the sidebar Agents view",
+                status: "in_progress",
+                priority: "medium",
+                dueDate: null,
+                parentTaskId: null,
+              },
+              threadId: "thr_child",
+              liveStatus: "working",
+              role: "execution",
+              mode: "delegated",
+              idempotencyKey: "agents-details",
+              dispatchState: "ready",
+            }],
+          },
+          error: null,
+        }),
+      }),
+    );
+
+    await waitFor(() => expect(slot.getByText("claude-opus-5[1m]")).toBeTruthy());
+    expect(slot.getByText("bb/agents-details")).toBeTruthy();
+    expect(slot.getByText("Agents worktree")).toBeTruthy();
+    expect(slot.getByText("BBPLUG-52")).toBeTruthy();
+    expect(slot.getByText("Enhance the sidebar Agents view")).toBeTruthy();
+    expect(slot.getByRole("img", { name: "Working" }).classList).toContain(
+      "ws-agent-state-working",
+    );
+    slot.lifecycle.unmount();
+  });
+
+  it("keeps agent rows usable when model details are unavailable", async () => {
+    const slot = await agentsSlot(
+      {
+        status: "ready",
+        threads: [thread("thr_root", null), thread("thr_child", "thr_root")],
+      },
+      rpcFixture({
+        getAgentDetails: () => Promise.reject(new Error("models unavailable")),
+      }),
+    );
+    await waitFor(() => expect(slot.getByRole("link", { name: "Open thr_child" })).toBeTruthy());
+    expect(slot.getByText("Model unavailable")).toBeTruthy();
+    expect(slot.queryByRole("alert")).toBeNull();
     slot.lifecycle.unmount();
   });
 
@@ -172,7 +277,9 @@ describe("R15 registered Agents Work slot", () => {
       }),
     );
     await waitFor(() => expect(slot.getByRole("link", { name: "Open thr_unbound" })).toBeTruthy());
-    await waitFor(() => expect(slot.getByText("Working · WORK-2")).toBeTruthy());
+    await waitFor(() => expect(slot.getByText("Working")).toBeTruthy());
+    expect(slot.getByText("WORK-2")).toBeTruthy();
+    expect(slot.getByText("Unbound task")).toBeTruthy();
     expect(slot.getByRole("article").classList.contains("ws-agent-review")).toBe(true);
     expect(slot.queryByText("Recovery Required")).toBeNull();
     slot.lifecycle.unmount();

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup } from "@testing-library/react";
+import { act, cleanup, waitFor, within } from "@testing-library/react";
 import { focusManager, onlineManager } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
@@ -50,6 +50,7 @@ function fixture(overrides: Partial<Rpc> = {}): Rpc {
     }),
     getWorkGoal: () => null,
     getWorkPlan: () => ({ items: [] }),
+    getWorkBackgroundJobs: () => ({ items: [] }),
     getWorkProviderStatus: () => ({
       tone: "green",
       providerId: "codex",
@@ -74,6 +75,71 @@ describe("registered Status activity lifecycle", () => {
     focusManager.setFocused(true);
     onlineManager.setOnline(true);
     vi.useRealTimers();
+  });
+
+  it("puts runtime and child-agent state in the card heading while preserving full activity text", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const agentText = `agent ${"progress ".repeat(30)}tail`;
+    const userText = `user ${"context ".repeat(30)}tail`;
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_status_header", params: null },
+      {
+        rpc: fixture({
+          getWorkStatus: () => ({
+            ...baseStatus("active"),
+            children: [
+              {
+                id: "thr_active_child",
+                title: "Active child",
+                depth: 1,
+                status: "active",
+                runtimeStatus: "active",
+                providerId: "codex",
+                isArchived: false,
+                task: null,
+              },
+              {
+                id: "thr_idle_child",
+                title: "Idle child",
+                depth: 1,
+                status: "idle",
+                runtimeStatus: "idle",
+                providerId: "claude-code",
+                isArchived: false,
+                task: null,
+              },
+            ],
+          }),
+          getLatestActivity: () => ({
+            currentThread: { status: "active", runtimeStatus: "active" },
+            latest: { text: agentText, kind: "assistant" },
+            lastUser: { text: userText, kind: "user" },
+            current: null,
+          }),
+        }),
+      },
+    );
+
+    const statusTitle = await slot.findByText("Status");
+    const heading = statusTitle.closest<HTMLElement>(".ws-card-heading");
+    expect(heading).not.toBeNull();
+    await waitFor(() =>
+      expect(within(heading!).getByRole("img", { name: "Working" })).toBeTruthy(),
+    );
+    expect(within(heading!).getByText("2 child agents")).toBeTruthy();
+    expect(within(heading!).getByText("1 active child agent")).toBeTruthy();
+    expect(slot.queryByRole("heading", { name: "Working" })).toBeNull();
+    await waitFor(() => expect(slot.getByText(agentText)).toBeTruthy());
+    expect(slot.getByText(userText)).toBeTruthy();
+    expect(
+      [...slot.container.querySelectorAll(".ws-activity-label")].map(
+        (label) => label.textContent,
+      ),
+    ).toEqual(["User", "Agent"]);
+
+    slot.lifecycle.unmount();
   });
 
   it("polls the exact latest-activity RPC every 2s only for an active selected thread and stops when idle", async () => {

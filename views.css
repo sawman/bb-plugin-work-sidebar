@@ -7,8 +7,41 @@
   padding-left: 1.35rem;
 }
 .ws-thread-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.24rem;
   font-size: 0.74rem;
   line-height: 1.2;
+}
+.ws-thread-title-copy {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-thread-provider {
+  position: relative;
+  display: grid;
+  width: 0.78rem;
+  height: 0.78rem;
+  flex: 0 0 0.78rem;
+  place-items: center;
+  color: var(--muted-foreground);
+}
+.ws-thread-provider svg {
+  width: 0.68rem;
+  height: 0.68rem;
+}
+.ws-thread-provider img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.ws-thread-provider img:not([hidden]) + svg {
+  visibility: hidden;
 }
 .ws-thread-meta {
   gap: 0.28rem;
@@ -312,22 +345,28 @@
   font-size: 0.62rem;
   white-space: nowrap;
 }
-.ws-view-selector {
+.ws-tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  gap: 0;
   border-bottom: 1px solid var(--border);
+  background: var(--background);
 }
-.ws-view-selector button {
+.ws-tabs button {
+  min-width: 0;
+  min-height: 2rem;
   border: 0;
   border-radius: calc(var(--radius) - 2px);
+  padding: 0.35rem 0.5rem;
   background: transparent;
   color: var(--muted-foreground);
   font-size: 0.72rem;
   font-weight: 650;
   cursor: pointer;
 }
-.ws-view-selector button:hover,
-.ws-view-active {
+.ws-tabs button:hover,
+.ws-tabs button[aria-selected="true"],
+.ws-tabs button[aria-pressed="true"] {
   /* R17 important: host sidebar tab styles otherwise override the active background. */
   background: var(--accent) !important;
   /* R17 important: host sidebar tab styles otherwise override the active foreground. */
@@ -504,6 +543,28 @@
 .ws-pr-number {
   font-weight: 650;
 }
+.ws-stack-number {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.18rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  border-radius: 999px;
+  padding: 0.05rem 0.3rem;
+  color: var(--primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.58rem;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+}
+.ws-stack-number svg {
+  width: 0.62rem;
+  height: 0.62rem;
+}
+.ws-thread-meta .ws-stack-number-compact {
+  padding: 0.04rem 0.24rem;
+}
 .ws-pr-title {
   overflow: hidden;
   font-size: 0.82rem;
@@ -662,7 +723,10 @@
 /* Keep project creation available without turning it into a full-width footer. */
 .ws-work-toolbar-actions {
   display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.25rem;
   margin-left: auto;
 }
@@ -812,7 +876,7 @@
   gap: 0.18rem;
   padding-left: 0;
 }
-.ws-archived-thread {
+.ws-archived-thread > .ws-thread-anchor {
   opacity: 0.8;
 }
 .ws-active-threads {
@@ -898,29 +962,24 @@
   width: 0.57rem;
   height: 0.57rem;
 }
-.ws-thread-meta .ws-thread-worktree,
-.ws-thread-meta .ws-task-link {
+.ws-thread-meta .ws-thread-worktree {
   display: inline-flex;
-  min-width: 0;
+  min-width: 2.75rem;
+  flex: 1 1 4rem;
   align-items: center;
   gap: 0.16rem;
 }
-.ws-thread-worktree svg,
-.ws-task-link svg {
+.ws-thread-worktree svg {
   width: 0.58rem;
   height: 0.58rem;
   flex: none;
   color: var(--muted-foreground);
 }
-.ws-thread-worktree > span,
-.ws-task-link > span {
+.ws-thread-worktree > span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.ws-task-link small {
-  flex: none;
 }
 .ws-thread-pr-token[data-tone="open"],
 .ws-thread-pr-token[data-tone="success"] { color: var(--success); }
@@ -944,24 +1003,25 @@
     transform: translateY(0.15px) rotate(7deg);
   }
 }
-.ws-thread-meta .ws-thread-worktree {
-  flex: 1 1 4rem;
-  min-width: 2.75rem;
-}
-.ws-thread-meta .ws-task-link {
-  flex: 0 1 auto;
-  max-width: 3.5rem;
-  overflow: hidden;
-}
-.ws-task-link small {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .ws-linear-card {
   gap: 0.36rem;
+}
+.ws-linear-linked-list {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 3px);
+}
+.ws-linear-linked-item {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.34rem;
+}
+.ws-linear-linked-item + .ws-linear-linked-item {
+  border-top: 1px solid var(--border);
 }
 .ws-linear-controls {
   display: flex;
@@ -1422,6 +1482,32 @@
   margin-top: 0.08rem;
   color: var(--primary);
 }
+.ws-thread-group-create {
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.12rem;
+}
+.ws-thread-group-create input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 3px);
+  padding: 0.34rem 0.45rem;
+  background: var(--background);
+  color: var(--foreground);
+  font: inherit;
+}
+.ws-thread-group-create input:focus-visible {
+  border-color: var(--ring);
+  outline: 2px solid color-mix(in srgb, var(--ring) 35%, transparent);
+  outline-offset: 1px;
+}
+.ws-thread-group-create-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.2rem;
+}
 .ws-native-thread-list {
   min-width: 0;
 }
@@ -1561,16 +1647,41 @@
 }
 .ws-agent-state-working {
   color: var(--primary);
+  animation: ws-agent-working-pulse 1.2s ease-in-out infinite;
 }
-.ws-agent-state-waiting,
+.ws-agent-state-waiting {
+  color: var(--primary);
+  animation: ws-agent-waiting-bob 1.6s ease-in-out infinite;
+}
 .ws-agent-state-idle {
   color: var(--muted-foreground);
 }
 .ws-agent-state-blocked {
   color: var(--destructive);
+  animation: ws-agent-blocked-nudge 1.8s ease-in-out infinite;
 }
 .ws-agent-state-complete {
   color: var(--success);
+}
+@keyframes ws-agent-working-pulse {
+  0%, 100% { opacity: 0.62; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+@keyframes ws-agent-waiting-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-0.12rem); }
+}
+@keyframes ws-agent-blocked-nudge {
+  0%, 88%, 100% { transform: translateX(0); }
+  92% { transform: translateX(-0.08rem); }
+  96% { transform: translateX(0.08rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-agent-state-working,
+  .ws-agent-state-waiting,
+  .ws-agent-state-blocked {
+    animation: none;
+  }
 }
 .ws-section-count {
   font-size: 0.58rem;
@@ -1712,9 +1823,7 @@
   gap: 0.28rem;
 }
 .ws-provider-health {
-  position: absolute;
-  top: 0.76rem;
-  right: 0.72rem;
+  flex: none;
   width: 0.4rem;
   height: 0.4rem;
   border: 0;
@@ -1741,26 +1850,52 @@ button.ws-provider-health:focus-visible {
 .ws-provider-health-red {
   background: var(--destructive);
 }
-.ws-status-summary {
-  display: grid;
-  grid-template-columns: 4.5rem minmax(0, 1fr);
-  min-width: 0;
-  align-items: baseline;
+.ws-status-heading-meta,
+.ws-status-heading-meta > span {
+  display: inline-flex;
+  align-items: center;
+}
+.ws-status-heading-meta {
   gap: 0.36rem;
-}
-.ws-status-summary h3 {
-  min-width: 0;
-}
-.ws-status-summary .ws-working-state {
-  margin: 0;
-}
-.ws-working-state {
-  overflow: hidden;
-  margin: 0;
   color: var(--muted-foreground);
-  font-size: 0.61rem;
-  text-overflow: ellipsis;
+  font-size: 0.58rem;
   white-space: nowrap;
+}
+.ws-status-heading-meta > span {
+  gap: 0.1rem;
+}
+.ws-status-heading-meta svg {
+  width: 0.62rem;
+  height: 0.62rem;
+}
+.ws-runtime-state {
+  color: var(--muted-foreground);
+}
+.ws-runtime-state-working,
+.ws-active-agent-count {
+  color: var(--primary);
+}
+.ws-runtime-state-working {
+  animation: ws-status-runtime-spin 1.2s linear infinite;
+}
+.ws-runtime-state-waiting {
+  color: var(--warning);
+}
+.ws-runtime-state-blocked {
+  color: var(--destructive);
+}
+.ws-runtime-state-complete {
+  color: var(--success);
+}
+@keyframes ws-status-runtime-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-runtime-state-working {
+    animation: none;
+  }
 }
 .ws-status-card .ws-activity-list {
   gap: 0.34rem;
@@ -1795,7 +1930,7 @@ button.ws-provider-health:focus-visible {
 }
 .ws-status-card .ws-activity-copy,
 .ws-status-card .ws-activity-command {
-  display: block;
+  display: -webkit-box;
   overflow: hidden;
   margin: 0;
   padding: 0;
@@ -1804,14 +1939,18 @@ button.ws-provider-health:focus-visible {
   color: var(--muted-foreground);
   font-size: 0.61rem;
   line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: pre-wrap;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 .ws-status-card .ws-activity-item-expanded .ws-activity-copy,
 .ws-status-card .ws-activity-item-expanded .ws-activity-command {
+  display: block;
   overflow: visible;
   white-space: pre-wrap;
   word-break: break-word;
+  -webkit-line-clamp: unset;
 }
 .ws-outcome-key {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -1841,24 +1980,6 @@ button.ws-provider-health:focus-visible {
 .ws-linear-header-badge:hover {
   background: var(--accent);
   color: var(--foreground);
-}
-.ws-status-card .ws-working-state {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.38rem;
-  justify-self: end;
-}
-.ws-status-card .ws-working-state > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.12rem;
-}
-.ws-status-card .ws-working-state svg {
-  width: 0.62rem;
-  height: 0.62rem;
-}
-.ws-status-card .ws-working-state > span:last-child {
-  color: var(--primary);
 }
 .ws-thread-selected,
 .ws-thread-selected:hover,
@@ -1974,6 +2095,42 @@ button.ws-provider-health:focus-visible {
 .ws-agent-target:hover strong {
   color: var(--primary);
 }
+.ws-agent-runtime-label {
+  color: var(--muted-foreground);
+}
+.ws-agent-facts {
+  display: grid;
+  gap: 0.14rem;
+  margin-top: 0.12rem;
+}
+.ws-agent-fact {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 0.7rem minmax(0, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.24rem;
+  color: var(--muted-foreground);
+  font-size: 0.6rem;
+  line-height: 1.2;
+}
+.ws-agent-fact svg {
+  width: 0.64rem;
+  height: 0.64rem;
+}
+.ws-agent-fact > span,
+.ws-agent-fact > small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-agent-fact > small {
+  opacity: 0.78;
+}
+.ws-agent-task b {
+  color: var(--foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 650;
+}
 .ws-agent-split {
   display: grid;
   place-items: center;
@@ -2031,8 +2188,11 @@ button.ws-provider-health:focus-visible {
 .ws-status {
   position: relative;
   display: inline-grid;
+  grid-auto-flow: column;
   place-items: center;
-  width: 0.8rem;
+  column-gap: 0.08rem;
+  width: auto;
+  min-width: 0.8rem;
   height: 0.8rem;
   color: var(--muted-foreground);
   font-size: 0.58rem;
@@ -2042,12 +2202,31 @@ button.ws-provider-health:focus-visible {
   width: 0.72rem;
   height: 0.72rem;
 }
+.ws-status[data-motion="spin"] > svg:first-child {
+  transform-origin: center;
+  animation: ws-status-spin 0.9s linear infinite;
+}
+@keyframes ws-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-status[data-motion="spin"] > svg:first-child {
+    animation: none;
+  }
+}
 .ws-status svg + svg {
   position: absolute;
-  right: -0.1rem;
+  left: 0.45rem;
   bottom: -0.08rem;
   width: 0.45rem;
   height: 0.45rem;
+}
+.ws-status > b {
+  font-size: 0.58rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .ws-status[data-tone="open"],
 .ws-status[data-tone="success"] {
@@ -2091,15 +2270,17 @@ button.ws-provider-health:focus-visible {
   z-index: 0;
 }
 .ws-list {
-  /* R17 important: the enhanced list must cancel host slot margin edge-to-edge. */
-  margin: -0.75rem !important;
+  width: 100%;
+  max-width: 100%;
+  /* R17 important: host sidebar margins must not shift sticky controls outside the viewport. */
+  margin: 0 !important;
   /* R17 important: the enhanced list must cancel host slot padding edge-to-edge. */
   padding: 0 !important;
   background: var(--background);
 }
 /* Both headers are direct children of the full list. That gives their sticky
    offsets the sidebar scrollport, rather than the short header wrapper. */
-.ws-view-selector {
+.ws-tabs-sticky {
   /* R17 important: host sidebar layout rules otherwise defeat sticky selector positioning. */
   position: sticky !important;
   z-index: 45;
@@ -2121,10 +2302,10 @@ button.ws-provider-health:focus-visible {
   /* R17 important: host sidebar layout rules otherwise override selector background. */
   background: var(--background) !important;
 }
-.ws-view-selector::before {
+.ws-tabs-sticky::before {
   content: none;
 }
-.ws-view-selector button {
+.ws-tabs-sticky button {
   position: relative;
   /* R17 important: host tab sizing otherwise changes the sticky selector box sizing. */
   box-sizing: border-box !important;
@@ -2138,6 +2319,11 @@ button.ws-provider-health:focus-visible {
 .ws-list-toolbar {
   /* R17 important: host toolbar margins otherwise break its sticky positioning. */
   position: sticky !important;
+  /* R17 important: host toolbar sizing must include its padding inside the sidebar width. */
+  box-sizing: border-box !important;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   z-index: 44;
   top: 2rem;
   isolation: isolate;
@@ -2325,6 +2511,26 @@ button.ws-provider-health:focus-visible {
 .ws-combobox-options > small {
   padding: 0.35rem;
 }
+.ws-task-attachment-picker .ws-combobox-options {
+  right: 0;
+  left: auto;
+  width: min(15rem, calc(100vw - 1.5rem));
+  min-width: 100%;
+  border-radius: calc(var(--radius) - 3px);
+  background: var(--card);
+}
+.ws-task-attachment-picker .ws-combobox-options button > span {
+  overflow: hidden;
+  color: var(--primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-task-attachment-picker .ws-combobox-options button > small {
+  color: var(--muted-foreground);
+  font-size: 0.59rem;
+}
 .ws-linear-search-row {
   border-bottom: 1px solid var(--border);
   padding: 0.28rem;
@@ -2367,6 +2573,15 @@ button.ws-provider-health:focus-visible {
 .ws-work-card-list {
   display: grid;
   gap: 0;
+}
+.ws-background-job-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ws-background-job-state {
+  color: var(--muted-foreground);
+  font-size: 0.56rem;
 }
 .ws-work-card-list-separated {
   margin-top: 0.04rem;

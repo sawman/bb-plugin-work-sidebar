@@ -28,7 +28,7 @@ const workContext = {
 
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (error: Error) => void; const promise = new Promise<T>((ok, bad) => { resolve = ok; reject = bad; }); return { promise, resolve, reject }; }
 function rpcFixtures(sidebarTasks: RpcHandlers["sidebarTasks"], call: RpcCall = () => Promise.resolve({}), links: Awaited<ReturnType<RpcHandlers["sidebarTaskLinks"]>>["links"] = {}) {
-  return { sidebarTasks, sidebarTaskLinks: () => ({ available: true, links, error: null }), getWorkContext: () => workContext, getChanges: () => ({ currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null, repository: { outcome: "absent", message: null, branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFileCount: 0, changedInsertions: 0, changedDeletions: 0, changedFiles: [] } }), getWorkTracker: () => ({ visible: false, available: false, message: null, suggestions: [], item: null, statusOptions: [] }), getWorkProviderStatus: () => ({ tone: "green", providerId: "codex", providerName: "Codex", statusUrl: null, status: "ready", message: null }), getGitHubApiHealth: () => ({ state: "available", scope: "unknown", message: null, retryAt: null }),
+  return { sidebarTasks, sidebarTaskLinks: () => ({ available: true, links, error: null }), getWorkContext: () => workContext, getChanges: () => ({ currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null, repository: { outcome: "absent", message: null, branch: null, base: null, ahead: 0, behind: 0, worktreeState: null, hasUncommittedChanges: false, changedFileCount: 0, changedInsertions: 0, changedDeletions: 0, changedFiles: [] } }), getWorkTracker: () => ({ visible: false, available: false, message: null, suggestions: [], items: [] }), getWorkProviderStatus: () => ({ tone: "green", providerId: "codex", providerName: "Codex", statusUrl: null, status: "ready", message: null }), getGitHubApiHealth: () => ({ state: "available", scope: "unknown", message: null, retryAt: null }),
     createSidebarTask: (input: unknown) => call("createSidebarTask", input), deleteSidebarTask: (input: unknown) => call("deleteSidebarTask", input), attachTaskToThread: (input: unknown) => call("attachTaskToThread", input), detachTaskFromThread: (input: unknown) => call("detachTaskFromThread", input), updateTaskStatus: (input: unknown) => call("updateTaskStatus", input), updateTaskAssignee: (input: unknown) => call("updateTaskAssignee", input), reorderTask: (input: unknown) => call("reorderTask", input),
   } as unknown as RpcHandlers;
 }
@@ -89,6 +89,28 @@ describe("Tasks registered controls", () => {
     fireEvent.blur(project, { relatedTarget: outside });
     await waitFor(() => expect(rendered.queryByRole("listbox")).toBeNull());
     outside.remove();
+    rendered.lifecycle.unmount();
+  });
+
+  it("dismisses the Work existing-task picker for a click outside", async () => {
+    const captured = await app();
+    const rendered = renderSlot(
+      captured.threadPanelActions[0]!,
+      { threadId: "thr_test", params: null },
+      { rpc: rpcFixtures(() => tasks([task, taskTwo])) },
+    );
+    const picker = await rendered.findByRole("combobox", {
+      name: "Add task to this thread",
+    });
+    expect(picker.closest(".ws-combobox")?.classList).toContain(
+      "ws-task-attachment-picker",
+    );
+
+    fireEvent.focus(picker);
+    await rendered.findByRole("listbox");
+    fireEvent.click(document.body);
+
+    await waitFor(() => expect(rendered.queryByRole("listbox")).toBeNull());
     rendered.lifecycle.unmount();
   });
 

@@ -7,12 +7,12 @@ import type { WorkThreadTreeProps } from "./thread-row-types";
 export function WorkThreadTree({
   thread,
   childrenByThread,
-  taskLinks,
   activeThreadId,
   selectedThreadIds,
   groupIds,
   groups,
   projectsById,
+  providersById,
   onNavigate,
   onSelect,
   onMoveToGroup,
@@ -41,7 +41,6 @@ export function WorkThreadTree({
         key={`${thread.id}:${subtextRefreshKey}`}
         thread={thread}
         active={thread.id === activeThreadId}
-        taskLinks={taskLinks?.[thread.id]}
         children={children.length}
         activeChildren={activeChildren}
         childrenExpanded={childrenExpanded}
@@ -54,6 +53,7 @@ export function WorkThreadTree({
         onSelect={onSelect}
         onMoveToGroup={onMoveToGroup}
         project={projectsById.get(thread.projectId)}
+        provider={providersById.get(thread.providerId)}
         onNavigate={onNavigate}
         reorderDisabled={reorderDisabled}
         canMoveUp={siblingIndex > 0}
@@ -79,12 +79,12 @@ export function WorkThreadTree({
             <WorkThreadTree
               thread={child}
               childrenByThread={childrenByThread}
-              taskLinks={taskLinks}
               activeThreadId={activeThreadId}
               selectedThreadIds={selectedThreadIds}
               groupIds={groupIds}
               groups={groups}
               projectsById={projectsById}
+              providersById={providersById}
               onNavigate={onNavigate}
               onSelect={onSelect}
               onMoveToGroup={onMoveToGroup}

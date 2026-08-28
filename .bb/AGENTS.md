@@ -29,6 +29,9 @@ decision appear different.
 - Treat Human-assigned tasks as user-owned unless the user explicitly
   delegates them. Agent-assigned tasks are eligible for agent work.
 - Keep execution work as direct children of the root outcome.
+- Move fully validated work directly from `in_progress` to `done`. Use
+  `in_review` only while a named reviewer or concrete acceptance gate is
+  actually pending; do not leave completed slices parked there by convention.
 
 ## Architecture boundaries
 

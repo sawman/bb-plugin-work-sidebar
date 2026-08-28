@@ -1,15 +1,14 @@
 import { z } from "zod";
+import { agentRpcSchemas } from "./features/agents/schemas.js";
 import { authoredPullRequest, sidebarStack, sidebarStackLayer } from "./features/pull-requests/schemas.js";
 import { sidebarTaskProjectSchema, sidebarTaskSchema, taskLinkSchema, taskPrioritySchema, taskStatusSchema, taskSummarySchema } from "./features/tasks/schemas.js";
 import { threadArchiveSchemas, threadPreferenceSchemas } from "./features/threads/schemas.js";
 import { trackerRpcSchemas } from "./features/tracker/schemas.js";
 import { changesRpcSchemas, githubStackBranchSchema } from "./features/changes/schemas.js";
-const taskStatus = taskStatusSchema;
-const taskPriority = taskPrioritySchema;
-const taskSummary = taskSummarySchema;
-const sidebarTask = sidebarTaskSchema;
-const sidebarTaskProject = sidebarTaskProjectSchema;
-const taskLink = taskLinkSchema;
+import { workContextRpcSchemas } from "./features/work-context/schemas.js";
+const taskStatus = taskStatusSchema; const taskPriority = taskPrioritySchema;
+const taskSummary = taskSummarySchema; const sidebarTask = sidebarTaskSchema;
+const sidebarTaskProject = sidebarTaskProjectSchema; const taskLink = taskLinkSchema;
 const binding = z.object({
   rootThreadId: z.string(),
   outcomeTaskId: z.string(),
@@ -62,8 +61,8 @@ const workGoal = z.object({ objective: z.string(), status: z.enum(["active", "bu
 const workPlan = z.object({ items: z.array(z.object({ id: z.string(), text: z.string(), status: z.enum(["completed", "in_progress", "pending"]) })) });
 export type GitHubStackBranch = z.infer<typeof githubStackBranchSchema>;
 export type GitHubStackSignal = z.infer<typeof sidebarStackLayer>;
-
 export const rpcSchemas = {
+  ...agentRpcSchemas,
   ...changesRpcSchemas,
   ...threadPreferenceSchemas,
   sidebarTasks: {
@@ -163,6 +162,7 @@ export const rpcSchemas = {
   getWorkOutcome: { input: workCardInput, output: workOutcome },
   getWorkGoal: { input: workCardInput, output: workGoal },
   getWorkPlan: { input: workCardInput, output: workPlan },
+  ...workContextRpcSchemas,
   getGitHubPollingPolicy: { input: z.null(), output: z.object({ activePollMs: z.number().int().positive(), backgroundPollMs: z.number().int().positive(), maxRestPollsPerMinute: z.number().int().positive() }) },
   ...trackerRpcSchemas,
   getWorkProviderStatus: { input: z.object({ threadId: z.string() }).strict(), output: workProviderStatus },

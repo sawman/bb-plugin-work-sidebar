@@ -2,6 +2,7 @@ import type { PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { rpcContract } from "../../contracts.js";
 import type { WorkContextCompositionDependencies } from "../../shared/server-composition-dependencies.js";
 import { createWorkContextReadService } from "./server-reads.js";
+import { createBackgroundJobsReadService } from "./background-jobs-server.js";
 
 type WorkContextHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
@@ -12,6 +13,7 @@ type WorkContextHandlers = Pick<
   | "getWorkPlan"
   | "getWorkProviderStatus"
   | "getLatestActivity"
+  | "getWorkBackgroundJobs"
 >;
 
 const PROVIDER_STATUS_URLS: Readonly<Record<string, string>> = {
@@ -81,6 +83,9 @@ export function createWorkContextRegistration(
   dependencies: WorkContextCompositionDependencies,
 ): WorkContextHandlers {
   const { bb, tasks } = dependencies;
+  const backgroundJobs = createBackgroundJobsReadService({
+    timeline: (input) => bb.sdk.threads.timeline(input),
+  });
   const readStatus = async (threadId: string) => {
     const [thread, children, root] = await Promise.all([
       bb.sdk.threads.get({ threadId }),
@@ -234,6 +239,7 @@ export function createWorkContextRegistration(
     async getWorkOutcome({ threadId }) { return cards.outcome(threadId); },
     async getWorkGoal({ threadId }) { return cards.goal(threadId); },
     async getWorkPlan({ threadId }) { return cards.plan(threadId); },
+    async getWorkBackgroundJobs({ threadId }) { return backgroundJobs.read(threadId); },
     async getWorkProviderStatus({ threadId }) {
       const thread = await bb.sdk.threads.get({ threadId });
       try {

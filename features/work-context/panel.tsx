@@ -6,6 +6,7 @@ import {
   type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
 import { Icon } from "../../components/ui/icon";
+import { TabSelector } from "../../components/ui/tab-selector";
 import { ChangesPanel } from "../changes/panel";
 import { invalidateChanges } from "../changes/queries";
 import { changesInteractionStore } from "../changes/store";
@@ -104,23 +105,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
   });
   const selectTab = (next: WorkTab) =>
     threadInteractionStore.getState().setWorkTab(threadId, next);
-  const onTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    event.preventDefault();
-    const index = WORK_TABS.findIndex((candidate) => candidate.id === tab);
-    const nextIndex =
-      event.key === "Home"
-        ? 0
-        : event.key === "End"
-          ? WORK_TABS.length - 1
-          : (index + (event.key === "ArrowRight" ? 1 : -1) + WORK_TABS.length) %
-            WORK_TABS.length;
-    const next = WORK_TABS[nextIndex]!;
-    selectTab(next.id);
-    window.requestAnimationFrame(() =>
-      document.getElementById(`ws-tab-${next.id}`)?.focus(),
-    );
-  };
+  const tabIdPrefix = `ws-work-${threadId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   return (
     <div className="ws-panel">
       <header className="ws-panel-header">
@@ -147,30 +132,19 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
           ↻
         </button>
       </header>
-      <nav className="ws-tabs" role="tablist" aria-label="Work context views">
-        {WORK_TABS.map((candidate) => (
-          <button
-            key={candidate.id}
-            id={`ws-tab-${candidate.id}`}
-            type="button"
-            role="tab"
-            aria-selected={tab === candidate.id}
-            aria-controls={`ws-panel-${candidate.id}`}
-            tabIndex={tab === candidate.id ? 0 : -1}
-            className={tab === candidate.id ? "ws-tab-active" : ""}
-            title={candidate.description}
-            onClick={() => selectTab(candidate.id)}
-            onKeyDown={onTabKeyDown}
-          >
-            {candidate.label}
-          </button>
-        ))}
-      </nav>
+      <TabSelector
+        ariaLabel="Work context views"
+        controls={(id) => `${tabIdPrefix}-panel-${id}`}
+        idPrefix={tabIdPrefix}
+        items={WORK_TABS}
+        value={tab}
+        onValueChange={selectTab}
+      />
       <div
         className="ws-panel-body"
         role="tabpanel"
-        id="ws-panel-work"
-        aria-labelledby="ws-tab-work"
+        id={`${tabIdPrefix}-panel-work`}
+        aria-labelledby={`${tabIdPrefix}-tab-work`}
         hidden={tab !== "work"}
         tabIndex={0}
       >
@@ -192,8 +166,8 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
       <div
         className="ws-panel-body"
         role="tabpanel"
-        id="ws-panel-changes"
-        aria-labelledby="ws-tab-changes"
+        id={`${tabIdPrefix}-panel-changes`}
+        aria-labelledby={`${tabIdPrefix}-tab-changes`}
         hidden={tab !== "changes"}
         tabIndex={0}
       >
@@ -202,8 +176,8 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
       <div
         className="ws-panel-body"
         role="tabpanel"
-        id="ws-panel-agents"
-        aria-labelledby="ws-tab-agents"
+        id={`${tabIdPrefix}-panel-agents`}
+        aria-labelledby={`${tabIdPrefix}-tab-agents`}
         hidden={tab !== "agents"}
         tabIndex={0}
       >

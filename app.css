@@ -78,12 +78,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ws-task-key {
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0 0.25rem;
-  color: var(--foreground);
-}
 .ws-pr-changes_requested {
   color: var(--destructive);
 }
@@ -114,12 +108,6 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-}
-.ws-tab-active {
-  /* R17 important: host tab button styles otherwise override the active background. */
-  background: var(--accent) !important;
-  /* R17 important: host tab button styles otherwise override the active foreground. */
-  color: var(--accent-foreground) !important;
 }
 .ws-panel-body {
   overflow: auto;

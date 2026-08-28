@@ -35,6 +35,33 @@ export type AgentRuntimePresentation = {
   tone: "working" | "waiting" | "blocked" | "complete" | "idle";
 };
 
+export type AgentWorkspacePresentation = {
+  label: string;
+  detail: string;
+};
+
+/** Prefer the branch, then the named worktree, then the host supplied by BB. */
+export function agentWorkspacePresentation(
+  thread: PluginSidebarThread,
+): AgentWorkspacePresentation | null {
+  const environment = thread.environment;
+  if (environment) {
+    const name = environment.name?.trim();
+    const branch = environment.branchName?.trim();
+    const workspaceKind = environment.workspaceDisplayKind === "managed-worktree"
+      ? "Managed worktree"
+      : environment.workspaceDisplayKind === "unmanaged-worktree"
+        ? "Unmanaged worktree"
+        : "Workspace";
+    const detail = name
+      ? /worktree/i.test(name) ? name : `${name} worktree`
+      : workspaceKind;
+    return { label: branch || name || workspaceKind, detail };
+  }
+  if (thread.host) return { label: thread.host.name, detail: "Host workspace" };
+  return null;
+}
+
 /** Translate only host-owned thread signals into the Agents row status. */
 export function agentRuntimePresentation(
   thread: PluginSidebarThread,

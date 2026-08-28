@@ -21,6 +21,25 @@ export const taskThreadSchema = z.object({
   title: z.string(), liveStatus: z.enum(["starting", "working", "idle", "completed", "failed"]),
   attachedAt: z.string(), updatedAt: z.string(),
 });
+const taskCommentSchema = z.object({
+  id: taskIdSchema,
+  taskId: taskIdSchema,
+  kind: z.enum(["user", "agent", "system"]),
+  authorName: z.string(),
+  presetName: z.string().nullable(),
+  threadId: taskThreadIdSchema.nullable(),
+  body: z.string(),
+  notifiedCount: z.number().int().nonnegative(),
+  createdAt: z.string(),
+});
+const displayTaskCommentSchema = taskCommentSchema.extend({
+  threadTitle: z.string().nullable(),
+  provider: z.object({
+    id: z.string(),
+    name: z.string(),
+    logoUrl: z.string().nullable(),
+  }).nullable(),
+});
 export const projectSchema = z.object({
   id: taskIdSchema, name: z.string(), prefix: z.string(), nextTaskNumber: z.number().int().positive(),
   color: z.string(), folderId: taskIdSchema.nullable(), linkedBbProjectId: z.string().startsWith("proj_").nullable(),
@@ -37,6 +56,9 @@ export type Project = z.infer<typeof projectSchema>;
 export type TaskSummary = ReturnType<typeof summarizeTask>;
 export type TaskStatus = Task["status"];
 export type TaskAssignee = "agent" | "human";
+export type TaskUpdate = Partial<
+  Pick<Task, "title" | "description" | "status" | "priority" | "dueDate">
+>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -72,6 +94,12 @@ export function createTasksPluginAdapter(bb: BbPluginApi) {
   };
   const projects = async () =>
     (await call("listProjects", {}, z.object({ projects: z.array(projectSchema) }))).projects;
+  const getByKey = async (key: string) =>
+    (await call("getTaskByKey", { taskKey: key }, z.object({ task: taskSchema.nullable() }))).task;
+  const comments = async (taskId: string) =>
+    (await call("listComments", { taskId }, z.object({ comments: z.array(displayTaskCommentSchema) }))).comments;
+  const threads = async (taskId: string) =>
+    (await call("listTaskThreads", { taskId }, z.object({ taskThreads: z.array(taskThreadSchema) }))).taskThreads;
   const allTasksById = async () => new Map(
     (await listAll({ activeOnly: false, sort: "manual" })).map((task) => [task.id, task]),
   );
@@ -105,6 +133,21 @@ export function createTasksPluginAdapter(bb: BbPluginApi) {
     if (!result.ok) throw new Error(result.error.message);
     return { task: summarizeTask(result.task) };
   };
+  const updateFields = async (taskId: string, changes: TaskUpdate) => {
+    const result = await call(
+      "updateTask",
+      { taskId, ...changes, authorName: "Work Sidebar Agent" },
+      taskMutationSchema,
+    );
+    if (!result.ok) throw new Error(result.error.message);
+    return result.task;
+  };
+  const comment = async (taskId: string, body: string, notify: boolean) =>
+    (await call(
+      "createComment",
+      { taskId, body, notify },
+      z.object({ comment: taskCommentSchema }),
+    )).comment;
   const createSidebar = async (projectId: string, title: string, assignee: TaskAssignee) => {
     const result = await call("createTask", {
       projectId, title, description: "", status: "todo", priority: "medium", dueDate: null,
@@ -139,5 +182,23 @@ export function createTasksPluginAdapter(bb: BbPluginApi) {
     if (!result.ok) throw new Error(result.error.message);
     return { task: summarizeTask(result.task) };
   };
-  return { call, available, listAll, projects, allTasksById, readAssignees, writeAssignee, sidebar, update, createSidebar, deleteSidebar, reorder };
+  return {
+    call,
+    available,
+    listAll,
+    projects,
+    getByKey,
+    comments,
+    threads,
+    allTasksById,
+    readAssignees,
+    writeAssignee,
+    sidebar,
+    update,
+    updateFields,
+    comment,
+    createSidebar,
+    deleteSidebar,
+    reorder,
+  };
 }

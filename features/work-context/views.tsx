@@ -1,12 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
-import { Icon } from "../../components/ui/icon";
+import { Icon, type IconName } from "../../components/ui/icon";
 import { Input } from "../../components/ui/input";
-import {
-  SurfaceCard,
-  SurfaceCardHeading,
-} from "../../components/ui/surface-card";
 import { Combobox } from "../../components/ui/combobox";
 import { AssigneePicker } from "./assignee-picker";
 import type { rpcContract } from "../../contracts";
@@ -30,47 +26,8 @@ import {
   useWorkProviderHealth,
   useWorkStatus,
 } from "./queries";
-
-type CardStateProps = {
-  title: string;
-  className?: string;
-  pending: boolean;
-  error: Error | null;
-  onRetry: () => void;
-  children: ReactNode;
-};
-
-function CardState({
-  title,
-  className = "",
-  pending,
-  error,
-  onRetry,
-  children,
-}: CardStateProps) {
-  return (
-    <SurfaceCard
-      className={`ws-work-context-card ${className}`}
-      data-card={title.toLowerCase()}
-    >
-      <SurfaceCardHeading title={title} />
-      {pending ? (
-        <p className="ws-card-note" role="status" aria-busy="true">
-          Loading {title.toLowerCase()}…
-        </p>
-      ) : null}
-      {error ? (
-        <div className="ws-card-note" role="alert">
-          <span>{error.message}</span>
-          <button type="button" onClick={onRetry}>
-            Try again
-          </button>
-        </div>
-      ) : null}
-      {!pending && !error ? children : null}
-    </SurfaceCard>
-  );
-}
+import { CardState } from "./card-state";
+import { BackgroundJobsCard } from "./background-jobs-view";
 
 function StatusCard({ threadId }: { threadId: string }) {
   const query = useWorkStatus(threadId);
@@ -92,39 +49,22 @@ function StatusCard({ threadId }: { threadId: string }) {
     <CardState
       title="Status"
       className="ws-status-card"
+      trailing={
+        data && runtime ? (
+          <StatusHeading
+            runtime={runtime}
+            total={total}
+            active={active}
+            provider={provider.data ?? null}
+          />
+        ) : undefined
+      }
       pending={query.isPending}
       error={query.error}
       onRetry={() => void query.refetch()}
     >
-      <div className="ws-status-summary">
-        <h3 className="ws-card-title">{runtime?.label ?? "Unknown"}</h3>
-        <p className="ws-working-state">
-          <span title={`${total} child agents`}>
-            <Icon name="Bot" aria-hidden />
-            {total}
-          </span>
-          <span title={`${active} active child agents`}>
-            <Icon name="Wrench" aria-hidden />
-            {active}
-          </span>
-        </p>
-      </div>
       {latestActivity.data?.latest || latestActivity.data?.lastUser ? (
         <div className="ws-activity-list">
-          {latestActivity.data?.latest ? (
-            <ActivityRow
-              label="Agent"
-              entry={latestActivity.data.latest}
-              expanded={expanded.has("agent")}
-              onToggle={() =>
-                setExpanded((current) => {
-                  const next = new Set(current);
-                  next.has("agent") ? next.delete("agent") : next.add("agent");
-                  return next;
-                })
-              }
-            />
-          ) : null}
           {latestActivity.data?.lastUser ? (
             <ActivityRow
               label="User"
@@ -139,10 +79,74 @@ function StatusCard({ threadId }: { threadId: string }) {
               }
             />
           ) : null}
+          {latestActivity.data?.latest ? (
+            <ActivityRow
+              label="Agent"
+              entry={latestActivity.data.latest}
+              expanded={expanded.has("agent")}
+              onToggle={() =>
+                setExpanded((current) => {
+                  const next = new Set(current);
+                  next.has("agent") ? next.delete("agent") : next.add("agent");
+                  return next;
+                })
+              }
+            />
+          ) : null}
         </div>
       ) : null}
-      {provider.data ? <ProviderHealth provider={provider.data} /> : null}
     </CardState>
+  );
+}
+
+const runtimeIcons = {
+  working: "LoaderCircle",
+  waiting: "UserClock",
+  blocked: "AlertCircle",
+  complete: "Check",
+  idle: "Circle",
+} satisfies Record<ReturnType<typeof runtimeStatusPresentation>["tone"], IconName>;
+
+function countLabel(count: number, description: string) {
+  return `${count} ${description}${count === 1 ? "" : "s"}`;
+}
+
+function StatusHeading({
+  runtime,
+  total,
+  active,
+  provider,
+}: {
+  runtime: ReturnType<typeof runtimeStatusPresentation>;
+  total: number;
+  active: number;
+  provider: Parameters<typeof ProviderHealth>[0]["provider"] | null;
+}) {
+  return (
+    <span className="ws-status-heading-meta">
+      <span
+        className={`ws-runtime-state ws-runtime-state-${runtime.tone}`}
+        title={runtime.label}
+      >
+        <Icon name={runtimeIcons[runtime.tone]} aria-label={runtime.label} />
+      </span>
+      <span title={countLabel(total, "child agent")}>
+        <Icon name="Bot" aria-hidden />
+        <span aria-hidden>{total}</span>
+        <span className="ws-sr-only">{countLabel(total, "child agent")}</span>
+      </span>
+      <span
+        className="ws-active-agent-count"
+        title={countLabel(active, "active child agent")}
+      >
+        <Icon name="Wrench" aria-hidden />
+        <span aria-hidden>{active}</span>
+        <span className="ws-sr-only">
+          {countLabel(active, "active child agent")}
+        </span>
+      </span>
+      {provider ? <ProviderHealth provider={provider} /> : null}
+    </span>
   );
 }
 
@@ -157,7 +161,6 @@ function ActivityRow({
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const text = expanded ? entry.text : entry.text.slice(0, 120);
   return (
     <button
       type="button"
@@ -167,9 +170,9 @@ function ActivityRow({
     >
       <span className="ws-activity-label">{label}</span>
       {entry.kind === "command" ? (
-        <code className="ws-activity-command">{text}</code>
+        <code className="ws-activity-command">{entry.text}</code>
       ) : (
-        <span className="ws-activity-copy">{text}</span>
+        <span className="ws-activity-copy">{entry.text}</span>
       )}
     </button>
   );
@@ -527,6 +530,7 @@ function TasksCard({ threadId }: { threadId: string }) {
             onChange={setSelection}
             placeholder="Add an existing task…"
             ariaLabel="Add task to this thread"
+            className="ws-task-attachment-picker"
           />
           <button
             type="button"
@@ -576,6 +580,7 @@ export function WorkContextCards({ threadId }: { threadId: string }) {
   return (
     <section className="ws-work-context-cards" aria-label="Work context">
       <StatusCard threadId={threadId} />
+      <BackgroundJobsCard threadId={threadId} />
       <TasksCard threadId={threadId} />
       <OutcomeCard threadId={threadId} />
       <GoalCard threadId={threadId} />

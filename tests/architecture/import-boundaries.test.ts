@@ -21,6 +21,7 @@ function longestPhysicalLine(path: string): number {
 }
 
 const registrationBudgets: Record<string, { lines: number; declarations: number }> = {
+  "features/agents/server-registration.ts": { lines: 40, declarations: 1 },
   "features/changes/server-registration.ts": { lines: 160, declarations: 6 },
   // Registration wires feature-owned services. GitHub command, stack
   // enrichment, and authored-list polling stay below this adapter.
@@ -54,7 +55,7 @@ function foreignFeatureImports(path: string): string[] {
   ].includes(path);
   return [...readFileSync(resolve(repositoryRoot, path), "utf8").matchAll(/from\s+["']\.\.\/([^/]+)/g)]
     .map((match) => match[1])
-    .filter((feature) => ["changes", "pull-requests", "tasks", "threads", "tracker", "work-context"].includes(feature))
+    .filter((feature) => ["agents", "changes", "pull-requests", "tasks", "threads", "tracker", "work-context"].includes(feature))
     .filter((feature) => feature !== ownFeature)
     .filter((feature) => !(permittedBindingSeam && feature === "work-context"));
 }

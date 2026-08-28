@@ -22,24 +22,43 @@ const unlinked = {
   suggestions: [
     { key: "LIN-1", title: "Suggested", url: "https://linear.app/issue/LIN-1" },
   ],
-  item: null,
-  statusOptions: [],
+  items: [],
 };
 const linked = {
   ...unlinked,
-  item: {
-    key: "LIN-1",
-    title: "Suggested",
-    url: "https://linear.app/issue/LIN-1",
-    status: "Todo",
-    stateCategory: "todo" as const,
-    priority: null,
-    assignee: null,
-    project: null,
-  },
-  statusOptions: [
-    { id: "todo", name: "Todo", current: true },
-    { id: "done", name: "Done", current: false },
+  items: [
+    {
+      item: {
+        key: "LIN-1",
+        title: "Suggested",
+        url: "https://linear.app/issue/LIN-1",
+        status: "Todo",
+        stateCategory: "todo" as const,
+        priority: null,
+        assignee: null,
+        project: null,
+      },
+      statusOptions: [
+        { id: "todo", name: "Todo", current: true },
+        { id: "done", name: "Done", current: false },
+      ],
+    },
+  ],
+};
+const multiLinked = {
+  ...unlinked,
+  suggestions: [],
+  items: [
+    linked.items[0],
+    {
+      item: {
+        ...linked.items[0].item,
+        key: "LIN-2",
+        title: "Second linked issue",
+        url: "https://linear.app/issue/LIN-2",
+      },
+      statusOptions: linked.items[0].statusOptions,
+    },
   ],
 };
 const context = {
@@ -110,6 +129,7 @@ function fixture(overrides: Partial<Rpc> = {}): Rpc {
     }),
     getWorkGoal: () => null,
     getWorkPlan: () => ({ items: [] }),
+    getWorkBackgroundJobs: () => ({ items: [] }),
     getWorkProviderStatus: () => ({
       tone: "green",
       providerId: "codex",
@@ -152,6 +172,59 @@ afterEach(() => {
 });
 
 describe("registered tracker card", () => {
+  it("renders multiple linked issues and keeps the add control available", async () => {
+    const app = await loadPluginApp(() => import("../../../app"));
+    const updateLinearIssueStatus = vi.fn(() => ({
+      key: "LIN-2",
+      status: "Done",
+    }));
+    const unlinkLinearIssue = vi.fn(() => ({ ok: true as const }));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_multi_tracker", params: null },
+      {
+        rpc: fixture({
+          getWorkTracker: () => multiLinked,
+          updateLinearIssueStatus,
+          unlinkLinearIssue,
+        }),
+      },
+    );
+
+    expect(
+      await slot.findByRole("button", { name: "LIN-1: Suggested" }),
+    ).toBeTruthy();
+    expect(
+      slot.getByRole("button", { name: "LIN-2: Second linked issue" }),
+    ).toBeTruthy();
+    expect(slot.getByLabelText("Search Linear issues")).toBeTruthy();
+    expect(
+      slot.getByRole("button", { name: "Unlink LIN-1" }),
+    ).toBeTruthy();
+    expect(
+      slot.getByRole("button", { name: "Unlink LIN-2" }),
+    ).toBeTruthy();
+    fireEvent.change(slot.getByLabelText("LIN-2 status"), {
+      target: { value: "done" },
+    });
+    await waitFor(() =>
+      expect(updateLinearIssueStatus).toHaveBeenCalledWith({
+        threadId: "thr_multi_tracker",
+        key: "LIN-2",
+        statusId: "done",
+      }),
+    );
+    fireEvent.click(slot.getByRole("button", { name: "Unlink LIN-1" }));
+    await waitFor(() =>
+      expect(unlinkLinearIssue).toHaveBeenCalledWith({
+        threadId: "thr_multi_tracker",
+        key: "LIN-1",
+      }),
+    );
+    await expectNoAriaViolations(slot.container);
+    slot.lifecycle.unmount();
+  });
+
   it("keeps populated tracker suggestions ARIA-valid with selected option semantics", async () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
@@ -286,9 +359,9 @@ describe("registered tracker card", () => {
       },
     );
     await waitFor(() =>
-      expect(slot.getByLabelText("Linear issue status")).toBeTruthy(),
+      expect(slot.getByLabelText("LIN-1 status")).toBeTruthy(),
     );
-    fireEvent.change(slot.getByLabelText("Linear issue status"), {
+    fireEvent.change(slot.getByLabelText("LIN-1 status"), {
       target: { value: "done" },
     });
     await waitFor(() =>
@@ -302,20 +375,20 @@ describe("registered tracker card", () => {
       slot.inspection.rpcCalls.find(
         (call) => call.method === "updateLinearIssueStatus",
       )?.input,
-    ).toEqual({ threadId: "thr_linked", statusId: "done" });
+    ).toEqual({ threadId: "thr_linked", key: "LIN-1", statusId: "done" });
     expect(
-      (slot.getByLabelText("Linear issue status") as HTMLSelectElement)
+      (slot.getByLabelText("LIN-1 status") as HTMLSelectElement)
         .disabled,
     ).toBe(true);
     status.resolve({ key: "LIN-1", status: "Done" });
     await waitFor(() =>
       expect(
-        (slot.getByLabelText("Linear issue status") as HTMLSelectElement)
+        (slot.getByLabelText("LIN-1 status") as HTMLSelectElement)
           .disabled,
       ).toBe(false),
     );
     expect(toast.success).toHaveBeenCalledWith("LIN-1 moved to Done");
-    fireEvent.click(slot.getByRole("button", { name: "Unlink" }));
+    fireEvent.click(slot.getByRole("button", { name: "Unlink LIN-1" }));
     await waitFor(() =>
       expect(
         slot.inspection.rpcCalls.filter(
@@ -327,15 +400,15 @@ describe("registered tracker card", () => {
       slot.inspection.rpcCalls.find(
         (call) => call.method === "unlinkLinearIssue",
       )?.input,
-    ).toEqual({ threadId: "thr_linked" });
+    ).toEqual({ threadId: "thr_linked", key: "LIN-1" });
     expect(
-      (slot.getByRole("button", { name: "Unlink" }) as HTMLButtonElement)
+      (slot.getByRole("button", { name: "Unlink LIN-1" }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
     unlink.reject(new Error("unlink failed"));
     await waitFor(() =>
       expect(
-        (slot.getByRole("button", { name: "Unlink" }) as HTMLButtonElement)
+        (slot.getByRole("button", { name: "Unlink LIN-1" }) as HTMLButtonElement)
           .disabled,
       ).toBe(false),
     );
@@ -368,13 +441,13 @@ describe("registered tracker card", () => {
       { rpc: fixture({ getWorkTracker: () => linked }) },
     );
     await waitFor(() =>
-      expect(slot.getByLabelText("Linear issue status")).toBeTruthy(),
+      expect(slot.getByLabelText("LIN-1 status")).toBeTruthy(),
     );
     fireEvent.click(slot.getAllByText("LIN-1")[0]!);
     fireEvent.click(slot.container.querySelector(".ws-linear-issue")!);
     expect(slot.inspection.navigateCalls).toEqual([
-      { method: "openUrl", url: linked.item.url },
-      { method: "openUrl", url: linked.item.url },
+      { method: "openUrl", url: linked.items[0].item.url },
+      { method: "openUrl", url: linked.items[0].item.url },
     ]);
     slot.lifecycle.unmount();
   });
@@ -438,10 +511,10 @@ describe("registered tracker card", () => {
       { rpc: fixture({ getWorkTracker, updateLinearIssueStatus }) },
     );
     await waitFor(() =>
-      expect(slot.getByLabelText("Linear issue status")).toBeTruthy(),
+      expect(slot.getByLabelText("LIN-1 status")).toBeTruthy(),
     );
     expect(getWorkTracker).toHaveBeenCalledTimes(1);
-    fireEvent.change(slot.getByLabelText("Linear issue status"), {
+    fireEvent.change(slot.getByLabelText("LIN-1 status"), {
       target: { value: "done" },
     });
     await waitFor(() => expect(getWorkTracker).toHaveBeenCalledTimes(2));

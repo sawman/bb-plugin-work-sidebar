@@ -35,13 +35,12 @@ const RED_DEAD_SELECTORS = [
   ".ws-agent-card small",
   ".ws-agent-card",
   ".ws-agent-card strong",
-  ".ws-agent-state-waiting, .ws-agent-state-idle",
+  ".ws-agent-state-waiting",
+  ".ws-agent-state-idle",
   ".ws-thread",
   ".ws-thread > .ws-thread-anchor",
   ".ws-thread > .ws-thread-anchor.ws-thread-has-children",
   ".ws-thread-dragging > .ws-thread-anchor",
-  ".ws-view-selector",
-  ".ws-view-selector button",
   ".ws-task-meta",
   ".ws-task-key-badge, .ws-task-badge",
   ".ws-task-status-picker",
@@ -90,8 +89,6 @@ const EXPECTED_DISJOINT_REPEATED_SELECTORS = [
   ".ws-thread > .ws-thread-anchor",
   ".ws-thread > .ws-rename",
   ".ws-thread-trailing",
-  ".ws-view-selector",
-  ".ws-view-selector button",
   ".ws-task-meta",
   ".ws-task-key-badge, .ws-task-badge",
   ".ws-task-status-picker",
@@ -103,17 +100,19 @@ const EXPECTED_DISJOINT_REPEATED_SELECTORS = [
   ".ws-pr-target",
   ".ws-pr-number",
   ".ws-work-toolbar-actions",
-  ".ws-task-link small",
   ".ws-thread-settings",
   ".ws-native-thread-list",
 ] as const;
 
 const EXPECTED_EFFECTIVE_STYLES: Record<string, Record<string, string>> = {
   ".ws-status": {
-    width: "0.8rem",
+    width: "auto",
+    "min-width": "0.8rem",
     "font-size": "0.58rem",
     position: "relative",
     display: "inline-grid",
+    "grid-auto-flow": "column",
+    "column-gap": "0.08rem",
     "place-items": "center",
     height: "0.8rem",
     color: "var(--muted-foreground)",
@@ -179,7 +178,11 @@ const EXPECTED_EFFECTIVE_STYLES: Record<string, Record<string, string>> = {
     "white-space": "nowrap",
     "line-height": "1.2",
   },
-  ".ws-agent-state-waiting, .ws-agent-state-idle": {
+  ".ws-agent-state-waiting": {
+    color: "var(--primary)",
+    animation: "ws-agent-waiting-bob 1.6s ease-in-out infinite",
+  },
+  ".ws-agent-state-idle": {
     color: "var(--muted-foreground)",
   },
   ".ws-thread": {
@@ -201,36 +204,6 @@ const EXPECTED_EFFECTIVE_STYLES: Record<string, Record<string, string>> = {
   },
   ".ws-thread-dragging > .ws-thread-anchor": {
     background: "var(--accent)",
-  },
-  ".ws-view-selector": {
-    display: "grid",
-    "grid-template-columns": "repeat(3, 1fr)",
-    gap: "0 !important",
-    padding: "0 !important",
-    "border-bottom": "1px solid var(--border)",
-    position: "sticky !important",
-    top: "0",
-    "z-index": "45",
-    background: "var(--background) !important",
-    "box-sizing": "border-box !important",
-    height: "2rem !important",
-    "min-height": "0 !important",
-    "max-height": "2rem !important",
-    margin: "0 !important",
-  },
-  ".ws-view-selector button": {
-    border: "0",
-    "border-radius": "calc(var(--radius) - 2px)",
-    padding: "0 0.25rem !important",
-    background: "transparent",
-    color: "var(--muted-foreground)",
-    "font-size": "0.72rem",
-    "font-weight": "650",
-    cursor: "pointer",
-    position: "relative",
-    "box-sizing": "border-box !important",
-    height: "2rem !important",
-    "min-height": "0 !important",
   },
   ".ws-task-meta": {
     display: "flex",
@@ -631,7 +604,7 @@ describe("protected stylesheet duplicate ownership", () => {
     const rules = parseRules(readFileSync(stylesheetPath, "utf8"));
     const inventory = overlappingProperties(rules);
 
-    expect(RED_DEAD_SELECTORS).toHaveLength(35);
+    expect(RED_DEAD_SELECTORS).toHaveLength(34);
     expect(STATE_SHAPED_RED_SELECTORS.every((selector) => RED_DEAD_SELECTORS.includes(selector))).toBe(true);
     expect(inventory, "all RED same-cascade overlaps must be consolidated").toEqual([]);
     expect(emptyRules(rules), "empty CSS rules must be removed").toEqual([]);

@@ -17,6 +17,9 @@ type WorkOutcome = z.infer<typeof rpcSchemas.getWorkOutcome.output>;
 type WorkGoal = z.infer<typeof rpcSchemas.getWorkGoal.output>;
 type WorkPlan = z.infer<typeof rpcSchemas.getWorkPlan.output>;
 type WorkActivity = z.infer<typeof rpcSchemas.getLatestActivity.output>;
+type WorkBackgroundJobs = z.infer<
+  typeof rpcSchemas.getWorkBackgroundJobs.output
+>;
 
 type WorkQueryKey = "status" | "outcome" | "goal" | "plan";
 
@@ -82,6 +85,20 @@ export function useWorkProviderHealth(threadId: string) {
   });
 }
 
+export function useWorkBackgroundJobs(threadId: string) {
+  const rpc = useRpc<typeof rpcContract>();
+  return useQuery({
+    queryKey: queryKeys.work.backgroundJobs(threadId),
+    queryFn: () =>
+      rpc.call("getWorkBackgroundJobs", { threadId }) as Promise<WorkBackgroundJobs>,
+    enabled: Boolean(threadId),
+    ...queryPolicies.workBackgroundJobs,
+    refetchIntervalInBackground: false,
+    refetchInterval: (query) =>
+      query.state.fetchStatus === "fetching" ? false : 5_000,
+  });
+}
+
 export function invalidateWorkContextCards(
   queryClient: QueryClient,
   threadId: string,
@@ -89,6 +106,7 @@ export function invalidateWorkContextCards(
   const keys = [
     queryKeys.work.status,
     queryKeys.work.activity,
+    queryKeys.work.backgroundJobs,
     queryKeys.work.outcome,
     queryKeys.work.goal,
     queryKeys.work.plan,

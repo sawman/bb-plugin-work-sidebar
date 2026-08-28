@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import type { rpcContract } from "../../contracts";
 import { Icon } from "../../components/ui/icon";
 import { useGitHubApiHealth } from "../pull-requests/queries";
+import { StackNumberBadge } from "../pull-requests/stack-number";
 import { changesHeaderLabel, mergeStackBranchSignals } from "./model";
 import {
   useChanges,
@@ -88,6 +89,9 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
             changesQuery.data,
             changesQuery.isPending,
             changesQuery.isError,
+          )}
+          {changesQuery.data?.stack?.number != null && (
+            <StackNumberBadge number={changesQuery.data.stack.number} icon />
           )}
         </span>
       </header>

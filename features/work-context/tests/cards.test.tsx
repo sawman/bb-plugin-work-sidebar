@@ -32,8 +32,7 @@ const aggregate = {
     available: false,
     message: null,
     suggestions: [],
-    item: null,
-    statusOptions: [],
+    items: [],
   },
 };
 const status = {
@@ -119,6 +118,7 @@ function fixture(overrides: Partial<Rpc> = {}): Rpc {
     getWorkOutcome: () => outcome,
     getWorkGoal: () => null,
     getWorkPlan: () => ({ items: [] }),
+    getWorkBackgroundJobs: () => ({ items: [] }),
     ...overrides,
   } as Rpc;
 }
@@ -139,9 +139,9 @@ describe("registered Work context cards", () => {
       () => expect(slot.getByText("outcome unavailable")).toBeTruthy(),
       { timeout: 3_000 },
     );
-    for (const name of ["Status", "Tasks", "Goal", "Plan"])
+    for (const name of ["Status", "Background", "Tasks", "Goal", "Plan"])
       expect(slot.getAllByText(name).length).toBeGreaterThan(0);
-    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(5);
+    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(6);
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();
   });
@@ -153,6 +153,7 @@ describe("registered Work context cards", () => {
     const getWorkOutcome = vi.fn(() => outcome);
     const getWorkGoal = vi.fn(() => null);
     const getWorkPlan = vi.fn(() => ({ items: [] }));
+    const getWorkBackgroundJobs = vi.fn(() => ({ items: [] }));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
       { threadId: "thr_one", params: null },
@@ -162,6 +163,7 @@ describe("registered Work context cards", () => {
           getWorkOutcome,
           getWorkGoal,
           getWorkPlan,
+          getWorkBackgroundJobs,
         }),
       },
     );
@@ -171,6 +173,7 @@ describe("registered Work context cards", () => {
       getWorkOutcome,
       getWorkGoal,
       getWorkPlan,
+      getWorkBackgroundJobs,
     ])
       expect(method).toHaveBeenCalledWith({ threadId: "thr_one" });
     slot.lifecycle.unmount();
@@ -184,6 +187,7 @@ describe("registered Work context cards", () => {
     const getWorkOutcome = vi.fn(() => outcome);
     const getWorkGoal = vi.fn(() => null);
     const getWorkPlan = vi.fn(() => ({ items: [] }));
+    const getWorkBackgroundJobs = vi.fn(() => ({ items: [] }));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
       { threadId: "thr_one", params: null },
@@ -193,11 +197,14 @@ describe("registered Work context cards", () => {
           getWorkOutcome,
           getWorkGoal,
           getWorkPlan,
+          getWorkBackgroundJobs,
         }),
       },
     );
     await waitFor(() => expect(getWorkPlan).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(slot.getByText("Idle")).toBeTruthy());
+    await waitFor(() =>
+      expect(slot.getByRole("img", { name: "Idle" })).toBeTruthy(),
+    );
     await slot.behavior.emitRealtime("work-sidebar:changed", {
       family: "work",
       rootThreadId: "thr_one",
@@ -210,6 +217,7 @@ describe("registered Work context cards", () => {
       getWorkOutcome,
       getWorkGoal,
       getWorkPlan,
+      getWorkBackgroundJobs,
     ])
       expect(method).toHaveBeenCalledTimes(3);
     slot.lifecycle.unmount();
@@ -297,7 +305,9 @@ describe("registered Work context cards", () => {
       { rpc: fixture({ getWorkStatus, getWorkPlan }) },
     );
     try {
-      await waitFor(() => expect(slot.getByText("Idle")).toBeTruthy());
+      await waitFor(() =>
+        expect(slot.getByRole("img", { name: "Idle" })).toBeTruthy(),
+      );
       slot.lifecycle.rerender(
         createElement(app.threadPanelActions[0]!.component, {
           threadId: "thr_b",
@@ -352,7 +362,9 @@ describe("registered Work context cards", () => {
       });
       expect(getWorkPlan).toHaveBeenCalledTimes(1);
       resolveStatus(status);
-      await waitFor(() => expect(slot.getByText("Idle")).toBeTruthy());
+      await waitFor(() =>
+        expect(slot.getByRole("img", { name: "Idle" })).toBeTruthy(),
+      );
       await waitFor(() => expect(getWorkPlan).toHaveBeenCalledTimes(2));
     } finally {
       slot.lifecycle.unmount();
@@ -393,7 +405,7 @@ describe("registered Work context cards", () => {
     );
     await waitFor(() => expect(slot.getByText("Attached task")).toBeTruthy());
     expect(slot.getByText("Ship cards")).toBeTruthy();
-    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(5);
+    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(6);
     expect(slot.container.querySelector(".ws-thread-task-card")).toBeTruthy();
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();

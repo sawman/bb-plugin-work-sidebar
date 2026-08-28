@@ -170,12 +170,13 @@ describe("R2 server registration and disposal", () => {
       "githubMaxRestPollsPerMinute",
     ]);
     expect(host.harness.inspection.registrations.rpcMethods).toEqual([
+      "getAgentDetails",
       "getChanges", "getChangesFingerprint", "checkoutStackBranch", "getWorkingTreeFileDiff",
       "getSidebarOrder", "saveSiblingOrder", "getThreadListMode", "saveThreadListMode",
       "getLaterThreads", "saveLaterThreads", "getThreadGroups", "saveThreadGroups",
       "sidebarTasks", "sidebarTaskLinks", "sidebarPullRequestStacks", "sidebarThreadPullRequests",
       "sidebarAuthoredPullRequests", "sidebarAuthoredPullRequestStacks", "setAuthoredPullRequestDraft",
-      "sidebarArchivedThreads", "unarchiveSidebarThread", "getWorkContext", "getWorkStatus", "getWorkOutcome", "getWorkGoal", "getWorkPlan", "getGitHubPollingPolicy", "getWorkTracker", "linkLinearIssue", "searchLinearIssues", "unlinkLinearIssue", "updateLinearIssueStatus", "getWorkProviderStatus",
+      "sidebarArchivedThreads", "unarchiveSidebarThread", "getWorkContext", "getWorkStatus", "getWorkOutcome", "getWorkGoal", "getWorkPlan", "getWorkBackgroundJobs", "getGitHubPollingPolicy", "getWorkTracker", "linkLinearIssue", "searchLinearIssues", "unlinkLinearIssue", "updateLinearIssueStatus", "getWorkProviderStatus",
       "getGitHubApiHealth", "getLatestActivity",
       "createWorkTask", "ensureOutcomeContext", "createExecutionTask", "bindExecutionOwner",
       "adoptLegacyOutcome", "updateWorkTask", "updateTaskStatus", "updateTaskAssignee", "createSidebarTask",

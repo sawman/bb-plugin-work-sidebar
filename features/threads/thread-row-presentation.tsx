@@ -1,13 +1,10 @@
+import type { ReactNode } from "react";
 import type {
   PluginSidebarPullRequest,
   PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
-import {
-  normalizeIndicator,
-  orderTaskLinksByRelevance,
-  type ThreadTaskLink,
-} from "@/work-model";
+import { normalizeIndicator } from "@/work-model";
 import { pullRequestPresentation } from "@/features/pull-requests/presentation";
 import type { ThreadProject } from "./thread-row-types";
 
@@ -46,14 +43,14 @@ export function ThreadMetadata({
   thread,
   project,
   projectLabel,
-  taskLinks,
+  stackNumber,
   pullRequest,
   pullRequestLoading,
 }: {
   thread: PluginSidebarThread;
   project?: ThreadProject;
   projectLabel: string;
-  taskLinks?: readonly ThreadTaskLink[];
+  stackNumber?: ReactNode;
   pullRequest: PluginSidebarPullRequest | null;
   pullRequestLoading: boolean;
 }) {
@@ -76,6 +73,7 @@ export function ThreadMetadata({
           <span>#{pullRequest.number}</span>
         </span>
       )}
+      {stackNumber}
       <span
         className="ws-thread-worktree"
         title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${thread.environment?.branchName || (project?.isPersonal ? "Personal" : projectLabel)}`}
@@ -86,16 +84,6 @@ export function ThreadMetadata({
             (project?.isPersonal ? "Personal" : projectLabel)}
         </span>
       </span>
-      {orderTaskLinksByRelevance(taskLinks ?? []).map((taskLink) => (
-        <span
-          className="ws-task-link"
-          key={`${taskLink.task.id}:${taskLink.role}`}
-          title={`${taskLink.task.title} · ${taskLink.task.key}`}
-        >
-          <Icon name="ListTodo" aria-hidden />
-          <small className="ws-task-key">{taskLink.task.key}</small>
-        </span>
-      ))}
       {pullRequestLoading && (
         <span className="ws-pr-meta" role="status" aria-label="Pull request loading">
           PR loading…

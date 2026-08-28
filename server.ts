@@ -1,5 +1,6 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { rpcContract } from "./contracts.js";
+import { createAgentRegistration } from "./features/agents/server-registration.js";
 import { createChangesRegistration } from "./features/changes/server-registration.js";
 import {
   createPullRequestRegistration,
@@ -25,6 +26,7 @@ export default function plugin(
 ) {
   bb.onDispose(() => lifecycle.dispose());
   const tasks = createTasksRegistration(bb, lifecycle);
+  const agents = createAgentRegistration(bb);
   const pullRequests = createPullRequestRegistration(bb, lifecycle);
   const dependencies: ServerCompositionDependencies = { bb, lifecycle, pullRequests, tasks };
   const changes = createChangesRegistration(dependencies);
@@ -32,6 +34,7 @@ export default function plugin(
   const workContext = createWorkContextRegistration(dependencies);
   const tracker = createTrackerRegistration(dependencies);
   bb.rpc.register(rpcContract, {
+    getAgentDetails: agents.getAgentDetails,
     getChanges: changes.getChanges,
     getChangesFingerprint: changes.getChangesFingerprint,
     checkoutStackBranch: changes.checkoutStackBranch,
@@ -58,6 +61,7 @@ export default function plugin(
     getWorkOutcome: workContext.getWorkOutcome,
     getWorkGoal: workContext.getWorkGoal,
     getWorkPlan: workContext.getWorkPlan,
+    getWorkBackgroundJobs: workContext.getWorkBackgroundJobs,
     getGitHubPollingPolicy: pullRequests.getGitHubPollingPolicy,
     getWorkTracker: tracker.getWorkTracker,
     linkLinearIssue: tracker.linkLinearIssue,
@@ -83,7 +87,16 @@ export default function plugin(
   });
   tasks.registerTools();
   bb.agents.configure(() => ({
-    tools: ["get_sidebar_tasks", "get_work_context", "create_work_task", "create_execution_task", "bind_execution_owner"],
+    tools: [
+      "get_sidebar_tasks",
+      "get_task",
+      "update_task",
+      "comment_task",
+      "get_work_context",
+      "create_work_task",
+      "create_execution_task",
+      "bind_execution_owner",
+    ],
     skills: [],
     instructions: WORK_AGENT_INSTRUCTIONS,
   }));

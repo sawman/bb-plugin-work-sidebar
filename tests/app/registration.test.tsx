@@ -92,7 +92,7 @@ describe("R2 app registration and Query lifecycle", () => {
     expect(mount).toHaveBeenCalledTimes(2);
     // Changes owns no cache entries until its tab mounts the panel; once
     // selected, the file query remains hook-stable and disabled until opened.
-    expect(client.getQueryCache().getAll()).toHaveLength(17);
+    expect(client.getQueryCache().getAll()).toHaveLength(18);
     expect(
       client
         .getQueryCache()
@@ -230,8 +230,7 @@ describe("R6 mounted Tasks reads", () => {
         available: false,
         message: null,
         suggestions: [],
-        item: null,
-        statusOptions: [],
+        items: [],
       }),
     } as never;
     const left = renderSlot(

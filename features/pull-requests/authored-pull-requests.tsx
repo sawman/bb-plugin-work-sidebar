@@ -12,6 +12,7 @@ import {
   type PullRequestSignal,
 } from "./presentation";
 import { orderStackLayers, type SidebarStack } from "../../work-model";
+import { StackNumberBadge } from "./stack-number";
 
 export type AuthoredPullRequest = {
   number: number;
@@ -32,6 +33,7 @@ type AuthoredRow = Omit<AuthoredPullRequest, "stack">;
 export function AuthoredPullRequestRow({
   pullRequest,
   stackControl,
+  stackNumber,
   selected,
   changingDraft,
   onSelect,
@@ -39,6 +41,7 @@ export function AuthoredPullRequestRow({
 }: {
   pullRequest: AuthoredRow;
   stackControl?: ReactNode;
+  stackNumber?: number | null;
   selected: boolean;
   changingDraft: boolean;
   onSelect(id: string, event: ReactMouseEvent<HTMLAnchorElement>): boolean;
@@ -80,6 +83,7 @@ export function AuthoredPullRequestRow({
           {pullRequest.title}
         </strong>
         <span className="ws-pr-context ws-pr-target-context">
+          {stackNumber != null && <StackNumberBadge number={stackNumber} />}
           <span className="ws-pr-number">#{pullRequest.number}</span>
           <span className="ws-pr-branch">
             {pullRequest.head || "Authored by you"}
@@ -145,10 +149,12 @@ export function AuthoredPullRequestStack({
   const row = (
     layer: SidebarStack["pullRequests"][number],
     stackControl?: ReactNode,
+    stackNumber?: number | null,
   ) => (
     <AuthoredPullRequestRow
       key={layer.number}
       stackControl={stackControl}
+      stackNumber={stackNumber}
       selected={selectedIds.has(layer.url)}
       changingDraft={changingDraftUrl === layer.url}
       onSelect={onSelect}
@@ -182,6 +188,7 @@ export function AuthoredPullRequestStack({
             ›
           </button>
         ) : undefined,
+        stack.number,
       )}
       {expanded &&
         layers.slice(1).map((layer) => (

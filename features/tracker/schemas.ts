@@ -63,6 +63,10 @@ export const trackerStatusOptionSchema = z.object({
   name: z.string(),
   current: z.boolean(),
 });
+export const trackerLinkedItemSchema = z.object({
+  item: trackerItemSchema,
+  statusOptions: z.array(trackerStatusOptionSchema),
+});
 export const trackerContextSchema = z.object({
   visible: z.boolean(),
   available: z.boolean(),
@@ -70,8 +74,7 @@ export const trackerContextSchema = z.object({
   suggestions: z.array(
     z.object({ key: z.string(), title: z.string(), url: z.string().url() }),
   ),
-  item: trackerItemSchema.nullable(),
-  statusOptions: z.array(trackerStatusOptionSchema),
+  items: z.array(trackerLinkedItemSchema),
 });
 
 const threadInput = z
@@ -94,11 +97,16 @@ export const trackerRpcSchemas = {
     }),
   },
   unlinkLinearIssue: {
-    input: threadInput,
+    input: threadInput.extend({ key: z.string().trim().min(2).max(64) }).strict(),
     output: z.object({ ok: z.literal(true) }).strict(),
   },
   updateLinearIssueStatus: {
-    input: threadInput.extend({ statusId: z.string().min(1) }).strict(),
+    input: threadInput
+      .extend({
+        key: z.string().trim().min(2).max(64),
+        statusId: z.string().min(1),
+      })
+      .strict(),
     output: z.object({ key: z.string(), status: z.string() }),
   },
 };

@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { threadTitle } from "@/work-model";
 import { ThreadRowMenu } from "./thread-row-menu";
 import { ThreadMetadata, ThreadStatus } from "./thread-row-presentation";
+import { ThreadProviderLogo } from "./thread-provider-logo";
+import { ThreadRowStackNumber } from "./thread-row-stack-number";
 import type { ThreadRowProps } from "./thread-row-types";
 import { useThreadRowActions } from "./use-thread-row-actions";
 import { useThreadRowPointerDrag } from "./use-thread-row-pointer-drag";
@@ -15,7 +17,6 @@ import { useThreadRowPointerDrag } from "./use-thread-row-pointer-drag";
 export function ThreadRow({
   thread,
   active,
-  taskLinks,
   children,
   activeChildren,
   childrenExpanded,
@@ -26,6 +27,7 @@ export function ThreadRow({
   onSelect,
   onMoveToGroup,
   project,
+  provider,
   onNavigate,
   reorderDisabled,
   canMoveUp,
@@ -185,13 +187,19 @@ export function ThreadRow({
               <span
                 className={`ws-thread-title ${thread.isUnread ? "ws-unread" : ""}`}
               >
-                {title}
+                <ThreadProviderLogo
+                  providerId={thread.providerId}
+                  provider={provider}
+                />
+                <span className="ws-thread-title-copy">{title}</span>
               </span>
               <ThreadMetadata
                 thread={thread}
                 project={project}
                 projectLabel={projectLabel}
-                taskLinks={taskLinks}
+                stackNumber={
+                  pullRequest ? <ThreadRowStackNumber threadId={thread.id} /> : null
+                }
                 pullRequest={pullRequest}
                 pullRequestLoading={pullRequestLoading}
               />

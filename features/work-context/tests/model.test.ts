@@ -6,10 +6,11 @@ import {
 } from "../model";
 
 describe("work-context card model", () => {
-  it("gives Status, Outcome, Goal, and Plan independently cacheable keys", () => {
+  it("gives every Work card an independently cacheable key", () => {
     expect(Object.keys(queryKeys.work)).toEqual([
       "status",
       "activity",
+      "backgroundJobs",
       "outcome",
       "goal",
       "plan",
@@ -35,6 +36,12 @@ describe("work-context card model", () => {
       gcTime: 2 * 60_000,
       retry: 1,
       refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+    });
+    expect(queryPolicies.workBackgroundJobs).toMatchObject({
+      staleTime: 0,
+      gcTime: 2 * 60_000,
+      retry: 1,
       refetchOnReconnect: true,
     });
     expect(shouldPollWorkActivity("active")).toBe(true);

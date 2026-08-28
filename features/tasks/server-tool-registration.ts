@@ -13,9 +13,28 @@ export function registerTasksTools(
   tasks: TaskAdapter,
   bindings: WorkBindingsService,
 ) {
+  const taskKey = z.string().trim().min(1).max(40);
   const namedTask = async (task: Parameters<typeof summarizeTask>[0]) => {
     const projects = await tasks.projects();
     return summarizeTask(task, projects.find((project) => project.id === task.projectId)?.name ?? "Work");
+  };
+  const findTask = async (key: string) => {
+    const task = await tasks.getByKey(key);
+    if (!task) throw new Error(`Task not found: ${key}`);
+    return task;
+  };
+  const taskDetails = async (task: Awaited<ReturnType<typeof findTask>>) => {
+    const [projects, assignees] = await Promise.all([
+      tasks.projects(),
+      tasks.readAssignees(),
+    ]);
+    return {
+      ...summarizeTask(
+        task,
+        projects.find((project) => project.id === task.projectId)?.name ?? "Work",
+      ),
+      assignee: assignees[task.id] ?? "human",
+    };
   };
   bb.agents.registerTool({
     name: "create_work_task",
@@ -26,7 +45,71 @@ export function registerTasksTools(
       const root = await bindings.rootThread(context.threadId);
       const result = await bindings.outcome({ rootThreadId: root.id, title: params.title, description: params.description, taskProjectId: params.taskProjectId });
       const task = await namedTask(result.task);
-      return `Work is tracked as ${task.key}: ${task.title}. Work through this task, record meaningful milestones with bb tasks comment, and set it to in_review after validation.`;
+      return `Work is tracked as ${task.key}: ${task.title}. Record meaningful milestones, then move fully validated work directly to done. Use in_review only while a named reviewer or concrete acceptance gate is pending.`;
+    },
+  });
+  bb.agents.registerTool({
+    name: "get_task",
+    description: "Read one BB Task by key, including comments and attached worker threads.",
+    parameters: z.object({ key: taskKey }).strict(),
+    async execute({ key }) {
+      const task = await findTask(key);
+      const [details, comments, threads] = await Promise.all([
+        taskDetails(task),
+        tasks.comments(task.id),
+        tasks.threads(task.id),
+      ]);
+      return JSON.stringify({ task: details, comments, threads });
+    },
+  });
+  bb.agents.registerTool({
+    name: "update_task",
+    description: "Update safe fields or the Human/Agent assignment for one BB Task.",
+    parameters: z.object({
+      key: taskKey,
+      title: z.string().trim().min(1).optional(),
+      description: z.string().optional(),
+      status: z.enum(["backlog", "todo", "in_progress", "in_review", "done", "canceled"]).optional(),
+      priority: z.enum(["urgent", "high", "medium", "low", "none"]).optional(),
+      dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+      assignee: z.enum(["agent", "human"]).optional(),
+    }).strict().refine(
+      ({ title, description, status, priority, dueDate, assignee }) =>
+        [title, description, status, priority, dueDate, assignee].some(
+          (value) => value !== undefined,
+        ),
+      { message: "At least one task field or assignee must be updated." },
+    ),
+    async execute({ key, assignee, ...changes }, context) {
+      const current = await findTask(key);
+      const fields = Object.fromEntries(
+        Object.entries(changes).filter(([, value]) => value !== undefined),
+      );
+      const updated = Object.keys(fields).length
+        ? await tasks.updateFields(current.id, fields)
+        : current;
+      if (assignee) await tasks.writeAssignee(current.id, assignee);
+      bb.realtime.publish("work-sidebar:changed", {
+        family: "tasks",
+        threadId: context.threadId,
+      });
+      return JSON.stringify({ task: await taskDetails(updated) });
+    },
+  });
+  bb.agents.registerTool({
+    name: "comment_task",
+    description: "Add one substantive markdown comment to a BB Task.",
+    parameters: z.object({
+      key: taskKey,
+      body: z.string().trim().min(1),
+      notify: z.boolean().default(false),
+    }).strict(),
+    async execute({ key, body, notify }) {
+      const task = await findTask(key);
+      return JSON.stringify({
+        taskKey: task.key,
+        comment: await tasks.comment(task.id, body, notify),
+      });
     },
   });
   bb.agents.registerTool({

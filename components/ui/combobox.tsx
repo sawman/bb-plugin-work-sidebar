@@ -42,15 +42,27 @@ export function Combobox({
 
   useEffect(() => {
     if (!open) return;
-    const dismissOutsidePointer = (event: PointerEvent) => {
-      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) {
+    const root = rootRef.current;
+    if (!root) return;
+    const ownerDocument = root.ownerDocument;
+    const dismissOutside = (event: Event) => {
+      const target = event.target;
+      const NodeConstructor = ownerDocument.defaultView?.Node;
+      if (
+        NodeConstructor &&
+        target instanceof NodeConstructor &&
+        !root.contains(target)
+      ) {
         setOpen(false);
         setActiveIndex(null);
       }
     };
-    document.addEventListener("pointerdown", dismissOutsidePointer, true);
-    return () =>
-      document.removeEventListener("pointerdown", dismissOutsidePointer, true);
+    ownerDocument.addEventListener("pointerdown", dismissOutside, true);
+    ownerDocument.addEventListener("click", dismissOutside, true);
+    return () => {
+      ownerDocument.removeEventListener("pointerdown", dismissOutside, true);
+      ownerDocument.removeEventListener("click", dismissOutside, true);
+    };
   }, [open]);
 
   useLayoutEffect(() => {

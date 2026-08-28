@@ -1,15 +1,19 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   experimental_useSidebarThreadActions,
   experimental_useSidebarThreads,
+  experimental_useProviders,
   type PluginThreadListProps,
 } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
+import { TabSelector } from "@/components/ui/tab-selector";
 import { threadTitle } from "@/work-model";
 import { TasksLeftSidebar } from "@/features/tasks/left-sidebar";
+import { invalidateTaskQueries } from "@/features/tasks/mutations";
 import { useTaskLinksRead } from "@/features/tasks/queries";
 import { PullRequestsLeftSidebar } from "@/features/pull-requests/left-sidebar";
+import { invalidateSidebarPullRequestStacks } from "@/features/pull-requests/queries";
 import "../../app.css";
 import "../../scrollbar.css";
 import "../../views.css";
@@ -24,6 +28,10 @@ import { threadInteractionStore } from "./store";
 import { SidebarThreadToolbar } from "./sidebar-toolbar";
 import { SidebarWorkView } from "./sidebar-work-view";
 
+const SIDEBAR_TABS: readonly { id: SidebarView; label: string }[] = (
+  ["work", "queue", "prs"] as const
+).map((id) => ({ id, label: sidebarViewLabel(id) }));
+
 function EmptyOriginal() {
   return null;
 }
@@ -32,6 +40,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   const Original =
     props.Original ?? props.experimental_Original ?? EmptyOriginal;
   const { status, threads, projects } = experimental_useSidebarThreads();
+  const providerDirectory = experimental_useProviders();
   const actions = experimental_useSidebarThreadActions();
   const queryClient = useQueryClient();
   const threadPreferences = useThreadPreferences();
@@ -39,6 +48,13 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   // cache and polling owner rather than creating per-consumer intervals.
   const { data: taskLinksData, refetch: refetchTaskLinks } = useTaskLinksRead();
   const unarchiveMutation = useUnarchiveSidebarThread();
+  const providersById = useMemo(
+    () =>
+      new Map(
+        providerDirectory.providers.map((provider) => [provider.id, provider]),
+      ),
+    [providerDirectory.providers],
+  );
   const [view, setView] = useState<SidebarView>("work");
   const [subtextRefreshKey, setSubtextRefreshKey] = useState(0);
   const threadListMode = threadPreferences.listMode.data ?? "enhanced";
@@ -93,6 +109,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     void threadPreferences.order.refetch();
     void threadPreferences.groups.refetch();
     void refetchTaskLinks();
+    void invalidateSidebarPullRequestStacks(queryClient);
     void queryClient.invalidateQueries({
       queryKey: threadQueryKeys.archived(),
     });
@@ -110,6 +127,14 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
       });
     },
     [threadPreferences.saveListMode],
+  );
+  const activateView = useCallback(
+    (nextView: SidebarView) => {
+      if (nextView === "queue" && view !== "queue")
+        void invalidateTaskQueries(queryClient, ["list", "links"]);
+      setView(nextView);
+    },
+    [queryClient, view],
   );
   const navigateToThread = useCallback(
     (threadId: string, split = false) => {
@@ -147,18 +172,14 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   );
   return (
     <div className="ws-list">
-      <nav className="ws-view-selector" aria-label="Sidebar views">
-        {(["work", "queue", "prs"] as const).map((id) => (
-          <button
-            key={id}
-            className={view === id ? "ws-view-active" : ""}
-            aria-pressed={view === id}
-            onClick={() => setView(id)}
-          >
-            {sidebarViewLabel(id)}
-          </button>
-        ))}
-      </nav>
+      <TabSelector
+        ariaLabel="Sidebar views"
+        idPrefix="ws-sidebar"
+        items={SIDEBAR_TABS}
+        sticky
+        value={view}
+        onValueChange={activateView}
+      />
       <TasksLeftSidebar
         active={view === "queue"}
         activeThreadId={props.activeThreadId}
@@ -177,8 +198,8 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
           Original={Original}
           toolbar={toolbar}
           organization={organization}
-          taskLinks={taskLinks}
           activeThreadId={props.activeThreadId}
+          providersById={providersById}
           onNavigate={props.onNavigate}
           subtextRefreshKey={subtextRefreshKey}
           emptyMessage={

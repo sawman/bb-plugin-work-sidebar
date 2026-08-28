@@ -143,8 +143,7 @@ function rpc({
       available: false,
       message: null,
       suggestions: [],
-      item: null,
-      statusOptions: [],
+      items: [],
     }),
     getWorkStatus,
     getLatestActivity: () => ({
@@ -162,6 +161,7 @@ function rpc({
     }),
     getWorkGoal: () => null,
     getWorkPlan: () => ({ items: [] }),
+    getWorkBackgroundJobs: () => ({ items: [] }),
     checkoutStackBranch,
     getWorkingTreeFileDiff,
     sidebarTasks: () => ({
@@ -301,6 +301,12 @@ describe("R13 registered Changes Work slot", () => {
     const stack = await changesSlot({
       getChanges: () =>
         changesResult(repository("available"), {
+          stack: {
+            number: 17,
+            base: "main",
+            currentPullRequest: 43,
+            pullRequests: [],
+          },
           githubStack: {
             stack: {
               trunk: "main",
@@ -319,6 +325,9 @@ describe("R13 registered Changes Work slot", () => {
         stack.getByRole("list", { name: "GitHub Stack based on main" }),
       ).toBeTruthy(),
     );
+    const stackNumber = stack.getByLabelText("Stack #17");
+    expect(stackNumber.textContent).toContain("Stack #17");
+    expect(stackNumber.querySelector("svg")).toBeTruthy();
     const disclosure = stack.getByRole("button", {
       name: /#43 Stack branch.*Show changed files for pull request #43/,
     });

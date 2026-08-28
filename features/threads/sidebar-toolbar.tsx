@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import type { SidebarThreadGroup } from "./model";
+import { AddThreadGroupControl } from "./sidebar-group-create";
 type SidebarToolbarProps = {
   listMode: "enhanced" | "native";
   threadCount: number;
@@ -11,7 +12,7 @@ type SidebarToolbarProps = {
   activeProjectId: string | null;
   onSaveListMode(mode: "enhanced" | "native"): void;
   onArchiveSelected(): void;
-  onAddGroup(): void;
+  onAddGroup(name: string): boolean;
   onRenameGroup(group: SidebarThreadGroup): void;
   onRemoveGroup(group: SidebarThreadGroup): void;
   onRefresh(): void;
@@ -132,9 +133,7 @@ function ThreadListSettings({
                 </div>
               );
             })}
-            <button className="ws-thread-group-add" onClick={onAddGroup}>
-              Add group
-            </button>
+            <AddThreadGroupControl onAddGroup={onAddGroup} />
           </div>
         </div>
       )}

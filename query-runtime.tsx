@@ -16,6 +16,14 @@ export type QueryPolicy = Readonly<{
 const queryRoot = ["work-sidebar"] as const;
 
 export const queryKeys = {
+  agents: {
+    details: (version: readonly string[]): QueryKey => [
+      ...queryRoot,
+      "agents",
+      "details",
+      ...version,
+    ],
+  },
   sidebar: {
     order: (): QueryKey => [...queryRoot, "sidebar", "order"],
     tasks: {
@@ -34,6 +42,12 @@ export const queryKeys = {
       ...queryRoot,
       "work",
       "activity",
+      threadId,
+    ],
+    backgroundJobs: (threadId: string): QueryKey => [
+      ...queryRoot,
+      "work",
+      "background-jobs",
       threadId,
     ],
     outcome: (threadId: string): QueryKey => [
@@ -64,6 +78,12 @@ export const queryKeys = {
 } as const;
 
 export const queryPolicies = {
+  agentDetails: {
+    staleTime: 15_000,
+    gcTime: 10 * 60_000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  },
   sidebarOrderPreferences: {
     staleTime: Infinity,
     gcTime: 30 * 60_000,
@@ -95,6 +115,13 @@ export const queryPolicies = {
     refetchOnWindowFocus: false,
   },
   workActivity: {
+    staleTime: 0,
+    gcTime: 2 * 60_000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+  },
+  workBackgroundJobs: {
     staleTime: 0,
     gcTime: 2 * 60_000,
     retry: 1,

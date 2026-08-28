@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
@@ -50,10 +50,17 @@ const workContext = {
   children: [],
 } satisfies Awaited<ReturnType<RpcHandlers["getWorkContext"]>>;
 
-function rpcFixtures(sidebarTasks: RpcHandlers["sidebarTasks"]): RpcHandlers {
+function rpcFixtures(
+  sidebarTasks: RpcHandlers["sidebarTasks"],
+  sidebarTaskLinks: RpcHandlers["sidebarTaskLinks"] = () => ({
+    available: true,
+    links: {},
+    error: null,
+  }),
+): RpcHandlers {
   return {
     sidebarTasks,
-    sidebarTaskLinks: () => ({ available: true, links: {}, error: null }),
+    sidebarTaskLinks,
     getWorkContext: () => workContext,
     getChanges: () => ({
       currentPullRequest: null,
@@ -80,8 +87,7 @@ function rpcFixtures(sidebarTasks: RpcHandlers["sidebarTasks"]): RpcHandlers {
       available: false,
       message: null,
       suggestions: [],
-      item: null,
-      statusOptions: [],
+      items: [],
     }),
     getWorkProviderStatus: () => ({
       tone: "green",
@@ -112,6 +118,7 @@ function rpcFixtures(sidebarTasks: RpcHandlers["sidebarTasks"]): RpcHandlers {
     }),
     getWorkGoal: () => null,
     getWorkPlan: () => ({ items: [] }),
+    getWorkBackgroundJobs: () => ({ items: [] }),
     getGitHubApiHealth: () => ({
       state: "available",
       scope: "unknown",
@@ -136,11 +143,44 @@ function leftProps() {
 }
 
 afterEach(() => {
+  cleanup();
   getPluginQueryClient().clear();
   vi.useRealTimers();
 });
 
 describe("Tasks read slots", () => {
+  it("refreshes list and link data once whenever the Tasks tab becomes active", async () => {
+    const tasks = vi
+      .fn<RpcHandlers["sidebarTasks"]>()
+      .mockReturnValueOnce(emptyTasks)
+      .mockReturnValue(populatedTasks);
+    const links = vi.fn<RpcHandlers["sidebarTaskLinks"]>(() => ({
+      available: true,
+      links: {},
+      error: null,
+    }));
+    const captured = await app();
+    const left = renderSlot(captured.threadLists[0]!, leftProps(), {
+      rpc: rpcFixtures(tasks, links),
+    });
+
+    await waitFor(() => expect(tasks).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(links).toHaveBeenCalledTimes(1));
+    fireEvent.click(left.getByRole("button", { name: "Tasks" }));
+    await waitFor(() => expect(tasks).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(links).toHaveBeenCalledTimes(2));
+    expect(left.getByText("Ship mounted fixtures")).toBeTruthy();
+
+    fireEvent.click(left.getByRole("button", { name: "Tasks" }));
+    expect(tasks).toHaveBeenCalledTimes(2);
+    expect(links).toHaveBeenCalledTimes(2);
+    fireEvent.click(left.getByRole("button", { name: "Threads" }));
+    fireEvent.click(left.getByRole("button", { name: "Tasks" }));
+    await waitFor(() => expect(tasks).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(links).toHaveBeenCalledTimes(3));
+    left.lifecycle.unmount();
+  });
+
   it("renders the registered left Tasks tab loading, empty, populated, and accessible retry states", async () => {
     let resolve!: (value: TasksResult) => void;
     const first = new Promise<TasksResult>((done) => {

@@ -8,10 +8,16 @@ import { Icon } from "../../components/ui/icon";
 import { readableStatus } from "../../work-model";
 import { useTaskLinksRead } from "../tasks/queries";
 import { useWorkOutcome } from "../work-context/queries";
-import { agentRuntimePresentation, projectAgentChildren } from "./model";
+import {
+  agentRuntimePresentation,
+  agentWorkspacePresentation,
+  projectAgentChildren,
+} from "./model";
+import { useAgentDetails } from "./queries";
 
 type AgentAnnotation = {
   taskKey: string | null;
+  taskTitle: string | null;
   taskStatus: string | null;
   dispatchState: string | null;
   recoveryMessage: string | null;
@@ -20,15 +26,18 @@ type AgentAnnotation = {
 function AgentRow({
   child,
   annotation,
+  model,
 }: {
   child: ReturnType<typeof projectAgentChildren>[number];
   annotation: AgentAnnotation;
+  model: string | null;
 }) {
   const actions = experimental_useSidebarThreadActions();
   const { splitProps, isAvailable } = experimental_useSidebarThreadSplit(
     child.thread.id,
   );
   const runtime = agentRuntimePresentation(child.thread);
+  const workspace = agentWorkspacePresentation(child.thread);
   const open = (split: boolean) => actions.open(child.thread.id, { split });
   return (
     <article
@@ -56,13 +65,35 @@ function AgentRow({
         <strong>
           {child.thread.title ?? child.thread.titleFallback ?? "Untitled agent"}
         </strong>
-        <small>
+        <small className="ws-agent-runtime-label">
           {runtime.label}
-          {annotation.taskKey ? ` · ${annotation.taskKey}` : ""}
           {annotation.dispatchState
             ? ` · ${readableStatus(annotation.dispatchState)}`
             : ""}
         </small>
+        <span className="ws-agent-facts">
+          <span className="ws-agent-fact" title="Agent model">
+            <Icon name="Bot" aria-hidden />
+            <span>{model ?? "Model unavailable"}</span>
+          </span>
+          {workspace ? (
+            <span
+              className="ws-agent-fact"
+              title={`${workspace.detail}: ${workspace.label}`}
+            >
+              <Icon name="GitBranch" aria-hidden />
+              <span>{workspace.label}</span>
+              <small>{workspace.detail}</small>
+            </span>
+          ) : null}
+          {annotation.taskKey ? (
+            <span className="ws-agent-fact ws-agent-task" title="Assigned task">
+              <Icon name="ListTodo" aria-hidden />
+              <b>{annotation.taskKey}</b>
+              {annotation.taskTitle ? <span>{annotation.taskTitle}</span> : null}
+            </span>
+          ) : null}
+        </span>
         {annotation.recoveryMessage ? (
           <small>{annotation.recoveryMessage}</small>
         ) : null}
@@ -92,6 +123,17 @@ export function AgentsView({ threadId }: { threadId: string }) {
   const children = useMemo(
     () => projectAgentChildren(hostThreads.threads, threadId),
     [hostThreads.threads, threadId],
+  );
+  const detailTargets = useMemo(
+    () => children.map(({ thread }) => ({ id: thread.id, updatedAt: thread.updatedAt })),
+    [children],
+  );
+  const agentDetails = useAgentDetails(detailTargets);
+  const modelsByThread = useMemo(
+    () => new Map(
+      (agentDetails.data?.agents ?? []).map(({ threadId: id, model }) => [id, model]),
+    ),
+    [agentDetails.data?.agents],
   );
 
   if (hostThreads.status === "loading")
@@ -126,10 +168,12 @@ export function AgentsView({ threadId }: { threadId: string }) {
             child={child}
             annotation={{
               taskKey: taskLink?.task.key ?? null,
+              taskTitle: taskLink?.task.title ?? null,
               taskStatus: taskLink?.task.status ?? null,
               dispatchState: binding?.dispatchState ?? null,
               recoveryMessage: binding?.recoveryMessage ?? null,
             }}
+            model={modelsByThread.get(child.thread.id) ?? null}
           />
         );
       })}

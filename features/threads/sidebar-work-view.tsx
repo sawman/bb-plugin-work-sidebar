@@ -1,15 +1,15 @@
 import type { ComponentType, ReactNode } from "react";
-import type { ThreadTaskLink } from "@/work-model";
 import type { SidebarThreadOrganization } from "./sidebar-organization";
 import { SidebarThreadGroups } from "./sidebar-group-tree";
+import type { ThreadProviderDirectory } from "./thread-provider-logo";
 
 type SidebarWorkViewProps = {
   listMode: "enhanced" | "native";
   Original: ComponentType;
   toolbar: ReactNode;
   organization: SidebarThreadOrganization;
-  taskLinks: Readonly<Record<string, readonly ThreadTaskLink[]>>;
   activeThreadId: string | null;
+  providersById: ThreadProviderDirectory;
   onNavigate(): void;
   subtextRefreshKey: number;
   emptyMessage: string;
@@ -20,8 +20,8 @@ export function SidebarWorkView({
   Original,
   toolbar,
   organization,
-  taskLinks,
   activeThreadId,
+  providersById,
   onNavigate,
   subtextRefreshKey,
   emptyMessage,
@@ -39,8 +39,8 @@ export function SidebarWorkView({
       ) : (
         <SidebarThreadGroups
           organization={organization}
-          taskLinks={taskLinks}
           activeThreadId={activeThreadId}
+          providersById={providersById}
           onNavigate={onNavigate}
           subtextRefreshKey={subtextRefreshKey}
           emptyMessage={emptyMessage}

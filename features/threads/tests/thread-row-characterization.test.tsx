@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -14,6 +15,8 @@ const host = vi.hoisted(() => ({
   },
   pullRequest: null as unknown,
   pullRequestLoading: false,
+  stackNumber: null as number | null,
+  rpcCall: vi.fn(),
   composerView: {
     scope: { kind: "none" },
     draft: { isEmpty: true },
@@ -36,6 +39,7 @@ vi.mock("@get-bb/plugin-sdk/app", async () => {
       pullRequest: host.pullRequest,
       isLoading: host.pullRequestLoading,
     }),
+    useRpc: () => ({ call: host.rpcCall }),
     useComposerView: () => host.composerView,
   };
 });
@@ -80,46 +84,54 @@ function renderRow({
     onDropThread: vi.fn(),
     onMoveThread: vi.fn(),
   };
+  host.rpcCall.mockImplementation(
+    async (method: string, input: { threadIds?: string[] }) => {
+      if (method !== "sidebarPullRequestStacks")
+        throw new Error(`unexpected ${method}`);
+      const threadId = input.threadIds?.[0] ?? thread.id;
+      return {
+        available: true,
+        stacks:
+          host.stackNumber == null
+            ? {}
+            : {
+                [threadId]: {
+                  id: `github-stack:${threadId}:${host.stackNumber}`,
+                  number: host.stackNumber,
+                  base: "main",
+                  currentPullRequest: 42,
+                  pullRequests: [],
+                },
+              },
+        mergeTargets: {},
+        error: null,
+      };
+    },
+  );
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   const view = render(
-    <ThreadRow
-      thread={thread}
-      active={false}
-      taskLinks={[
-        {
-          task: {
-            id: "task_one",
-            projectId: "project",
-            projectName: "Project",
-            key: "WORK-1",
-            title: "Preserve the row contract",
-            status: "in_progress",
-            priority: "medium",
-            dueDate: null,
-            parentTaskId: null,
-          },
-          threadId: thread.id,
-          liveStatus: "working",
-          role: "outcome",
-          mode: "direct",
-          idempotencyKey: null,
-          dispatchState: "ready",
-        },
-      ]}
-      children={1}
-      activeChildren={1}
-      childrenExpanded={false}
-      selected={false}
-      groupId={groupId}
-      groups={groups}
-      project={{ name: "Project", isPersonal: false }}
-      reorderDisabled={false}
-      canMoveUp={true}
-      canMoveDown={true}
-      dragThreadId={null}
-      dropTarget={null}
-      canDropThread={() => true}
-      {...props}
-    />,
+    <QueryClientProvider client={client}>
+      <ThreadRow
+        thread={thread}
+        active={false}
+        children={1}
+        activeChildren={1}
+        childrenExpanded={false}
+        selected={false}
+        groupId={groupId}
+        groups={groups}
+        project={{ name: "Project", isPersonal: false }}
+        reorderDisabled={false}
+        canMoveUp={true}
+        canMoveDown={true}
+        dragThreadId={null}
+        dropTarget={null}
+        canDropThread={() => true}
+        {...props}
+      />
+    </QueryClientProvider>,
   );
   return { ...view, ...props };
 }
@@ -133,11 +145,13 @@ afterEach(() => {
   for (const action of Object.values(host.actions)) action.mockReset();
   host.pullRequest = null;
   host.pullRequestLoading = false;
+  host.stackNumber = null;
+  host.rpcCall.mockReset();
   host.composerView = { scope: { kind: "none" }, draft: { isEmpty: true } };
 });
 
 describe("R21D ThreadRow characterization", () => {
-  it("keeps metadata and status/task/PR presentation in the row", () => {
+  it("keeps status and PR metadata without duplicating task mappings", async () => {
     host.pullRequest = {
       number: 42,
       title: "M7",
@@ -149,11 +163,13 @@ describe("R21D ThreadRow characterization", () => {
       scope: { kind: "thread", threadId: thread.id },
       draft: { isEmpty: false },
     };
+    host.stackNumber = 17;
     const view = renderRow();
 
     expect(view.getByText("feature/m7")).toBeTruthy();
-    expect(view.getByText("WORK-1")).toBeTruthy();
+    expect(view.queryByText("WORK-1")).toBeNull();
     expect(view.getByText("#42")).toBeTruthy();
+    expect((await view.findByLabelText("Stack #17")).textContent).toBe("S#17");
     expect(view.getByTitle("PR #42 · Open")).toBeTruthy();
     expect(view.getByRole("img", { name: "Thread is running" })).toBeTruthy();
     expect(view.getByRole("img", { name: "Unsent draft" })).toBeTruthy();

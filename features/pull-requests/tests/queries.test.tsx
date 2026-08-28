@@ -9,6 +9,7 @@ import {
   useAuthoredPullRequests,
   useSetAuthoredPullRequestDraft,
   useGitHubApiHealth,
+  useSidebarPullRequestStacks,
   type PullRequestRpc,
 } from "../queries";
 
@@ -33,6 +34,53 @@ function deferred<T>() {
 
 describe("R5 pull-request queries", () => {
   afterEach(() => vi.useRealTimers());
+
+  it("normalizes one bounded thread-roster stack read and keeps it inactive off the Work view", async () => {
+    const rpc = {
+      call: vi.fn(async (method: string, input: unknown) => {
+        if (method !== "sidebarPullRequestStacks")
+          throw new Error(`unexpected ${method}`);
+        expect(input).toEqual({ threadIds: ["thr_a", "thr_b"] });
+        return {
+          available: true,
+          stacks: {
+            thr_a: {
+              id: "github-stack:thr_a:17",
+              number: 17,
+              base: "main",
+              currentPullRequest: 42,
+              pullRequests: [],
+            },
+          },
+          mergeTargets: {},
+          error: null,
+        };
+      }),
+    } as unknown as PullRequestRpc;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const inactive = renderHook(
+      () => useSidebarPullRequestStacks(rpc, ["thr_b", "thr_a", "thr_a"], false),
+      { wrapper: wrapper(client) },
+    );
+    await act(async () => Promise.resolve());
+    expect(rpc.call).not.toHaveBeenCalled();
+
+    inactive.rerender();
+    const active = renderHook(
+      () => useSidebarPullRequestStacks(rpc, ["thr_b", "thr_a", "thr_a"], true),
+      { wrapper: wrapper(client) },
+    );
+    await waitFor(() => expect(active.result.current.data?.thr_a?.number).toBe(17));
+    expect(rpc.call).toHaveBeenCalledTimes(1);
+    expect(pullRequestPolicies.sidebarStacks).toMatchObject({
+      staleTime: 60_000,
+      gcTime: 15 * 60_000,
+      retry: false,
+    });
+    inactive.unmount();
+    active.unmount();
+    client.clear();
+  });
 
   it("progressively paints the shared authored list before deferred stack enrichment settles", async () => {
     const stacks = deferred<{ available: boolean; pullRequests: typeof authored; error: null }>();

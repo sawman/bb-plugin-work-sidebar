@@ -25,7 +25,7 @@ export function useTrackerMutations(rpc: Rpc, threadId: string) {
   // mutating here too can cause a duplicate context read.
   return {
     link: useMutation({ mutationKey: [...trackerKeys.context(threadId), "link"], mutationFn: (key: string) => rpc.call("linkLinearIssue", { threadId, key }) }),
-    unlink: useMutation({ mutationKey: [...trackerKeys.context(threadId), "unlink"], mutationFn: () => rpc.call("unlinkLinearIssue", { threadId }) }),
-    status: useMutation({ mutationKey: [...trackerKeys.context(threadId), "status"], mutationFn: (statusId: string) => rpc.call("updateLinearIssueStatus", { threadId, statusId }) }),
+    unlink: useMutation({ mutationKey: [...trackerKeys.context(threadId), "unlink"], mutationFn: (key: string) => rpc.call("unlinkLinearIssue", { threadId, key }) }),
+    status: useMutation({ mutationKey: [...trackerKeys.context(threadId), "status"], mutationFn: ({ key, statusId }: { key: string; statusId: string }) => rpc.call("updateLinearIssueStatus", { threadId, key, statusId }) }),
   };
 }

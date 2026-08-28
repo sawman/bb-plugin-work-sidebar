@@ -42,6 +42,8 @@ export const WORK_AGENT_INSTRUCTIONS = [
   "Bind direct work to the root or delegated work to one spawned child.",
   "Pending/recovery dispatch states require explicit reconciliation; never retry an uncertain spawn automatically.",
   "Task lifecycle is explicit: thread idle/completion never promotes a task.",
+  "Move fully validated tasks directly from in_progress to done; use in_review only while a named reviewer or concrete acceptance gate is actually pending.",
+  "Use get_task for task detail, update_task for safe task fields or assignment, and comment_task for milestones without falling back to shell commands.",
 ].join(" ");
 
 type TaskHandlers = Pick<

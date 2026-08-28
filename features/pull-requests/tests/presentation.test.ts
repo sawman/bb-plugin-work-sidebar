@@ -29,6 +29,13 @@ describe("pull-request presentation semantics", () => {
     expect(pullRequestSignalPresentation({ checks, review: "none", reviewCommentCount: 0 }).checks).toEqual(expected);
   });
 
+  it("marks the partial-circle pending-check icon for continuous rotation", () => {
+    const pending = pullRequestSignalPresentation({ checks: "pending", review: "none", reviewCommentCount: 0 }).checks;
+    const markup = renderToStaticMarkup(createElement(Status, { presentation: pending }));
+
+    expect(markup).toContain('data-motion="spin"');
+  });
+
   it.each([
     ["approved", { icon: "Check", label: "Approved", tone: "success" }],
     ["changes_requested", { icon: "Wrench", label: "Changes requested", tone: "destructive" }],
