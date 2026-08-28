@@ -285,7 +285,9 @@
   grid-row: 1;
 }
 .ws-thread-main {
+  display: grid;
   grid-column: 2;
+  row-gap: 0.1rem;
 }
 .ws-thread-trailing {
   grid-column: 3;

@@ -694,6 +694,14 @@ describe("shared surface and list-row architecture", () => {
     expect(branch?.declarations).toContain("max-width: 100%");
   });
 
+  test("spaces the shared thread title and subtitle rows", () => {
+    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const main = rules.find(({ selector }) => selector === ".ws-thread-main");
+
+    expect(main?.declarations).toContain("display: grid");
+    expect(main?.declarations).toContain("row-gap: 0.1rem");
+  });
+
   test("keeps authored PR and branch badges bounded within their rows", () => {
     const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
     const badges = rules.filter(
