@@ -589,10 +589,10 @@
   flex: none;
   align-items: center;
   gap: 0.18rem;
-  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.05rem 0.3rem;
-  color: var(--primary);
+  color: var(--foreground);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.58rem;
   font-weight: 650;

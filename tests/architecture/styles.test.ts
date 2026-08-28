@@ -410,6 +410,22 @@ describe("shared surface and list-row architecture", () => {
     expect(badge?.declarations).toContain("white-space: nowrap");
   });
 
+  test("uses one neutral badge tone for Changes pull request and stack identifiers", () => {
+    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const pullRequestBadge = rules.find(
+      ({ selector }) => selector === ".ws-pr-number-badge",
+    );
+    const stackBadge = rules.find(
+      ({ selector }) => selector === ".ws-stack-number",
+    );
+
+    for (const badge of [pullRequestBadge, stackBadge]) {
+      expect(badge?.declarations).toContain("border: 1px solid var(--border)");
+      expect(badge?.declarations).toContain("color: var(--foreground)");
+      expect(badge?.declarations).not.toContain("var(--primary)");
+    }
+  });
+
   test("associates each important declaration with its immediately preceding R17 comment", () => {
     expect(undocumentedImportantDeclarations(`
       /* R17 important: a former blanket comment. */
