@@ -17,13 +17,11 @@ import type { SidebarThreadGroup } from "./model";
 const root = ["work-sidebar", "sidebar", "threads"] as const;
 export const threadQueryKeys = {
   order: () => [...root, "order"] as const,
-  listMode: () => [...root, "list-mode"] as const,
   groups: () => [...root, "groups"] as const,
   archived: () => [...root, "archived"] as const,
 } as const;
 export const threadQueryPolicies = {
   order: queryPolicies.sidebarOrderPreferences,
-  listMode: queryPolicies.sidebarOrderPreferences,
   groups: queryPolicies.sidebarOrderPreferences,
 } as const;
 export type ThreadsRpc = PluginRpcClient<typeof rpcContract>;
@@ -46,11 +44,6 @@ export function useThreadPreferences() {
     queryFn: async () => (await rpc.call("getSidebarOrder", null)).threadIds,
     ...threadQueryPolicies.order,
   });
-  const listMode = useQuery({
-    queryKey: threadQueryKeys.listMode(),
-    queryFn: async () => (await rpc.call("getThreadListMode", null)).mode,
-    ...threadQueryPolicies.listMode,
-  });
   const groups = useQuery({
     queryKey: threadQueryKeys.groups(),
     queryFn: async () => (await rpc.call("getThreadGroups", null)).groups,
@@ -70,14 +63,7 @@ export function useThreadPreferences() {
       return result.threadIds;
     },
   });
-  const saveListMode = useMutation({
-    mutationFn: async (mode: "enhanced" | "native") => {
-      const result = await rpc.call("saveThreadListMode", { mode });
-      client.setQueryData(threadQueryKeys.listMode(), result.mode);
-      return result.mode;
-    },
-  });
-  return { order, listMode, groups, saveGroups, saveOrder, saveListMode };
+  return { order, groups, saveGroups, saveOrder };
 }
 
 export const archivedThreadQueryPolicy = {

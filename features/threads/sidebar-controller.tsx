@@ -17,7 +17,11 @@ import { invalidateSidebarPullRequestStacks } from "@/features/pull-requests/que
 import "../../app.css";
 import "../../scrollbar.css";
 import "../../views.css";
-import { sidebarViewLabel, type SidebarView } from "./model";
+import {
+  sidebarViewLabel,
+  threadCountPresentation,
+  type SidebarView,
+} from "./model";
 import {
   threadQueryKeys,
   useThreadPreferences,
@@ -57,7 +61,10 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   );
   const [view, setView] = useState<SidebarView>("work");
   const [subtextRefreshKey, setSubtextRefreshKey] = useState(0);
-  const threadListMode = threadPreferences.listMode.data ?? "enhanced";
+  const threadCount = useMemo(
+    () => threadCountPresentation(threads),
+    [threads],
+  );
   const saveGroups = useCallback(
     (
       groups: Parameters<typeof threadPreferences.saveGroups.mutateAsync>[0],
@@ -120,14 +127,6 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     threadPreferences.groups,
     threadPreferences.order,
   ]);
-  const saveListMode = useCallback(
-    (mode: "enhanced" | "native") => {
-      void threadPreferences.saveListMode.mutateAsync(mode).catch(() => {
-        toast.error("Could not save thread-list preference.");
-      });
-    },
-    [threadPreferences.saveListMode],
-  );
   const activateView = useCallback(
     (nextView: SidebarView) => {
       if (nextView === "queue" && view !== "queue")
@@ -152,14 +151,12 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   const taskLinks = taskLinksData?.links ?? {};
   const toolbar = (
     <SidebarThreadToolbar
-      listMode={threadListMode}
-      threadCount={organization.filtered.length}
+      threadCountLabel={threadCount.label}
       selectedCount={organization.selectedThreadIds.size}
       reorderDisabled={organization.reorderDisabled}
       groups={organization.groups}
       occupiedGroupIds={organization.occupiedGroupIds}
       activeProjectId={props.activeProjectId}
-      onSaveListMode={saveListMode}
       onArchiveSelected={() => void organization.archiveSelected()}
       onAddGroup={organization.addGroup}
       onRenameGroup={organization.renameGroup}
@@ -194,8 +191,6 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
       />
       {view === "work" && (
         <SidebarWorkView
-          listMode={threadListMode}
-          Original={Original}
           toolbar={toolbar}
           organization={organization}
           activeThreadId={props.activeThreadId}

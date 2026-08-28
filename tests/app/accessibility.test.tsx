@@ -40,13 +40,11 @@ const task = {
 function fixture() {
   return {
     getSidebarOrder: () => ({ threadIds: ["thr_accessible"] }),
-    getThreadListMode: () => ({ mode: "enhanced" }),
     getThreadGroups: () => ({
       groups: [{ id: "group_later", name: "Later", threadIds: [] }],
     }),
     saveThreadGroups: ({ groups }: { groups: unknown[] }) => ({ groups }),
     saveSiblingOrder: ({ threadIds }: { threadIds: string[] }) => ({ threadIds }),
-    saveThreadListMode: ({ mode }: { mode: "enhanced" | "native" }) => ({ mode }),
     sidebarArchivedThreads: () => ({ available: true, threads: [], error: null }),
     sidebarTasks: () => ({
       available: true,

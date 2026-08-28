@@ -78,11 +78,9 @@ async function leftSlot({
     sidebarTasks: () => ({ available: true, tasks: [], projects: [], error: null }),
     sidebarTaskLinks: () => ({ available: true, links: {}, error: null }),
     getSidebarOrder: () => ({ threadIds: threads.map(({ id }) => id) }),
-    getThreadListMode: () => ({ mode: "enhanced" }),
     getThreadGroups: () => ({ groups }),
     saveThreadGroups: ({ groups: next }: { groups: unknown[] }) => ({ groups: next }),
     saveSiblingOrder: ({ threadIds }: { threadIds: string[] }) => ({ threadIds }),
-    saveThreadListMode: ({ mode }: { mode: "enhanced" | "native" }) => ({ mode }),
     sidebarArchivedThreads: () => ({ available: true, threads: [], error: null }),
     sidebarPullRequestStacks: () => ({
       available: true,
@@ -326,19 +324,34 @@ describe("R18 registered left sidebar parity", () => {
     slot.lifecycle.unmount();
   });
 
-  it("disables occupied group removal and switches between enhanced and native lists", async () => {
-    const saveMode = vi.fn(({ mode }: { mode: "enhanced" | "native" }) => ({ mode }));
-    const slot = await leftSlot({ groups: [{ id: "group_later", name: "Later", threadIds: ["thr_one"] }], rpc: { saveThreadListMode: saveMode } });
+  it("disables occupied group removal and links to the plugin setting that owns list mode", async () => {
+    const slot = await leftSlot({
+      threads: [
+        thread("thr_one", "One"),
+        thread("thr_child", "Child", "thr_one"),
+        thread("thr_grouped", "Grouped"),
+      ],
+      groups: [
+        { id: "group_later", name: "Later", threadIds: ["thr_grouped"] },
+      ],
+    });
     await waitFor(() => expect(slot.getByText("Later")).toBeTruthy());
+    expect(slot.getByText("2 threads · 1 subthread")).toBeTruthy();
     fireEvent.click(slot.getByRole("button", { name: "Thread list settings" }));
     expect(slot.getByLabelText("Remove Later").hasAttribute("disabled")).toBe(true);
-    fireEvent.click(slot.getByRole("button", { name: "BB native list" }));
-    await waitFor(() => expect(saveMode).toHaveBeenCalledWith({ mode: "native" }));
-    expect(slot.getByText("Native BB list")).toBeTruthy();
-    fireEvent.click(slot.getByRole("button", { name: "Thread list settings" }));
-    fireEvent.click(slot.getByRole("button", { name: "Enhanced list" }));
-    await waitFor(() => expect(saveMode).toHaveBeenNthCalledWith(2, { mode: "enhanced" }));
-    expect(slot.getByRole("link", { name: /One/ })).toBeTruthy();
+    const settingsLink = slot.getByRole("link", {
+      name: "Open Work Sidebar settings",
+    });
+    expect(settingsLink.getAttribute("href")).toBe(
+      "/settings/plugins/work-sidebar",
+    );
+    expect(
+      slot
+        .getByRole("link", { name: "Open sidebar list settings" })
+        .getAttribute("href"),
+    ).toBe("/settings/appearance");
+    expect(slot.queryByRole("button", { name: "BB native list" })).toBeNull();
+    expect(slot.queryByRole("button", { name: "Enhanced list" })).toBeNull();
     slot.lifecycle.unmount();
   });
 

@@ -95,7 +95,6 @@ describe("R9 production ThreadRow host behavior", () => {
           }),
           sidebarTaskLinks: () => ({ available: true, links: {}, error: null }),
           getSidebarOrder: () => ({ threadIds: [] }),
-          getThreadListMode: () => ({ mode: "enhanced" }),
           getThreadGroups: () => ({
             groups: [{ id: "group_later", name: "Later", threadIds: [] }],
           }),

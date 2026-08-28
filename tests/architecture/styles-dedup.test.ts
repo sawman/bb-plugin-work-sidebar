@@ -101,7 +101,6 @@ const EXPECTED_DISJOINT_REPEATED_SELECTORS = [
   ".ws-pr-number",
   ".ws-work-toolbar-actions",
   ".ws-thread-settings",
-  ".ws-native-thread-list",
 ] as const;
 
 const EXPECTED_EFFECTIVE_STYLES: Record<string, Record<string, string>> = {

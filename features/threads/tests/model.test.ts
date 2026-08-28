@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { archiveDurationLabel, selectThreadIds } from "../model";
+import {
+  archiveDurationLabel,
+  selectThreadIds,
+  threadCountPresentation,
+} from "../model";
 import { visibleThreadTreeIds } from "../thread-tree-model";
 
 describe("thread interaction selection", () => {
@@ -32,6 +36,23 @@ describe("thread tree traversal", () => {
     expect(
       visibleThreadTreeIds([parent, sibling], new Map([["thr_parent", [child]]])),
     ).toEqual(["thr_parent", "thr_child", "thr_sibling"]);
+  });
+});
+
+describe("thread count presentation", () => {
+  it("separates top-level threads from subthreads across the active roster", () => {
+    expect(
+      threadCountPresentation([
+        { id: "thr_root", parentThreadId: null },
+        { id: "thr_child", parentThreadId: "thr_root" },
+        { id: "thr_nested", parentThreadId: "thr_child" },
+        { id: "thr_orphan", parentThreadId: "thr_missing" },
+      ]),
+    ).toEqual({
+      threads: 2,
+      subthreads: 2,
+      label: "2 threads · 2 subthreads",
+    });
   });
 });
 

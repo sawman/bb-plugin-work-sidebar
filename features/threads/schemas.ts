@@ -29,14 +29,6 @@ export const threadPreferenceSchemas = {
     input: z.object({ threadIds: z.array(z.string()) }).strict(),
     output: z.object({ threadIds: z.array(z.string()) }).strict(),
   },
-  getThreadListMode: {
-    input: z.null(),
-    output: z.object({ mode: z.enum(["enhanced", "native"]) }).strict(),
-  },
-  saveThreadListMode: {
-    input: z.object({ mode: z.enum(["enhanced", "native"]) }).strict(),
-    output: z.object({ mode: z.enum(["enhanced", "native"]) }).strict(),
-  },
   getLaterThreads: {
     input: z.null(),
     output: z

@@ -41,8 +41,6 @@ export default function plugin(
     getWorkingTreeFileDiff: changes.getWorkingTreeFileDiff,
     getSidebarOrder: threads.getSidebarOrder,
     saveSiblingOrder: threads.saveSiblingOrder,
-    getThreadListMode: threads.getThreadListMode,
-    saveThreadListMode: threads.saveThreadListMode,
     getLaterThreads: threads.getLaterThreads,
     saveLaterThreads: threads.saveLaterThreads,
     getThreadGroups: threads.getThreadGroups,

@@ -2,6 +2,27 @@ export type ThreadSelectionModifiers = Readonly<{ toggle?: boolean; range?: bool
 
 export type SidebarThreadGroup = Readonly<{ id: string; name: string; threadIds: string[] }>;
 
+type CountableThread = Readonly<{
+  id: string;
+  parentThreadId: string | null;
+}>;
+
+export function threadCountPresentation(threads: readonly CountableThread[]) {
+  const ids = new Set(threads.map((thread) => thread.id));
+  const rootCount = threads.filter(
+    (thread) =>
+      !thread.parentThreadId || !ids.has(thread.parentThreadId),
+  ).length;
+  const subthreadCount = threads.length - rootCount;
+  const threadLabel = `${rootCount} thread${rootCount === 1 ? "" : "s"}`;
+  const subthreadLabel = `${subthreadCount} subthread${subthreadCount === 1 ? "" : "s"}`;
+  return {
+    threads: rootCount,
+    subthreads: subthreadCount,
+    label: `${threadLabel} · ${subthreadLabel}`,
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }

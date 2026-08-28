@@ -92,17 +92,11 @@ describe("R2 app registration and Query lifecycle", () => {
     expect(mount).toHaveBeenCalledTimes(2);
     // Changes owns no cache entries until its tab mounts the panel; once
     // selected, the file query remains hook-stable and disabled until opened.
-    expect(client.getQueryCache().getAll()).toHaveLength(18);
+    expect(client.getQueryCache().getAll()).toHaveLength(17);
     expect(
       client
         .getQueryCache()
         .find({ queryKey: ["work-sidebar", "sidebar", "threads", "order"] })
-        ?.getObserversCount(),
-    ).toBe(1);
-    expect(
-      client
-        .getQueryCache()
-        .find({ queryKey: ["work-sidebar", "sidebar", "threads", "list-mode"] })
         ?.getObserversCount(),
     ).toBe(1);
     expect(
@@ -218,7 +212,6 @@ describe("R6 mounted Tasks reads", () => {
       }),
       sidebarTaskLinks: () => ({ available: true, links: {}, error: null }),
       getSidebarOrder: () => ({ threadIds: [] }),
-      getThreadListMode: () => ({ mode: "enhanced" }),
       getThreadGroups: () => ({ groups: [] }),
       sidebarArchivedThreads: () => ({
         available: true,
@@ -314,7 +307,6 @@ describe("R6 mounted Tasks reads", () => {
           }),
           sidebarTaskLinks: () => ({ available: true, links: {}, error: null }),
           getSidebarOrder: () => ({ threadIds: [] }),
-          getThreadListMode: () => ({ mode: "enhanced" }),
           getThreadGroups: () => ({ groups: [] }),
           sidebarArchivedThreads: () => ({
             available: true,

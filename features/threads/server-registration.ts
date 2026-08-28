@@ -9,8 +9,6 @@ type ThreadHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
   | "getSidebarOrder"
   | "saveSiblingOrder"
-  | "getThreadListMode"
-  | "saveThreadListMode"
   | "getLaterThreads"
   | "saveLaterThreads"
   | "getThreadGroups"
@@ -31,10 +29,6 @@ export function createThreadRegistration(bb: BbPluginApi): ThreadHandlers {
     async getSidebarOrder() { return { threadIds: await preferences.order() }; },
     async saveSiblingOrder({ threadIds }) {
       return { threadIds: await preferences.saveOrder(threadIds) };
-    },
-    async getThreadListMode() { return { mode: await preferences.listMode() }; },
-    async saveThreadListMode({ mode }) {
-      return { mode: await preferences.saveListMode(mode) };
     },
     async getLaterThreads() { return { threadIds: await preferences.later() }; },
     async saveLaterThreads({ threadIds }) {

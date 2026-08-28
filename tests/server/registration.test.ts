@@ -172,7 +172,7 @@ describe("R2 server registration and disposal", () => {
     expect(host.harness.inspection.registrations.rpcMethods).toEqual([
       "getAgentDetails",
       "getChanges", "getChangesFingerprint", "checkoutStackBranch", "getWorkingTreeFileDiff",
-      "getSidebarOrder", "saveSiblingOrder", "getThreadListMode", "saveThreadListMode",
+      "getSidebarOrder", "saveSiblingOrder",
       "getLaterThreads", "saveLaterThreads", "getThreadGroups", "saveThreadGroups",
       "sidebarTasks", "sidebarTaskLinks", "sidebarPullRequestStacks", "sidebarThreadPullRequests",
       "sidebarAuthoredPullRequests", "sidebarAuthoredPullRequestStacks", "setAuthoredPullRequestDraft",

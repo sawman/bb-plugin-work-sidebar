@@ -1464,6 +1464,28 @@
   text-align: left;
   cursor: pointer;
 }
+.ws-thread-settings-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-radius: calc(var(--radius) - 3px);
+  padding: 0.34rem 0.45rem;
+  color: var(--foreground);
+  font-size: 0.68rem;
+  text-decoration: none;
+}
+.ws-thread-settings-link:hover {
+  background: var(--accent);
+}
+.ws-thread-settings-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.ws-thread-settings-link svg {
+  width: 0.7rem;
+  height: 0.7rem;
+}
 .ws-thread-settings-menu button:hover,
 .ws-thread-settings-menu button[aria-pressed="true"] {
   background: var(--accent);
@@ -1543,9 +1565,6 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.2rem;
-}
-.ws-native-thread-list {
-  min-width: 0;
 }
 .ws-repository-changes-toggle {
   display: inline-flex;
@@ -2369,10 +2388,6 @@ button.ws-provider-health:focus-visible {
 }
 .ws-thread-settings {
   z-index: 41;
-}
-.ws-native-thread-list {
-  position: relative;
-  z-index: 0;
 }
 .ws-list {
   width: 100%;

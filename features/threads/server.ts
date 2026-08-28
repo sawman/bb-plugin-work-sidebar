@@ -3,7 +3,6 @@ import { normalizeThreadGroups, type SidebarThreadGroup } from "./model";
 export const THREAD_PREFERENCE_CHANNEL = "sidebar-order:changed";
 export const THREAD_PREFERENCE_KEYS = {
   order: "sidebar-thread-order:v1",
-  listMode: "sidebar-thread-list-mode:v1",
   later: "sidebar-later-threads:v1",
   groups: "sidebar-thread-groups:v1",
 } as const;
@@ -123,15 +122,6 @@ export function createThreadPreferencesService(
       await adapter.set(THREAD_PREFERENCE_KEYS.order, value);
       adapter.publish(THREAD_PREFERENCE_CHANNEL, { threadIds: value });
       return value;
-    },
-    async listMode() {
-      return (await adapter.get(THREAD_PREFERENCE_KEYS.listMode)) === "native"
-        ? ("native" as const)
-        : ("enhanced" as const);
-    },
-    async saveListMode(mode: "enhanced" | "native") {
-      await adapter.set(THREAD_PREFERENCE_KEYS.listMode, mode);
-      return mode;
     },
     async later() {
       return sanitizeThreadOrder(

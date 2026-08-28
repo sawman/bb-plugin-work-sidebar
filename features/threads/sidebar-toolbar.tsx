@@ -3,14 +3,12 @@ import { Icon } from "@/components/ui/icon";
 import type { SidebarThreadGroup } from "./model";
 import { AddThreadGroupControl } from "./sidebar-group-create";
 type SidebarToolbarProps = {
-  listMode: "enhanced" | "native";
-  threadCount: number;
+  threadCountLabel: string;
   selectedCount: number;
   reorderDisabled: boolean;
   groups: readonly SidebarThreadGroup[];
   occupiedGroupIds: ReadonlySet<string>;
   activeProjectId: string | null;
-  onSaveListMode(mode: "enhanced" | "native"): void;
   onArchiveSelected(): void;
   onAddGroup(name: string): boolean;
   onRenameGroup(group: SidebarThreadGroup): void;
@@ -20,19 +18,15 @@ type SidebarToolbarProps = {
 };
 
 function ThreadListSettings({
-  listMode,
   groups,
   occupiedGroupIds,
-  onSaveListMode,
   onAddGroup,
   onRenameGroup,
   onRemoveGroup,
 }: Pick<
   SidebarToolbarProps,
-  | "listMode"
   | "groups"
   | "occupiedGroupIds"
-  | "onSaveListMode"
   | "onAddGroup"
   | "onRenameGroup"
   | "onRemoveGroup"
@@ -64,10 +58,6 @@ function ThreadListSettings({
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
-  const saveListMode = (mode: "enhanced" | "native") => {
-    closeSettings();
-    onSaveListMode(mode);
-  };
   return (
     <div className="ws-thread-settings" ref={settingsRef}>
       <button
@@ -89,18 +79,24 @@ function ThreadListSettings({
           aria-label="Thread list settings"
           tabIndex={-1}
         >
-          <button
-            aria-pressed={listMode === "enhanced"}
-            onClick={() => saveListMode("enhanced")}
+          <a
+            className="ws-thread-settings-link"
+            href="/settings/appearance"
+            aria-label="Open sidebar list settings"
+            onClick={() => closeSettings({ restoreFocus: false })}
           >
-            Enhanced list
-          </button>
-          <button
-            aria-pressed={listMode === "native"}
-            onClick={() => saveListMode("native")}
+            <span>Sidebar list preference</span>
+            <Icon name="ExternalLink" aria-hidden />
+          </a>
+          <a
+            className="ws-thread-settings-link"
+            href="/settings/plugins/work-sidebar"
+            aria-label="Open Work Sidebar settings"
+            onClick={() => closeSettings({ restoreFocus: false })}
           >
-            BB native list
-          </button>
+            <span>Plugin settings</span>
+            <Icon name="ExternalLink" aria-hidden />
+          </a>
           <div
             className="ws-thread-group-settings"
             role="group"
@@ -142,14 +138,12 @@ function ThreadListSettings({
 }
 
 export function SidebarThreadToolbar({
-  listMode,
-  threadCount,
+  threadCountLabel,
   selectedCount,
   reorderDisabled,
   groups,
   occupiedGroupIds,
   activeProjectId,
-  onSaveListMode,
   onArchiveSelected,
   onAddGroup,
   onRenameGroup,
@@ -159,13 +153,9 @@ export function SidebarThreadToolbar({
 }: SidebarToolbarProps) {
   return (
     <>
-      <span>
-        {listMode === "native"
-          ? "Threads"
-          : `${threadCount} thread${threadCount === 1 ? "" : "s"}`}
-      </span>
+      <span>{threadCountLabel}</span>
       <div className="ws-work-toolbar-actions">
-        {listMode === "enhanced" && selectedCount > 1 && (
+        {selectedCount > 1 && (
           <>
             <span className="ws-selection-count" role="status">
               {selectedCount} selected
@@ -178,16 +168,14 @@ export function SidebarThreadToolbar({
             </button>
           </>
         )}
-        {listMode === "enhanced" && reorderDisabled && (
+        {reorderDisabled && (
           <span className="ws-reorder-disabled" role="status">
             Clear search to reorder
           </span>
         )}
         <ThreadListSettings
-          listMode={listMode}
           groups={groups}
           occupiedGroupIds={occupiedGroupIds}
-          onSaveListMode={onSaveListMode}
           onAddGroup={onAddGroup}
           onRenameGroup={onRenameGroup}
           onRemoveGroup={onRemoveGroup}

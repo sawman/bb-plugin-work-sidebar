@@ -65,7 +65,7 @@ const threadsCompositionBudgets = {
   "features/threads/sidebar-controller.tsx": 350,
   // Settings/menu presentation remains an independently reviewable primitive.
   "features/threads/sidebar-toolbar.tsx": 220,
-  // Native/enhanced switching is intentionally only a small composition seam.
+  // BB selects the replacement; this module only composes the enhanced view.
   "features/threads/sidebar-work-view.tsx": 160,
   // Group drop zones and recursive live trees are the largest owned composition.
   "features/threads/sidebar-group-tree.tsx": 240,
