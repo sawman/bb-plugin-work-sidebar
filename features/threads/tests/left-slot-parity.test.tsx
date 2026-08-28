@@ -105,7 +105,7 @@ async function leftSlot({
   );
 }
 
-afterEach(() => { cleanup(); getPluginQueryClient().clear(); vi.restoreAllMocks(); Reflect.deleteProperty(document, "elementFromPoint"); });
+afterEach(() => { cleanup(); getPluginQueryClient().clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); Reflect.deleteProperty(document, "elementFromPoint"); });
 
 function mockElementAt(element: Element | null) {
   const elementAt = vi.fn(() => element);
@@ -166,6 +166,12 @@ describe("R18 registered left sidebar parity", () => {
   });
 
   it("shows host provider logos and an accessible fallback on thread rows", async () => {
+    const fetchLogo = vi.fn(async (_url: string) => ({
+      ok: true,
+      status: 200,
+      blob: async () => new Blob(["logo"], { type: "image/svg+xml" }),
+    }));
+    vi.stubGlobal("fetch", fetchLogo);
     const slot = await leftSlot({
       threads: [
         thread("thr_codex", "Codex thread"),
@@ -184,12 +190,21 @@ describe("R18 registered left sidebar parity", () => {
 
     const codex = slot.getByRole("img", { name: "Codex provider" });
     const claude = slot.getByRole("img", { name: "Claude Code provider" });
-    expect(codex.querySelector("img")?.getAttribute("src")).toBe(
+    await waitFor(() =>
+      expect(codex.querySelector("img")?.getAttribute("src")).toMatch(
+        /^data:image\/svg\+xml/,
+      ),
+    );
+    await waitFor(() =>
+      expect(claude.querySelector("img")?.getAttribute("src")).toMatch(
+        /^data:image\/svg\+xml/,
+      ),
+    );
+    expect(fetchLogo).toHaveBeenCalledTimes(2);
+    expect(fetchLogo.mock.calls.map(([url]) => url)).toEqual([
       "/api/v1/system/providers/codex/logo",
-    );
-    expect(claude.querySelector("img")?.getAttribute("src")).toBe(
       "/api/v1/system/providers/claude-code/logo",
-    );
+    ]);
     const codexImage = codex.querySelector("img")!;
     fireEvent.error(codexImage);
     expect(codexImage.hidden).toBe(true);

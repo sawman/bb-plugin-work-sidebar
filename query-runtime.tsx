@@ -16,6 +16,14 @@ export type QueryPolicy = Readonly<{
 const queryRoot = ["work-sidebar"] as const;
 
 export const queryKeys = {
+  assets: {
+    providerLogo: (logoUrl: string): QueryKey => [
+      ...queryRoot,
+      "assets",
+      "provider-logo",
+      logoUrl,
+    ],
+  },
   agents: {
     details: (version: readonly string[]): QueryKey => [
       ...queryRoot,
@@ -78,6 +86,16 @@ export const queryKeys = {
 } as const;
 
 export const queryPolicies = {
+  providerLogo: {
+    // Provider identity and its logo route are immutable for one frontend
+    // bundle generation. The host route is `no-store`, so retain the decoded
+    // asset here instead of re-downloading it when sidebar rows remount.
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: 1,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  },
   agentDetails: {
     staleTime: 15_000,
     gcTime: 10 * 60_000,
