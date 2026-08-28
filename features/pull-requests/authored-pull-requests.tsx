@@ -5,7 +5,6 @@ import {
   type ReactNode,
 } from "react";
 import { Icon } from "../../components/ui/icon";
-import { CopyBadge } from "../../components/ui/copy-badge";
 import { Status } from "../../components/ui/status";
 import {
   pullRequestPresentation,
@@ -13,6 +12,7 @@ import {
   type PullRequestSignal,
 } from "./presentation";
 import { orderStackLayers, type SidebarStack } from "../../work-model";
+import { PullRequestIdentifierBadge } from "./identifier-badge";
 import { StackNumberBadge } from "./stack-number";
 
 export type AuthoredPullRequest = {
@@ -85,25 +85,17 @@ export function AuthoredPullRequestRow({
         </strong>
         <span className="ws-pr-context ws-pr-target-context">
           {stackNumber != null && <StackNumberBadge number={stackNumber} />}
-          <CopyBadge
-            value={`#${pullRequest.number}`}
-            copyValue={`PR #${pullRequest.number}`}
-            label="PR number"
-            className="ws-pr-number"
-          >
-            #{pullRequest.number}
-          </CopyBadge>
+          <PullRequestIdentifierBadge
+            kind="pull-request"
+            number={pullRequest.number}
+          />
           {pullRequest.head ? (
-            <CopyBadge
-              value={pullRequest.head}
-              copyValue={`Branch ${pullRequest.head}`}
-              label="branch name"
-              className="ws-pr-branch"
-            >
-              {pullRequest.head}
-            </CopyBadge>
+            <PullRequestIdentifierBadge
+              kind="branch"
+              name={pullRequest.head}
+            />
           ) : (
-            <span className="ws-pr-branch">Authored by you</span>
+            <span className="ws-pr-context-note">Authored by you</span>
           )}
         </span>
       </a>

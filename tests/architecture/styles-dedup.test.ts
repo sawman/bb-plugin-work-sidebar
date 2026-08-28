@@ -97,7 +97,6 @@ const EXPECTED_DISJOINT_REPEATED_SELECTORS = [
   ".ws-pr-stack-layer-item",
   ".ws-pr-stack-layer-item .ws-pr-row",
   ".ws-pr-target",
-  ".ws-pr-number",
   ".ws-work-toolbar-actions",
   ".ws-thread-settings",
 ] as const;

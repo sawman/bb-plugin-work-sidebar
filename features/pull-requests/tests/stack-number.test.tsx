@@ -91,15 +91,24 @@ describe("pull-request stack number presentation", () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole("button", { name: "Copy PR number #42" }),
-    );
+    const pullRequest = screen.getByRole("button", {
+      name: "Copy PR number #42",
+    });
+    fireEvent.click(pullRequest);
     fireEvent.click(
       screen.getByRole("button", { name: "Copy stack number #17" }),
     );
     const branch = screen.getByRole("button", {
       name: "Copy branch name feature/stack-number",
     });
+    expect(pullRequest.classList.contains("ws-pr-identifier-badge")).toBe(
+      true,
+    );
+    expect(branch.classList.contains("ws-pr-identifier-badge")).toBe(true);
+    expect(pullRequest.getAttribute("data-tone")).toBeNull();
+    expect(branch.getAttribute("data-tone")).toBeNull();
+    expect(pullRequest.querySelector("svg")).toBeTruthy();
+    expect(branch.querySelector("svg")).toBeTruthy();
     fireEvent.keyDown(branch, { key: "Enter" });
     fireEvent.keyDown(branch, { key: " " });
 

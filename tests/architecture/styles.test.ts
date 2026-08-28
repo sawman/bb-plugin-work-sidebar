@@ -606,6 +606,21 @@ describe("shared surface and list-row architecture", () => {
     expect(branch?.declarations).toContain("max-width: 100%");
   });
 
+  test("uses one neutral identifier badge contract for authored PRs and branches", () => {
+    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const badges = rules.filter(
+      ({ selector }) => selector === ".ws-pr-identifier-badge",
+    );
+
+    expect(badges).toHaveLength(1);
+    expect(badges[0]?.declarations).toContain("border: 1px solid var(--border)");
+    expect(badges[0]?.declarations).toContain("color: var(--foreground)");
+    expect(badges[0]?.declarations).toContain("flex: 0 1 auto");
+    expect(badges[0]?.declarations).not.toContain("var(--success)");
+    expect(badges[0]?.declarations).not.toContain("var(--destructive)");
+    expect(badges[0]?.declarations).not.toContain("var(--primary)");
+  });
+
   test("keeps archived-thread context menus outside the dimmed stacking context", () => {
     const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
     const archivedRow = rules.find(({ selector }) => selector === ".ws-archived-thread");

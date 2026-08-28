@@ -536,10 +536,36 @@
   outline-offset: 1px;
 }
 .ws-pr-number {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-.ws-pr-number {
   font-weight: 650;
+}
+.ws-pr-identifier-badge {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 0.18rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.05rem 0.3rem;
+  color: var(--foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.58rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.ws-pr-identifier-badge svg {
+  width: 0.62rem;
+  height: 0.62rem;
+  flex: none;
+  color: var(--muted-foreground);
+}
+.ws-pr-identifier-badge > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ws-pr-number-badge {
   display: inline-flex;
@@ -723,12 +749,7 @@
 .ws-pr-row {
   min-height: 2.35rem;
 }
-.ws-pr-context .ws-pr-number {
-  flex: none;
-  overflow: visible;
-  text-overflow: clip;
-}
-.ws-pr-context .ws-pr-branch {
+.ws-pr-context .ws-pr-context-note {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
