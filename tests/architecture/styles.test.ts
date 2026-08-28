@@ -369,21 +369,32 @@ describe("shared surface and list-row architecture", () => {
     expect(taskTitle?.declarations).toContain("color: var(--muted-foreground)");
   });
 
-  test("preserves the Changes stack disclosure grid and chevron control", () => {
+  test("keeps Changes branch controls in one fixed trailing grid", () => {
     const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
     const toggle = rules.find(({ selector }) => selector === ".ws-stack-layer-toggle");
+    const actions = rules.find(
+      ({ selector }) => selector === ".ws-stack-trailing-actions",
+    );
+    const slot = rules.find(
+      ({ selector }) => selector === ".ws-stack-action-slot",
+    );
     const chevron = rules.find(({ selector }) => selector === ".ws-stack-expand");
 
     expect(toggle?.declarations).toContain(
-      "grid-template-columns: minmax(0, 1fr) auto",
+      "grid-template-columns: minmax(0, 1fr)",
     );
     expect(toggle?.declarations).toMatch(
-      /grid-template-areas:\s+"title chevron"\s+"subtitle chevron"/,
+      /grid-template-areas:\s+"title"\s+"subtitle"/,
     );
-    expect(chevron?.declarations).toContain("grid-area: chevron");
+    expect(actions?.declarations).toContain(
+      "grid-template-columns: repeat(3, 1.15rem)",
+    );
+    expect(actions?.declarations).toContain("justify-items: center");
+    expect(slot?.declarations).toContain("place-items: center");
+    expect(slot?.declarations).toContain("width: 1.15rem");
     expect(chevron?.declarations).toContain("place-items: center");
-    expect(chevron?.declarations).toContain("width: 1rem");
-    expect(chevron?.declarations).toContain("height: 1rem");
+    expect(chevron?.declarations).toContain("width: 1.15rem");
+    expect(chevron?.declarations).toContain("height: 1.15rem");
     expect(chevron?.declarations).toContain("color: var(--muted-foreground)");
   });
 

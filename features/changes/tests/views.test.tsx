@@ -1,9 +1,57 @@
 // @vitest-environment jsdom
 import { createElement } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { GitHubStackBranch } from "../../../contracts";
 import { changesHeaderLabel } from "../model";
 import { ChangesError, ChangesStackBranchRow } from "../views";
+
+afterEach(cleanup);
+
+function stackBranch(
+  overrides: Partial<GitHubStackBranch> = {},
+): GitHubStackBranch {
+  return {
+    name: "feature/aligned-actions",
+    isCurrent: false,
+    isMerged: false,
+    isQueued: false,
+    needsRebase: false,
+    hasStash: false,
+    stashCount: null,
+    pr: {
+      number: 8,
+      url: "https://github.com/acme/repo/pull/8",
+      state: "open",
+      title: "A very long pull request title that must yield to its actions",
+      isDraft: false,
+      metadataStale: false,
+    },
+    diff: {
+      additions: 2,
+      deletions: 1,
+      files: [
+        {
+          path: "src/aligned.ts",
+          previousPath: null,
+          status: "modified",
+          additions: 2,
+          deletions: 1,
+        },
+      ],
+      truncated: false,
+    },
+    aheadOfRemote: 0,
+    behindRemote: 0,
+    ...overrides,
+  };
+}
 
 describe("R13 Changes error presentation", () => {
   it("renders an accessible Changes failure and retries only the Changes query", () => {
@@ -75,5 +123,108 @@ describe("R13 Changes error presentation", () => {
       "Show changed files",
     );
     expect(label.querySelector(".ws-stack-expand")).toBeNull();
+  });
+
+  it.each([
+    { name: "ordinary", branch: stackBranch(), checkingOut: false },
+    { name: "busy checkout", branch: stackBranch(), checkingOut: true },
+    {
+      name: "branch without a pull request",
+      branch: stackBranch({ pr: null }),
+      checkingOut: false,
+    },
+  ])(
+    "keeps $name controls in one fixed trailing area with disclosure last",
+    ({ branch, checkingOut }) => {
+      const { container } = render(
+        <ChangesStackBranchRow
+          branch={branch}
+          expanded={false}
+          checkingOut={checkingOut}
+          onToggle={() => undefined}
+          onCheckout={() => undefined}
+        />,
+      );
+
+      const actions = container.querySelector<HTMLElement>(
+        ".ws-stack-trailing-actions",
+      );
+      expect(actions).toBeTruthy();
+      if (!actions) throw new Error("missing trailing actions");
+      expect(actions.children).toHaveLength(3);
+      expect(
+        actions.lastElementChild?.querySelector(".ws-stack-expand"),
+      ).toBeTruthy();
+      expect(
+        within(actions).getByRole("button", { name: /changed files/ }),
+      ).toBeTruthy();
+      expect(
+        within(actions).getByRole("button", {
+          name: checkingOut ? /Checking out/ : /Check out/,
+        }),
+      ).toBeTruthy();
+    },
+  );
+
+  it("leaves the disclosure slot empty when there are no files", () => {
+    const { container } = render(
+      <ChangesStackBranchRow
+        branch={stackBranch({
+          diff: { additions: 0, deletions: 0, files: [], truncated: false },
+        })}
+        expanded={false}
+        checkingOut={false}
+        onToggle={() => undefined}
+        onCheckout={() => undefined}
+      />,
+    );
+
+    const actions = container.querySelector<HTMLElement>(
+      ".ws-stack-trailing-actions",
+    );
+    expect(actions).toBeTruthy();
+    if (!actions) throw new Error("missing trailing actions");
+    expect(actions.children).toHaveLength(3);
+    expect(actions.lastElementChild?.childElementCount).toBe(0);
+    expect(
+      within(actions).queryByRole("button", { name: /changed files/ }),
+    ).toBeNull();
+  });
+
+  it("keeps title, checkout, and trailing disclosure interactions isolated", () => {
+    const onToggle = vi.fn();
+    const onCheckout = vi.fn();
+    const { container } = render(
+      <ChangesStackBranchRow
+        branch={stackBranch()}
+        expanded={false}
+        checkingOut={false}
+        onToggle={onToggle}
+        onCheckout={onCheckout}
+      />,
+    );
+
+    const actions = container.querySelector<HTMLElement>(
+      ".ws-stack-trailing-actions",
+    );
+    expect(actions).toBeTruthy();
+    if (!actions) throw new Error("missing trailing actions");
+    fireEvent.click(
+      within(actions).getByRole("link", { name: /Open pull request/ }),
+    );
+    expect(onToggle).not.toHaveBeenCalled();
+    expect(onCheckout).not.toHaveBeenCalled();
+    fireEvent.click(within(actions).getByRole("button", { name: /Check out/ }));
+    expect(onCheckout).toHaveBeenCalledOnce();
+    expect(onToggle).not.toHaveBeenCalled();
+    fireEvent.click(
+      within(actions).getByRole("button", { name: /Show changed files/ }),
+    );
+    expect(onToggle).toHaveBeenCalledOnce();
+    expect(onCheckout).toHaveBeenCalledOnce();
+    fireEvent.click(
+      within(container).getByRole("button", { name: /#8 A very long/ }),
+    );
+    expect(onToggle).toHaveBeenCalledTimes(2);
   });
 });

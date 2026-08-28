@@ -15,6 +15,7 @@ import {
 import { HostWorkingTreeRenderer } from "./host-renderer.js";
 import type { Repository, WorkingTreeFileDiff } from "./schemas.js";
 import { repositoryPresentation, type StackBranchSignals } from "./model";
+import { StackBranchActions } from "./stack-branch-actions.js";
 
 export function ChangesError({
   error,
@@ -394,50 +395,19 @@ export function ChangesStackBranchRow({
               </>
             ) : null}
           </small>
-          {hasFiles && (
-            <span className="ws-stack-expand" aria-hidden>
-              {expanded ? "⌄" : "›"}
-            </span>
-          )}
         </button>
-        <span className="ws-stack-actions">
-          {pr && (
-            <a
-              className="ws-pr-tooltip"
-              data-tooltip="Open on GitHub"
-              href={pr.url}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={`Open pull request #${pr.number} on GitHub`}
-            >
-              ↗
-            </a>
-          )}
-          <button
-            type="button"
-            className="ws-stack-checkout ws-pr-tooltip"
-            data-tooltip={
-              merged
-                ? "Merged branch"
-                : branch.isCurrent
-                  ? "Current branch"
-                  : `Check out ${branch.name}`
-            }
-            onClick={onCheckout}
-            disabled={merged || branch.isCurrent || checkingOut}
-            aria-label={
-              checkingOut
-                ? `Checking out ${branch.name}`
-                : merged
-                  ? "Merged branch"
-                  : branch.isCurrent
-                    ? "Current branch"
-                    : `Check out ${branch.name}`
-            }
-          >
-            {checkingOut ? "…" : "⇥"}
-          </button>
-        </span>
+        <StackBranchActions
+          pullRequest={pr}
+          branchName={branch.name}
+          merged={merged}
+          current={branch.isCurrent}
+          checkingOut={checkingOut}
+          hasFiles={hasFiles}
+          expanded={expanded}
+          filesLabel={filesLabel}
+          onCheckout={onCheckout}
+          onToggle={onToggle}
+        />
       </div>
       {expanded && branch.diff && (
         <div className="ws-stack-files">

@@ -1315,10 +1315,10 @@
 }
 .ws-stack-layer-toggle {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas:
-    "title chevron"
-    "subtitle chevron";
+    "title"
+    "subtitle";
   min-width: 0;
   gap: 0.05rem;
   border: 0;
@@ -1353,25 +1353,38 @@
   font-style: normal;
 }
 .ws-stack-expand {
-  grid-area: chevron;
   display: grid;
   place-items: center;
-  align-self: center;
-  width: 1rem;
-  height: 1rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
   color: var(--muted-foreground);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
 }
-.ws-stack-actions {
-  display: flex;
-  gap: 0.28rem;
+.ws-stack-trailing-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1.15rem);
   align-items: center;
+  justify-items: center;
+  gap: 0.14rem;
 }
-.ws-stack-actions a,
+.ws-stack-action-slot {
+  display: grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+}
+.ws-stack-trailing-actions a,
 .ws-stack-checkout {
   display: grid;
   place-items: center;
-  width: 1rem;
-  height: 1rem;
+  width: 1.15rem;
+  height: 1.15rem;
   border: 0;
   border-radius: 3px;
   background: transparent;
@@ -1380,7 +1393,8 @@
   text-decoration: none;
   cursor: pointer;
 }
-.ws-stack-actions a:hover,
+.ws-stack-trailing-actions a:hover,
+.ws-stack-expand:hover,
 .ws-stack-checkout:hover:not(:disabled) {
   background: var(--accent);
   color: var(--foreground);
@@ -1388,6 +1402,12 @@
 .ws-stack-checkout:disabled {
   opacity: 0.55;
   cursor: default;
+}
+.ws-stack-expand:focus-visible,
+.ws-stack-checkout:focus-visible,
+.ws-stack-trailing-actions a:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
 }
 .ws-stack-files {
   display: grid;
@@ -2171,7 +2191,7 @@ button.ws-provider-health:focus-visible {
 .ws-stack-merged {
   opacity: 0.56;
 }
-.ws-stack-merged .ws-stack-actions a {
+.ws-stack-merged .ws-stack-trailing-actions a {
   color: var(--muted-foreground);
 }
 .ws-agent-card {

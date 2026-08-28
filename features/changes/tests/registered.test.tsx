@@ -331,11 +331,18 @@ describe("R13 registered Changes Work slot", () => {
     const disclosure = stack.getByRole("button", {
       name: /#43 Stack branch.*Show changed files for pull request #43/,
     });
+    const trailingDisclosure = stack.getByRole("button", {
+      name: "Show changed files for pull request #43",
+    });
     expect(disclosure.getAttribute("aria-expanded")).toBe("false");
-    expect(disclosure.querySelector(".ws-stack-expand")).toBeTruthy();
+    expect(trailingDisclosure.classList.contains("ws-stack-expand")).toBe(true);
+    expect(
+      trailingDisclosure.parentElement?.parentElement?.lastElementChild,
+    ).toBe(trailingDisclosure.parentElement);
     fireEvent.keyDown(disclosure, { key: "Enter" });
     fireEvent.click(disclosure);
     expect(disclosure.getAttribute("aria-expanded")).toBe("true");
+    expect(trailingDisclosure.getAttribute("aria-expanded")).toBe("true");
     expect(stack.getByText("renamed.ts")).toBeTruthy();
     stack.lifecycle.unmount();
   });
