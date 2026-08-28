@@ -1,6 +1,7 @@
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { describe, expect, it } from "vitest";
 import {
+  agentDurationLabel,
   agentRuntimePresentation,
   agentWorkspacePresentation,
   projectAgentChildren,
@@ -99,6 +100,20 @@ describe("Agents projection model", () => {
     }))).toEqual({
       label: "bb/r24-agents",
       detail: "R24 Agents worktree",
+      kind: "managed-worktree",
+    });
+
+    expect(agentWorkspacePresentation(thread("thr_workspace", "thr_root", {
+      environment: {
+        id: "env_2",
+        name: "Shared checkout",
+        branchName: null,
+        workspaceDisplayKind: "other",
+      },
+    }))).toEqual({
+      label: "Shared checkout",
+      detail: "Workspace",
+      kind: "workspace",
     });
 
     expect(agentWorkspacePresentation(thread("thr_host", "thr_root", {
@@ -106,7 +121,17 @@ describe("Agents projection model", () => {
     }))).toEqual({
       label: "Matthew's Mac",
       detail: "Host workspace",
+      kind: "host",
     });
     expect(agentWorkspacePresentation(thread("thr_unknown", "thr_root"))).toBeNull();
+  });
+
+  it("formats a live thread age without overstating active compute time", () => {
+    const startedAt = Date.UTC(2026, 7, 28, 6, 0, 0);
+    expect(agentDurationLabel(startedAt, startedAt + 42_000)).toBe("42s");
+    expect(agentDurationLabel(startedAt, startedAt + 65_000)).toBe("1m 5s");
+    expect(agentDurationLabel(startedAt, startedAt + 7_500_000)).toBe("2h 5m");
+    expect(agentDurationLabel(startedAt, startedAt + 93_600_000)).toBe("1d 2h");
+    expect(agentDurationLabel(0, startedAt)).toBeNull();
   });
 });

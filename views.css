@@ -1656,12 +1656,18 @@
   line-height: 1.2;
 }
 .ws-agent-state {
+  display: grid;
   width: 0.72rem;
   height: 0.72rem;
+  place-items: center;
+}
+.ws-agent-state svg {
+  width: 100%;
+  height: 100%;
 }
 .ws-agent-state-working {
   color: var(--primary);
-  animation: ws-agent-working-pulse 1.2s ease-in-out infinite;
+  animation: ws-agent-working-bounce 0.9s ease-in-out infinite;
 }
 .ws-agent-state-waiting {
   color: var(--primary);
@@ -1677,9 +1683,11 @@
 .ws-agent-state-complete {
   color: var(--success);
 }
-@keyframes ws-agent-working-pulse {
-  0%, 100% { opacity: 0.62; transform: scale(0.92); }
-  50% { opacity: 1; transform: scale(1.08); }
+@keyframes ws-agent-working-bounce {
+  0%, 100% { transform: translateY(0); }
+  45% { transform: translateY(-0.16rem); }
+  65% { transform: translateY(0); }
+  80% { transform: translateY(-0.06rem); }
 }
 @keyframes ws-agent-waiting-bob {
   0%, 100% { transform: translateY(0); }
@@ -2145,7 +2153,16 @@ button.ws-provider-health:focus-visible {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-weight: 650;
 }
-.ws-agent-split {
+.ws-agent-actions {
+  display: grid;
+  justify-items: end;
+  gap: 0.12rem;
+}
+.ws-agent-action-buttons {
+  display: flex;
+  gap: 0.08rem;
+}
+.ws-agent-action {
   display: grid;
   place-items: center;
   width: 1.2rem;
@@ -2157,18 +2174,25 @@ button.ws-provider-health:focus-visible {
   color: var(--muted-foreground);
   cursor: pointer;
 }
-.ws-agent-split svg {
+.ws-agent-action svg {
   width: 0.7rem;
   height: 0.7rem;
 }
-.ws-agent-split:hover {
+.ws-agent-action:hover {
   background: var(--accent);
   color: var(--foreground);
 }
-.ws-agent-split:focus-visible,
+.ws-agent-action:focus-visible,
 .ws-agent-target:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 1px;
+}
+.ws-agent-duration {
+  color: var(--muted-foreground);
+  font-size: 0.52rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
 }
 .ws-stack-current {
   background: transparent;

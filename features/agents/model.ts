@@ -38,6 +38,7 @@ export type AgentRuntimePresentation = {
 export type AgentWorkspacePresentation = {
   label: string;
   detail: string;
+  kind: "managed-worktree" | "unmanaged-worktree" | "workspace" | "host";
 };
 
 /** Prefer the branch, then the named worktree, then the host supplied by BB. */
@@ -48,18 +49,46 @@ export function agentWorkspacePresentation(
   if (environment) {
     const name = environment.name?.trim();
     const branch = environment.branchName?.trim();
-    const workspaceKind = environment.workspaceDisplayKind === "managed-worktree"
-      ? "Managed worktree"
-      : environment.workspaceDisplayKind === "unmanaged-worktree"
-        ? "Unmanaged worktree"
-        : "Workspace";
-    const detail = name
-      ? /worktree/i.test(name) ? name : `${name} worktree`
-      : workspaceKind;
-    return { label: branch || name || workspaceKind, detail };
+    const workspaceKind =
+      environment.workspaceDisplayKind === "managed-worktree"
+        ? "Managed worktree"
+        : environment.workspaceDisplayKind === "unmanaged-worktree"
+          ? "Unmanaged worktree"
+          : "Workspace";
+    const kind =
+      environment.workspaceDisplayKind === "managed-worktree"
+        ? "managed-worktree"
+        : environment.workspaceDisplayKind === "unmanaged-worktree"
+          ? "unmanaged-worktree"
+          : "workspace";
+    const detail =
+      name && kind !== "workspace"
+        ? /worktree/i.test(name)
+          ? name
+          : `${name} worktree`
+        : workspaceKind;
+    return { label: branch || name || workspaceKind, detail, kind };
   }
-  if (thread.host) return { label: thread.host.name, detail: "Host workspace" };
+  if (thread.host)
+    return { label: thread.host.name, detail: "Host workspace", kind: "host" };
   return null;
+}
+
+/** Format elapsed thread age; BB does not expose a continuous compute timer. */
+export function agentDurationLabel(
+  createdAt: number,
+  now: number,
+): string | null {
+  if (!Number.isFinite(createdAt) || createdAt <= 0 || now < createdAt)
+    return null;
+  const seconds = Math.floor((now - createdAt) / 1_000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ${minutes % 60}m`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ${hours % 24}h`;
 }
 
 /** Translate only host-owned thread signals into the Agents row status. */

@@ -87,7 +87,7 @@ function undocumentedImportantDeclarations(source: string): string[] {
 }
 
 const dynamicClassFamilies = [
-  { prefix: "ws-agent-state-", file: "features/agents/views.tsx", suffixes: ["working", "waiting", "blocked", "complete", "idle"] },
+  { prefix: "ws-agent-state-", file: "features/agents/agent-row.tsx", suffixes: ["working", "waiting", "blocked", "complete", "idle"] },
   { prefix: "ws-file-", file: "features/changes/views.tsx", suffixes: ["added", "deleted", "modified", "renamed", "untracked"] },
   { prefix: "ws-github-api-", file: "features/changes/panel.tsx", suffixes: ["available", "rate_limited", "unavailable"] },
   { prefix: "ws-plan-", file: "features/work-context/views.tsx", suffixes: ["completed", "in_progress", "pending"] },

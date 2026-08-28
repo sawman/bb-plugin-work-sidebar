@@ -171,6 +171,7 @@ describe("R15 registered Agents Work slot", () => {
     expect(slot.queryByText("thr_archived")).toBeNull();
     expect(slot.getByText("Working")).toBeTruthy();
     expect(slot.getByText("Waiting")).toBeTruthy();
+    expect(slot.getByRole("img", { name: "Working" }).querySelector("rect")).toBeTruthy();
     expect(slot.getByRole("img", { name: "Waiting for input" })).toBeTruthy();
     expect(slot.getByText("2")).toBeTruthy();
     slot.lifecycle.unmount();
@@ -265,6 +266,7 @@ describe("R15 registered Agents Work slot", () => {
     );
     await waitFor(() => expect(slot.getByRole("link", { name: "Open thr_child" })).toBeTruthy());
     expect(slot.getByText("Model unavailable")).toBeTruthy();
+    expect(slot.getByRole("img", { name: "Idle" }).querySelectorAll("path")).toHaveLength(3);
     expect(slot.queryByRole("alert")).toBeNull();
     slot.lifecycle.unmount();
   });
@@ -323,19 +325,37 @@ describe("R15 registered Agents Work slot", () => {
     vi.useRealTimers();
   });
 
-  it("uses host open actions for normal, modifier, explicit split, and shortcut navigation", async () => {
-    const slot = await agentsSlot({ status: "ready", threads: [thread("thr_root", null), thread("thr_child", "thr_root")] });
+  it("uses host open actions for normal, modifier, explicit open, split, and shortcut navigation", async () => {
+    const slot = await agentsSlot({
+      status: "ready",
+      threads: [
+        thread("thr_root", null),
+        thread("thr_child", "thr_root", {
+          createdAt: Date.now() - 65_000,
+          environment: {
+            id: "env_child",
+            name: "Agent checkout",
+            branchName: "bb/agent-child",
+            workspaceDisplayKind: "managed-worktree",
+          },
+        }),
+      ],
+    });
     const link = await slot.findByRole("link", { name: "Open thr_child" });
     expect(link.getAttribute("data-sidebar-thread-shortcut-target")).toBe("");
     expect(link.getAttribute("data-sidebar-thread-id")).toBe("thr_child");
 
     fireEvent.click(link);
     fireEvent.click(link, { ctrlKey: true });
+    fireEvent.click(slot.getByRole("button", { name: "Open thr_child" }));
     fireEvent.click(slot.getByRole("button", { name: "Open thr_child in split" }));
 
+    expect(slot.getByText("1m 5s").getAttribute("title")).toBe("Agent thread age");
+    expect(slot.getByTitle("Agent checkout worktree: bb/agent-child").getAttribute("data-workspace-kind")).toBe("managed-worktree");
     expect(slot.inspection.sidebarActionCalls).toEqual([
       { method: "open", threadId: "thr_child", options: { split: false } },
       { method: "open", threadId: "thr_child", options: { split: true } },
+      { method: "open", threadId: "thr_child", options: { split: false } },
       { method: "open", threadId: "thr_child", options: { split: true } },
     ]);
     slot.lifecycle.unmount();
