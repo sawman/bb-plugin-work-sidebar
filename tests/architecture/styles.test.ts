@@ -536,6 +536,8 @@ describe("shared surface and list-row architecture", () => {
     expect(toolbar?.declarations).toContain("box-sizing: border-box !important");
     expect(toolbar?.declarations).toContain("width: 100%");
     expect(toolbar?.declarations).toContain("max-width: 100%");
+    expect(toolbar?.declarations).toContain("padding-block: 0.35rem !important");
+    expect(toolbar?.declarations).not.toContain("padding-top: 0 !important");
     expect(actions?.declarations).toContain("flex-wrap: wrap");
     expect(actions?.declarations).toContain("min-width: 0");
   });
