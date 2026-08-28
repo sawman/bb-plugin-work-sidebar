@@ -5,6 +5,7 @@ import {
 import { useRpc, useSettings } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Icon } from "@/components/ui/icon";
+import { SidebarListActions } from "@/components/ui/sidebar-list-actions";
 import {
   AuthoredPullRequestRow,
   AuthoredPullRequestStack,
@@ -121,8 +122,8 @@ export function PullRequestsLeftSidebar({
         <span>
           {visible.length} open pull request{visible.length === 1 ? "" : "s"}
         </span>
-        <span className="ws-work-toolbar-actions">
-          {health && (
+        <SidebarListActions
+          context={health ? (
             <span
               className={`ws-github-api-indicator ws-github-api-${health.tone}`}
               title={healthState.message ?? health.label}
@@ -130,17 +131,19 @@ export function PullRequestsLeftSidebar({
               <Icon name={health.icon} aria-hidden />
               {health.label}
             </span>
-          )}
-          <button
-            className="ws-icon-button"
-            title="Refresh pull requests"
-            aria-label="Refresh pull requests"
-            disabled={list.isFetching}
-            onClick={() => void list.refresh().catch(() => undefined)}
-          >
-            <Icon name="RefreshCw" aria-hidden />
-          </button>
-        </span>
+          ) : undefined}
+          refresh={
+            <button
+              className="ws-icon-button"
+              title="Refresh pull requests"
+              aria-label="Refresh pull requests"
+              disabled={list.isFetching}
+              onClick={() => void list.refresh().catch(() => undefined)}
+            >
+              <Icon name="RefreshCw" aria-hidden />
+            </button>
+          }
+        />
       </div>
       <div className="ws-view-content">
         {list.isPending && (

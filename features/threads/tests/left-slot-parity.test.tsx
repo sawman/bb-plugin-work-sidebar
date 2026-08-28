@@ -56,12 +56,14 @@ function provider(id: string, displayName: string, logoUrl: string | null) {
 async function leftSlot({
   threads = [thread("thr_one", "One"), thread("thr_two", "Two")],
   groups = [{ id: "group_later", name: "Later", threadIds: [] as string[] }],
+  activeProjectId = null,
   sidebarPullRequests = {},
   providers = [],
   rpc = {},
 }: {
   threads?: ReturnType<typeof thread>[];
   groups?: { id: string; name: string; threadIds: string[] }[];
+  activeProjectId?: string | null;
   sidebarPullRequests?: Record<string, {
     number: number;
     title: string;
@@ -95,7 +97,7 @@ async function leftSlot({
   };
   return renderSlot(
     app.threadLists[0]!,
-    { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: vi.fn(), searchQuery: "", Original: () => <div>Native BB list</div>, experimental_Original: () => <div>Deprecated native BB list</div> },
+    { activeThreadId: null, activeProjectId, isCompactViewport: false, onNavigate: vi.fn(), searchQuery: "", Original: () => <div>Native BB list</div>, experimental_Original: () => <div>Deprecated native BB list</div> },
     {
       sidebarThreads: { status: "ready", projects: [project], threads },
       providers: { status: "ready", providers: providers as never },
@@ -114,6 +116,25 @@ function mockElementAt(element: Element | null) {
 }
 
 describe("R18 registered left sidebar parity", () => {
+  it("keeps creation before refresh and refresh rightmost on every left tab", async () => {
+    const slot = await leftSlot({ activeProjectId: project.id });
+    const actionLabels = () =>
+      [...slot.container.querySelectorAll(".ws-work-toolbar-actions button")]
+        .map((button) => button.getAttribute("aria-label"));
+
+    expect(actionLabels()).toEqual([
+      "Thread list settings",
+      "New thread in project",
+      "Refresh threads",
+    ]);
+
+    fireEvent.click(slot.getByRole("button", { name: "Tasks" }));
+    expect(actionLabels()).toEqual(["Add task", "Refresh tasks"]);
+
+    fireEvent.click(slot.getByRole("button", { name: "PRs" }));
+    expect(actionLabels()).toEqual(["Refresh pull requests"]);
+  });
+
   it("keeps task mappings in Tasks without duplicating badges on thread rows", async () => {
     const task = {
       id: "task_one",

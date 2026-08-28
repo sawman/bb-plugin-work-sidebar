@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { SidebarListActions } from "@/components/ui/sidebar-list-actions";
 import type { SidebarThreadGroup } from "./model";
 import { AddThreadGroupControl } from "./sidebar-group-create";
 type SidebarToolbarProps = {
@@ -154,52 +155,60 @@ export function SidebarThreadToolbar({
   return (
     <>
       <span>{threadCountLabel}</span>
-      <div className="ws-work-toolbar-actions">
-        {selectedCount > 1 && (
+      <SidebarListActions
+        context={
           <>
-            <span className="ws-selection-count" role="status">
-              {selectedCount} selected
-            </span>
-            <button
-              className="ws-selection-archive"
-              onClick={onArchiveSelected}
-            >
-              Archive selected
-            </button>
+            {selectedCount > 1 && (
+              <>
+                <span className="ws-selection-count" role="status">
+                  {selectedCount} selected
+                </span>
+                <button
+                  className="ws-selection-archive"
+                  onClick={onArchiveSelected}
+                >
+                  Archive selected
+                </button>
+              </>
+            )}
+            {reorderDisabled && (
+              <span className="ws-reorder-disabled" role="status">
+                Clear search to reorder
+              </span>
+            )}
+            <ThreadListSettings
+              groups={groups}
+              occupiedGroupIds={occupiedGroupIds}
+              onAddGroup={onAddGroup}
+              onRenameGroup={onRenameGroup}
+              onRemoveGroup={onRemoveGroup}
+            />
           </>
-        )}
-        {reorderDisabled && (
-          <span className="ws-reorder-disabled" role="status">
-            Clear search to reorder
-          </span>
-        )}
-        <ThreadListSettings
-          groups={groups}
-          occupiedGroupIds={occupiedGroupIds}
-          onAddGroup={onAddGroup}
-          onRenameGroup={onRenameGroup}
-          onRemoveGroup={onRemoveGroup}
-        />
-        <button
-          className="ws-icon-button"
-          title="Refresh threads"
-          aria-label="Refresh threads"
-          onClick={onRefresh}
-        >
-          <Icon name="RefreshCw" aria-hidden />
-        </button>
-        {activeProjectId && (
+        }
+        create={
+          activeProjectId ? (
+            <button
+              type="button"
+              className="ws-new-thread"
+              title="New thread in project"
+              aria-label="New thread in project"
+              onClick={() => onNewThread(activeProjectId)}
+            >
+              <Icon name="Plus" aria-hidden />
+            </button>
+          ) : undefined
+        }
+        refresh={
           <button
-            type="button"
-            className="ws-new-thread"
-            title="New thread in project"
-            aria-label="New thread in project"
-            onClick={() => onNewThread(activeProjectId)}
+            className="ws-icon-button"
+            title="Refresh threads"
+            aria-label="Refresh threads"
+            onClick={onRefresh}
           >
-            <Icon name="Plus" aria-hidden />
+            <Icon name="RefreshCw" aria-hidden />
           </button>
-        )}
-      </div>
+        }
+      />
     </>
   );
 }

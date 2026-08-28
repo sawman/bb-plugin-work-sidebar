@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Icon } from "@/components/ui/icon";
+import { SidebarListActions } from "@/components/ui/sidebar-list-actions";
 import { TaskRow } from "./task-row";
 import type { rpcContract } from "../../contracts";
 import {
@@ -283,30 +284,34 @@ export function TasksLeftSidebar({
         <span>
           {filtered.length} active task{filtered.length === 1 ? "" : "s"}
         </span>
-        <span className="ws-work-toolbar-actions">
-          {selectedIds.size > 1 && (
+        <SidebarListActions
+          context={selectedIds.size > 1 ? (
             <span className="ws-selection-count" role="status">
               {selectedIds.size} selected
             </span>
-          )}
-          <button
-            className="ws-icon-button"
-            title="Add task"
-            aria-label="Add task"
-            disabled={!projects.length}
-            onClick={() => setComposerOpen((open) => !open)}
-          >
-            <Icon name="Plus" aria-hidden />
-          </button>
-          <button
-            className="ws-icon-button"
-            title="Refresh tasks"
-            aria-label="Refresh tasks"
-            onClick={refresh}
-          >
-            <Icon name="RefreshCw" aria-hidden />
-          </button>
-        </span>
+          ) : undefined}
+          create={
+            <button
+              className="ws-icon-button"
+              title="Add task"
+              aria-label="Add task"
+              disabled={!projects.length}
+              onClick={() => setComposerOpen((open) => !open)}
+            >
+              <Icon name="Plus" aria-hidden />
+            </button>
+          }
+          refresh={
+            <button
+              className="ws-icon-button"
+              title="Refresh tasks"
+              aria-label="Refresh tasks"
+              onClick={refresh}
+            >
+              <Icon name="RefreshCw" aria-hidden />
+            </button>
+          }
+        />
       </div>
       <div className="ws-view-content">
         {composerOpen && (
