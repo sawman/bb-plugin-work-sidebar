@@ -248,6 +248,47 @@ describe("R13 Changes error presentation", () => {
     );
   });
 
+  it("renders additions and deletions in separate accessible count columns", () => {
+    render(
+      <ChangesStackBranchRow
+        branch={stackBranch({
+          diff: {
+            additions: 1241,
+            deletions: 134,
+            files: [
+              {
+                path: "src/short.ts",
+                previousPath: null,
+                status: "modified",
+                additions: 1,
+                deletions: 23,
+              },
+              {
+                path: "src/four-digits.ts",
+                previousPath: null,
+                status: "added",
+                additions: 1234,
+                deletions: 4,
+              },
+            ],
+            truncated: false,
+          },
+        })}
+        expanded
+        checkingOut={false}
+        onToggle={() => undefined}
+        onCheckout={() => undefined}
+      />,
+    );
+
+    const additions = screen.getAllByLabelText(/lines? added$/);
+    const deletions = screen.getAllByLabelText(/lines? deleted$/);
+    expect(additions.map((count) => count.textContent)).toEqual(["+1", "+1234"]);
+    expect(deletions.map((count) => count.textContent)).toEqual(["−23", "−4"]);
+    expect(additions.every((count) => count.classList.contains("ws-file-additions"))).toBe(true);
+    expect(deletions.every((count) => count.classList.contains("ws-file-deletions"))).toBe(true);
+  });
+
   it("keeps title, checkout, and trailing disclosure interactions isolated", () => {
     const onToggle = vi.fn();
     const onCheckout = vi.fn();

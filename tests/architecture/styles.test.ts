@@ -421,6 +421,27 @@ describe("shared surface and list-row architecture", () => {
     expect(chevron?.declarations).toContain("color: var(--muted-foreground)");
   });
 
+  test("aligns Changes file additions and deletions in four-digit columns", () => {
+    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const row = rules.find(({ selector }) => selector === ".ws-stack-files > span");
+    const additions = rules.find(
+      ({ selector }) => selector === ".ws-stack-files small.ws-file-additions",
+    );
+    const deletions = rules.find(
+      ({ selector }) => selector === ".ws-stack-files small.ws-file-deletions",
+    );
+
+    expect(row?.declarations).toContain(
+      "grid-template-columns: 0.65rem minmax(0, 1fr) 5ch 5ch",
+    );
+    expect(additions?.declarations).toContain("color: var(--success)");
+    expect(additions?.declarations).toContain("font-variant-numeric: tabular-nums");
+    expect(additions?.declarations).toContain("text-align: right");
+    expect(deletions?.declarations).toContain("color: var(--destructive)");
+    expect(deletions?.declarations).toContain("font-variant-numeric: tabular-nums");
+    expect(deletions?.declarations).toContain("text-align: right");
+  });
+
   test("uses one atomic visual contract for copyable identifier badges", () => {
     const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
     const badge = rules.find(

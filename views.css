@@ -1342,7 +1342,7 @@
 }
 .ws-stack-files > span {
   display: grid;
-  grid-template-columns: 0.65rem minmax(0, 1fr) auto;
+  grid-template-columns: 0.65rem minmax(0, 1fr) 5ch 5ch;
   gap: 0.18rem;
   align-items: center;
   font-size: 0.61rem;
@@ -1371,6 +1371,18 @@
 .ws-stack-files small {
   color: var(--muted-foreground);
   font-size: 0.54rem;
+}
+.ws-stack-files small.ws-file-additions {
+  color: var(--success);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.ws-stack-files small.ws-file-deletions {
+  color: var(--destructive);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
 }
 .ws-stack-files-truncated {
   padding-top: 0.1rem;

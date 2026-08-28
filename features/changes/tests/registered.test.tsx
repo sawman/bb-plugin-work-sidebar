@@ -371,6 +371,8 @@ describe("R13 registered Changes Work slot", () => {
     expect(disclosure.getAttribute("aria-expanded")).toBe("true");
     expect(trailingDisclosure.getAttribute("aria-expanded")).toBe("true");
     expect(stack.getByText("renamed.ts")).toBeTruthy();
+    expect(stack.getByLabelText("2 lines added").textContent).toBe("+2");
+    expect(stack.getByLabelText("1 line deleted").textContent).toBe("−1");
     stack.lifecycle.unmount();
   });
 
@@ -486,6 +488,8 @@ describe("R13 registered Changes Work slot", () => {
         ?.getAttribute("d"),
     ).toBe("m6 9 6 6 6-6");
     expect(slot.getByText("infra/pyproject.toml")).toBeTruthy();
+    expect(slot.getByLabelText("1 line added").textContent).toBe("+1");
+    expect(slot.getByLabelText("1 line deleted").textContent).toBe("−1");
     slot.lifecycle.unmount();
   });
   it("refreshes Changes exactly once without calling the legacy aggregate on manual refresh", async () => {
