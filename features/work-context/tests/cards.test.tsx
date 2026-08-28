@@ -124,6 +124,34 @@ function fixture(overrides: Partial<Rpc> = {}): Rpc {
 }
 
 describe("registered Work context cards", () => {
+  it("orders Outcome, Tasks, Goal, Plan, then Background below Status", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      { rpc: fixture() },
+    );
+
+    await waitFor(() =>
+      expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(6),
+    );
+    const cardOrder = Array.from(
+      slot.container.querySelectorAll("[data-card]"),
+      (card) => card.getAttribute("data-card"),
+    );
+    slot.lifecycle.unmount();
+    getPluginQueryClient().clear();
+    expect(cardOrder).toEqual([
+      "status",
+      "outcome",
+      "tasks",
+      "goal",
+      "plan",
+      "background",
+    ]);
+  });
+
   it("isolates an Outcome RPC failure without blanking Status, Tasks, Goal, or Plan", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));

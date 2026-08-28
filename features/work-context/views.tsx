@@ -682,11 +682,11 @@ export function WorkContextCards({ threadId }: { threadId: string }) {
   return (
     <section className="ws-work-context-cards" aria-label="Work context">
       <StatusCard threadId={threadId} />
-      <BackgroundJobsCard threadId={threadId} />
-      <TasksCard threadId={threadId} />
       <OutcomeCard threadId={threadId} />
+      <TasksCard threadId={threadId} />
       <GoalCard threadId={threadId} />
       <PlanCard threadId={threadId} />
+      <BackgroundJobsCard threadId={threadId} />
     </section>
   );
 }
