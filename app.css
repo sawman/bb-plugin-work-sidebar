@@ -29,7 +29,7 @@
 }
 .ws-thread {
   position: relative;
-  border-radius: calc(var(--radius) - 2px);
+  border-radius: 0;
 }
 .ws-thread:hover {
   background: var(--accent);
@@ -93,10 +93,6 @@
 .ws-callout {
   border: 1px dashed var(--border);
   border-radius: var(--radius);
-}
-.ws-new-thread {
-  width: calc(100% - 1rem);
-  margin: 0.5rem;
 }
 .ws-panel {
   display: flex;
@@ -205,10 +201,18 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0.28rem;
-  background: var(--popover);
+  background: color-mix(in srgb, var(--background) 96%, var(--foreground) 4%);
   box-shadow: 0 0.5rem 1.5rem
     color-mix(in srgb, var(--foreground) 20%, transparent);
   color: var(--popover-foreground);
+  isolation: isolate;
+  opacity: 1;
+}
+.ws-context-menu-info {
+  padding: 0.3rem 0.45rem;
+  color: var(--muted-foreground);
+  font-size: 0.64rem;
+  line-height: 1.25;
 }
 .ws-context-menu-label {
   display: block;

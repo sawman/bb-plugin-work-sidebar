@@ -107,43 +107,48 @@ export function SidebarThreadGroups({
   return (
     <>
       <section className="ws-thread-statuses" aria-label="Thread status groups">
-        <details
-          className="ws-thread-group ws-active-threads"
-          data-ws-thread-drop-zone="active"
-          data-drop-target={dropTargetId === "active" || undefined}
-          open={activeOpen}
-          onToggle={(event) => setActiveOpen(event.currentTarget.open)}
-          onDragOver={(event) => {
-            if (allowActiveDrop(event))
-              organization.setDropTarget({
-                threadId: "active",
-                placement: "after",
-              });
-          }}
-          onDrop={(event) => {
-            const id = allowActiveDrop(event);
-            if (!id) return;
-            if (archivedThreadIds.has(id))
-              organization.unarchiveToGroup(id, null);
-            else organization.moveToGroup(id, null);
-            clearDrop();
-          }}
-        >
-          <summary>
-            Active <span>{organization.activeRoots.length}</span>
-          </summary>
-          <ThreadTree
-            organization={organization}
-            roots={organization.activeRoots}
-            childrenByThread={organization.activeChildren}
-            activeThreadId={activeThreadId}
-            providersById={providersById}
-            onNavigate={onNavigate}
-            subtextRefreshKey={subtextRefreshKey}
-            label="Work threads"
-          />
-        </details>
-        {organization.groups.map((group) => {
+        {organization.groupPositions.map((position) => {
+          const group = position.group;
+          if (!group)
+            return (
+              <details
+                key={position.id}
+                className="ws-thread-group ws-active-threads"
+                data-ws-thread-drop-zone="active"
+                data-drop-target={dropTargetId === "active" || undefined}
+                open={activeOpen}
+                onToggle={(event) => setActiveOpen(event.currentTarget.open)}
+                onDragOver={(event) => {
+                  if (allowActiveDrop(event))
+                    organization.setDropTarget({
+                      threadId: "active",
+                      placement: "after",
+                    });
+                }}
+                onDrop={(event) => {
+                  const id = allowActiveDrop(event);
+                  if (!id) return;
+                  if (archivedThreadIds.has(id))
+                    organization.unarchiveToGroup(id, null);
+                  else organization.moveToGroup(id, null);
+                  clearDrop();
+                }}
+              >
+                <summary>
+                  Active <span>{organization.activeRoots.length}</span>
+                </summary>
+                <ThreadTree
+                  organization={organization}
+                  roots={organization.activeRoots}
+                  childrenByThread={organization.activeChildren}
+                  activeThreadId={activeThreadId}
+                  providersById={providersById}
+                  onNavigate={onNavigate}
+                  subtextRefreshKey={subtextRefreshKey}
+                  label="Work threads"
+                />
+              </details>
+            );
           const tree = organization.groupedTrees.get(group.id);
           const roots = tree?.roots ?? [];
           return (

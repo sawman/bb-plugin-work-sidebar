@@ -14,7 +14,14 @@ import {
   reorderThreadSibling,
   rootThreads,
 } from "../../work-model";
-import { selectThreadIds, type SidebarThreadGroup } from "./model";
+import {
+  moveThreadGroup,
+  reorderThreadGroup,
+  selectThreadIds,
+  threadGroupPositions,
+  type SidebarThreadGroup,
+  type SidebarThreadGroupPosition,
+} from "./model";
 import { threadInteractionStore, type ThreadDropTarget } from "./store";
 import { visibleThreadTreeIds } from "./thread-tree-model";
 
@@ -29,8 +36,9 @@ type SidebarOrganizationInput = {
   projects: readonly ThreadProject[];
   order: readonly string[];
   groups: readonly SidebarThreadGroup[];
+  activeGroupPosition: number;
   searchQuery: string;
-  saveGroups(groups: SidebarThreadGroup[]): void;
+  saveGroups(groups: SidebarThreadGroup[], activeGroupPosition?: number): void;
   saveOrder(order: string[]): void;
   unarchive(threadId: string): Promise<unknown>;
   archive(threadId: string): Promise<unknown>;
@@ -39,6 +47,7 @@ type SidebarOrganizationInput = {
 export type SidebarThreadOrganization = {
   threads: readonly PluginSidebarThread[];
   groups: readonly SidebarThreadGroup[];
+  groupPositions: readonly SidebarThreadGroupPosition[];
   filtered: readonly PluginSidebarThread[];
   activeRoots: readonly PluginSidebarThread[];
   groupedTrees: ReadonlyMap<string, ThreadTree>;
@@ -68,6 +77,8 @@ export type SidebarThreadOrganization = {
   archiveThread(threadId: string): void;
   saveGroups(groups: SidebarThreadGroup[]): void;
   addGroup(name: string): boolean;
+  moveGroup(groupId: string, direction: -1 | 1): void;
+  reorderGroup(sourceId: string, targetId: string): void;
   renameGroup(group: SidebarThreadGroup): void;
   removeGroup(group: SidebarThreadGroup): void;
 };
@@ -77,6 +88,7 @@ export function useSidebarThreadOrganization({
   projects,
   order,
   groups,
+  activeGroupPosition,
   searchQuery,
   saveGroups,
   saveOrder,
@@ -159,6 +171,10 @@ export function useSidebarThreadOrganization({
         }),
       ),
     [effectiveOrder, groupIds, groups, threads],
+  );
+  const groupPositions = useMemo(
+    () => threadGroupPositions(groups, activeGroupPosition),
+    [activeGroupPosition, groups],
   );
   const visibleThreadIds = useMemo(
     () => visibleThreadTreeIds(activeRoots, activeChildren),
@@ -342,16 +358,47 @@ export function useSidebarThreadOrganization({
     },
     [groups, saveGroups],
   );
+  const moveGroup = useCallback(
+    (groupId: string, direction: -1 | 1) => {
+      const next = moveThreadGroup(
+        groups,
+        activeGroupPosition,
+        groupId,
+        direction,
+      );
+      if (next) saveGroups(next.groups, next.activeGroupPosition);
+    },
+    [activeGroupPosition, groups, saveGroups],
+  );
+  const reorderGroup = useCallback(
+    (sourceId: string, targetId: string) => {
+      const next = reorderThreadGroup(
+        groups,
+        activeGroupPosition,
+        sourceId,
+        targetId,
+      );
+      if (next) saveGroups(next.groups, next.activeGroupPosition);
+    },
+    [activeGroupPosition, groups, saveGroups],
+  );
   const removeGroup = useCallback(
     (group: SidebarThreadGroup) => {
-      if (!occupiedGroupIds.has(group.id))
-        saveGroups(groups.filter((candidate) => candidate.id !== group.id));
+      if (occupiedGroupIds.has(group.id)) return;
+      const remainingPositions = groupPositions.filter(
+        (position) => position.id !== group.id,
+      );
+      saveGroups(
+        groups.filter((candidate) => candidate.id !== group.id),
+        remainingPositions.findIndex((position) => !position.group),
+      );
     },
-    [groups, occupiedGroupIds, saveGroups],
+    [groupPositions, groups, occupiedGroupIds, saveGroups],
   );
   return {
     threads,
     groups,
+    groupPositions,
     filtered,
     activeRoots,
     groupedTrees,
@@ -374,6 +421,8 @@ export function useSidebarThreadOrganization({
     archiveThread,
     saveGroups,
     addGroup,
+    moveGroup,
+    reorderGroup,
     renameGroup,
     removeGroup,
   };

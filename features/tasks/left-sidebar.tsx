@@ -11,7 +11,11 @@ import { toast } from "sonner";
 import { Combobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Icon } from "@/components/ui/icon";
-import { SidebarListActions } from "@/components/ui/sidebar-list-actions";
+import { RefreshButton } from "@/components/ui/refresh-button";
+import {
+  SidebarListActions,
+  SidebarListIconButton,
+} from "@/components/ui/sidebar-list-actions";
 import type { ThreadProvider } from "../../components/threads/thread-provider-logo";
 import { TaskRow } from "./task-row";
 import type { rpcContract } from "../../contracts";
@@ -32,7 +36,6 @@ const EMPTY_TASKS: SidebarTask[] = [];
 export interface TasksLeftSidebarProps {
   active: boolean;
   activeThreadId: string | null;
-  activeThreadTitle: string | null;
   taskLinks: Readonly<Record<string, readonly ThreadTaskLink[]>>;
   ownerThreads: ReadonlyMap<
     string,
@@ -46,7 +49,6 @@ export interface TasksLeftSidebarProps {
 export function TasksLeftSidebar({
   active,
   activeThreadId,
-  activeThreadTitle,
   taskLinks,
   ownerThreads,
   onOpenThread,
@@ -61,7 +63,6 @@ export function TasksLeftSidebar({
   const [composerOpen, setComposerOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [projectId, setProjectId] = useState("");
-  const [assignee, setAssignee] = useState<SidebarTask["assignee"]>("human");
   const selectedIds = useStore(tasksSidebarStore, (state) => state.selectedIds);
   const anchorId = useStore(
     tasksSidebarStore,
@@ -120,8 +121,8 @@ export function TasksLeftSidebar({
       ]),
     [queue],
   );
-  const refresh = useCallback(() => {
-    void refetch();
+  const refresh = useCallback(async () => {
+    await refetch();
   }, [refetch]);
   const create = useCallback(async () => {
     const nextTitle = title.trim();
@@ -130,7 +131,7 @@ export function TasksLeftSidebar({
       await mutations.create.mutateAsync({
         projectId,
         title: nextTitle,
-        assignee,
+        assignee: "human",
       });
       setTitle("");
       setComposerOpen(false);
@@ -139,7 +140,7 @@ export function TasksLeftSidebar({
         cause instanceof Error ? cause.message : "Could not create task",
       );
     }
-  }, [assignee, mutations.create, projectId, title]);
+  }, [mutations.create, projectId, title]);
   const updateStatus = useCallback(
     async (taskId: string, status: SidebarTask["status"]) => {
       try {
@@ -151,23 +152,6 @@ export function TasksLeftSidebar({
       }
     },
     [mutations.status],
-  );
-  const updateAssignee = useCallback(
-    async (taskId: string, nextAssignee: SidebarTask["assignee"]) => {
-      try {
-        await mutations.assignment.mutateAsync({
-          taskId,
-          assignee: nextAssignee,
-        });
-      } catch (cause) {
-        toast.error(
-          cause instanceof Error
-            ? cause.message
-            : "Could not update task assignee",
-        );
-      }
-    },
-    [mutations.assignment],
   );
   const updateAttachment = useCallback(
     async (taskId: string, threadId: string, attached: boolean) => {
@@ -268,17 +252,16 @@ export function TasksLeftSidebar({
             ? visibleIds.slice(Math.min(first, last), Math.max(first, last) + 1)
             : [taskId],
         );
-        return true;
+        return;
       }
       if (event.ctrlKey || event.metaKey) {
         const next = new Set(state.selectedIds);
         if (next.has(taskId)) next.delete(taskId);
         else next.add(taskId);
         state.setSelected(taskId, next);
-        return true;
+        return;
       }
       state.setSelected(taskId, [taskId]);
-      return false;
     },
     [anchorId, visibleIds],
   );
@@ -297,25 +280,17 @@ export function TasksLeftSidebar({
             </span>
           ) : undefined}
           create={
-            <button
-              className="ws-icon-button"
+            <SidebarListIconButton
               title="Add task"
               aria-label="Add task"
               disabled={!projects.length}
               onClick={() => setComposerOpen((open) => !open)}
             >
               <Icon name="Plus" aria-hidden />
-            </button>
+            </SidebarListIconButton>
           }
           refresh={
-            <button
-              className="ws-icon-button"
-              title="Refresh tasks"
-              aria-label="Refresh tasks"
-              onClick={refresh}
-            >
-              <Icon name="RefreshCw" aria-hidden />
-            </button>
+            <RefreshButton label="Refresh tasks" onRefresh={refresh} />
           }
         />
       </div>
@@ -343,18 +318,6 @@ export function TasksLeftSidebar({
               onChange={setProjectId}
               placeholder="Project"
               ariaLabel="Task project"
-            />
-            <Combobox
-              value={assignee}
-              options={[
-                { value: "human", label: "Human" },
-                { value: "agent", label: "Agent" },
-              ]}
-              onChange={(value) =>
-                setAssignee(value as SidebarTask["assignee"])
-              }
-              placeholder="Assignee"
-              ariaLabel="Task assignee"
             />
             <button
               type="submit"
@@ -415,10 +378,8 @@ export function TasksLeftSidebar({
               onMoveTask={move}
               onOpenThread={onOpenThread}
               onUpdateStatus={updateStatus}
-              onUpdateAssignee={updateAssignee}
               onDelete={remove}
               activeThreadId={activeThreadId}
-              activeThreadTitle={activeThreadTitle}
               bindingLinks={bindingLinks}
               bindingOwnerLinks={bindingOwnerLinks}
               ownerThreads={ownerThreads}
@@ -433,9 +394,9 @@ export function TasksLeftSidebar({
                   ? (mutations.status.variables?.taskId ?? null)
                   : null
               }
-              updatingAssigneeTaskId={
-                mutations.assignment.isPending
-                  ? (mutations.assignment.variables?.taskId ?? null)
+              updatingAttachmentTaskId={
+                mutations.attachment.isPending
+                  ? (mutations.attachment.variables?.taskId ?? null)
                   : null
               }
               selectedTaskIds={selectedIds}

@@ -76,8 +76,7 @@ function undocumentedImportantDeclarations(source: string): string[] {
     }
     if (!trimmed || /^\/\*.*\*\/$/.test(trimmed)) continue;
     if (line.includes("!important")) {
-      if (!hasDeclarationComment)
-        violations.push(`${index + 1}: ${trimmed}`);
+      if (!hasDeclarationComment) violations.push(`${index + 1}: ${trimmed}`);
       hasDeclarationComment = false;
       continue;
     }
@@ -87,19 +86,97 @@ function undocumentedImportantDeclarations(source: string): string[] {
 }
 
 const dynamicClassFamilies = [
-  { prefix: "ws-agent-state-", file: "features/agents/agent-row.tsx", suffixes: ["working", "waiting", "blocked", "complete", "idle"] },
-  { prefix: "ws-file-", file: "features/changes/views.tsx", suffixes: ["added", "deleted", "modified", "renamed", "untracked"] },
-  { prefix: "ws-github-api-", file: "features/changes/panel.tsx", suffixes: ["available", "rate_limited", "unavailable"] },
-  { prefix: "ws-outcome-status-", file: "features/work-context/views.tsx", suffixes: ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] },
-  { prefix: "ws-plan-", file: "features/work-context/views.tsx", suffixes: ["completed", "in_progress", "pending"] },
-  { prefix: "ws-provider-health-", file: "features/work-context/views.tsx", suffixes: ["green", "amber", "red"] },
-  { prefix: "ws-runtime-state-", file: "features/work-context/views.tsx", suffixes: ["working", "waiting", "blocked", "complete", "idle"] },
-  { prefix: "ws-status-dot-", file: "features/work-context/views.tsx", suffixes: ["in_progress", "running", "done"] },
-  { prefix: "ws-status-", file: "features/threads/thread-row-presentation.tsx", suffixes: ["none", "runtime", "workflow", "background-agent", "background-command", "goal", "plan-mode", "working-draft", "unread-error", "unread-success", "waiting-for-input"] },
-  { prefix: "ws-task-priority-", file: "features/tasks/priority.tsx", suffixes: ["urgent", "high", "medium", "low"] },
-  { prefix: "ws-task-row-", file: "features/tasks/task-row.tsx", suffixes: ["outcome", "execution"] },
-  { prefix: "ws-task-status-", file: "features/tasks/task-row.tsx", suffixes: ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] },
-  { prefix: "ws-thread-child-depth-", file: "features/threads/thread-tree.tsx", suffixes: ["1", "2", "3", "4"] },
+  {
+    prefix: "ws-agent-state-",
+    file: "features/agents/agent-row.tsx",
+    suffixes: ["working", "waiting", "blocked", "complete", "idle"],
+  },
+  {
+    prefix: "ws-file-",
+    file: "features/changes/file-list.tsx",
+    suffixes: ["added", "deleted", "modified", "renamed", "untracked"],
+  },
+  {
+    prefix: "ws-github-api-",
+    file: "features/changes/panel.tsx",
+    suffixes: ["available", "rate_limited", "unavailable"],
+  },
+  {
+    prefix: "ws-outcome-status-",
+    file: "features/work-context/views.tsx",
+    suffixes: [
+      "backlog",
+      "todo",
+      "in_progress",
+      "in_review",
+      "done",
+      "canceled",
+    ],
+  },
+  {
+    prefix: "ws-plan-",
+    file: "features/work-context/views.tsx",
+    suffixes: ["completed", "in_progress", "pending"],
+  },
+  {
+    prefix: "ws-provider-health-",
+    file: "features/work-context/views.tsx",
+    suffixes: ["green", "amber", "red"],
+  },
+  {
+    prefix: "ws-runtime-state-",
+    file: "features/work-context/views.tsx",
+    suffixes: ["working", "waiting", "blocked", "complete", "idle"],
+  },
+  {
+    prefix: "ws-status-dot-",
+    file: "features/work-context/views.tsx",
+    suffixes: ["in_progress", "running", "done"],
+  },
+  {
+    prefix: "ws-status-",
+    file: "features/threads/thread-row-presentation.tsx",
+    suffixes: [
+      "none",
+      "runtime",
+      "workflow",
+      "background-agent",
+      "background-command",
+      "goal",
+      "plan-mode",
+      "working-draft",
+      "unread-error",
+      "unread-success",
+      "waiting-for-input",
+    ],
+  },
+  {
+    prefix: "ws-task-priority-",
+    file: "features/tasks/priority.tsx",
+    suffixes: ["urgent", "high", "medium", "low"],
+  },
+  {
+    prefix: "ws-task-row-",
+    file: "features/tasks/task-row.tsx",
+    suffixes: ["outcome", "execution"],
+  },
+  {
+    prefix: "ws-task-status-",
+    file: "features/tasks/task-row.tsx",
+    suffixes: [
+      "backlog",
+      "todo",
+      "in_progress",
+      "in_review",
+      "done",
+      "canceled",
+    ],
+  },
+  {
+    prefix: "ws-thread-child-depth-",
+    file: "features/threads/thread-tree.tsx",
+    suffixes: ["1", "2", "3", "4"],
+  },
 ] as const;
 
 // R22 I1 audited these static hooks as intentionally unstyled from the recovery
@@ -124,14 +201,24 @@ function scriptKind(path: string) {
 function classAttributeTokens(path: string, source: string) {
   const tokens = new Set<string>();
   const templatePrefixes = new Set<string>();
-  const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, scriptKind(path));
+  const sourceFile = ts.createSourceFile(
+    path,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    scriptKind(path),
+  );
   const collectText = (text: string) => {
-    for (const token of text.match(/ws-[A-Za-z0-9_-]+/g) ?? []) tokens.add(token);
+    for (const token of text.match(/ws-[A-Za-z0-9_-]+/g) ?? [])
+      tokens.add(token);
   };
   const visitClassValue = (node: ts.Node) => {
     if (ts.isStringLiteralLike(node)) collectText(node.text);
     if (ts.isTemplateExpression(node)) {
-      const literalParts = [node.head.text, ...node.templateSpans.map((span) => span.literal.text)];
+      const literalParts = [
+        node.head.text,
+        ...node.templateSpans.map((span) => span.literal.text),
+      ];
       for (const part of literalParts) {
         collectText(part);
         for (const { prefix } of dynamicClassFamilies) {
@@ -142,7 +229,12 @@ function classAttributeTokens(path: string, source: string) {
     ts.forEachChild(node, visitClassValue);
   };
   const visit = (node: ts.Node) => {
-    if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name) && (node.name.text === "className" || node.name.text === "class") && node.initializer) {
+    if (
+      ts.isJsxAttribute(node) &&
+      ts.isIdentifier(node.name) &&
+      (node.name.text === "className" || node.name.text === "class") &&
+      node.initializer
+    ) {
       visitClassValue(node.initializer);
     }
     ts.forEachChild(node, visit);
@@ -152,24 +244,41 @@ function classAttributeTokens(path: string, source: string) {
 }
 
 function sourceClassConsumers() {
-  const sourceByPath = new Map(productionSourcePaths().map((file) => [relative(root, file), readFileSync(file, "utf8")]));
+  const sourceByPath = new Map(
+    productionSourcePaths().map((file) => [
+      relative(root, file),
+      readFileSync(file, "utf8"),
+    ]),
+  );
   const staticClasses = new Set(
-    [...sourceByPath.entries()].flatMap(([path, source]) => [...classAttributeTokens(path, source).tokens]),
+    [...sourceByPath.entries()].flatMap(([path, source]) => [
+      ...classAttributeTokens(path, source).tokens,
+    ]),
   );
   const dynamicFamilies = dynamicClassFamilies.filter(({ prefix, file }) => {
     const source = sourceByPath.get(file);
-    return source ? classAttributeTokens(file, source).templatePrefixes.has(prefix) : false;
+    return source
+      ? classAttributeTokens(file, source).templatePrefixes.has(prefix)
+      : false;
   });
   return { staticClasses, dynamicFamilies };
 }
 
 function selectorClassNames(selector: string) {
-  return [...selector.matchAll(/\.((?:ws-[A-Za-z0-9_-]+))/g)].map((match) => match[1]);
+  return [...selector.matchAll(/\.((?:ws-[A-Za-z0-9_-]+))/g)].map(
+    (match) => match[1],
+  );
 }
 
-function hasProductionConsumer(className: string, consumers: ReturnType<typeof sourceClassConsumers>) {
-  return consumers.staticClasses.has(className) || consumers.dynamicFamilies.some(({ prefix, suffixes }) =>
-    suffixes.some((suffix) => className === `${prefix}${suffix}`),
+function hasProductionConsumer(
+  className: string,
+  consumers: ReturnType<typeof sourceClassConsumers>,
+) {
+  return (
+    consumers.staticClasses.has(className) ||
+    consumers.dynamicFamilies.some(({ prefix, suffixes }) =>
+      suffixes.some((suffix) => className === `${prefix}${suffix}`),
+    )
   );
 }
 
@@ -200,16 +309,41 @@ function staticClassesWithoutStylesheetOwner() {
 
 function directSurfacePrimitivePaths() {
   const violations: string[] = [];
-  for (const file of productionSourcePaths().filter((path) => path.endsWith(".tsx") && relative(root, path) !== "components/ui/surface-card.tsx")) {
-    const sourceFile = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  for (const file of productionSourcePaths().filter(
+    (path) =>
+      path.endsWith(".tsx") &&
+      relative(root, path) !== "components/ui/surface-card.tsx",
+  )) {
+    const sourceFile = ts.createSourceFile(
+      file,
+      readFileSync(file, "utf8"),
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    );
     const visit = (node: ts.Node) => {
-      if (ts.isJsxOpeningElement(node) && ["article", "div"].includes(node.tagName.getText())) {
-        const className = node.attributes.properties.find((attribute): attribute is ts.JsxAttribute =>
-          ts.isJsxAttribute(attribute) && attribute.name.getText() === "className",
+      if (
+        ts.isJsxOpeningElement(node) &&
+        ["article", "div"].includes(node.tagName.getText())
+      ) {
+        const className = node.attributes.properties.find(
+          (attribute): attribute is ts.JsxAttribute =>
+            ts.isJsxAttribute(attribute) &&
+            attribute.name.getText() === "className",
         );
-        const tokens = new Set(className?.initializer?.getText().match(/ws-[A-Za-z0-9_-]+/g) ?? []);
-        if ((node.tagName.getText() === "article" && tokens.has("ws-card")) || (node.tagName.getText() === "div" && tokens.has("ws-card-heading"))) {
-          violations.push(relative(root, file) + ":" + (sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1));
+        const tokens = new Set(
+          className?.initializer?.getText().match(/ws-[A-Za-z0-9_-]+/g) ?? [],
+        );
+        if (
+          (node.tagName.getText() === "article" && tokens.has("ws-card")) ||
+          (node.tagName.getText() === "div" && tokens.has("ws-card-heading"))
+        ) {
+          violations.push(
+            relative(root, file) +
+              ":" +
+              (sourceFile.getLineAndCharacterOfPosition(node.getStart()).line +
+                1),
+          );
         }
       }
       ts.forEachChild(node, visit);
@@ -220,16 +354,24 @@ function directSurfacePrimitivePaths() {
 }
 
 function jsxAttributeNames(attributes: ts.JsxAttributes) {
-  return new Set(attributes.properties.filter(ts.isJsxAttribute).map((attribute) => attribute.name.getText()));
+  return new Set(
+    attributes.properties
+      .filter(ts.isJsxAttribute)
+      .map((attribute) => attribute.name.getText()),
+  );
 }
 
 function buttonHasVisibleText(children: ts.NodeArray<ts.JsxChild>) {
   let visibleText = false;
   const visit = (child: ts.Node) => {
-    if (ts.isJsxText(child) && /[A-Za-z0-9]/.test(child.text)) visibleText = true;
-    if (ts.isStringLiteralLike(child) && /[A-Za-z0-9]/.test(child.text)) visibleText = true;
-    if (ts.isJsxElement(child) || ts.isJsxFragment(child)) child.children.forEach(visit);
-    if (ts.isJsxExpression(child) && child.expression) ts.forEachChild(child.expression, visit);
+    if (ts.isJsxText(child) && /[A-Za-z0-9]/.test(child.text))
+      visibleText = true;
+    if (ts.isStringLiteralLike(child) && /[A-Za-z0-9]/.test(child.text))
+      visibleText = true;
+    if (ts.isJsxElement(child) || ts.isJsxFragment(child))
+      child.children.forEach(visit);
+    if (ts.isJsxExpression(child) && child.expression)
+      ts.forEachChild(child.expression, visit);
   };
   children.forEach(visit);
   return visibleText;
@@ -238,14 +380,21 @@ function buttonHasVisibleText(children: ts.NodeArray<ts.JsxChild>) {
 function buttonHasIconOrGlyph(node: ts.JsxElement) {
   let iconOrGlyph = false;
   const visit = (child: ts.Node) => {
-    if (ts.isJsxText(child) && /[^\sA-Za-z0-9]/.test(child.text)) iconOrGlyph = true;
-    if (ts.isJsxSelfClosingElement(child) && /^(?:Icon|svg)$/.test(child.tagName.getText())) iconOrGlyph = true;
+    if (ts.isJsxText(child) && /[^\sA-Za-z0-9]/.test(child.text))
+      iconOrGlyph = true;
+    if (
+      ts.isJsxSelfClosingElement(child) &&
+      /^(?:Icon|svg)$/.test(child.tagName.getText())
+    )
+      iconOrGlyph = true;
     if (ts.isJsxElement(child)) {
-      if (/^(?:Icon|svg)$/.test(child.openingElement.tagName.getText())) iconOrGlyph = true;
+      if (/^(?:Icon|svg)$/.test(child.openingElement.tagName.getText()))
+        iconOrGlyph = true;
       child.children.forEach(visit);
     }
     if (ts.isJsxFragment(child)) child.children.forEach(visit);
-    if (ts.isJsxExpression(child) && child.expression) ts.forEachChild(child.expression, visit);
+    if (ts.isJsxExpression(child) && child.expression)
+      ts.forEachChild(child.expression, visit);
   };
   node.children.forEach(visit);
   return iconOrGlyph;
@@ -254,10 +403,20 @@ function buttonHasIconOrGlyph(node: ts.JsxElement) {
 function undocumentedIconButtons(sourceFile: ts.SourceFile) {
   const undocumented: string[] = [];
   const visit = (node: ts.Node) => {
-    if (ts.isJsxElement(node) && node.openingElement.tagName.getText() === "button") {
+    if (
+      ts.isJsxElement(node) &&
+      node.openingElement.tagName.getText() === "button"
+    ) {
       const attributes = jsxAttributeNames(node.openingElement.attributes);
-      if (buttonHasIconOrGlyph(node) && !buttonHasVisibleText(node.children) && !attributes.has("aria-label") && !attributes.has("aria-labelledby")) {
-        undocumented.push(`${sourceFile.fileName}:${sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1}`);
+      if (
+        buttonHasIconOrGlyph(node) &&
+        !buttonHasVisibleText(node.children) &&
+        !attributes.has("aria-label") &&
+        !attributes.has("aria-labelledby")
+      ) {
+        undocumented.push(
+          `${sourceFile.fileName}:${sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1}`,
+        );
       }
     }
     ts.forEachChild(node, visit);
@@ -342,28 +501,43 @@ describe("stylesheet architecture baseline", () => {
             depth += 1;
           } else if (character === "}") {
             depth -= 1;
-            if (depth < 0) parseErrors.push(`${relative}:${index + 1}: unexpected closing brace`);
+            if (depth < 0)
+              parseErrors.push(
+                `${relative}:${index + 1}: unexpected closing brace`,
+              );
           } else if (character === "(") {
             parentheses += 1;
           } else if (character === ")") {
             parentheses -= 1;
-            if (parentheses < 0) parseErrors.push(`${relative}:${index + 1}: unexpected closing parenthesis`);
+            if (parentheses < 0)
+              parseErrors.push(
+                `${relative}:${index + 1}: unexpected closing parenthesis`,
+              );
           }
         }
       }
-      if (depth !== 0) parseErrors.push(`${relative}: unbalanced braces (${depth})`);
-      if (parentheses !== 0) parseErrors.push(`${relative}: unbalanced parentheses (${parentheses})`);
+      if (depth !== 0)
+        parseErrors.push(`${relative}: unbalanced braces (${depth})`);
+      if (parentheses !== 0)
+        parseErrors.push(
+          `${relative}: unbalanced parentheses (${parentheses})`,
+        );
       if (inComment) parseErrors.push(`${relative}: unterminated comment`);
       if (quote) parseErrors.push(`${relative}: unterminated string`);
     }
 
-    expect(parseErrors, `CSS parse errors:\n${parseErrors.join("\n")}`).toEqual([]);
-    expect(longLines, `CSS physical lines over 240 chars:\n${longLines.join("\n")}`).toEqual([]);
+    expect(parseErrors, `CSS parse errors:\n${parseErrors.join("\n")}`).toEqual(
+      [],
+    );
+    expect(
+      longLines,
+      `CSS physical lines over 240 chars:\n${longLines.join("\n")}`,
+    ).toEqual([]);
   });
 });
 
 describe("shared surface and list-row architecture", () => {
-  test("reserves scrollbar space at both shared tab scrollports", () => {
+  test("reserves scrollbar space only inside each tab content scrollport", () => {
     const rules = stylesheetPaths().flatMap((path) =>
       stylesheetRules(readFileSync(path, "utf8")),
     );
@@ -375,21 +549,30 @@ describe("shared surface and list-row architecture", () => {
         .map(({ declarations }) => declarations)
         .join("\n");
     const leftTabs = declarationsFor(".ws-list.ws-list");
+    const leftContent = declarationsFor(".ws-list > .ws-view-content");
     const rightTabs = [
       declarationsFor(".ws-panel-body"),
       declarationsFor(".ws-panel-body.ws-panel-body"),
     ].join("\n");
 
-    expect(leftTabs).toContain("overflow-y: auto");
-    expect(leftTabs).toContain("scrollbar-gutter: stable");
+    expect(leftTabs).toContain("overflow: hidden");
+    expect(leftTabs).toContain("gap: 0");
+    expect(leftTabs).not.toContain("scrollbar-gutter: stable");
+    expect(leftContent).toContain("overflow-y: auto");
+    expect(leftContent).toContain("align-content: start");
+    expect(leftContent).toContain("padding-top: 0 !important");
+    expect(leftContent).toContain("scrollbar-gutter: stable");
     expect(rightTabs).toContain("overflow: auto");
     expect(rightTabs).toContain("scrollbar-gutter: stable");
   });
 
   test("gives the semantic active combobox option a host-token highlight", () => {
-    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
-    const activeOption = rules.find(({ selector }) =>
-      selector === '.ws-combobox-options button[data-active="true"]',
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
+    const activeOption = rules.find(
+      ({ selector }) =>
+        selector === '.ws-combobox-options button[data-active="true"]',
     );
 
     expect(activeOption?.declarations).toContain("background: var(--accent)");
@@ -399,7 +582,9 @@ describe("shared surface and list-row architecture", () => {
   });
 
   test("presents existing tasks like the Linear issue list", () => {
-    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
     const picker = rules.find(
       ({ selector }) =>
         selector === ".ws-task-attachment-picker .ws-combobox-options",
@@ -428,15 +613,21 @@ describe("shared surface and list-row architecture", () => {
   });
 
   test("keeps Changes branch controls in one fixed trailing grid", () => {
-    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
-    const toggle = rules.find(({ selector }) => selector === ".ws-stack-layer-toggle");
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
+    const toggle = rules.find(
+      ({ selector }) => selector === ".ws-stack-layer-toggle",
+    );
     const actions = rules.find(
       ({ selector }) => selector === ".ws-stack-trailing-actions",
     );
     const slot = rules.find(
       ({ selector }) => selector === ".ws-stack-action-slot",
     );
-    const chevron = rules.find(({ selector }) => selector === ".ws-stack-expand");
+    const chevron = rules.find(
+      ({ selector }) => selector === ".ws-stack-expand",
+    );
 
     expect(toggle?.declarations).toContain(
       "grid-template-columns: minmax(0, 1fr)",
@@ -457,8 +648,12 @@ describe("shared surface and list-row architecture", () => {
   });
 
   test("aligns Changes file additions and deletions in four-digit columns", () => {
-    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
-    const row = rules.find(({ selector }) => selector === ".ws-stack-files > span");
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
+    const row = rules.find(
+      ({ selector }) => selector === ".ws-change-file-row",
+    );
     const additions = rules.find(
       ({ selector }) => selector === ".ws-stack-files small.ws-file-additions",
     );
@@ -470,15 +665,54 @@ describe("shared surface and list-row architecture", () => {
       "grid-template-columns: 0.65rem minmax(0, 1fr) 5ch 5ch",
     );
     expect(additions?.declarations).toContain("color: var(--success)");
-    expect(additions?.declarations).toContain("font-variant-numeric: tabular-nums");
+    expect(additions?.declarations).toContain(
+      "font-variant-numeric: tabular-nums",
+    );
     expect(additions?.declarations).toContain("text-align: right");
     expect(deletions?.declarations).toContain("color: var(--destructive)");
-    expect(deletions?.declarations).toContain("font-variant-numeric: tabular-nums");
+    expect(deletions?.declarations).toContain(
+      "font-variant-numeric: tabular-nums",
+    );
     expect(deletions?.declarations).toContain("text-align: right");
   });
 
+  test("bounds both Changes file lists with one inner-scroll contract", () => {
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
+    const fileList = rules.find(
+      ({ selector }) => selector === ".ws-changes-file-list-scroll",
+    );
+
+    expect(fileList?.declarations).toContain("max-height: 12rem");
+    expect(fileList?.declarations).toContain("overflow-y: auto");
+    expect(fileList?.declarations).toContain("overscroll-behavior: contain");
+    expect(fileList?.declarations).toContain("scrollbar-gutter: stable");
+    expect(fileList?.declarations).toContain("padding-right: 0.35rem");
+  });
+
+  test("spins the shared refresh icon without a wait cursor", () => {
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
+    const button = rules.find(
+      ({ selector }) => selector === ".ws-refresh-button:disabled",
+    );
+    const icon = rules.find(
+      ({ selector }) =>
+        selector === '.ws-refresh-icon[data-motion="spin"]',
+    );
+
+    expect(button?.declarations).toContain("cursor: default");
+    expect(icon?.declarations).toContain(
+      "animation: ws-refresh-spin 0.8s linear infinite",
+    );
+  });
+
   test("uses one atomic visual contract for copyable identifier badges", () => {
-    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
     const badge = rules.find(
       ({ selector }) => selector === ".ws-identifier-badge",
     );
@@ -493,6 +727,12 @@ describe("shared surface and list-row architecture", () => {
     expect(badge?.declarations).toContain("font-weight: 400");
     expect(badge?.declarations).toContain("white-space: nowrap");
 
+    const fixedBadge = rules.find(
+      ({ selector }) =>
+        selector === '.ws-identifier-badge[data-variant="badge"]',
+    );
+    expect(fixedBadge?.declarations).toContain("flex: none");
+
     const text = rules.find(
       ({ selector }) =>
         selector === '.ws-identifier-badge[data-variant="text"]',
@@ -501,6 +741,12 @@ describe("shared surface and list-row architecture", () => {
     expect(text?.declarations).toContain("border-radius: 0");
     expect(text?.declarations).toContain("padding: 0");
     expect(text?.declarations).toContain("color: inherit");
+
+    const branch = rules.find(
+      ({ selector }) => selector === ".ws-pr-identifier-badge",
+    );
+    expect(branch?.declarations).toContain("flex: 0 1 auto");
+    expect(branch?.declarations).toContain("overflow: hidden");
 
     const contextualTypography = rules.find(
       ({ selector }) =>
@@ -524,7 +770,9 @@ describe("shared surface and list-row architecture", () => {
   });
 
   test("renders cached provider artwork through the current theme color", () => {
-    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
     const mark = rules.find(
       ({ selector }) => selector === ".ws-thread-provider-mark",
     );
@@ -540,7 +788,9 @@ describe("shared surface and list-row architecture", () => {
   });
 
   test("keeps left task titles regular and stacks priority over row controls", () => {
-    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
     const declarations = (selector: string) =>
       rules.find((rule) => rule.selector === selector)?.declarations ?? "";
 
@@ -555,31 +805,65 @@ describe("shared surface and list-row architecture", () => {
   });
 
   test("shares one left-sidebar row rhythm across Threads, Tasks, and PRs", () => {
-    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
     const declarations = (selector: string) =>
       rules.find((rule) => rule.selector === selector)?.declarations;
 
     expect(declarations(".ws-sidebar-row")).toMatch(
-      /min-height:\s*2\.35rem/,
+      /min-height:\s*var\(--ws-sidebar-row-height,\s*45px\)/,
     );
-    expect(declarations(".ws-sidebar-row-main")).toMatch(
-      /row-gap:\s*0\.1rem/,
+    expect(declarations(".ws-sidebar-row")).toMatch(/border-radius:\s*0/);
+    expect(declarations(".ws-sidebar-row")).toMatch(
+      /padding-block:\s*0\.28rem/,
     );
+    expect(declarations(".ws-sidebar-row-main")).toMatch(/row-gap:\s*0\.1rem/);
     expect(declarations(".ws-sidebar-row-title")).toMatch(
       /font-size:\s*0\.74rem/,
     );
-    expect(declarations(".ws-sidebar-row-title")).toMatch(
-      /font-weight:\s*400/,
-    );
+    expect(declarations(".ws-sidebar-row-title")).toMatch(/font-weight:\s*400/);
     expect(declarations(".ws-sidebar-row-title")).toMatch(
       /line-height:\s*1\.2/,
     );
     expect(declarations(".ws-sidebar-row-meta")).toMatch(
       /font-size:\s*0\.59rem/,
     );
-    expect(declarations(".ws-sidebar-row-meta")).toMatch(
-      /line-height:\s*1\.1/,
+    expect(declarations(".ws-sidebar-row-meta")).toMatch(/line-height:\s*1\.1/);
+    expect(declarations(".ws-thread-leading")).toMatch(/align-self:\s*center/);
+    expect(declarations(".ws-thread-agent-badge")).toMatch(
+      /align-self:\s*center/,
     );
+    const pullRequestTargetDeclarations = rules
+      .filter((rule) => rule.selector === ".ws-pr-target")
+      .map((rule) => rule.declarations)
+      .join("\n");
+    expect(pullRequestTargetDeclarations).toMatch(
+      /grid-template-areas:\s*"title"\s*"context"/,
+    );
+    expect(pullRequestTargetDeclarations).not.toContain('"thread"');
+    expect(pullRequestTargetDeclarations).not.toContain("grid-template-rows");
+    expect(pullRequestTargetDeclarations).toMatch(/row-gap:\s*0\.16rem/);
+    expect(declarations(".ws-pr-repository-group")).toMatch(/gap:\s*0/);
+    expect(declarations(".ws-pr-repository-group > h3")).toMatch(
+      /margin:\s*0\.15rem 0\.45rem 0\.28rem/,
+    );
+    expect(declarations(".ws-stack-files")).not.toContain("border-left");
+    const pullRequestRowDeclarations = rules
+      .filter((rule) => rule.selector === ".ws-pr-row")
+      .map((rule) => rule.declarations)
+      .join("\n");
+    expect(pullRequestRowDeclarations).toMatch(/padding-block:\s*0\.16rem/);
+    expect(pullRequestRowDeclarations).not.toContain("border-radius");
+    expect(pullRequestRowDeclarations).not.toContain("border-bottom");
+    expect(declarations(".ws-task-row")).not.toContain("border-radius");
+
+    const appRules = stylesheetRules(
+      readFileSync(join(root, "app.css"), "utf8"),
+    );
+    expect(
+      appRules.find((rule) => rule.selector === ".ws-thread")?.declarations,
+    ).toMatch(/border-radius:\s*0/);
 
     for (const [path, hooks] of [
       [
@@ -608,44 +892,77 @@ describe("shared surface and list-row architecture", () => {
       ],
     ] as const) {
       const source = readFileSync(join(root, path), "utf8");
-      for (const hook of hooks) expect(source, `${path}: ${hook}`).toContain(hook);
+      for (const hook of hooks)
+        expect(source, `${path}: ${hook}`).toContain(hook);
     }
   });
 
+  test("makes invalid sidebar appearance values visibly destructive", () => {
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
+    const declarations = (selector: string) =>
+      rules.find((rule) => rule.selector === selector)?.declarations ?? "";
+
+    expect(
+      declarations('.ws-settings-input-row input[aria-invalid="true"]'),
+    ).toContain("border-color: var(--destructive)");
+    expect(declarations(".ws-settings-card .ws-settings-error")).toContain(
+      "color: var(--destructive)",
+    );
+  });
+
   test("associates each important declaration with its immediately preceding R17 comment", () => {
-    expect(undocumentedImportantDeclarations(`
+    expect(
+      undocumentedImportantDeclarations(`
       /* R17 important: a former blanket comment. */
       color: inherit;
       background: var(--accent) !important;
-    `)).toEqual(["4: background: var(--accent) !important;"]);
-    expect(undocumentedImportantDeclarations(`
+    `),
+    ).toEqual(["4: background: var(--accent) !important;"]);
+    expect(
+      undocumentedImportantDeclarations(`
       /* R17 important: host styling overrides this background. */
       background: var(--accent) !important;
-    `)).toEqual([]);
+    `),
+    ).toEqual([]);
   });
 
   test("finds every static class in multi-class and template JSX attributes", () => {
-    const fixture = classAttributeTokens("fixture.tsx", `
+    const fixture = classAttributeTokens(
+      "fixture.tsx",
+      `
       const fixture = <article className="ws-card ws-empty-state-card">
         <span className={\`ws-card-note \${busy ? "ws-card-note-busy" : ""}\`} />
       </article>;
-    `);
+    `,
+    );
 
-    expect(fixture.tokens).toEqual(new Set(["ws-card", "ws-empty-state-card", "ws-card-note", "ws-card-note-busy"]));
+    expect(fixture.tokens).toEqual(
+      new Set([
+        "ws-card",
+        "ws-empty-state-card",
+        "ws-card-note",
+        "ws-card-note-busy",
+      ]),
+    );
   });
 
   test("limits dynamic template consumers to their evidenced class families", () => {
     const consumers = sourceClassConsumers();
 
     expect(hasProductionConsumer("ws-file-modified", consumers)).toBe(true);
-    expect(hasProductionConsumer("ws-file-list", consumers)).toBe(consumers.staticClasses.has("ws-file-list"));
+    expect(hasProductionConsumer("ws-file-list", consumers)).toBe(
+      consumers.staticClasses.has("ws-file-list"),
+    );
     expect(hasProductionConsumer("ws-file-legacy", consumers)).toBe(false);
   });
 
   test("records classes nested in an at-rule as stylesheet owners", () => {
     expect(
-      stylesheetRules("@media (min-width: 1px) { .ws-at-rule-only { color: red; } }")
-        .map(({ selector }) => selector),
+      stylesheetRules(
+        "@media (min-width: 1px) { .ws-at-rule-only { color: red; } }",
+      ).map(({ selector }) => selector),
     ).toEqual([".ws-at-rule-only"]);
   });
 
@@ -657,26 +974,41 @@ describe("shared surface and list-row architecture", () => {
   test("rotates shared partial-circle status icons with a reduced-motion fallback", () => {
     const source = readFileSync(join(root, "views.css"), "utf8");
     const declarations = stylesheetRules(source)
-      .filter(({ selector }) => selector === '.ws-status[data-motion="spin"] > svg:first-child')
+      .filter(
+        ({ selector }) =>
+          selector === '.ws-status[data-motion="spin"] > svg:first-child',
+      )
       .map(({ declarations: ruleDeclarations }) => ruleDeclarations);
 
-    expect(declarations.some((rule) => rule.includes("animation: ws-status-spin 0.9s linear infinite"))).toBe(true);
-    expect(declarations.some((rule) => rule.includes("animation: none"))).toBe(true);
+    expect(
+      declarations.some((rule) =>
+        rule.includes("animation: ws-status-spin 0.9s linear infinite"),
+      ),
+    ).toBe(true);
+    expect(declarations.some((rule) => rule.includes("animation: none"))).toBe(
+      true,
+    );
     expect(source).toContain("@keyframes ws-status-spin");
     expect(source).toContain("transform: rotate(360deg)");
   });
 
   test("keeps outcome progress static while animating pending mutations", () => {
-    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
     const animated = rules.filter(({ declarations }) =>
-      declarations.includes("animation: ws-status-runtime-spin 1.2s linear infinite"),
+      declarations.includes(
+        "animation: ws-status-runtime-spin 1.2s linear infinite",
+      ),
     );
 
     expect(animated.map(({ selector }) => selector).join("\n")).not.toContain(
       "ws-outcome-status-in_progress",
     );
     expect(
-      animated.some(({ selector }) => selector === ".ws-outcome-status-updating svg"),
+      animated.some(
+        ({ selector }) => selector === ".ws-outcome-status-updating svg",
+      ),
     ).toBe(true);
   });
 
@@ -685,7 +1017,9 @@ describe("shared surface and list-row architecture", () => {
     const rules = stylesheetRules(source);
     const status = rules.find(({ selector }) => selector === ".ws-status");
     const count = rules.find(({ selector }) => selector === ".ws-status > b");
-    const overlay = rules.find(({ selector }) => selector === ".ws-status svg + svg");
+    const overlay = rules.find(
+      ({ selector }) => selector === ".ws-status svg + svg",
+    );
 
     expect(status?.declarations).toContain("grid-auto-flow: column");
     expect(status?.declarations).toContain("width: auto");
@@ -696,7 +1030,9 @@ describe("shared surface and list-row architecture", () => {
   });
 
   test("removes the unimplemented Button wrapper and its production imports", () => {
-    const sourcePaths = productionSourcePaths().map((file) => relative(root, file));
+    const sourcePaths = productionSourcePaths().map((file) =>
+      relative(root, file),
+    );
     const productionSource = productionSourcePaths()
       .map((file) => readFileSync(file, "utf8"))
       .join("\n");
@@ -706,46 +1042,115 @@ describe("shared surface and list-row architecture", () => {
   });
 
   test("keeps one consumed surface contract and no broad primitive typography overrides", () => {
-    const rules = stylesheetPaths().flatMap((file) => stylesheetRules(readFileSync(file, "utf8")));
+    const rules = stylesheetPaths().flatMap((file) =>
+      stylesheetRules(readFileSync(file, "utf8")),
+    );
     const competingContracts = rules
-      .filter(({ selector }) => /\.ws-(?:surface|work-card)(?:[.:#\s,{]|$)/.test(selector))
+      .filter(({ selector }) =>
+        /\.ws-(?:surface|work-card)(?:[.:#\s,{]|$)/.test(selector),
+      )
       .map(({ selector }) => selector);
-    const cardContractDefinitions = rules.filter(({ selector }) => selector === ".ws-card").map(({ selector }) => selector);
-    const cardHeadingDefinitions = rules.filter(({ selector }) => selector === ".ws-card-heading").map(({ selector }) => selector);
-    const cardHeadingStrongDefinitions = rules.filter(({ selector }) => selector === ".ws-card-heading strong").map(({ selector }) => selector);
-    const cardControlFocus = rules.find(({ selector }) => selector === ".ws-card :is(button, input, select):focus-visible");
+    const cardContractDefinitions = rules
+      .filter(({ selector }) => selector === ".ws-card")
+      .map(({ selector }) => selector);
+    const cardHeadingDefinitions = rules
+      .filter(({ selector }) => selector === ".ws-card-heading")
+      .map(({ selector }) => selector);
+    const cardHeadingStrongDefinitions = rules
+      .filter(({ selector }) => selector === ".ws-card-heading strong")
+      .map(({ selector }) => selector);
+    const cardControlFocus = rules.find(
+      ({ selector }) =>
+        selector === ".ws-card :is(button, input, select):focus-visible",
+    );
     const broadTypography = rules
-      .filter(({ selector, declarations }) =>
-        /\.ws-(?:card|surface|work-card)\s+(?:h[1-6]|p|small|strong|\*\b)/.test(selector)
-        || (selector.includes(".ws-card-heading") && ![".ws-card-heading", ".ws-card-heading strong"].includes(selector) && /\b(?:font(?:-size|-weight)?|line-height|letter-spacing)\s*:/.test(declarations)),
+      .filter(
+        ({ selector, declarations }) =>
+          /\.ws-(?:card|surface|work-card)\s+(?:h[1-6]|p|small|strong|\*\b)/.test(
+            selector,
+          ) ||
+          (selector.includes(".ws-card-heading") &&
+            ![".ws-card-heading", ".ws-card-heading strong"].includes(
+              selector,
+            ) &&
+            /\b(?:font(?:-size|-weight)?|line-height|letter-spacing)\s*:/.test(
+              declarations,
+            )),
       )
       .map(({ selector }) => selector);
 
-    expect(competingContracts, "only the shared .ws-card surface contract may own card layout").toEqual([]);
-    expect(cardContractDefinitions, "the shared card contract is defined once across plugin stylesheets").toEqual([".ws-card"]);
-    expect(cardHeadingDefinitions, "the shared card heading contract is defined once across plugin stylesheets").toEqual([".ws-card-heading"]);
-    expect(cardHeadingStrongDefinitions, "only the heading primitive owns its strong typography").toEqual([".ws-card-heading strong"]);
-    expect(cardControlFocus?.declarations, "shared card controls retain an explicit visible focus treatment").toContain("outline: 2px solid var(--ring)");
-    expect(broadTypography, "surface selectors must not override descendant typography").toEqual([]);
+    expect(
+      competingContracts,
+      "only the shared .ws-card surface contract may own card layout",
+    ).toEqual([]);
+    expect(
+      cardContractDefinitions,
+      "the shared card contract is defined once across plugin stylesheets",
+    ).toEqual([".ws-card"]);
+    expect(
+      cardHeadingDefinitions,
+      "the shared card heading contract is defined once across plugin stylesheets",
+    ).toEqual([".ws-card-heading"]);
+    expect(
+      cardHeadingStrongDefinitions,
+      "only the heading primitive owns its strong typography",
+    ).toEqual([".ws-card-heading strong"]);
+    expect(
+      cardControlFocus?.declarations,
+      "shared card controls retain an explicit visible focus treatment",
+    ).toContain("outline: 2px solid var(--ring)");
+    expect(
+      broadTypography,
+      "surface selectors must not override descendant typography",
+    ).toEqual([]);
   });
 
   test("keeps settings group row selectors aligned with the semantic dialog markup", () => {
-    const rules = stylesheetPaths().flatMap((file) => stylesheetRules(readFileSync(file, "utf8")));
-    const row = rules.find(({ selector }) => selector === ".ws-thread-group-settings > div");
-    const title = rules.find(({ selector }) => selector === ".ws-thread-group-settings > div > button:first-child");
+    const rules = stylesheetPaths().flatMap((file) =>
+      stylesheetRules(readFileSync(file, "utf8")),
+    );
+    const row = rules.find(
+      ({ selector }) => selector === ".ws-thread-group-settings-row",
+    );
+    const group = rules.find(
+      ({ selector }) => selector === ".ws-thread-group-settings",
+    );
+    const header = rules.find(
+      ({ selector }) => selector === ".ws-thread-group-settings-header",
+    );
+    const drag = rules.find(
+      ({ selector }) => selector === ".ws-thread-group-drag",
+    );
+    const title = rules.find(
+      ({ selector }) =>
+        selector.includes(
+          ".ws-thread-group-settings .ws-thread-group-rename",
+        ) &&
+        selector.includes(".ws-thread-group-settings .ws-thread-group-system"),
+    );
 
-    expect(row?.declarations).toContain("grid-template-columns: minmax(0, 1fr) 1.55rem");
+    expect(row?.declarations).toContain(
+      "grid-template-columns: minmax(0, 1fr) 1.55rem 1.55rem",
+    );
+    expect(group?.declarations).toContain("padding: 0.48rem 0 0");
+    expect(header?.declarations).toContain(
+      "grid-template-columns: minmax(0, 1fr) 1.55rem",
+    );
+    expect(drag?.declarations).toContain("cursor: grab");
     expect(title?.declarations).toContain("text-overflow: ellipsis");
   });
 
   test("keeps the settings dialog below and above the sticky toolbar", () => {
-    const rules = stylesheetPaths().flatMap((file) => stylesheetRules(readFileSync(file, "utf8")));
+    const rules = stylesheetPaths().flatMap((file) =>
+      stylesheetRules(readFileSync(file, "utf8")),
+    );
     const menuDeclarations = rules
       .filter(({ selector }) => selector === ".ws-thread-settings-menu")
       .map(({ declarations }) => declarations)
       .join("\n");
-    const toolbarRules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"))
-      .filter(({ selector }) => selector === ".ws-list-toolbar");
+    const toolbarRules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    ).filter(({ selector }) => selector === ".ws-list-toolbar");
     const settingsDeclarations = rules
       .filter(({ selector }) => selector === ".ws-thread-settings")
       .map(({ declarations }) => declarations)
@@ -755,7 +1160,9 @@ describe("shared surface and list-row architecture", () => {
     expect(menuDeclarations).toContain("bottom: auto !important");
     expect(menuDeclarations).toContain("z-index: 100 !important");
     expect(toolbarRules).toHaveLength(1);
-    expect(toolbarRules[0]?.declarations).toContain("position: sticky !important");
+    expect(toolbarRules[0]?.declarations).toContain(
+      "position: sticky !important",
+    );
     expect(toolbarRules[0]?.declarations).toContain("z-index: 44");
     expect(toolbarRules[0]?.declarations).toContain("top: 2rem");
     expect(toolbarRules[0]?.declarations).toContain("isolation: isolate");
@@ -763,26 +1170,40 @@ describe("shared surface and list-row architecture", () => {
   });
 
   test("contains the enhanced list toolbar inside the sidebar viewport", () => {
-    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
     const list = rules.find(({ selector }) => selector === ".ws-list");
-    const toolbar = rules.find(({ selector }) => selector === ".ws-list-toolbar");
+    const toolbar = rules.find(
+      ({ selector }) => selector === ".ws-list-toolbar",
+    );
     const actions = rules.find(
       ({ selector }) => selector === ".ws-work-toolbar-actions",
     );
     const threadGroup = rules.find(
       ({ selector }) => selector === ".ws-thread-group",
     );
-    const legacyGroupSources = [...productionSourcePaths(), ...stylesheetPaths()]
+    const legacyGroupSources = [
+      ...productionSourcePaths(),
+      ...stylesheetPaths(),
+    ]
       .map((file) => relative(root, file))
-      .filter((file) => readFileSync(join(root, file), "utf8").includes("ws-later"));
+      .filter((file) =>
+        readFileSync(join(root, file), "utf8").includes("ws-later"),
+      );
 
     expect(list?.declarations).toContain("margin: 0 !important");
     expect(list?.declarations).toContain("width: 100%");
     expect(list?.declarations).toContain("max-width: 100%");
-    expect(toolbar?.declarations).toContain("box-sizing: border-box !important");
+    expect(toolbar?.declarations).toContain(
+      "box-sizing: border-box !important",
+    );
     expect(toolbar?.declarations).toContain("width: 100%");
     expect(toolbar?.declarations).toContain("max-width: 100%");
-    expect(toolbar?.declarations).toContain("padding-block: 0.35rem !important");
+    expect(toolbar?.declarations).toContain("min-height: 0 !important");
+    expect(toolbar?.declarations).toContain(
+      "padding-block: 0.35rem 0 !important",
+    );
     expect(toolbar?.declarations).not.toContain("padding-top: 0 !important");
     expect(threadGroup?.declarations).toContain("margin: 0 0.15rem 0.55rem");
     expect(threadGroup?.declarations).toContain("padding-top: 0.3rem");
@@ -791,10 +1212,69 @@ describe("shared surface and list-row architecture", () => {
     expect(actions?.declarations).toContain("min-width: 0");
   });
 
+  test("constructs every left toolbar icon action through one component", () => {
+    const expectedUses = new Map([
+      ["features/threads/sidebar-toolbar.tsx", 2],
+      ["features/threads/sidebar-group-settings.tsx", 1],
+      ["features/tasks/left-sidebar.tsx", 2],
+      ["features/pull-requests/left-sidebar.tsx", 1],
+    ]);
+
+    for (const [relativePath, expectedCount] of expectedUses) {
+      const sourcePath = join(root, relativePath);
+      const source = readFileSync(sourcePath, "utf8");
+      const sourceFile = ts.createSourceFile(
+        sourcePath,
+        source,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      );
+      let sharedButtonCount = 0;
+      const rawIconButtons: string[] = [];
+      const visit = (node: ts.Node) => {
+        if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
+          const tagName = node.tagName.getText(sourceFile);
+          if (
+            tagName === "SidebarListIconButton" ||
+            tagName === "RefreshButton"
+          )
+            sharedButtonCount += 1;
+          if (tagName === "button") {
+            const className = node.attributes.properties.find(
+              (attribute): attribute is ts.JsxAttribute =>
+                ts.isJsxAttribute(attribute) &&
+                attribute.name.getText(sourceFile) === "className",
+            );
+            if (
+              className?.initializer &&
+              ts.isStringLiteral(className.initializer) &&
+              className.initializer.text === "ws-icon-button"
+            ) {
+              rawIconButtons.push(
+                `${relativePath}:${sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1}`,
+              );
+            }
+          }
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(sourceFile);
+
+      expect(sharedButtonCount, relativePath).toBe(expectedCount);
+      expect(rawIconButtons, relativePath).toEqual([]);
+      expect(source, relativePath).not.toContain("ws-new-thread");
+    }
+  });
+
   test("shares one tab contract across the left and right sidebars", () => {
-    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
     const tabs = rules.find(({ selector }) => selector === ".ws-tabs");
-    const buttons = rules.find(({ selector }) => selector === ".ws-tabs button");
+    const buttons = rules.find(
+      ({ selector }) => selector === ".ws-tabs button",
+    );
     const sticky = rules.find(({ selector }) => selector === ".ws-tabs-sticky");
     const workCards = rules.find(
       ({ selector }) => selector === ".ws-work-context-cards",
@@ -805,18 +1285,26 @@ describe("shared surface and list-row architecture", () => {
         '.ws-tabs button:hover, .ws-tabs button[aria-selected="true"], .ws-tabs button[aria-pressed="true"]',
     );
 
-    expect(tabs?.declarations).toContain("grid-template-columns: repeat(3, 1fr)");
+    expect(tabs?.declarations).toContain(
+      "grid-template-columns: repeat(3, 1fr)",
+    );
     expect(buttons?.declarations).toContain("min-height: 2rem");
     expect(buttons?.declarations).toContain("border-radius: 0");
     expect(sticky?.declarations).toContain("position: sticky !important");
-    expect(active?.declarations).toContain("background: var(--accent) !important");
+    expect(active?.declarations).toContain(
+      "background: var(--accent) !important",
+    );
     expect(workCards?.declarations).toContain("display: grid");
     expect(workCards?.declarations).toContain("gap: 0.58rem");
   });
 
   test("keeps branch copy targets content-sized and stale clocks inline", () => {
-    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
-    const working = rules.find(({ selector }) => selector === ".ws-status-working");
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
+    const working = rules.find(
+      ({ selector }) => selector === ".ws-status-working",
+    );
     const clock = rules.find(
       ({ selector }) => selector === ".ws-status-stale-clock",
     );
@@ -832,7 +1320,9 @@ describe("shared surface and list-row architecture", () => {
   });
 
   test("spaces the shared left-sidebar title and subtitle rows", () => {
-    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
     const main = rules.find(
       ({ selector }) => selector === ".ws-sidebar-row-main",
     );
@@ -842,7 +1332,9 @@ describe("shared surface and list-row architecture", () => {
   });
 
   test("keeps authored PR and branch badges bounded within their rows", () => {
-    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
     const badges = rules.filter(
       ({ selector }) => selector === ".ws-pr-identifier-badge",
     );
@@ -854,13 +1346,18 @@ describe("shared surface and list-row architecture", () => {
   });
 
   test("keeps archived-thread context menus outside the dimmed stacking context", () => {
-    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
-    const archivedRow = rules.find(({ selector }) => selector === ".ws-archived-thread");
+    const rules = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    );
+    const archivedRow = rules.find(
+      ({ selector }) => selector === ".ws-archived-thread",
+    );
     const archivedAnchor = rules.find(
       ({ selector }) => selector === ".ws-archived-thread > .ws-thread-anchor",
     );
     const archivedAge = rules.find(
-      ({ selector }) => selector === ".ws-archived-thread .ws-thread-archive-age",
+      ({ selector }) =>
+        selector === ".ws-archived-thread .ws-thread-archive-age",
     );
 
     expect(
@@ -883,11 +1380,16 @@ describe("shared surface and list-row architecture", () => {
   });
 
   test("removes unsupported style debt rather than snapshotting it", () => {
-    const selectors = stylesheetPaths().flatMap((file) => stylesheetSelectors(readFileSync(file, "utf8")));
-    const source = stylesheetPaths().map((file) => readFileSync(file, "utf8")).join("\n");
+    const selectors = stylesheetPaths().flatMap((file) =>
+      stylesheetSelectors(readFileSync(file, "utf8")),
+    );
+    const source = stylesheetPaths()
+      .map((file) => readFileSync(file, "utf8"))
+      .join("\n");
     const consumers = sourceClassConsumers();
-    const obsolete = [...new Set(selectors.flatMap(selector => selectorClassNames(selector)))]
-      .filter((className) => !hasProductionConsumer(className, consumers));
+    const obsolete = [
+      ...new Set(selectors.flatMap((selector) => selectorClassNames(selector))),
+    ].filter((className) => !hasProductionConsumer(className, consumers));
 
     expect(source).not.toMatch(/\ball\s*:\s*unset\b/);
     expect(source).not.toMatch(/#[0-9a-f]{3,8}\b/i);
@@ -903,27 +1405,55 @@ describe("shared surface and list-row architecture", () => {
     });
 
     const undocumentedImportant = stylesheetPaths().flatMap((file) =>
-      undocumentedImportantDeclarations(readFileSync(file, "utf8"))
-        .map((violation) => `${relative(root, file)}: ${violation}`),
+      undocumentedImportantDeclarations(readFileSync(file, "utf8")).map(
+        (violation) => `${relative(root, file)}: ${violation}`,
+      ),
     );
 
-    expect(undocumentedImportant, "every important declaration directly documents its host override reason").toEqual([]);
-    expect(importantRules.every(({ selector }) => selectorClassNames(selector).every((className) => hasProductionConsumer(className, consumers))), "important overrides must retain production consumers").toBe(true);
-    expect(obsolete, "every ws-* selector must retain a production consumer").toEqual([]);
+    expect(
+      undocumentedImportant,
+      "every important declaration directly documents its host override reason",
+    ).toEqual([]);
+    expect(
+      importantRules.every(({ selector }) =>
+        selectorClassNames(selector).every((className) =>
+          hasProductionConsumer(className, consumers),
+        ),
+      ),
+      "important overrides must retain production consumers",
+    ).toBe(true);
+    expect(
+      obsolete,
+      "every ws-* selector must retain a production consumer",
+    ).toEqual([]);
   });
 
   test("keeps icon-only controls accessible", () => {
-    const fixture = ts.createSourceFile("fixture.tsx", `
+    const fixture = ts.createSourceFile(
+      "fixture.tsx",
+      `
       const controls = <>
         <button><Icon name="X" /></button>
         <button>Close</button>
         <button aria-label="Close"><Icon name="X" /></button>
       </>;
-    `, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    `,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    );
     expect(undocumentedIconButtons(fixture)).toEqual(["fixture.tsx:3"]);
-    const undocumented = productionSourcePaths(root).flatMap((file) => undocumentedIconButtons(
-      ts.createSourceFile(relative(root, file), readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true, scriptKind(file)),
-    ));
+    const undocumented = productionSourcePaths(root).flatMap((file) =>
+      undocumentedIconButtons(
+        ts.createSourceFile(
+          relative(root, file),
+          readFileSync(file, "utf8"),
+          ts.ScriptTarget.Latest,
+          true,
+          scriptKind(file),
+        ),
+      ),
+    );
     expect(undocumented).toEqual([]);
   });
 

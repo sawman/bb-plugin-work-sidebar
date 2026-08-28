@@ -13,6 +13,8 @@ type ThreadHandlers = Pick<
   | "saveLaterThreads"
   | "getThreadGroups"
   | "saveThreadGroups"
+  | "getSidebarAppearance"
+  | "saveSidebarAppearance"
   | "sidebarArchivedThreads"
   | "unarchiveSidebarThread"
 >;
@@ -34,9 +36,15 @@ export function createThreadRegistration(bb: BbPluginApi): ThreadHandlers {
     async saveLaterThreads({ threadIds }) {
       return { threadIds: await preferences.saveLater(threadIds) };
     },
-    async getThreadGroups() { return { groups: await preferences.groups() }; },
-    async saveThreadGroups({ groups }) {
-      return { groups: await preferences.saveGroups(groups) };
+    async getThreadGroups() { return preferences.groups(); },
+    async saveThreadGroups({ groups, activeGroupPosition }) {
+      return preferences.saveGroups(groups, activeGroupPosition);
+    },
+    async getSidebarAppearance() {
+      return preferences.appearance();
+    },
+    async saveSidebarAppearance({ rowHeight }) {
+      return preferences.saveAppearance(rowHeight);
     },
     async sidebarArchivedThreads() {
       try {

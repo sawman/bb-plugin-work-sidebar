@@ -13,6 +13,7 @@ import "./app.css";
 import "./scrollbar.css";
 import "./views.css";
 import { WorkThreadList } from "./features/threads/left-sidebar";
+import { SidebarAppearanceSettings } from "./features/threads/sidebar-appearance-settings";
 import { WorkPanel } from "./features/work-context/panel";
 import { withPluginProviders } from "./query-runtime";
 
@@ -97,6 +98,12 @@ function TrackWorkAction() {
 }
 
 export default definePluginApp((app) => {
+  app.slots.settingsSection({
+    id: "sidebar-appearance",
+    title: "Sidebar appearance",
+    description: "Tune the shared Threads, Tasks, and PR row layout.",
+    component: withPluginProviders(SidebarAppearanceSettings),
+  });
   app.slots.settingsSection({
     id: "github-polling",
     title: "GitHub polling",

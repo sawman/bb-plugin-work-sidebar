@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import plugin, { createServerLifecycle } from "../../server";
 import { WORK_BINDINGS_KEY } from "../../features/tasks/server-work-bindings";
+import { TASK_ASSIGNEES_KEY } from "../../features/tasks/server-task-adapter";
 
 const TASK_PROJECT_ID = "01M12DCYYGDB0WT05RXEQ2K3XA";
 const OUTCOME_TASK_ID = "01M12DCYZ0W87MD2SENEPDWMV8";
@@ -684,7 +685,7 @@ describe("durable Work/Tasks binding parity", () => {
 
     await host.harness.behavior.callAgentTool(
       "create_work_task",
-      { title: "Create the durable outcome", description: "" },
+      { title: "Create the durable outcome", description: "", assignee: "agent" },
       { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
     );
     expect(host.harness.inspection.realtimeSignals).toEqual([
@@ -698,6 +699,11 @@ describe("durable Work/Tasks binding parity", () => {
       { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
     );
     expect(host.harness.inspection.realtimeSignals).toHaveLength(2);
+    expect(
+      await host.bb.storage.kv.get<Record<string, "agent" | "human">>(
+        TASK_ASSIGNEES_KEY,
+      ),
+    ).toMatchObject({ [CREATED_OUTCOME_TASK_ID]: "agent" });
 
     await host.harness.behavior.callAgentTool(
       "create_execution_task",
@@ -705,6 +711,7 @@ describe("durable Work/Tasks binding parity", () => {
         title: "Create an execution task",
         description: "",
         idempotencyKey: "agent-created-execution",
+        assignee: "human",
       },
       { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
     );
@@ -714,6 +721,14 @@ describe("durable Work/Tasks binding parity", () => {
       { channel: "work-sidebar:changed", payload: { family: "work", rootThreadId: ROOT_THREAD_ID } },
       { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: ROOT_THREAD_ID } },
     ]);
+    expect(
+      await host.bb.storage.kv.get<Record<string, "agent" | "human">>(
+        TASK_ASSIGNEES_KEY,
+      ),
+    ).toMatchObject({
+      [CREATED_OUTCOME_TASK_ID]: "agent",
+      [CREATED_EXECUTION_TASK_ID]: "human",
+    });
 
     await host.harness.behavior.callAgentTool(
       "create_execution_task",

@@ -14,7 +14,12 @@ const root = ["work-sidebar", "pull-requests"] as const;
 
 export const pullRequestKeys = {
   authored: (): QueryKey => [...root, "authored"],
-  authoredStacks: (): QueryKey => [...root, "authored", "stacks"],
+  authoredStacks: (baseRevision?: number): QueryKey => [
+    ...root,
+    "authored",
+    "stacks",
+    ...(baseRevision == null ? [] : [baseRevision]),
+  ],
   sidebarStacks: (threadIds: readonly string[]): QueryKey => [
     ...root,
     "sidebar-stacks",
@@ -37,8 +42,6 @@ export const pullRequestPolicies = {
     gcTime: 15 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
-    refetchInterval: (polling: AuthoredPullRequestPolling): number =>
-      polling.intervalMs,
   },
   sidebarStacks: {
     staleTime: 60_000,
@@ -120,17 +123,15 @@ export function useAuthoredPullRequests(
     refetchInterval: pullRequestPolicies.authored.refetchInterval(polling),
   });
   const stacks = useQuery({
-    queryKey: pullRequestKeys.authoredStacks(),
+    // A successful base read defines the stack projection generation. This
+    // prevents a slightly later base response from hiding valid enrichment
+    // until the next polling interval.
+    queryKey: pullRequestKeys.authoredStacks(base.dataUpdatedAt),
     queryFn: () => authoredPullRequestStacks(rpc),
     enabled: base.isSuccess,
     ...pullRequestPolicies.authoredStacks,
-    refetchInterval:
-      pullRequestPolicies.authoredStacks.refetchInterval(polling),
   });
-  const enriched =
-    stacks.data && stacks.dataUpdatedAt >= base.dataUpdatedAt
-      ? stacks.data
-      : base.data;
+  const enriched = stacks.data ?? base.data;
   const refresh = async () => {
     await Promise.all([
       client.cancelQueries({ queryKey: pullRequestKeys.authored() }),
@@ -139,7 +140,6 @@ export function useAuthoredPullRequests(
     forceRefresh.current = true;
     try {
       await base.refetch({ throwOnError: true });
-      await stacks.refetch({ throwOnError: true });
     } finally {
       forceRefresh.current = false;
     }

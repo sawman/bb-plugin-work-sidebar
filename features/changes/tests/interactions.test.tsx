@@ -82,6 +82,30 @@ describe("R14 Changes interactions", () => {
     expect(store.getState().byThread.get("thr_two")?.selectedFilePath).toBe("two.ts");
   });
 
+  it("uses an accessible X icon to close the working-tree diff", () => {
+    const close = vi.fn();
+    const preview = render(
+      <ChangesWorkingTreePreview
+        path="src/file.ts"
+        query={{
+          data: { kind: "absent", path: "src/file.ts", patch: null, message: "No diff." },
+          error: null,
+          isError: false,
+          isPending: false,
+        }}
+        onClose={close}
+      />,
+    );
+
+    const button = preview.getByRole("button", {
+      name: "Close diff for src/file.ts",
+    });
+    expect(button.textContent).toBe("");
+    expect(button.querySelector('[data-icon="X"]')).not.toBeNull();
+    fireEvent.click(button);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
   it("does not load a preview until a file is selected, supports close, and exposes binary, absent, and unavailable fallbacks", async () => {
     const rpc = {
       call: vi.fn(async (_method: string, input: { path: string }) => ({
@@ -138,6 +162,45 @@ describe("R14 Changes interactions", () => {
     expect(document.activeElement).toBe(file);
     fireEvent.click(file);
     expect(open).toHaveBeenCalledOnce();
+  });
+
+  it("renders every received working-tree file without a local truncation notice", () => {
+    const changedFiles = Array.from({ length: 8 }, (_, index) => ({
+      path: `src/visible-${index + 1}.ts`,
+      status: "modified",
+      insertions: index,
+      deletions: 0,
+    }));
+    const { container } = render(
+      <ChangesRepositoryCard
+        repository={{
+          outcome: "available",
+          message: null,
+          branch: "main",
+          base: "main",
+          ahead: 0,
+          behind: 0,
+          worktreeState: "dirty_uncommitted",
+          hasUncommittedChanges: true,
+          changedFileCount: 12,
+          changedInsertions: 28,
+          changedDeletions: 0,
+          changedFiles,
+        }}
+        loading={false}
+        expanded
+        onToggle={() => undefined}
+        onOpenFile={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText("src/visible-8.ts")).toBeTruthy();
+    expect(screen.queryByText(/Only the first .* files are shown/)).toBeNull();
+    expect(
+      container
+        .querySelector(".ws-stack-files")
+        ?.classList.contains("ws-changes-file-list-scroll"),
+    ).toBe(true);
   });
 
   it("keeps checkout busy until it settles, reports success/failure, and invalidates only the owning Changes thread", async () => {

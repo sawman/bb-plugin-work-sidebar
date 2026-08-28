@@ -143,6 +143,20 @@ export function createWorkBindingsService(
     normalizeBindings(await bb.storage.kv.get<unknown>(WORK_BINDINGS_KEY));
   const write = (bindings: WorkBindings) =>
     bb.storage.kv.set(WORK_BINDINGS_KEY, bindings);
+  const persistAssignee = async (
+    taskId: string,
+    assignee: "agent" | "human" | undefined,
+  ) => {
+    if (!assignee) return false;
+    const stored = (await tasks.readAssignees())[taskId];
+    if (stored !== assignee) await tasks.writeAssignee(taskId, assignee);
+    return (stored ?? "human") !== assignee;
+  };
+  const publishTaskAssignment = (rootThreadId: string) =>
+    bb.realtime.publish("work-sidebar:changed", {
+      family: "tasks",
+      threadId: rootThreadId,
+    });
   const rootThread = async (threadId: string) => {
     let thread = await bb.sdk.threads.get({ threadId });
     for (let depth = 0; thread.parentThreadId && depth < 32; depth += 1) {
@@ -444,6 +458,7 @@ export function createWorkBindingsService(
     title: string;
     description: string;
     taskProjectId?: string | null;
+    assignee?: "agent" | "human";
   }) => {
     if (!(await tasks.available()))
       throw new Error("The official BB Tasks plugin is not available");
@@ -462,6 +477,8 @@ export function createWorkBindingsService(
           `Outcome binding ${existing.outcomeTaskId} is missing; resolve recovery before creating another outcome`,
         );
       assertOutcomeTaskBinding(existing, task);
+      if (await persistAssignee(task.id, input.assignee))
+        publishTaskAssignment(root.id);
       return { task, binding: existing };
     }
     const taskProjectId = await projectFor(root, {
@@ -505,6 +522,7 @@ export function createWorkBindingsService(
       updatedAt: now,
     };
     await write({ ...saved, outcomes: [...saved.outcomes, binding] });
+    await persistAssignee(result.task.id, input.assignee);
     invalidateLegacy(root.id, root.projectId);
     publishWorkBindingReady(bb.realtime, root.id);
     return { task: result.task, binding };
@@ -514,6 +532,7 @@ export function createWorkBindingsService(
     title: string;
     description: string;
     idempotencyKey: string;
+    assignee?: "agent" | "human";
   }) => {
     const root = await rootThread(input.rootThreadId);
     const saved = await read();
@@ -537,6 +556,8 @@ export function createWorkBindingsService(
           `Execution binding ${existing.executionTaskId} is missing; recovery is required`,
         );
       assertExecutionTaskBinding(existing, task);
+      if (await persistAssignee(task.id, input.assignee))
+        publishTaskAssignment(root.id);
       return { task, binding: existing, reused: true };
     }
     const outcomeTask = all.get(outcomeBinding.outcomeTaskId);
@@ -587,6 +608,7 @@ export function createWorkBindingsService(
       updatedAt: now,
     };
     await write({ ...saved, executions: [...saved.executions, binding] });
+    await persistAssignee(result.task.id, input.assignee);
     invalidateLegacy(root.id, root.projectId);
     publishWorkBindingReady(bb.realtime, root.id);
     return { task: result.task, binding, reused: false };

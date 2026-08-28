@@ -2,6 +2,90 @@ export type ThreadSelectionModifiers = Readonly<{ toggle?: boolean; range?: bool
 
 export type SidebarThreadGroup = Readonly<{ id: string; name: string; threadIds: string[] }>;
 
+export const ACTIVE_THREAD_GROUP_ID = "active";
+
+export type SidebarThreadGroupPosition = Readonly<{
+  id: string;
+  name: string;
+  group: SidebarThreadGroup | null;
+}>;
+
+export type SidebarThreadGroupPreferences = Readonly<{
+  groups: SidebarThreadGroup[];
+  activeGroupPosition: number;
+}>;
+
+export function normalizeActiveGroupPosition(value: unknown, groupCount: number) {
+  const position = typeof value === "number" && Number.isInteger(value) ? value : 0;
+  return Math.max(0, Math.min(groupCount, position));
+}
+
+export function threadGroupPositions(
+  groups: readonly SidebarThreadGroup[],
+  activeGroupPosition: number,
+): SidebarThreadGroupPosition[] {
+  const positions: SidebarThreadGroupPosition[] = groups.map((group) => ({
+    id: group.id,
+    name: group.name,
+    group,
+  }));
+  positions.splice(normalizeActiveGroupPosition(activeGroupPosition, groups.length), 0, {
+    id: ACTIVE_THREAD_GROUP_ID,
+    name: "Active",
+    group: null,
+  });
+  return positions;
+}
+
+export function moveThreadGroup(
+  groups: readonly SidebarThreadGroup[],
+  activeGroupPosition: number,
+  groupId: string,
+  direction: -1 | 1,
+): SidebarThreadGroupPreferences | null {
+  const positions = threadGroupPositions(groups, activeGroupPosition);
+  const source = positions.findIndex((position) => position.id === groupId);
+  const destination = source + direction;
+  if (source < 0 || destination < 0 || destination >= positions.length)
+    return null;
+  [positions[source], positions[destination]] = [
+    positions[destination]!,
+    positions[source]!,
+  ];
+  const activePosition = positions.findIndex(
+    (position) => position.id === ACTIVE_THREAD_GROUP_ID,
+  );
+  return {
+    groups: positions.flatMap((position) =>
+      position.group ? [position.group] : [],
+    ),
+    activeGroupPosition: activePosition,
+  };
+}
+
+export function reorderThreadGroup(
+  groups: readonly SidebarThreadGroup[],
+  activeGroupPosition: number,
+  sourceId: string,
+  targetId: string,
+): SidebarThreadGroupPreferences | null {
+  const positions = threadGroupPositions(groups, activeGroupPosition);
+  const source = positions.findIndex((position) => position.id === sourceId);
+  const target = positions.findIndex((position) => position.id === targetId);
+  if (source < 0 || target < 0 || source === target) return null;
+  const [moved] = positions.splice(source, 1);
+  if (!moved) return null;
+  positions.splice(target, 0, moved);
+  return {
+    groups: positions.flatMap((position) =>
+      position.group ? [position.group] : [],
+    ),
+    activeGroupPosition: positions.findIndex(
+      (position) => position.id === ACTIVE_THREAD_GROUP_ID,
+    ),
+  };
+}
+
 type CountableThread = Readonly<{
   id: string;
   parentThreadId: string | null;

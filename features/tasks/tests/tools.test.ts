@@ -136,6 +136,9 @@ describe("agent-facing Tasks workflow tools", () => {
     expect(WORK_AGENT_INSTRUCTIONS).toContain(
       "use in_review only while a named reviewer or concrete acceptance gate is actually pending",
     );
+    expect(WORK_AGENT_INSTRUCTIONS).toContain(
+      "Set assignee to Agent when creating work for yourself",
+    );
   });
 
   it("reads one task with project, assignment, comments, and worker threads", async () => {
@@ -215,6 +218,17 @@ describe("agent-facing Tasks workflow tools", () => {
       host.harness.behavior.callAgentTool(
         "update_task",
         { key: "BBPLUG-60" },
+        { threadId: THREAD_ID, projectId: "proj_root" },
+      ),
+    ).rejects.toThrow();
+    await expect(
+      host.harness.behavior.callAgentTool(
+        "create_execution_task",
+        {
+          title: "Invalid owner",
+          idempotencyKey: "invalid-owner",
+          assignee: "robot",
+        } as never,
         { threadId: THREAD_ID, projectId: "proj_root" },
       ),
     ).rejects.toThrow();

@@ -18,6 +18,8 @@ export function registerTasksTools(
     const projects = await tasks.projects();
     return summarizeTask(task, projects.find((project) => project.id === task.projectId)?.name ?? "Work");
   };
+  const assignedTo = async (taskId: string) =>
+    (await tasks.readAssignees())[taskId] ?? "human";
   const findTask = async (key: string) => {
     const task = await tasks.getByKey(key);
     if (!task) throw new Error(`Task not found: ${key}`);
@@ -38,14 +40,30 @@ export function registerTasksTools(
   };
   bb.agents.registerTool({
     name: "create_work_task",
-    description: "Ensure the one top-level outcome task for the current root work item.",
-    parameters: z.object({ title: z.string().trim().min(1), description: z.string(), taskProjectId: z.string().nullable().optional() }),
-    instructions: "Call get_work_context first. Outcomes are top-level only; execution units are direct children created with create_execution_task.",
+    description: "Ensure the one top-level outcome task and set its Human or Agent assignment.",
+    parameters: z.object({
+      title: z.string().trim().min(1),
+      description: z.string(),
+      taskProjectId: z.string().nullable().optional(),
+      assignee: z.enum(["agent", "human"]).optional(),
+    }).strict(),
+    instructions: "Call get_work_context first. Outcomes are top-level only; execution units are direct children created with create_execution_task. Assign agent-owned work to Agent and explicit user follow-up to Human.",
     async execute(params, context) {
       const root = await bindings.rootThread(context.threadId);
-      const result = await bindings.outcome({ rootThreadId: root.id, title: params.title, description: params.description, taskProjectId: params.taskProjectId });
+      const result = await bindings.outcome({
+        rootThreadId: root.id,
+        title: params.title,
+        description: params.description,
+        taskProjectId: params.taskProjectId,
+        assignee: params.assignee,
+      });
       const task = await namedTask(result.task);
-      return `Work is tracked as ${task.key}: ${task.title}. Record meaningful milestones, then move fully validated work directly to done. Use in_review only while a named reviewer or concrete acceptance gate is pending.`;
+      const assignment = await assignedTo(result.task.id);
+      return [
+        `Work is tracked as ${task.key}: ${task.title}, assigned to ${assignment}.`,
+        "Record meaningful milestones, then move fully validated work directly to done.",
+        "Use in_review only while a named reviewer or concrete acceptance gate is pending.",
+      ].join(" ");
     },
   });
   bb.agents.registerTool({
@@ -126,13 +144,24 @@ export function registerTasksTools(
   });
   bb.agents.registerTool({
     name: "create_execution_task",
-    description: "Create or reuse one direct execution subtask using a stable idempotency key.",
-    parameters: z.object({ rootThreadId: z.string().optional(), title: z.string().trim().min(1), description: z.string().default(""), idempotencyKey: z.string().trim().min(1).max(200) }),
-    instructions: "Call get_work_context first. This creates only a direct child of the durable top-level outcome; never create nested Tasks subtasks.",
+    description: "Create or reuse one direct execution subtask with explicit Human or Agent assignment.",
+    parameters: z.object({
+      rootThreadId: z.string().optional(),
+      title: z.string().trim().min(1),
+      description: z.string().default(""),
+      idempotencyKey: z.string().trim().min(1).max(200),
+      assignee: z.enum(["agent", "human"]).optional(),
+    }).strict(),
+    instructions: [
+      "Call get_work_context first.",
+      "This creates only a direct child of the durable top-level outcome; never create nested Tasks subtasks.",
+      "Assign work the agent will execute to Agent; use Human when the task is waiting for user follow-up.",
+    ].join(" "),
     async execute(params, context) {
       const root = await bindings.rootThread(params.rootThreadId ?? context.threadId);
       const result = await bindings.execution({ ...params, rootThreadId: root.id });
-      return `${result.reused ? "Reused" : "Created"} execution task ${result.task.key} with idempotency key ${result.binding.idempotencyKey}.`;
+      const assignment = await assignedTo(result.task.id);
+      return `${result.reused ? "Reused" : "Created"} execution task ${result.task.key}, assigned to ${assignment}, with idempotency key ${result.binding.idempotencyKey}.`;
     },
   });
   bb.agents.registerTool({

@@ -25,6 +25,38 @@ function requiredNumber(value: unknown, field: string): number {
   return value;
 }
 
+function requestedReviewerNames(value: unknown): string[] {
+  if (!isRecord(value) || !Array.isArray(value.nodes)) return [];
+  const names = value.nodes.flatMap((node) => {
+    if (!isRecord(node) || !isRecord(node.requestedReviewer)) return [];
+    const reviewer = node.requestedReviewer;
+    if (typeof reviewer.login === "string" && reviewer.login) return [reviewer.login];
+    if (typeof reviewer.slug === "string" && reviewer.slug) return [reviewer.slug];
+    if (typeof reviewer.name === "string" && reviewer.name) return [reviewer.name];
+    return [];
+  });
+  return [...new Set(names)];
+}
+
+function restRequestedReviewerNames(pullRequest: Record<string, unknown>): string[] {
+  const users = Array.isArray(pullRequest.requested_reviewers)
+    ? pullRequest.requested_reviewers.flatMap((reviewer) =>
+        isRecord(reviewer) && typeof reviewer.login === "string" && reviewer.login
+          ? [reviewer.login]
+          : [],
+      )
+    : [];
+  const teams = Array.isArray(pullRequest.requested_teams)
+    ? pullRequest.requested_teams.flatMap((team) => {
+        if (!isRecord(team)) return [];
+        if (typeof team.slug === "string" && team.slug) return [team.slug];
+        if (typeof team.name === "string" && team.name) return [team.name];
+        return [];
+      })
+    : [];
+  return [...new Set([...users, ...teams])];
+}
+
 export function githubStackApiArgs(owner: string, repo: string, pullRequest: number): string[] {
   return [
     "api", "--method", "GET", `repos/${owner}/${repo}/stacks`,
@@ -112,8 +144,9 @@ function signalFromGraphql(value: unknown): GitHubSignal | null {
   const reviewDecision = String(value.reviewDecision ?? "");
   const reviewRequests = isRecord(value.reviewRequests) && typeof value.reviewRequests.totalCount === "number"
     ? value.reviewRequests.totalCount : 0;
+  const requestedReviewers = requestedReviewerNames(value.reviewRequests);
   const review = reviewDecision === "APPROVED" ? "approved"
-    : reviewDecision === "CHANGES_REQUESTED" ? reviewRequests > 0 ? "changes_requested_review_requested" : "changes_requested"
+    : reviewDecision === "CHANGES_REQUESTED" ? reviewRequests > 0 ? "review_required" : "changes_requested"
       : reviewRequests > 0 ? "review_requested" : reviewDecision === "REVIEW_REQUIRED" ? "review_required" : "none";
   const commits = isRecord(value.commits) && Array.isArray(value.commits.nodes) ? value.commits.nodes : [];
   const commit = commits[commits.length - 1];
@@ -128,6 +161,7 @@ function signalFromGraphql(value: unknown): GitHubSignal | null {
   return {
     checks,
     review,
+    ...(requestedReviewers.length ? { requestedReviewers } : {}),
     ...(head ? { head } : {}),
     ...(base ? { base } : {}),
   };
@@ -157,9 +191,17 @@ export async function readGitHubSignals(
     else missing.push(number);
   }
   if (missing.length && Date.now() >= lifecycle.githubGraphqlBackoffUntil) {
-    const selections = missing.map((number, index) =>
-      `p${index}: pullRequest(number: ${number}) { headRefName baseRefName reviewDecision reviewRequests(first: 1) { totalCount } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } }`,
-    ).join(" ");
+    const selections = missing
+      .map((number, index) =>
+        [
+          `p${index}: pullRequest(number: ${number}) {`,
+          "headRefName baseRefName reviewDecision",
+          "reviewRequests(first: 20) { totalCount nodes { requestedReviewer { ... on User { login } ... on Team { slug } } } }",
+          "commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }",
+          "}",
+        ].join(" "),
+      )
+      .join(" ");
     try {
       const stdout = await run(["api", "graphql", "-f", `query=query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${selections} } }`], 4_000_000);
       const parsed: unknown = JSON.parse(stdout);
@@ -209,9 +251,11 @@ async function readRestSignal(
       ? pullRequest.head.ref : null;
     const base = isRecord(pullRequest.base) && typeof pullRequest.base.ref === "string" && pullRequest.base.ref
       ? pullRequest.base.ref : null;
+    const requestedReviewerList = restRequestedReviewerNames(pullRequest);
     const metadata = {
       ...(head ? { head } : {}),
       ...(base ? { base } : {}),
+      ...(requestedReviewerList.length ? { requestedReviewers: requestedReviewerList } : {}),
     };
     const requestedReviewers = Array.isArray(pullRequest.requested_reviewers) ? pullRequest.requested_reviewers.length : 0;
     const requestedTeams = Array.isArray(pullRequest.requested_teams) ? pullRequest.requested_teams.length : 0;
@@ -223,7 +267,7 @@ async function readRestSignal(
     const reviewStates = [...latestReviewByUser.values()];
     const requests = requestedReviewers + requestedTeams;
     const review = reviewStates.includes("CHANGES_REQUESTED")
-      ? requests > 0 ? "changes_requested_review_requested" : "changes_requested"
+      ? requests > 0 ? "review_required" : "changes_requested"
       : reviewStates.includes("APPROVED") ? "approved"
         : requests > 0 ? "review_requested" : "none";
     const sha = isRecord(pullRequest.head) && typeof pullRequest.head.sha === "string" ? pullRequest.head.sha : null;

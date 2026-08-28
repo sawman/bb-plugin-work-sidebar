@@ -45,6 +45,8 @@ export default function plugin(
     saveLaterThreads: threads.saveLaterThreads,
     getThreadGroups: threads.getThreadGroups,
     saveThreadGroups: threads.saveThreadGroups,
+    getSidebarAppearance: threads.getSidebarAppearance,
+    saveSidebarAppearance: threads.saveSidebarAppearance,
     sidebarTasks: tasks.sidebarTasks,
     sidebarTaskLinks: tasks.sidebarTaskLinks,
     sidebarPullRequestStacks: pullRequests.sidebarPullRequestStacks,

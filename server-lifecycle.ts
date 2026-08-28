@@ -9,7 +9,6 @@ export type GitHubPullRequestSignal = {
   review:
     | "approved"
     | "changes_requested"
-    | "changes_requested_review_requested"
     | "review_requested"
     | "review_required"
     | "none";

@@ -73,7 +73,6 @@ export function ThreadWorkspaceBadge({
         <BranchName
           name={branch}
           icon="GitBranch"
-          typography="context"
           title={`${contextTitle} · ${branch}`}
         />
       </span>

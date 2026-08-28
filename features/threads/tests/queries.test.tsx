@@ -50,12 +50,15 @@ describe("R9 Threads query ownership", () => {
     await saveThreadGroups(client, rpc as unknown as ThreadsRpc, [
       { id: "group_later", name: "Later", threadIds: ["thr_1"] },
     ]);
-    expect(client.getQueryData(threadQueryKeys.groups())).toEqual([
-      { id: "group_later", name: "Later", threadIds: ["thr_1"] },
-    ]);
+    expect(client.getQueryData(threadQueryKeys.groups())).toEqual({
+      groups: [
+        { id: "group_later", name: "Later", threadIds: ["thr_1"] },
+      ],
+      activeGroupPosition: 0,
+    });
   });
 
-  it("owns archive reads through the registered-slot lifecycle: closed, cached reopen, roster invalidation, and stable roster", async () => {
+  it("caches archive reads while collapsed and refreshes them when the active roster changes", async () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
@@ -66,35 +69,36 @@ describe("R9 Threads query ownership", () => {
       })),
     };
     const view = renderHook(
-      ({ enabled, roster }: { enabled: boolean; roster: string }) =>
-        useArchivedThreadsQuery(rpc as unknown as ThreadsRpc, enabled, roster),
+      ({ roster }: { roster: string }) =>
+        useArchivedThreadsQuery(rpc as unknown as ThreadsRpc, roster),
       {
-        initialProps: { enabled: false, roster: "thr_active" },
+        initialProps: { roster: "thr_active" },
         wrapper: queryWrapper(client),
       },
     );
     await act(async () => {
       await Promise.resolve();
     });
-    expect(rpc.call).toHaveBeenCalledTimes(0);
-    view.rerender({ enabled: true, roster: "thr_active" });
     await waitFor(() => expect(rpc.call).toHaveBeenCalledTimes(1));
-    view.rerender({ enabled: false, roster: "thr_active" });
-    view.rerender({ enabled: true, roster: "thr_active" });
+    view.rerender({ roster: "thr_active" });
     await act(async () => {
       await Promise.resolve();
     });
     expect(rpc.call).toHaveBeenCalledTimes(1);
-    view.rerender({ enabled: false, roster: "thr_changed" });
+    view.rerender({ roster: "thr_active" });
     await act(async () => {
       await Promise.resolve();
     });
     expect(rpc.call).toHaveBeenCalledTimes(1);
-    view.rerender({ enabled: true, roster: "thr_changed" });
+    view.rerender({ roster: "thr_changed" });
     await waitFor(() => expect(rpc.call).toHaveBeenCalledTimes(2));
-    view.rerender({ enabled: false, roster: "thr_changed" });
-    view.rerender({ enabled: false, roster: "thr_changed" });
-    view.rerender({ enabled: true, roster: "thr_changed" });
+    view.rerender({ roster: "thr_changed" });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(rpc.call).toHaveBeenCalledTimes(2);
+    view.rerender({ roster: "thr_changed" });
+    view.rerender({ roster: "thr_changed" });
     await act(async () => {
       await Promise.resolve();
     });
@@ -122,14 +126,8 @@ describe("R9 Threads query ownership", () => {
         }),
     };
     const view = renderHook(
-      ({ enabled }: { enabled: boolean }) =>
-        useArchivedThreadsQuery(
-          rpc as unknown as ThreadsRpc,
-          enabled,
-          "stable",
-        ),
+      () => useArchivedThreadsQuery(rpc as unknown as ThreadsRpc, "stable"),
       {
-        initialProps: { enabled: true },
         wrapper: queryWrapper(client),
       },
     );

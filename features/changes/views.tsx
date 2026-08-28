@@ -14,6 +14,7 @@ import {
   type PullRequestSignal,
 } from "../pull-requests/presentation.js";
 import { HostWorkingTreeRenderer } from "./host-renderer.js";
+import { ChangedFilesList } from "./file-list.js";
 import type { Repository, WorkingTreeFileDiff } from "./schemas.js";
 import { repositoryPresentation, type StackBranchSignals } from "./model";
 import { StackBranchActions } from "./stack-branch-actions.js";
@@ -48,31 +49,15 @@ function RepositoryFiles({
   onOpenFile(path: string): void;
 }) {
   return (
-    <div className="ws-current-pr-details ws-working-tree-files">
-      {repository.changedFiles.map((file) => (
-        <button
-          type="button"
-          className="ws-working-tree-file"
-          key={file.path}
-          onClick={() => onOpenFile(file.path)}
-          aria-label={`Open uncommitted diff for ${file.path}`}
-        >
-          <b className={`ws-file-${file.status}`}>
-            {file.status[0]?.toUpperCase()}
-          </b>
-          <em>{file.path}</em>
-          <small>
-            {file.insertions !== null ? `+${file.insertions}` : ""}{" "}
-            {file.deletions !== null ? `−${file.deletions}` : ""}
-          </small>
-        </button>
-      ))}
-      {repository.changedFileCount > repository.changedFiles.length && (
-        <small>
-          Only the first {repository.changedFiles.length} files are shown.
-        </small>
-      )}
-    </div>
+    <ChangedFilesList
+      files={repository.changedFiles.map((file) => ({
+        path: file.path,
+        status: file.status,
+        additions: file.insertions,
+        deletions: file.deletions,
+      }))}
+      onOpenFile={onOpenFile}
+    />
   );
 }
 
@@ -219,11 +204,11 @@ export function ChangesWorkingTreePreview({
         trailing={
           <button
             type="button"
-            className="ws-text-button"
+            className="ws-icon-button"
             onClick={onClose}
             aria-label={`Close diff for ${path}`}
           >
-            Close
+            <Icon name="X" aria-hidden />
           </button>
         }
       />
@@ -324,56 +309,11 @@ function PullRequestFiles({
 }: {
   diff: GitHubStackBranch["diff"];
 }): ReactElement {
-  if (!diff)
-    return (
-      <div className="ws-stack-files">
-        <small>Changed files are unavailable.</small>
-      </div>
-    );
-  if (diff.files.length === 0)
-    return (
-      <div className="ws-stack-files">
-        <small>No changed files.</small>
-      </div>
-    );
   return (
-    <div className="ws-stack-files">
-      {diff.files.map((file) => (
-        <span key={file.path}>
-          <b className={`ws-file-${file.status}`}>
-            {file.status[0]?.toUpperCase()}
-          </b>
-          <em>{file.path}</em>
-          <small
-            className="ws-file-additions"
-            aria-label={
-              file.additions === null
-                ? undefined
-                : `${file.additions} ${file.additions === 1 ? "line" : "lines"} added`
-            }
-            aria-hidden={file.additions === null ? true : undefined}
-          >
-            {file.additions !== null ? `+${file.additions}` : ""}
-          </small>
-          <small
-            className="ws-file-deletions"
-            aria-label={
-              file.deletions === null
-                ? undefined
-                : `${file.deletions} ${file.deletions === 1 ? "line" : "lines"} deleted`
-            }
-            aria-hidden={file.deletions === null ? true : undefined}
-          >
-            {file.deletions !== null ? `−${file.deletions}` : ""}
-          </small>
-        </span>
-      ))}
-      {diff.truncated && (
-        <small className="ws-stack-files-truncated">
-          Only the first {diff.files.length} files are shown.
-        </small>
-      )}
-    </div>
+    <ChangedFilesList
+      files={diff?.files ?? null}
+      truncated={diff?.truncated ?? false}
+    />
   );
 }
 

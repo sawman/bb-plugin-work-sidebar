@@ -49,14 +49,13 @@ const RED_DEAD_SELECTORS = [
   ".ws-pr-row",
   ".ws-pr-changes_requested",
   ".ws-pr-stack-disclosure",
-  ".ws-pr-stack-disclosure[data-state=\"open\"]",
+  '.ws-pr-stack-disclosure[data-state="open"]',
   ".ws-pr-stack-disclosure:hover",
   ".ws-pr-stack-layer-item",
   ".ws-pr-stack-layer-item .ws-pr-row",
   ".ws-pr-target",
   ".ws-pr-stack-layer-item::before",
   ".ws-pr-stack-layer-item > .ws-pr-row",
-  ".ws-new-thread",
   ".ws-thread-settings-menu",
   ".ws-thread-task-card",
 ] as const;
@@ -68,7 +67,7 @@ const STATE_SHAPED_RED_SELECTORS = [
   ".ws-thread-dragging > .ws-thread-anchor",
   ".ws-task-status-picker:hover:not(:disabled)",
   ".ws-pr-changes_requested",
-  ".ws-pr-stack-disclosure[data-state=\"open\"]",
+  '.ws-pr-stack-disclosure[data-state="open"]',
   ".ws-pr-stack-disclosure:hover",
 ] as const;
 
@@ -94,7 +93,6 @@ const EXPECTED_DISJOINT_REPEATED_SELECTORS = [
   ".ws-pr-stack",
   ".ws-pr-stack-disclosure",
   ".ws-pr-stack-layer-item",
-  ".ws-pr-stack-layer-item .ws-pr-row",
   ".ws-pr-target",
   ".ws-work-toolbar-actions",
   ".ws-thread-settings",
@@ -114,11 +112,12 @@ const EXPECTED_EFFECTIVE_STYLES: Record<string, Record<string, string>> = {
     color: "var(--muted-foreground)",
     "line-height": "1",
   },
-  ".ws-thread-child-depth-1, .ws-thread-child-depth-2, .ws-thread-child-depth-3, .ws-thread-child-depth-4": {
-    "border-left": "1px solid var(--border)",
-    "margin-left": "0.38rem",
-    "padding-left": "0.24rem",
-  },
+  ".ws-thread-child-depth-1, .ws-thread-child-depth-2, .ws-thread-child-depth-3, .ws-thread-child-depth-4":
+    {
+      "border-left": "1px solid var(--border)",
+      "margin-left": "0.38rem",
+      "padding-left": "0.24rem",
+    },
   ".ws-section-count": {
     color: "var(--muted-foreground)",
     "font-size": "0.58rem",
@@ -205,6 +204,7 @@ const EXPECTED_EFFECTIVE_STYLES: Record<string, Record<string, string>> = {
     "flex-wrap": "wrap",
     gap: "0.2rem",
     "align-items": "center",
+    overflow: "visible",
   },
   ".ws-task-key-badge, .ws-task-badge": {
     border: "1px solid var(--border)",
@@ -249,13 +249,12 @@ const EXPECTED_EFFECTIVE_STYLES: Record<string, Record<string, string>> = {
   },
   ".ws-pr-row": {
     position: "relative",
-    "border-radius": "calc(var(--radius) - 2px)",
     display: "grid",
     "grid-template-columns": "var(--ws-pr-stack-gutter) minmax(0, 1fr) auto",
     gap: "0.18rem",
     "align-items": "center",
+    "padding-block": "0.16rem",
     "padding-inline": "0.45rem",
-    "border-bottom": "1px solid var(--border)",
     "padding-left": "0",
   },
   ".ws-pr-changes_requested": {
@@ -278,7 +277,7 @@ const EXPECTED_EFFECTIVE_STYLES: Record<string, Record<string, string>> = {
     "line-height": "1",
     transition: "transform 0.12s ease",
   },
-  ".ws-pr-stack-disclosure[data-state=\"open\"]": {
+  '.ws-pr-stack-disclosure[data-state="open"]': {
     transform: "rotate(90deg)",
     background: "transparent",
     color: "var(--foreground)",
@@ -298,12 +297,11 @@ const EXPECTED_EFFECTIVE_STYLES: Record<string, Record<string, string>> = {
   },
   ".ws-pr-stack-layer-item .ws-pr-row": {
     "padding-left": "0",
-    "border-bottom": "0",
   },
   ".ws-pr-target": {
     "grid-template-columns": "minmax(0, 1fr)",
-    "grid-template-areas": "\"title\" \"context\"",
-    "grid-template-rows": "auto auto",
+    "grid-template-areas": '"title" "context"',
+    "row-gap": "0.16rem",
     color: "inherit",
     "text-decoration": "none",
   },
@@ -314,30 +312,13 @@ const EXPECTED_EFFECTIVE_STYLES: Record<string, Record<string, string>> = {
     left: "calc(var(--ws-pr-row-inline-padding) + (var(--ws-pr-stack-gutter) - 1px) / 2 - 1px) !important",
     width: "1px",
     background: "color-mix(in srgb, var(--primary) 72%, var(--border))",
-    content: "\"\"",
+    content: '""',
   },
   ".ws-pr-stack-layer-item > .ws-pr-row": {
     "margin-left": "0 !important",
-    background: "linear-gradient( 90deg, color-mix(in srgb, var(--primary) 6%, transparent), transparent 36% )",
+    background:
+      "linear-gradient( 90deg, color-mix(in srgb, var(--primary) 6%, transparent), transparent 36% )",
     "padding-left": "0 !important",
-  },
-  ".ws-new-thread": {
-    display: "inline-flex !important",
-    width: "1.6rem !important",
-    height: "1.6rem !important",
-    "align-items": "center",
-    "justify-content": "center",
-    margin: "0 !important",
-    padding: "0 !important",
-    border: "1px solid transparent !important",
-    "border-radius": "calc(var(--radius) - 3px) !important",
-    color: "var(--muted-foreground) !important",
-  },
-  ".ws-new-thread svg": {
-    width: "0.76rem",
-    height: "0.76rem",
-    display: "block",
-    margin: "0",
   },
   ".ws-thread-settings-menu": {
     position: "absolute",
@@ -350,7 +331,8 @@ const EXPECTED_EFFECTIVE_STYLES: Record<string, Record<string, string>> = {
     border: "1px solid var(--border)",
     "border-radius": "var(--radius)",
     background: "var(--popover)",
-    "box-shadow": "0 8px 24px color-mix(in srgb, var(--foreground) 18%, transparent)",
+    "box-shadow":
+      "0 8px 24px color-mix(in srgb, var(--foreground) 18%, transparent)",
     bottom: "auto !important",
   },
   ".ws-thread-task-card": {
@@ -361,7 +343,9 @@ const EXPECTED_EFFECTIVE_STYLES: Record<string, Record<string, string>> = {
 };
 
 function withoutComments(source: string) {
-  return source.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, " "));
+  return source.replace(/\/\*[\s\S]*?\*\//g, (comment) =>
+    comment.replace(/[^\n]/g, " "),
+  );
 }
 
 function lineNumber(source: string, index: number) {
@@ -393,7 +377,11 @@ function normalizeWhitespace(value: string) {
   return value.trim().replace(/\s+/g, " ");
 }
 
-function parseDeclarations(source: string, start: number, end: number): Declaration[] {
+function parseDeclarations(
+  source: string,
+  start: number,
+  end: number,
+): Declaration[] {
   const declarations: Declaration[] = [];
   let segmentStart = start;
   let parentheses = 0;
@@ -426,7 +414,12 @@ function parseDeclarations(source: string, start: number, end: number): Declarat
     let value = normalizeWhitespace(segment.slice(colon + 1));
     const important = /\s*!important$/.test(value);
     if (important) value = value.replace(/\s*!important$/, " !important");
-    declarations.push({ property, value, important, line: lineNumber(source, segmentStartIndex) });
+    declarations.push({
+      property,
+      value,
+      important,
+      line: lineNumber(source, segmentStartIndex),
+    });
   }
   return declarations;
 }
@@ -441,7 +434,10 @@ function parseRules(source: string): Rule[] {
       const open = clean.indexOf("{", cursor);
       if (open < 0 || open >= end) return;
       const close = matchingClose(clean, open);
-      if (close > end) throw new Error(`CSS block escapes its parent at ${lineNumber(clean, open)}`);
+      if (close > end)
+        throw new Error(
+          `CSS block escapes its parent at ${lineNumber(clean, open)}`,
+        );
       const prelude = normalizeWhitespace(clean.slice(cursor, open));
       if (prelude.startsWith("@")) {
         parseRange(open + 1, close, [...atRules, prelude]);
@@ -465,16 +461,26 @@ function ruleKey({ atRules, selector }: Pick<Rule, "atRules" | "selector">) {
   return JSON.stringify([...atRules, selector]);
 }
 
-function effectiveDeclarations(rules: Rule[], selector: string, atRules: string[] = []) {
+function effectiveDeclarations(
+  rules: Rule[],
+  selector: string,
+  atRules: string[] = [],
+) {
   const effective = new Map<string, Declaration>();
   const key = ruleKey({ atRules, selector });
   for (const rule of rules.filter((candidate) => ruleKey(candidate) === key)) {
     for (const declaration of rule.declarations) {
       const previous = effective.get(declaration.property);
-      if (!previous || declaration.important || !previous.important) effective.set(declaration.property, declaration);
+      if (!previous || declaration.important || !previous.important)
+        effective.set(declaration.property, declaration);
     }
   }
-  return Object.fromEntries([...effective.entries()].map(([property, declaration]) => [property, declaration.value]));
+  return Object.fromEntries(
+    [...effective.entries()].map(([property, declaration]) => [
+      property,
+      declaration.value,
+    ]),
+  );
 }
 
 function overlappingProperties(rules: Rule[]) {
@@ -489,10 +495,15 @@ function overlappingProperties(rules: Rule[]) {
     if (selectorRules.length < 2) continue;
     const properties = new Set<string>();
     for (let first = 0; first < selectorRules.length; first += 1) {
-      const firstProperties = selectorRules[first]!.declarations.map(({ property }) => property);
+      const firstProperties = selectorRules[first]!.declarations.map(
+        ({ property }) => property,
+      );
       for (let second = first + 1; second < selectorRules.length; second += 1) {
-        const secondProperties = new Set(selectorRules[second]!.declarations.map(({ property }) => property));
-        for (const property of firstProperties) if (secondProperties.has(property)) properties.add(property);
+        const secondProperties = new Set(
+          selectorRules[second]!.declarations.map(({ property }) => property),
+        );
+        for (const property of firstProperties)
+          if (secondProperties.has(property)) properties.add(property);
       }
     }
     if (properties.size === 0) continue;
@@ -510,7 +521,10 @@ function repeatedExactSelectors(rules: Rule[]) {
   for (const rule of rules) {
     const key = ruleKey(rule);
     const count = counts.get(key);
-    counts.set(key, { count: (count?.count ?? 0) + 1, selector: rule.selector });
+    counts.set(key, {
+      count: (count?.count ?? 0) + 1,
+      selector: rule.selector,
+    });
   }
   return [...counts.values()]
     .filter(({ count }) => count > 1)
@@ -518,12 +532,18 @@ function repeatedExactSelectors(rules: Rule[]) {
 }
 
 function emptyRules(rules: Rule[]) {
-  return rules.filter(({ declarations }) => declarations.length === 0).map(({ selector, line }) => ({ selector, line }));
+  return rules
+    .filter(({ declarations }) => declarations.length === 0)
+    .map(({ selector, line }) => ({ selector, line }));
 }
 
 describe("protected stylesheet duplicate ownership", () => {
   test("records class rules nested in at-rules for ownership checks", () => {
-    expect(parseRules("@media (min-width: 1px) { .ws-at-rule-only { color: red; } }")).toEqual([
+    expect(
+      parseRules(
+        "@media (min-width: 1px) { .ws-at-rule-only { color: red; } }",
+      ),
+    ).toEqual([
       {
         selector: ".ws-at-rule-only",
         declarations: [
@@ -573,9 +593,18 @@ describe("protected stylesheet duplicate ownership", () => {
     `);
 
     expect(EXPECTED_DISJOINT_REPEATED_SELECTORS).toContain(selector);
-    expect(repeatedExactSelectors(rules), "media-only rules must not enter the top-level repeated-selector inventory").toEqual([selector]);
-    expect(overlappingProperties(rules), "a media-only declaration must not create a top-level duplicate-property overlap").toEqual([]);
-    expect(effectiveDeclarations(rules, selector), "top-level effective declarations must exclude media-only properties").toEqual({
+    expect(
+      repeatedExactSelectors(rules),
+      "media-only rules must not enter the top-level repeated-selector inventory",
+    ).toEqual([selector]);
+    expect(
+      overlappingProperties(rules),
+      "a media-only declaration must not create a top-level duplicate-property overlap",
+    ).toEqual([]);
+    expect(
+      effectiveDeclarations(rules, selector),
+      "top-level effective declarations must exclude media-only properties",
+    ).toEqual({
       display: "grid",
       gap: "0.25rem",
     });
@@ -585,13 +614,22 @@ describe("protected stylesheet duplicate ownership", () => {
     const rules = parseRules(readFileSync(stylesheetPath, "utf8"));
     const inventory = overlappingProperties(rules);
 
-    expect(RED_DEAD_SELECTORS).toHaveLength(33);
-    expect(STATE_SHAPED_RED_SELECTORS.every((selector) => RED_DEAD_SELECTORS.includes(selector))).toBe(true);
-    expect(inventory, "all RED same-cascade overlaps must be consolidated").toEqual([]);
+    expect(RED_DEAD_SELECTORS).toHaveLength(32);
+    expect(
+      STATE_SHAPED_RED_SELECTORS.every((selector) =>
+        RED_DEAD_SELECTORS.includes(selector),
+      ),
+    ).toBe(true);
+    expect(
+      inventory,
+      "all RED same-cascade overlaps must be consolidated",
+    ).toEqual([]);
     expect(emptyRules(rules), "empty CSS rules must be removed").toEqual([]);
 
     for (const selector of RED_DEAD_SELECTORS) {
-      expect(effectiveDeclarations(rules, selector), selector).toEqual(EXPECTED_EFFECTIVE_STYLES[selector]);
+      expect(effectiveDeclarations(rules, selector), selector).toEqual(
+        EXPECTED_EFFECTIVE_STYLES[selector],
+      );
     }
 
     const repeated = repeatedExactSelectors(rules);
@@ -599,7 +637,12 @@ describe("protected stylesheet duplicate ownership", () => {
   });
 
   test("requires zero overlapping properties across repeated exact selectors", () => {
-    const inventory = overlappingProperties(parseRules(readFileSync(stylesheetPath, "utf8")));
-    expect(inventory.map(({ selector }) => selector), "repeated exact selectors must not overlap").toEqual([]);
+    const inventory = overlappingProperties(
+      parseRules(readFileSync(stylesheetPath, "utf8")),
+    );
+    expect(
+      inventory.map(({ selector }) => selector),
+      "repeated exact selectors must not overlap",
+    ).toEqual([]);
   });
 });

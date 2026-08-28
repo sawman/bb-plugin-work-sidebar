@@ -449,9 +449,11 @@ than normalizing the difference.
 - **Green:** create pure pull-request models/presentation functions and switch
   both consumers to them without moving requests. Define one shared
   `pullRequestSignal` schema whose checks are
-  `failed|passing|pending|none|unknown` and whose review states include
-  `changes_requested_review_requested`; both `pullRequest` and
-  `sidebarStackLayer` reuse it and the server normalizes before responding.
+  `failed|passing|pending|none|unknown`. Review status remains independent
+  from reviewer identity: a dismissed changes request followed by re-review
+  normalizes to `review_required`, while requested reviewer names remain a
+  separate field. Both `pullRequest` and `sidebarStackLayer` reuse the schema,
+  and the server normalizes before responding.
 - **Refactor/removal:** promote a status primitive to `shared` only because the
   second sidebar now consumes the same semantic contract; remove both old
   mappings and their selectors in this loop.

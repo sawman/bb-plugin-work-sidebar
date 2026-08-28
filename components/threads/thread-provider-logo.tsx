@@ -55,9 +55,11 @@ function CachedProviderImage({ logoUrl }: { logoUrl: string }) {
 export function ThreadProviderLogo({
   providerId,
   provider,
+  title,
 }: {
   providerId: string;
   provider?: ThreadProvider;
+  title?: string | null;
 }) {
   const displayName = provider?.displayName ?? providerId;
   return (
@@ -66,9 +68,11 @@ export function ThreadProviderLogo({
       data-provider-id={providerId}
       role="img"
       aria-label={`${displayName} provider`}
-      title={displayName}
+      title={title === undefined ? displayName : (title ?? undefined)}
     >
-      {provider?.logoUrl ? <CachedProviderImage logoUrl={provider.logoUrl} /> : null}
+      {provider?.logoUrl ? (
+        <CachedProviderImage logoUrl={provider.logoUrl} />
+      ) : null}
       <Icon name="Bot" aria-hidden />
     </span>
   );

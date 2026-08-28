@@ -51,7 +51,7 @@ export function ArchivedThreads({
         .join("|"),
     [threads],
   );
-  const query = useArchivedThreads(open, fingerprint);
+  const query = useArchivedThreads(fingerprint);
   const archived = (query.archive.data ??
     EMPTY_ARCHIVED_THREADS) as ArchivedThread[];
   const ids = useMemo(
@@ -120,7 +120,7 @@ export function ArchivedThreads({
       }}
     >
       <summary>
-        Archive <span>{state === "ready" ? archived.length : ""}</span>
+        Archive <span>{query.archive.data ? archived.length : ""}</span>
       </summary>
       {state === "idle" || state === "loading" ? (
         <div className="ws-thread-group-empty">Loading archive threads…</div>

@@ -365,7 +365,8 @@ export interface StackLayer {
   base: string;
   attention?: string | null;
   checks: "failed" | "passing" | "pending" | "none" | "unknown";
-  review: "approved" | "changes_requested" | "changes_requested_review_requested" | "review_requested" | "review_required" | "none";
+  review: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
+  requestedReviewers?: string[];
   reviewCommentCount: number;
 }
 
@@ -437,7 +438,7 @@ export interface CurrentPullRequestView {
   };
   signal: {
     checks: "failed" | "passing" | "pending" | "none" | "unknown";
-    review: "approved" | "changes_requested" | "changes_requested_review_requested" | "review_requested" | "review_required" | "none";
+    review: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
     reviewCommentCount: number;
   };
 }

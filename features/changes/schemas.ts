@@ -62,7 +62,6 @@ export const githubStackBranchSchema = z.object({
     .enum([
       "approved",
       "changes_requested",
-      "changes_requested_review_requested",
       "review_requested",
       "review_required",
       "none",

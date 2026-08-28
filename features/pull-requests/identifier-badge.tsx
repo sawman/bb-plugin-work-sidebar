@@ -1,33 +1,49 @@
+import type { HTMLAttributes } from "react";
 import { BranchName } from "../../components/ui/branch-name";
 import { CopyBadge } from "../../components/ui/copy-badge";
 import { Icon } from "../../components/ui/icon";
+import type { StatusPresentation } from "../../components/ui/status";
 
 type PullRequestIdentifier =
-  | { kind: "pull-request"; number: number }
+  | {
+      kind: "pull-request";
+      number: number;
+      presentation?: StatusPresentation;
+    }
   | { kind: "branch"; name: string };
 
+type PullRequestIdentifierProps = PullRequestIdentifier & {
+  onContextMenu?: HTMLAttributes<HTMLSpanElement>["onContextMenu"];
+  onKeyDown?: HTMLAttributes<HTMLSpanElement>["onKeyDown"];
+};
+
 export function PullRequestIdentifierBadge(
-  identifier: PullRequestIdentifier,
+  identifier: PullRequestIdentifierProps,
 ) {
   if (identifier.kind === "branch") {
     return (
-      <BranchName
-        name={identifier.name}
-        className="ws-pr-identifier-badge"
-      />
+      <BranchName name={identifier.name} className="ws-pr-identifier-badge" />
     );
   }
   const value = `#${identifier.number}`;
+  const stateLabel = identifier.presentation?.label;
 
   return (
     <CopyBadge
       value={value}
       copyValue={`PR ${value}`}
       label="PR number"
-      className="ws-pr-identifier-badge"
-      title={`PR ${value}`}
+      className="ws-pr-identifier-badge ws-pr-number-badge"
+      title={`PR ${value}${stateLabel ? ` · ${stateLabel}` : ""}`}
+      tone={identifier.presentation?.tone}
+      aria-haspopup="menu"
+      onContextMenu={identifier.onContextMenu}
+      onKeyDown={identifier.onKeyDown}
     >
-      <Icon name="GitPullRequest" aria-hidden />
+      <Icon
+        name={identifier.presentation?.icon ?? "GitPullRequest"}
+        aria-hidden
+      />
       <span>{value}</span>
     </CopyBadge>
   );

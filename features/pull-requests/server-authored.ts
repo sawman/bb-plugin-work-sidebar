@@ -87,7 +87,16 @@ function createAuthoredStackReader(bb: BbPluginApi, lifecycle: ServerLifecycle, 
         if (!stack) return item;
         const pullRequests = stack.pullRequests.flatMap((layer) => {
           const known = byPullRequest.get(`${item.repository}#${layer.number}`);
-          return known ? [{ ...known, head: layer.head, base: layer.base || stack.base, checks: layer.checks, review: layer.review }] : [];
+          return known ? [{
+            ...known,
+            head: layer.head,
+            base: layer.base || stack.base,
+            checks: layer.checks,
+            review: layer.review,
+            ...(layer.requestedReviewers?.length
+              ? { requestedReviewers: layer.requestedReviewers }
+              : {}),
+          }] : [];
         });
         return pullRequests.length ? {
           ...item,

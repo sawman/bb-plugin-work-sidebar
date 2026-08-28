@@ -127,6 +127,24 @@ describe("R13 Changes error presentation", () => {
     );
   });
 
+  it("uses the shared bounded file-list container for expanded pull requests", () => {
+    const { container } = render(
+      <ChangesStackBranchRow
+        branch={stackBranch()}
+        expanded
+        checkingOut={false}
+        onToggle={() => undefined}
+        onCheckout={() => undefined}
+      />,
+    );
+
+    expect(
+      container
+        .querySelector(".ws-stack-files")
+        ?.classList.contains("ws-changes-file-list-scroll"),
+    ).toBe(true);
+  });
+
   it.each([
     { name: "ordinary", branch: stackBranch(), checkingOut: false },
     { name: "busy checkout", branch: stackBranch(), checkingOut: true },

@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   experimental_useSidebarThreadActions,
@@ -14,6 +20,7 @@ import { invalidateTaskQueries } from "@/features/tasks/mutations";
 import { useTaskLinksRead } from "@/features/tasks/queries";
 import { PullRequestsLeftSidebar } from "@/features/pull-requests/left-sidebar";
 import { invalidateSidebarPullRequestStacks } from "@/features/pull-requests/queries";
+import { DEFAULT_SIDEBAR_ROW_HEIGHT } from "./sidebar-appearance";
 import "../../app.css";
 import "../../scrollbar.css";
 import "../../views.css";
@@ -73,18 +80,37 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
       ),
     [providersById, threads],
   );
+  const pullRequestThreads = useMemo(
+    () =>
+      threads.map((thread) => ({
+        id: thread.id,
+        title: threadTitle(thread),
+        branchName: thread.environment?.branchName ?? null,
+        parentThreadId: thread.parentThreadId,
+        providerId: thread.providerId,
+        provider: providersById.get(thread.providerId),
+      })),
+    [providersById, threads],
+  );
   const [view, setView] = useState<SidebarView>("work");
   const [subtextRefreshKey, setSubtextRefreshKey] = useState(0);
+  const groupPreferences = threadPreferences.groups.data ?? {
+    groups: [],
+    activeGroupPosition: 0,
+  };
   const threadCount = useMemo(
     () => threadCountPresentation(threads),
     [threads],
   );
   const saveGroups = useCallback(
     (
-      groups: Parameters<typeof threadPreferences.saveGroups.mutateAsync>[0],
+      groups: Parameters<
+        typeof threadPreferences.saveGroups.mutateAsync
+      >[0]["groups"],
+      activeGroupPosition = groupPreferences.activeGroupPosition,
     ) => {
       void threadPreferences.saveGroups
-        .mutateAsync(groups)
+        .mutateAsync({ groups, activeGroupPosition })
         .catch((error: unknown) => {
           toast.error(
             error instanceof Error
@@ -93,7 +119,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
           );
         });
     },
-    [threadPreferences.saveGroups],
+    [groupPreferences.activeGroupPosition, threadPreferences.saveGroups],
   );
   const saveOrder = useCallback(
     (order: string[]) => {
@@ -113,7 +139,8 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     threads,
     projects,
     order: threadPreferences.order.data ?? [],
-    groups: threadPreferences.groups.data ?? [],
+    groups: groupPreferences.groups,
+    activeGroupPosition: groupPreferences.activeGroupPosition,
     searchQuery: props.searchQuery,
     saveGroups,
     saveOrder,
@@ -126,15 +153,17 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     threadInteractionStore.getState().reconcileRoster(threadIds);
   }, [threads]);
 
-  const refreshThreadDetails = useCallback(() => {
-    void threadPreferences.order.refetch();
-    void threadPreferences.groups.refetch();
-    void refetchTaskLinks();
-    void invalidateSidebarPullRequestStacks(queryClient);
-    void queryClient.invalidateQueries({
-      queryKey: threadQueryKeys.archived(),
-    });
+  const refreshThreadDetails = useCallback(async () => {
     setSubtextRefreshKey((current) => current + 1);
+    await Promise.all([
+      threadPreferences.order.refetch(),
+      threadPreferences.groups.refetch(),
+      refetchTaskLinks(),
+      invalidateSidebarPullRequestStacks(queryClient),
+      queryClient.invalidateQueries({
+        queryKey: threadQueryKeys.archived(),
+      }),
+    ]);
   }, [
     queryClient,
     refetchTaskLinks,
@@ -159,20 +188,20 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
 
   if (status !== "ready") return <Original />;
 
-  const activeThread = props.activeThreadId
-    ? (threads.find((thread) => thread.id === props.activeThreadId) ?? null)
-    : null;
   const taskLinks = taskLinksData?.links ?? {};
   const toolbar = (
     <SidebarThreadToolbar
       threadCountLabel={threadCount.label}
       selectedCount={organization.selectedThreadIds.size}
       reorderDisabled={organization.reorderDisabled}
-      groups={organization.groups}
+      groupPositions={organization.groupPositions}
       occupiedGroupIds={organization.occupiedGroupIds}
+      groupReorderPending={threadPreferences.saveGroups.isPending}
       activeProjectId={props.activeProjectId}
       onArchiveSelected={() => void organization.archiveSelected()}
       onAddGroup={organization.addGroup}
+      onMoveGroup={organization.moveGroup}
+      onReorderGroup={organization.reorderGroup}
       onRenameGroup={organization.renameGroup}
       onRemoveGroup={organization.removeGroup}
       onRefresh={refreshThreadDetails}
@@ -182,7 +211,14 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     />
   );
   return (
-    <div className="ws-list">
+    <div
+      className="ws-list"
+      style={
+        {
+          "--ws-sidebar-row-height": `${threadPreferences.appearance.data?.rowHeight ?? DEFAULT_SIDEBAR_ROW_HEIGHT}px`,
+        } as CSSProperties
+      }
+    >
       <TabSelector
         ariaLabel="Sidebar views"
         idPrefix="ws-sidebar"
@@ -194,7 +230,6 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
       <TasksLeftSidebar
         active={view === "queue"}
         activeThreadId={props.activeThreadId}
-        activeThreadTitle={activeThread ? threadTitle(activeThread) : null}
         taskLinks={taskLinks}
         ownerThreads={taskOwnerThreads}
         onOpenThread={navigateToThread}
@@ -203,6 +238,8 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
       <PullRequestsLeftSidebar
         active={view === "prs"}
         searchQuery={props.searchQuery}
+        threads={pullRequestThreads}
+        onOpenThread={navigateToThread}
       />
       {view === "work" && (
         <SidebarWorkView

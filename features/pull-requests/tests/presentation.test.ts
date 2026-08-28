@@ -5,6 +5,7 @@ import { Status } from "../../../components/ui/status";
 import {
   githubHealthPresentation,
   isVisibleAuthoredPullRequest,
+  normalizePullRequestSignal,
   pullRequestPresentation,
   pullRequestSignalPresentation,
 } from "../presentation";
@@ -39,12 +40,36 @@ describe("pull-request presentation semantics", () => {
   it.each([
     ["approved", { icon: "Check", label: "Approved", tone: "success" }],
     ["changes_requested", { icon: "Wrench", label: "Changes requested", tone: "destructive" }],
-    ["changes_requested_review_requested", { icon: "Eye", label: "Changes requested; re-review requested", tone: "warning", overlayIcon: "Wrench" }],
     ["review_requested", { icon: "Eye", label: "Review requested", tone: "warning" }],
     ["review_required", { icon: "Eye", label: "Review required", tone: "muted" }],
     ["none", { icon: "UserClock", label: "No reviewer requested", tone: "muted" }],
   ] as const)("preserves the review signal %s across both surfaces", (review, expected) => {
     expect(pullRequestSignalPresentation({ checks: "none", review, reviewCommentCount: 3 }).review).toEqual({ ...expected, count: 3 });
+  });
+
+  it("normalizes a dismissed changes request with re-review into review required", () => {
+    expect(normalizePullRequestSignal({
+      checks: "passing",
+      review: { state: "changes_requested", reviewRequestCount: 2 },
+      reviewCommentCount: 1,
+    })).toEqual({
+      checks: "passing",
+      review: "review_required",
+      reviewCommentCount: 1,
+    });
+    expect(
+      pullRequestSignalPresentation({
+        checks: "passing",
+        review: "review_required",
+        requestedReviewers: ["octocat", "platform-team"],
+        reviewCommentCount: 1,
+      }).review,
+    ).toEqual({
+      icon: "Eye",
+      label: "Review required",
+      tone: "muted",
+      count: 1,
+    });
   });
 
   it("keeps comment counts, merged layers, archived repositories, and GitHub health semantic", () => {

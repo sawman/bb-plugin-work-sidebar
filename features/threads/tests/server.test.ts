@@ -21,6 +21,7 @@ describe("R9 Threads server preferences", () => {
         },
       ],
       [THREAD_PREFERENCE_KEYS.order, ["thr_b", "thr_a", "thr_b", "bad"]],
+      [THREAD_PREFERENCE_KEYS.appearance, 47.5],
     ]);
     const published: unknown[] = [];
     const service = createThreadPreferencesService({
@@ -31,20 +32,55 @@ describe("R9 Threads server preferences", () => {
       publish: (channel, payload) => published.push({ channel, payload }),
     });
 
-    await expect(service.groups()).resolves.toEqual([
-      { id: "group_later", name: "Later", threadIds: ["thr_b"] },
-    ]);
+    await expect(service.groups()).resolves.toEqual({
+      groups: [
+        { id: "group_later", name: "Later", threadIds: ["thr_b"] },
+      ],
+      activeGroupPosition: 0,
+    });
     await expect(
       service.saveOrder(["thr_b", "thr_a", "thr_b", "bad"]),
     ).resolves.toEqual(["thr_b", "thr_a"]);
     await expect(
-      service.saveGroups([
+      service.saveGroups(
+        [{ id: "group_later", name: "Later", threadIds: ["thr_a"] }],
+        1,
+      ),
+    ).resolves.toEqual({
+      groups: [
         { id: "group_later", name: "Later", threadIds: ["thr_a"] },
-      ]),
-    ).resolves.toEqual([
-      { id: "group_later", name: "Later", threadIds: ["thr_a"] },
-    ]);
-    expect(published).toHaveLength(2);
+      ],
+      activeGroupPosition: 1,
+    });
+    await expect(service.appearance()).resolves.toEqual({ rowHeight: 47.5 });
+    await expect(service.saveAppearance(52.5)).resolves.toEqual({
+      rowHeight: 52.5,
+    });
+    expect(saved.get(THREAD_PREFERENCE_KEYS.appearance)).toBe(52.5);
+    await expect(service.saveAppearance(60.25)).rejects.toThrow(
+      "Enter a number with at most one decimal place.",
+    );
+    expect(saved.get(THREAD_PREFERENCE_KEYS.appearance)).toBe(52.5);
+    expect(saved.get(THREAD_PREFERENCE_KEYS.groups)).toEqual({
+      groups: [
+        { id: "group_later", name: "Later", threadIds: ["thr_a"] },
+      ],
+      activeGroupPosition: 1,
+    });
+    expect(published.at(-2)).toEqual({
+      channel: "sidebar-order:changed",
+      payload: {
+        groups: [
+          { id: "group_later", name: "Later", threadIds: ["thr_a"] },
+        ],
+        activeGroupPosition: 1,
+      },
+    });
+    expect(published.at(-1)).toEqual({
+      channel: "sidebar-order:changed",
+      payload: { appearance: { rowHeight: 52.5 } },
+    });
+    expect(published).toHaveLength(3);
     expect(service).not.toHaveProperty("archivedThreads");
   });
 });

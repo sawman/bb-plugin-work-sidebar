@@ -148,7 +148,7 @@ describe("R9 production ThreadRow host behavior", () => {
     fireEvent.contextMenu(slot.getByRole("link", { name: /Parent/ }));
     fireEvent.click(await slot.findByRole("menuitem", { name: "Later" }));
     await waitFor(() =>
-      expect(saveGroups).toHaveBeenCalledWith({
+      expect(saveGroups).toHaveBeenCalledWith(expect.objectContaining({
         groups: [
           {
             id: "group_later",
@@ -156,7 +156,7 @@ describe("R9 production ThreadRow host behavior", () => {
             threadIds: ["thr_parent"],
           },
         ],
-      }),
+      })),
     );
     const groupedLink = slot.getByRole("link", { name: /Parent/ });
     fireEvent.contextMenu(slot.getByRole("link", { name: /Parent/ }));

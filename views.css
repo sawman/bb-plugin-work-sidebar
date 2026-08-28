@@ -1,6 +1,7 @@
 .ws-sidebar-row {
   box-sizing: border-box;
-  min-height: 2.35rem;
+  min-height: var(--ws-sidebar-row-height, 45px);
+  border-radius: 0;
   padding-block: 0.28rem;
 }
 .ws-sidebar-row-main {
@@ -137,19 +138,27 @@
   color: var(--primary);
 }
 .ws-icon-button {
+  /* R17 important: host icon controls must use the fixed hit-target display. */
+  display: grid !important;
   width: 1.6rem;
   height: 1.6rem;
+  place-items: center;
+  flex: none;
+  /* R17 important: host icon controls must not inject fixed-hit-target padding. */
+  padding: 0 !important;
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) - 3px);
   background: transparent;
   color: var(--muted-foreground);
   cursor: pointer;
   font-size: 0.9rem;
-  line-height: 1;
+  line-height: 0;
 }
 .ws-icon-button svg {
   width: 0.76rem;
   height: 0.76rem;
+  display: block;
+  margin: 0;
 }
 .ws-icon-button:hover:not(:disabled) {
   background: var(--accent);
@@ -158,6 +167,22 @@
 .ws-icon-button:disabled {
   cursor: wait;
   opacity: 0.55;
+}
+.ws-refresh-button:disabled {
+  cursor: default;
+}
+.ws-refresh-icon[data-motion="spin"] {
+  animation: ws-refresh-spin 0.8s linear infinite;
+}
+@keyframes ws-refresh-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-refresh-icon[data-motion="spin"] {
+    animation: none;
+  }
 }
 .ws-tabs button:focus-visible,
 .ws-icon-button:focus-visible,
@@ -398,7 +423,6 @@
   gap: 0.45rem;
   padding-inline: 0.4rem;
   border-bottom: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 2px);
   cursor: grab;
 }
 .ws-task-row:hover {
@@ -422,6 +446,7 @@
 }
 .ws-task-meta {
   flex-wrap: wrap;
+  overflow: visible;
 }
 .ws-task-owner-badge {
   min-width: 0;
@@ -436,6 +461,11 @@
   grid-template-rows: auto auto;
   justify-items: end;
   gap: 0.08rem;
+}
+.ws-task-row-primary-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.14rem;
 }
 .ws-task-priority-slot {
   display: grid;
@@ -498,7 +528,6 @@
 }
 .ws-pr-row {
   position: relative;
-  border-radius: calc(var(--radius) - 2px);
 }
 .ws-pr-stack {
   display: grid;
@@ -523,9 +552,6 @@
 .ws-pr-stack-layer-item {
   min-width: 0;
 }
-.ws-pr-stack-layer-item .ws-pr-row {
-  border-bottom: 0;
-}
 .ws-pr-stack-closed {
   opacity: 0.95;
 }
@@ -533,7 +559,6 @@
   display: grid;
   align-items: center;
   padding-inline: 0.45rem;
-  border-bottom: 1px solid var(--border);
 }
 .ws-pr-row:hover {
   background: var(--accent);
@@ -544,6 +569,8 @@
 }
 .ws-pr-target-title {
   grid-area: title;
+  color: inherit;
+  text-decoration: none;
 }
 .ws-pr-target-context {
   grid-area: context;
@@ -580,6 +607,9 @@
   text-decoration: none;
   white-space: nowrap;
 }
+.ws-identifier-badge[data-variant="badge"] {
+  flex: none;
+}
 .ws-identifier-badge[data-variant="text"] {
   border: 0;
   border-radius: 0;
@@ -596,6 +626,7 @@
 }
 .ws-branch-name {
   min-width: 0;
+  font: inherit;
   font-weight: 400;
 }
 .ws-branch-name-unavailable {
@@ -636,11 +667,11 @@
    titles aligned whether or not a row is the root of a stack. */
 .ws-pr-repository-group {
   display: grid;
-  gap: 0.08rem;
+  gap: 0;
   margin: 0.3rem 0 0.55rem;
 }
 .ws-pr-repository-group > h3 {
-  margin: 0.15rem 0.45rem 0.12rem;
+  margin: 0.15rem 0.45rem 0.28rem;
   color: var(--muted-foreground);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.62rem;
@@ -700,28 +731,61 @@
   background: var(--accent);
   border-radius: calc(var(--radius) - 3px);
 }
-.ws-pr-state-toggle {
+.ws-pr-thread-provider-link {
+  position: relative;
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
   border: 0;
   background: transparent;
   color: inherit;
   cursor: pointer;
 }
-.ws-pr-state-toggle:disabled {
-  cursor: wait;
+.ws-pr-thread-tooltip {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.35rem);
+  z-index: 1100;
+  width: max-content;
+  max-width: 14rem;
+  overflow: hidden;
+  padding: 0.28rem 0.42rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 3px);
+  background: color-mix(in srgb, var(--background) 96%, var(--foreground) 4%);
+  box-shadow: 0 0.4rem 1rem
+    color-mix(in srgb, var(--foreground) 18%, transparent);
+  color: var(--foreground);
+  font-size: 0.64rem;
+  font-weight: 400;
+  line-height: 1.2;
+  opacity: 0;
+  pointer-events: none;
+  text-overflow: ellipsis;
+  transform: translateY(0.1rem);
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
+  white-space: nowrap;
 }
-.ws-pr-state-toggle:focus-visible {
+.ws-pr-thread-provider-link:hover .ws-pr-thread-tooltip,
+.ws-pr-thread-provider-link:focus-visible .ws-pr-thread-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+.ws-pr-thread-provider-link:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-radius: 2px;
 }
 
-/* PR rows intentionally use only a title and one compact subtitle line. */
+/* PR content stays on the shared two-line row rhythm; a linked thread belongs
+   to the trailing provider affordance rather than adding a third text row. */
 .ws-pr-target {
   grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "title" "context";
-  grid-template-rows: auto auto;
+  row-gap: 0.16rem;
 }
 /* Keep project creation available without turning it into a full-width footer. */
 .ws-work-toolbar-actions {
@@ -799,44 +863,6 @@
   /* R17 important: host toolbar hover styling hides the archive affordance. */
   background: var(--accent) !important;
 }
-.ws-new-thread {
-  /* R17 important: host sidebar button rules must not change the icon-only display. */
-  display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-  /* R17 important: host sidebar button rules must not add icon-only margins. */
-  margin: 0 !important;
-  /* R17 important: host sidebar button rules must not add icon-only padding. */
-  padding: 0 !important;
-  /* R17 important: host sidebar button rules must not alter the icon-only border. */
-  border: 1px solid transparent !important;
-  /* R17 important: host sidebar button rules must not alter the icon-only radius. */
-  border-radius: calc(var(--radius) - 3px) !important;
-  /* R17 important: host sidebar button rules must not alter the icon-only color. */
-  color: var(--muted-foreground) !important;
-  /* R17 important: host sidebar button sizing must keep the action aligned with icons. */
-  width: 1.6rem !important;
-  /* R17 important: host sidebar button sizing must keep the action aligned with icons. */
-  height: 1.6rem !important;
-}
-.ws-new-thread:hover {
-  /* R17 important: host sidebar button hover rules override this semantic action border. */
-  border-color: var(--border) !important;
-  /* R17 important: host sidebar button hover rules override this semantic action background. */
-  background: var(--accent) !important;
-  /* R17 important: host sidebar button hover rules override this semantic action color. */
-  color: var(--foreground) !important;
-}
-.ws-new-thread:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 1px;
-}
-.ws-new-thread svg {
-  width: 0.86rem;
-  height: 0.86rem;
-}
-
-
 /* Modifier-selected task rows stay visible without changing their normal layout. */
 .ws-task-row-selected {
   background: color-mix(in srgb, var(--accent) 82%, var(--primary) 18%);
@@ -875,6 +901,7 @@
 .ws-pr-row {
   grid-template-columns: var(--ws-pr-stack-gutter) minmax(0, 1fr) auto;
   gap: 0.18rem;
+  padding-block: 0.16rem;
   padding-left: 0;
 }
 .ws-archived-thread > .ws-thread-anchor {
@@ -1146,13 +1173,13 @@
 }
 .ws-thread-leading {
   grid-column: 1;
-  align-self: start;
+  align-self: center;
   display: grid;
   justify-items: center;
   height: 1.76rem;
 }
 .ws-thread-agent-badge {
-  align-self: start;
+  align-self: center;
   display: grid;
   grid-template-rows: 0.9rem 0.72rem;
   align-items: center;
@@ -1345,14 +1372,34 @@
   gap: 0.12rem;
   margin: 0.05rem 0.35rem 0.24rem 1.02rem;
   padding: 0.14rem 0 0.14rem 0.5rem;
-  border-left: 1px solid var(--border);
 }
-.ws-stack-files > span {
+.ws-changes-file-list-scroll {
+  max-height: 12rem;
+  padding-right: 0.35rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.ws-change-file-row {
   display: grid;
   grid-template-columns: 0.65rem minmax(0, 1fr) 5ch 5ch;
   gap: 0.18rem;
   align-items: center;
   font-size: 0.61rem;
+}
+button.ws-change-file-row {
+  width: 100%;
+  border: 0;
+  border-radius: 3px;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.ws-change-file-row:hover {
+  background: var(--accent);
 }
 .ws-stack-files b {
   font-size: 0.55rem;
@@ -1430,8 +1477,6 @@
 .ws-thread-settings-link {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
   border-radius: calc(var(--radius) - 3px);
   padding: 0.34rem 0.45rem;
   color: var(--foreground);
@@ -1445,49 +1490,79 @@
   outline: 2px solid var(--ring);
   outline-offset: -2px;
 }
-.ws-thread-settings-link svg {
-  width: 0.7rem;
-  height: 0.7rem;
-}
 .ws-thread-settings-menu button:hover,
 .ws-thread-settings-menu button[aria-pressed="true"] {
   background: var(--accent);
 }
-.ws-thread-settings-menu button[aria-pressed="true"]::before {
-  content: "✓ ";
-  color: var(--primary);
-}
 .ws-thread-group-settings {
   display: grid;
   gap: 0.08rem;
-  margin: 0.18rem 0 0;
-  padding: 0.28rem 0 0;
+  margin: 0.28rem 0 0;
+  padding: 0.48rem 0 0;
   border-top: 1px solid var(--border);
 }
-.ws-thread-group-settings > strong {
-  padding: 0 0.45rem;
+.ws-thread-group-settings-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1.55rem;
+  align-items: center;
+  margin-bottom: 0.12rem;
+}
+.ws-thread-group-settings-header > strong {
+  padding-left: 0.45rem;
   color: var(--muted-foreground);
   font-size: 0.57rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.ws-thread-group-settings > div {
+.ws-thread-group-settings-header .ws-thread-group-add {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 1.55rem;
+  width: 1.55rem;
+  height: 1.4rem;
+  place-items: center;
+  padding: 0;
+  color: var(--muted-foreground);
+}
+.ws-thread-group-settings-header .ws-thread-group-add svg {
+  width: 0.68rem;
+  height: 0.68rem;
+}
+.ws-thread-group-settings-header .ws-thread-group-create {
+  grid-column: 1 / -1;
+}
+.ws-thread-group-settings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1.55rem 1.55rem;
   align-items: center;
 }
-.ws-thread-group-settings > div > button:first-child {
+.ws-thread-group-settings-row[data-drag-target="true"] {
+  background: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+.ws-thread-group-settings .ws-thread-group-rename,
+.ws-thread-group-settings .ws-thread-group-system {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.ws-thread-group-settings .ws-thread-group-system {
+  padding: 0.26rem 0.45rem;
+  color: var(--muted-foreground);
+}
+.ws-thread-group-drag,
 .ws-thread-group-settings .ws-thread-group-remove {
   display: grid;
   place-items: center;
   padding: 0.26rem;
   color: var(--muted-foreground);
 }
+.ws-thread-group-drag {
+  cursor: grab;
+}
+.ws-thread-group-drag:active {
+  cursor: grabbing;
+}
+.ws-thread-group-drag svg,
 .ws-thread-group-settings .ws-thread-group-remove svg {
   width: 0.62rem;
   height: 0.62rem;
@@ -1495,18 +1570,15 @@
 .ws-thread-group-settings .ws-thread-group-remove:hover:not(:disabled) {
   color: var(--destructive);
 }
+.ws-thread-group-drag:disabled,
 .ws-thread-group-settings .ws-thread-group-remove:disabled {
   opacity: 0.35;
   cursor: not-allowed;
 }
-.ws-thread-group-settings .ws-thread-group-add {
-  margin-top: 0.08rem;
-  color: var(--primary);
-}
 .ws-thread-group-create {
   display: grid;
-  gap: 0.25rem;
-  margin-top: 0.12rem;
+  margin: 0.12rem 0 0;
+  padding: 0 0.25rem 0.18rem;
 }
 .ws-thread-group-create input {
   box-sizing: border-box;
@@ -1523,11 +1595,6 @@
   border-color: var(--ring);
   outline: 2px solid color-mix(in srgb, var(--ring) 35%, transparent);
   outline-offset: 1px;
-}
-.ws-thread-group-create-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.2rem;
 }
 .ws-repository-changes-toggle {
   display: inline-flex;
@@ -1889,32 +1956,6 @@
   color: var(--muted-foreground);
   font-size: 0.57rem;
 }
-.ws-working-tree-files {
-  display: grid;
-  gap: 0.12rem;
-}
-.ws-working-tree-files > span {
-  display: grid;
-  grid-template-columns: 0.65rem minmax(0, 1fr) auto;
-  gap: 0.18rem;
-  align-items: center;
-}
-.ws-working-tree-files b {
-  font-size: 0.55rem;
-  font-weight: 600;
-}
-.ws-working-tree-files em {
-  overflow: hidden;
-  color: var(--muted-foreground);
-  font-size: 0.58rem;
-  font-style: normal;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ws-working-tree-files small {
-  color: var(--muted-foreground);
-  font-size: 0.54rem;
-}
 .ws-panel-body > .ws-status-card {
   margin-bottom: 0.58rem;
 }
@@ -2083,23 +2124,6 @@ button.ws-provider-health:focus-visible {
   height: 0.68rem;
   flex: none;
   color: var(--muted-foreground);
-}
-.ws-working-tree-files .ws-working-tree-file {
-  display: grid;
-  grid-template-columns: 0.65rem minmax(0, 1fr) auto;
-  gap: 0.18rem;
-  align-items: center;
-  width: 100%;
-  border: 0;
-  border-radius: 3px;
-  padding: 0.12rem;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.ws-working-tree-files .ws-working-tree-file:hover {
-  background: var(--accent);
 }
 .ws-working-tree-diff {
   max-height: 32rem;
@@ -2333,23 +2357,6 @@ button.ws-provider-health:focus-visible {
 .ws-work-toolbar-actions {
   min-height: 1.6rem;
 }
-.ws-icon-button,
-.ws-new-thread {
-  /* R17 important: host icon controls must use the fixed hit-target display. */
-  display: grid !important;
-  place-items: center;
-  flex: none;
-  /* R17 important: host icon controls must not inject fixed-hit-target padding. */
-  padding: 0 !important;
-  line-height: 0;
-}
-.ws-icon-button svg,
-.ws-new-thread svg {
-  display: block;
-  width: 0.76rem;
-  height: 0.76rem;
-  margin: 0;
-}
 .ws-thread-settings {
   z-index: 41;
 }
@@ -2408,13 +2415,15 @@ button.ws-provider-health:focus-visible {
   width: 100%;
   max-width: 100%;
   min-width: 0;
+  /* R17 important: host toolbar sizing otherwise preserves an empty row below the controls. */
+  min-height: 0 !important;
   z-index: 44;
   top: 2rem;
   isolation: isolate;
   /* R17 important: host toolbar margins otherwise add sticky toolbar margins. */
   margin: 0 !important;
   /* R17 important: host toolbar spacing must stay balanced below the tab strip. */
-  padding-block: 0.35rem !important;
+  padding-block: 0.35rem 0 !important;
   /* R17 important: host toolbar margins otherwise override the sticky toolbar background. */
   background: var(--background) !important;
 }
@@ -2779,6 +2788,47 @@ button.ws-provider-health:focus-visible {
 .ws-settings-card small {
   font-size: 0.64rem;
 }
+.ws-sidebar-appearance-settings label {
+  color: var(--foreground);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+.ws-settings-input-row {
+  display: grid;
+  grid-template-columns: minmax(5rem, 8rem) auto auto;
+  gap: 0.35rem;
+  align-items: center;
+}
+.ws-settings-input-row input {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.32rem 0.42rem;
+  background: var(--background);
+  color: var(--foreground);
+  font: inherit;
+}
+.ws-settings-input-row input[aria-invalid="true"] {
+  border-color: var(--destructive);
+  outline: 1px solid var(--destructive);
+  outline-offset: 1px;
+}
+.ws-settings-input-row button {
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.32rem 0.55rem;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+.ws-settings-input-row button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.ws-settings-card .ws-settings-error {
+  color: var(--destructive);
+}
 .ws-task-assign {
   min-width: 0;
   border: 0;
@@ -2885,4 +2935,157 @@ button.ws-provider-health:focus-visible {
 .ws-assignee-options svg {
   width: 0.65rem;
   height: 0.65rem;
+}
+.ws-task-thread-picker {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+}
+.ws-task-thread-chip {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+}
+.ws-task-thread-chip .ws-task-owner-badge {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  padding-inline: 0.22rem;
+}
+.ws-task-thread-chip .ws-task-owner-badge:hover,
+.ws-task-thread-empty:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+.ws-task-thread-empty {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.16rem;
+  padding-inline: 0.22rem;
+  color: var(--muted-foreground);
+  font-size: 0.58rem;
+  white-space: nowrap;
+}
+.ws-task-thread-empty svg {
+  width: 0.62rem;
+  height: 0.62rem;
+}
+.ws-task-thread-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  min-width: 1rem;
+  height: 1rem;
+  border: 0;
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.ws-task-thread-trigger:hover {
+  background: var(--accent);
+  color: var(--foreground);
+}
+.ws-task-thread-trigger > svg {
+  width: 0.65rem;
+  height: 0.65rem;
+}
+.ws-task-thread-count {
+  color: var(--muted-foreground);
+  font-size: 0.5rem;
+  line-height: 1;
+}
+.ws-task-thread-popover {
+  position: absolute;
+  z-index: 90;
+  top: calc(100% + 0.16rem);
+  left: 0;
+  display: grid;
+  width: min(15rem, calc(100vw - 1rem));
+  min-width: min(10rem, calc(100vw - 1rem));
+  max-width: min(16rem, calc(100vw - 1rem));
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--popover);
+  box-shadow: 0 0.35rem 1rem
+    color-mix(in srgb, var(--foreground) 18%, transparent);
+}
+.ws-task-thread-search {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.22rem;
+  padding: 0.24rem 0.3rem;
+  border-bottom: 1px solid var(--border);
+}
+.ws-task-thread-search svg {
+  width: 0.66rem;
+  height: 0.66rem;
+  color: var(--muted-foreground);
+}
+.ws-task-thread-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--popover-foreground);
+  font: inherit;
+  font-size: 0.61rem;
+}
+.ws-task-thread-options {
+  display: grid;
+  max-height: 11rem;
+  overflow-y: auto;
+  padding: 0.12rem;
+}
+.ws-task-thread-options button,
+.ws-task-thread-options > span {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.28rem;
+  border: 0;
+  border-radius: 2px;
+  padding: 0.28rem 0.34rem;
+  background: transparent;
+  color: var(--popover-foreground);
+  font-size: 0.59rem;
+  text-align: left;
+}
+.ws-task-thread-options button {
+  cursor: pointer;
+}
+.ws-task-thread-options button:hover,
+.ws-task-thread-options button[aria-selected="true"],
+.ws-task-thread-options button[data-active="true"] {
+  background: var(--accent);
+}
+.ws-task-thread-options button[data-active="true"] {
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+.ws-task-thread-options button:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+.ws-task-thread-options .ws-thread-provider,
+.ws-task-thread-options svg {
+  width: 0.68rem;
+  height: 0.68rem;
+}
+.ws-task-thread-options button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

@@ -3,6 +3,8 @@ import {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
   type ButtonHTMLAttributes,
   type CSSProperties,
@@ -10,6 +12,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 
 type MenuState = {
   close(): void;
@@ -18,6 +21,25 @@ type MenuState = {
 };
 
 const MenuContext = createContext<MenuState | null>(null);
+const VIEWPORT_INSET = 8;
+
+type Point = { x: number; y: number };
+type Size = { height: number; width: number };
+
+export function fitContextMenuPosition(
+  anchor: Point,
+  menu: Size,
+  viewport: Size,
+  inset = VIEWPORT_INSET,
+) {
+  const maxLeft = Math.max(inset, viewport.width - menu.width - inset);
+  const left = Math.min(Math.max(inset, anchor.x), maxLeft);
+  const fitsBelow = anchor.y + menu.height + inset <= viewport.height;
+  const top = fitsBelow
+    ? Math.max(inset, anchor.y)
+    : Math.max(inset, anchor.y - menu.height);
+  return { left, top };
+}
 
 export function ContextMenu({ children }: { children: ReactNode }) {
   const [position, setPosition] = useState<{ x: number; y: number } | null>(
@@ -63,6 +85,18 @@ export function ContextMenuTrigger({
       event.preventDefault();
       menu.openAt(event.clientX, event.clientY);
     },
+    onKeyDown: (event: React.KeyboardEvent) => {
+      children.props.onKeyDown?.(event as React.KeyboardEvent<HTMLElement>);
+      if (
+        event.defaultPrevented ||
+        (event.key !== "ContextMenu" &&
+          !(event.key === "F10" && event.shiftKey))
+      )
+        return;
+      event.preventDefault();
+      const bounds = event.currentTarget.getBoundingClientRect();
+      menu.openAt(bounds.left + Math.min(bounds.width, 12), bounds.bottom);
+    },
   });
 }
 
@@ -73,24 +107,62 @@ export function ContextMenuContent({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   const menu = useContext(MenuContext);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [fitted, setFitted] = useState<
+    (Point & { anchorX: number; anchorY: number }) | null
+  >(null);
+  const anchorX = menu?.position?.x;
+  const anchorY = menu?.position?.y;
+  useLayoutEffect(() => {
+    if (
+      anchorX === undefined ||
+      anchorY === undefined ||
+      !contentRef.current
+    )
+      return;
+    const bounds = contentRef.current.getBoundingClientRect();
+    const update = () => {
+      const position = fitContextMenuPosition(
+        { x: anchorX, y: anchorY },
+        { width: bounds.width, height: bounds.height },
+        { width: window.innerWidth, height: window.innerHeight },
+      );
+      setFitted({
+        x: position.left,
+        y: position.top,
+        anchorX,
+        anchorY,
+      });
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [anchorX, anchorY]);
   if (!menu?.position) return null;
+  const isFitted =
+    fitted?.anchorX === menu.position.x && fitted.anchorY === menu.position.y;
   const menuStyle: CSSProperties = {
     position: "fixed",
-    left: menu.position.x,
-    top: menu.position.y,
+    left: isFitted ? fitted.x : menu.position.x,
+    top: isFitted ? fitted.y : menu.position.y,
     zIndex: 1000,
+    visibility: isFitted ? undefined : "hidden",
     ...style,
   };
-  return (
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div
+      ref={contentRef}
       {...props}
       className={`ws-context-menu${className ? ` ${className}` : ""}`}
       role="menu"
+      data-portalled="true"
       style={menuStyle}
       onPointerDown={(event) => event.stopPropagation()}
     >
       {children}
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -132,6 +204,13 @@ export function ContextMenuItem({
 
 export function ContextMenuLabel({ children }: { children: ReactNode }) {
   return <strong className="ws-context-menu-label">{children}</strong>;
+}
+export function ContextMenuInfo({ children }: { children: ReactNode }) {
+  return (
+    <div className="ws-context-menu-info" role="menuitem" aria-disabled="true">
+      {children}
+    </div>
+  );
 }
 export function ContextMenuSeparator() {
   return <hr className="ws-context-menu-separator" />;

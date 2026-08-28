@@ -13,12 +13,43 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Owns user-configured PR polling cadence and the shared REST fingerprint budget. */
-export function createGitHubPollingService(bb: BbPluginApi, read: GitHubReadRunner): GitHubPollingService {
+export function createGitHubPollingService(
+  bb: BbPluginApi,
+  read: GitHubReadRunner,
+): GitHubPollingService {
   const settings = bb.settings.define({
-    githubActivePollSeconds: { type: "select", label: "Right Work PR polling", description: "How often to poll the visible right-side Work PR through GitHub REST.", options: ["30", "60", "120", "300"], default: "60" },
-    githubBackgroundPollSeconds: { type: "select", label: "Right Work PR background polling", description: "How often to poll the right-side Work PR while BB is not visible.", options: ["120", "300", "600", "900"], default: "300" },
-    githubLeftListRefreshSeconds: { type: "select", label: "Left PR list refresh", description: "How often to refresh authored pull requests and Stack membership in the left sidebar.", options: ["60", "120", "300", "600"], default: "300" },
-    githubMaxRestPollsPerMinute: { type: "select", label: "Global REST poll budget", description: "Maximum fingerprint polls across all Work panels each minute.", options: ["10", "20", "30", "60"], default: "30" },
+    githubActivePollSeconds: {
+      type: "select",
+      label: "Right Work PR polling",
+      description:
+        "How often to poll the visible right-side Work PR through GitHub REST.",
+      options: ["30", "60", "120", "300"],
+      default: "60",
+    },
+    githubBackgroundPollSeconds: {
+      type: "select",
+      label: "Right Work PR background polling",
+      description:
+        "How often to poll the right-side Work PR while BB is not visible.",
+      options: ["120", "300", "600", "900"],
+      default: "300",
+    },
+    githubLeftListRefreshSeconds: {
+      type: "select",
+      label: "Left PR list refresh",
+      description:
+        "How often to refresh authored pull requests and Stack membership in the left sidebar.",
+      options: ["60", "120", "300", "600"],
+      default: "300",
+    },
+    githubMaxRestPollsPerMinute: {
+      type: "select",
+      label: "Global REST poll budget",
+      description:
+        "Maximum fingerprint polls across all Work panels each minute.",
+      options: ["10", "20", "30", "60"],
+      default: "30",
+    },
   });
   let lastFingerprintPollAt = 0;
   const policy = async () => {

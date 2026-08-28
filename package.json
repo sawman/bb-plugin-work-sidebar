@@ -20,6 +20,7 @@
   "scripts": {
     "build": "env -u BB_CLI bb plugin build .",
     "dev": "bb plugin dev .",
+    "theme-control": "node scripts/bb-theme-control.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

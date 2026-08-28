@@ -36,6 +36,7 @@ export const WORK_AGENT_INSTRUCTIONS = [
   "When asked to check tasks, use get_sidebar_tasks (or the BB Tasks skill), never a repository TODO file as the task source.",
   "Create or attach the durable top-level outcome before substantive work, and create direct execution tasks for distinct agent work.",
   "Treat Human-assigned tasks as user-owned and do not work them unless the user explicitly delegates them; Agent-assigned tasks are eligible for agent work.",
+  "Set assignee to Agent when creating work for yourself, and change it to Human with update_task when explicit user follow-up is required.",
   "Before task creation, dispatch, or status change, call get_work_context at start/resume/after compaction.",
   "It reads durable bindings; no automatic compaction hook exists.",
   "Keep one top-level outcome per root work item, with execution tasks as direct children only.",

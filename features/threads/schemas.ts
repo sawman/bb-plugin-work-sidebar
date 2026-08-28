@@ -52,11 +52,36 @@ export const threadPreferenceSchemas = {
   },
   getThreadGroups: {
     input: z.null(),
-    output: z.object({ groups: z.array(sidebarThreadGroup).max(12) }).strict(),
+    output: z
+      .object({
+        groups: z.array(sidebarThreadGroup).max(12),
+        activeGroupPosition: z.number().int().min(0).max(12).optional(),
+      })
+      .strict(),
   },
   saveThreadGroups: {
-    input: z.object({ groups: z.array(sidebarThreadGroup).max(12) }).strict(),
-    output: z.object({ groups: z.array(sidebarThreadGroup).max(12) }).strict(),
+    input: z
+      .object({
+        groups: z.array(sidebarThreadGroup).max(12),
+        activeGroupPosition: z.number().int().min(0).max(12).optional(),
+      })
+      .strict(),
+    output: z
+      .object({
+        groups: z.array(sidebarThreadGroup).max(12),
+        activeGroupPosition: z.number().int().min(0).max(12).optional(),
+      })
+      .strict(),
+  },
+  getSidebarAppearance: {
+    input: z.null(),
+    output: z.object({ rowHeight: z.number().min(40).max(60) }).strict(),
+  },
+  saveSidebarAppearance: {
+    input: z
+      .object({ rowHeight: z.number().min(40).max(60).multipleOf(0.1) })
+      .strict(),
+    output: z.object({ rowHeight: z.number().min(40).max(60) }).strict(),
   },
 } as const;
 

@@ -104,6 +104,56 @@ describe("R5 pull-request queries", () => {
     client.clear();
   });
 
+  it("re-enriches a newer base generation even when the previous stack result settled first", async () => {
+    const nextStacks = deferred<{ available: boolean; pullRequests: typeof authored; error: null }>();
+    let stackReads = 0;
+    const rpc = {
+      call: vi.fn((method: string) => {
+        if (method === "sidebarAuthoredPullRequests")
+          return Promise.resolve({ available: true, pullRequests: authored, error: null });
+        if (method === "sidebarAuthoredPullRequestStacks") {
+          stackReads += 1;
+          if (stackReads === 1)
+            return Promise.resolve({
+              available: true,
+              pullRequests: [{ ...authored[0]!, title: "first stack" }],
+              error: null,
+            });
+          return nextStacks.promise;
+        }
+        throw new Error(`unexpected ${method}`);
+      }),
+    } as unknown as PullRequestRpc;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderHook(() => useAuthoredPullRequests(rpc), {
+      wrapper: wrapper(client),
+    });
+    await waitFor(() =>
+      expect(view.result.current.data?.[0]?.title).toBe("first stack"),
+    );
+
+    act(() => {
+      client.setQueryData(
+        pullRequestKeys.authored(),
+        [{ ...authored[0]!, title: "second base" }],
+        { updatedAt: Date.now() + 1_000 },
+      );
+    });
+    await waitFor(() => expect(stackReads).toBe(2));
+    expect(view.result.current.data?.[0]?.title).toBe("second base");
+
+    nextStacks.resolve({
+      available: true,
+      pullRequests: [{ ...authored[0]!, title: "second stack" }],
+      error: null,
+    });
+    await waitFor(() =>
+      expect(view.result.current.data?.[0]?.title).toBe("second stack"),
+    );
+    view.unmount();
+    client.clear();
+  });
+
   it("shares authored PR list and stack cache across left/right consumers, force-refreshes server data, and filters no client records", async () => {
     let reads = 0;
     let version = "base";

@@ -263,6 +263,12 @@ relevant gates for each task.
   live beside `SHA256SUMS` in root thread storage. Cua Driver used background
   accessibility actions; the original app frame and `default` BB theme were
   restored before the session ended.
+- Current live checks can switch the desktop client without opening Settings or
+  taking focus by running
+  `npm run theme-control -- matrix -- <capture-or-check-command>`. The helper
+  changes the renderer's real `bb.theme` preference, emits the same storage
+  event consumed by BB, sets the native Electron theme through BB's existing
+  subscription, and restores the exact original value after success or failure.
 - A `dracula` BB palette capture is retained as a palette diagnostic, not
   claimed as OS dark-mode evidence. True dark mode plus loading, empty, error,
   selected, expanded, and mutation-busy states remain mandatory harness and

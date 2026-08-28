@@ -80,7 +80,7 @@ export function createChangesRegistration(
           changedDeletions: workspace.workingTree.files.reduce(
             (total, file) => total + (file.deletions ?? 0), 0,
           ),
-          changedFiles: workspace.workingTree.files.slice(0, 8).map((file) => ({
+          changedFiles: workspace.workingTree.files.map((file) => ({
             path: file.path,
             status: file.status,
             insertions: file.insertions,

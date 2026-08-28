@@ -17,6 +17,8 @@ type CopyBadgeProps = {
   tone?: string;
   typography?: "context";
   variant?: "badge" | "text";
+  onContextMenu?: HTMLAttributes<HTMLSpanElement>["onContextMenu"];
+  onKeyDown?: HTMLAttributes<HTMLSpanElement>["onKeyDown"];
 } & Omit<
   HTMLAttributes<HTMLSpanElement>,
   | "children"
@@ -26,9 +28,7 @@ type CopyBadgeProps = {
   | "tabIndex"
   | "onPointerDown"
   | "onMouseDown"
-  | "onContextMenu"
   | "onClick"
-  | "onKeyDown"
   | "aria-label"
 >;
 
@@ -42,6 +42,8 @@ export function CopyBadge({
   tone,
   typography,
   variant = "badge",
+  onContextMenu,
+  onKeyDown,
   ...spanProps
 }: CopyBadgeProps) {
   const clipboardValue = copyValue ?? value;
@@ -56,7 +58,8 @@ export function CopyBadge({
     })();
   };
   const activate = (
-    event: ReactMouseEvent<HTMLSpanElement> | ReactKeyboardEvent<HTMLSpanElement>,
+    event:
+      ReactMouseEvent<HTMLSpanElement> | ReactKeyboardEvent<HTMLSpanElement>,
   ) => {
     event.preventDefault();
     event.stopPropagation();
@@ -81,11 +84,14 @@ export function CopyBadge({
         event.stopPropagation();
       }}
       onContextMenu={(event) => {
+        onContextMenu?.(event);
         event.preventDefault();
         event.stopPropagation();
       }}
       onClick={activate}
       onKeyDown={(event) => {
+        onKeyDown?.(event);
+        if (event.defaultPrevented) return;
         if (event.key === "Enter" || event.key === " ") activate(event);
       }}
     >

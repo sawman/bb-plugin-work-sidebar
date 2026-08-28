@@ -5,11 +5,11 @@ export const pullRequestSignal = z.object({
   review: z.enum([
     "approved",
     "changes_requested",
-    "changes_requested_review_requested",
     "review_requested",
     "review_required",
     "none",
   ]),
+  requestedReviewers: z.array(z.string()).optional(),
   reviewCommentCount: z.number().int().nonnegative(),
 });
 

@@ -1,10 +1,20 @@
-import { normalizeThreadGroups, type SidebarThreadGroup } from "./model";
+import {
+  normalizeActiveGroupPosition,
+  normalizeThreadGroups,
+  type SidebarThreadGroup,
+  type SidebarThreadGroupPreferences,
+} from "./model";
+import {
+  normalizeSidebarRowHeight,
+  validateSidebarRowHeight,
+} from "./sidebar-appearance.js";
 
 export const THREAD_PREFERENCE_CHANNEL = "sidebar-order:changed";
 export const THREAD_PREFERENCE_KEYS = {
   order: "sidebar-thread-order:v1",
   later: "sidebar-later-threads:v1",
   groups: "sidebar-thread-groups:v1",
+  appearance: "sidebar-appearance:v1",
 } as const;
 
 export function sanitizeThreadOrder(value: unknown): string[] {
@@ -149,17 +159,50 @@ export function createThreadPreferencesService(
       adapter.publish(THREAD_PREFERENCE_CHANNEL, { threadIds: value });
       return value;
     },
-    async groups(): Promise<SidebarThreadGroup[]> {
-      return normalizeThreadGroups(
-        await adapter.get(THREAD_PREFERENCE_KEYS.groups),
+    async groups(): Promise<SidebarThreadGroupPreferences> {
+      const stored = await adapter.get(THREAD_PREFERENCE_KEYS.groups);
+      const groups = normalizeThreadGroups(
+        stored,
         await adapter.get(THREAD_PREFERENCE_KEYS.later),
       );
+      const activeGroupPosition =
+        typeof stored === "object" && stored !== null
+          ? normalizeActiveGroupPosition(
+              Reflect.get(stored, "activeGroupPosition"),
+              groups.length,
+            )
+          : 0;
+      return { groups, activeGroupPosition };
     },
-    async saveGroups(groups: SidebarThreadGroup[]) {
+    async saveGroups(groups: SidebarThreadGroup[], activeGroupPosition = 0) {
       const value = normalizeThreadGroups({ groups });
-      await adapter.set(THREAD_PREFERENCE_KEYS.groups, { groups: value });
-      adapter.publish(THREAD_PREFERENCE_CHANNEL, { groups: value });
-      return value;
+      const preferences = {
+        groups: value,
+        activeGroupPosition: normalizeActiveGroupPosition(
+          activeGroupPosition,
+          value.length,
+        ),
+      };
+      await adapter.set(THREAD_PREFERENCE_KEYS.groups, preferences);
+      adapter.publish(THREAD_PREFERENCE_CHANNEL, preferences);
+      return preferences;
+    },
+    async appearance() {
+      return {
+        rowHeight: normalizeSidebarRowHeight(
+          await adapter.get(THREAD_PREFERENCE_KEYS.appearance),
+        ),
+      };
+    },
+    async saveAppearance(rowHeight: number) {
+      const validation = validateSidebarRowHeight(String(rowHeight));
+      if (validation.value === null) throw new Error(validation.error);
+      const value = validation.value;
+      await adapter.set(THREAD_PREFERENCE_KEYS.appearance, value);
+      adapter.publish(THREAD_PREFERENCE_CHANNEL, {
+        appearance: { rowHeight: value },
+      });
+      return { rowHeight: value };
     },
   };
 }

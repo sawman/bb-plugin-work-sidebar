@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { configureAxe } from "vitest-axe";
 import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
+import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../../contracts";
 import { getPluginQueryClient } from "../../../query-runtime";
 import type { SidebarTask } from "../../../work-model";
@@ -19,10 +20,48 @@ const scrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
   HTMLElement.prototype,
   "scrollIntoView",
 );
+const clipboardWrite = vi.fn(() => Promise.resolve());
 
 const task: SidebarTask = { id: "task_1", projectId: "project_1", projectName: "Work", key: "WORK-1", title: "Ship mounted fixtures", status: "todo", priority: "none", dueDate: null, parentTaskId: null, position: 1024, linkedThreadIds: [], assignee: "human" };
 const taskTwo = { ...task, id: "task_2", key: "WORK-2", title: "Second task", position: 2048 };
 const tasks = (items = [task]): TasksResult => ({ available: true, tasks: items, projects: [{ id: "project_1", name: "Work" }], error: null });
+const sidebarProject = { id: "project_1", name: "Work", isPersonal: false };
+function sidebarThread(id: string, title: string): PluginSidebarThread {
+  return {
+    id,
+    projectId: sidebarProject.id,
+    title,
+    titleFallback: null,
+    parentThreadId: null,
+    sectionId: null,
+    originKind: null,
+    originPluginId: null,
+    providerId: "codex",
+    hasPendingInteraction: false,
+    activity: {
+      workflows: 0,
+      backgroundAgents: 0,
+      backgroundCommands: 0,
+      planMode: 0,
+      goals: 0,
+    },
+    indicator: "none",
+    indicatorLabel: null,
+    isUnread: false,
+    isPinned: false,
+    isArchived: false,
+    environment: null,
+    host: null,
+    createdAt: 0,
+    updatedAt: 0,
+    lastReadAt: null,
+    latestAttentionAt: 0,
+  } as PluginSidebarThread;
+}
+const sidebarThreads = [
+  sidebarThread("thr_test", "Fixture thread"),
+  sidebarThread("thr_two", "Second thread"),
+];
 const workContext = {
   rootThreadId: "thr_test", tasksAvailable: true, currentThread: { title: "Fixture thread", status: "idle" as const, runtimeStatus: "idle", providerId: "codex" }, tasks: [], subtasks: [], outcome: null, executionTasks: [], bindings: [], legacy: { state: "none" as const, taskIds: [], message: null }, goal: null, todos: [], children: [],
 } satisfies Awaited<ReturnType<RpcHandlers["getWorkContext"]>>;
@@ -35,7 +74,7 @@ function rpcFixtures(sidebarTasks: RpcHandlers["sidebarTasks"], call: RpcCall = 
 }
 async function app() { return loadPluginApp(() => import("../../../app")); }
 function leftProps(searchQuery = "") { return { activeThreadId: "thr_test", activeProjectId: null, isCompactViewport: false, onNavigate: () => undefined, searchQuery, Original: () => null }; }
-async function leftSlot(items = [task], call: RpcCall = vi.fn(() => Promise.resolve({})), links: Awaited<ReturnType<RpcHandlers["sidebarTaskLinks"]>>["links"] = {}) { const captured = await app(); const rendered = renderSlot(captured.threadLists[0]!, leftProps(), { rpc: rpcFixtures(() => tasks(items), call, links) }); fireEvent.click(rendered.getByRole("button", { name: "Tasks" })); await waitFor(() => expect(rendered.getByText(items[0]!.title)).toBeTruthy()); return { rendered, call }; }
+async function leftSlot(items = [task], call: RpcCall = vi.fn(() => Promise.resolve({})), links: Awaited<ReturnType<RpcHandlers["sidebarTaskLinks"]>>["links"] = {}) { const captured = await app(); const rendered = renderSlot(captured.threadLists[0]!, leftProps(), { sidebarThreads: { status: "ready", projects: [sidebarProject], threads: sidebarThreads }, rpc: rpcFixtures(() => tasks(items), call, links) }); fireEvent.click(rendered.getByRole("button", { name: "Tasks" })); await waitFor(() => expect(rendered.getByText(items[0]!.title)).toBeTruthy()); return { rendered, call }; }
 
 async function expectNoAriaViolations(container: HTMLElement) {
   const results = await axe(container);
@@ -56,6 +95,14 @@ afterEach(() => {
   } else {
     Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
   }
+});
+
+beforeEach(() => {
+  clipboardWrite.mockClear();
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText: clipboardWrite },
+  });
 });
 
 describe("Tasks registered controls", () => {
@@ -180,7 +227,7 @@ describe("Tasks registered controls", () => {
     rendered.lifecycle.unmount();
   });
 
-  it("preserves pointer selection across all three registered Combobox call sites", async () => {
+  it("preserves pointer selection across both registered Combobox call sites", async () => {
     const { rendered: left } = await leftSlot();
     fireEvent.click(left.getByRole("button", { name: "Add task" }));
     const project = left.getByRole("combobox", { name: "Task project" });
@@ -194,11 +241,7 @@ describe("Tasks registered controls", () => {
     fireEvent.click(project);
     await left.findByRole("listbox");
     fireEvent.keyDown(project, { key: "Escape" });
-    const assignee = left.getByRole("combobox", { name: "Task assignee" });
-    fireEvent.focus(assignee);
-    fireEvent.click(await left.findByRole("option", { name: "Agent" }));
-    expect((assignee as HTMLInputElement).value).toBe("Agent");
-    expect(left.queryByRole("listbox")).toBeNull();
+    expect(left.queryByRole("combobox", { name: "Task assignee" })).toBeNull();
     left.lifecycle.unmount();
     getPluginQueryClient().clear();
 
@@ -278,46 +321,126 @@ describe("Tasks registered controls", () => {
     rendered.lifecycle.unmount();
   });
 
-  it("changes a left-row assignee and keeps priority above status", async () => {
+  it("edits left-row thread links without exposing Human/Agent assignment", async () => {
     const pending = deferred<unknown>();
     const { rendered, call } = await leftSlot(
       [{ ...task, priority: "high" }],
       vi.fn((method) =>
-        method === "updateTaskAssignee" ? pending.promise : Promise.resolve({}),
+        method === "attachTaskToThread" ? pending.promise : Promise.resolve({}),
       ),
     );
     const row = rendered.getByText(task.title).closest(".ws-task-row")!;
     const trailing = row.querySelector(".ws-task-row-actions")!;
-    expect(trailing.firstElementChild?.classList).toContain(
-      "ws-task-priority-slot",
+    const primaryInfo = trailing.querySelector(".ws-task-row-primary-info")!;
+    expect(primaryInfo.querySelector(".ws-task-key-badge")?.textContent).toBe(
+      "WORK-1",
+    );
+    expect(primaryInfo.querySelector(".ws-task-priority-slot")).toBeTruthy();
+    expect(row.querySelector(".ws-task-meta .ws-task-key-badge")).toBeNull();
+    fireEvent.click(
+      rendered.getByRole("button", { name: "Copy task WORK-1" }),
+    );
+    await waitFor(() =>
+      expect(clipboardWrite).toHaveBeenCalledWith("Task WORK-1"),
     );
     expect(
       trailing.querySelector('[aria-label="Change status for WORK-1: To do"]'),
     ).toBeTruthy();
 
-    const assignee = rendered.getByLabelText("Human assigned");
-    fireEvent.click(assignee);
-    expect(rendered.getByRole("listbox", { name: "Task assignee" })).toBeTruthy();
+    expect(rendered.queryByLabelText("Human assigned")).toBeNull();
+    expect(rendered.queryByLabelText("Agent assigned")).toBeNull();
+    expect(
+      rendered.queryByRole("button", { name: "Manage threads for WORK-1" }),
+    ).toBeNull();
+    const threadPicker = rendered.getByRole("button", {
+      name: "Edit threads for WORK-1",
+    });
+    fireEvent.click(threadPicker);
+    const search = rendered.getByRole("combobox", {
+      name: "Search threads for WORK-1",
+    });
+    expect(search.getAttribute("aria-autocomplete")).toBe("list");
+    const listbox = rendered.getByRole("listbox", {
+      name: "Thread assignment for WORK-1",
+    });
+    expect(listbox.getAttribute("aria-multiselectable")).toBe("true");
+    expect(
+      rendered.getByRole("option", { name: "Fixture thread" }).getAttribute(
+        "aria-selected",
+      ),
+    ).toBe("false");
+    fireEvent.change(search, { target: { value: "second" } });
+    expect(
+      rendered.queryByRole("option", { name: "Fixture thread" }),
+    ).toBeNull();
+    expect(
+      rendered.getByRole("option", { name: "Second thread" }),
+    ).toBeTruthy();
     await expectNoAriaViolations(rendered.container);
     fireEvent.pointerDown(document.body);
     await waitFor(() =>
-      expect(rendered.queryByRole("listbox", { name: "Task assignee" })).toBeNull(),
+      expect(
+        rendered.queryByRole("listbox", {
+          name: "Thread assignment for WORK-1",
+        }),
+      ).toBeNull(),
     );
-    fireEvent.click(assignee);
-    fireEvent.click(rendered.getByRole("option", { name: "Agent" }));
+    fireEvent.click(threadPicker);
+    fireEvent.change(
+      rendered.getByRole("combobox", { name: "Search threads for WORK-1" }),
+      { target: { value: "fixture" } },
+    );
+    fireEvent.click(rendered.getByRole("option", { name: "Fixture thread" }));
     await waitFor(() =>
-      expect(call).toHaveBeenCalledWith("updateTaskAssignee", {
+      expect(call).toHaveBeenCalledWith("attachTaskToThread", {
         taskId: "task_1",
-        assignee: "agent",
+        threadId: "thr_test",
       }),
     );
-    expect(rendered.getByLabelText("Agent assigned")).toBeTruthy();
-    expect((rendered.getByLabelText("Agent assigned") as HTMLButtonElement).disabled).toBe(true);
-    pending.resolve({ taskId: "task_1", assignee: "agent" });
-    await waitFor(() =>
-      expect((rendered.getByLabelText("Human assigned") as HTMLButtonElement).disabled).toBe(false),
-    );
+    expect((threadPicker as HTMLButtonElement).disabled).toBe(true);
+    pending.resolve({ taskId: "task_1", threadId: "thr_test" });
     rendered.lifecycle.unmount();
+    getPluginQueryClient().clear();
+
+    const attached = await leftSlot([
+      { ...task, linkedThreadIds: ["thr_test"] },
+    ]);
+    const copyThread = attached.rendered.getByRole("button", {
+      name: "Copy assigned thread Fixture thread",
+    });
+    const taskTitle = attached.rendered.getByRole("button", { name: task.title });
+    fireEvent.click(copyThread);
+    await waitFor(() =>
+      expect(clipboardWrite).toHaveBeenCalledWith("Fixture thread"),
+    );
+    expect(taskTitle.getAttribute("aria-pressed")).toBe("false");
+    expect(attached.rendered.queryByRole("listbox")).toBeNull();
+    fireEvent.click(
+      attached.rendered.getByRole("button", {
+        name: "Edit threads for WORK-1",
+      }),
+    );
+    const assignedThread = attached.rendered.getByRole("option", {
+      name: "Fixture thread",
+    });
+    expect(assignedThread.getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(
+      attached.rendered.getByRole("option", { name: "Second thread" }),
+    );
+    await waitFor(() =>
+      expect(attached.call).toHaveBeenCalledWith("attachTaskToThread", {
+        taskId: "task_1",
+        threadId: "thr_two",
+      }),
+    );
+    fireEvent.click(assignedThread);
+    await waitFor(() =>
+      expect(attached.call).toHaveBeenCalledWith("detachTaskFromThread", {
+        taskId: "task_1",
+        threadId: "thr_test",
+      }),
+    );
+    attached.rendered.lifecycle.unmount();
   });
 
   it("confirms deletion and preserves the task on deleted:false", async () => {
@@ -335,13 +458,15 @@ describe("Tasks registered controls", () => {
     await waitFor(() => expect(deleted.call).toHaveBeenCalledWith("deleteSidebarTask", { taskId: "task_1" })); deleted.rendered.lifecycle.unmount();
   });
 
-  it("attaches and detaches the active thread, but modifier selection never attaches", async () => {
-    const { rendered, call } = await leftSlot(); const assign = rendered.getByRole("button", { name: task.title });
-    fireEvent.click(assign, { ctrlKey: true }); fireEvent.click(assign, { metaKey: true }); expect(call).not.toHaveBeenCalled();
-    fireEvent.click(assign); await waitFor(() => expect(call).toHaveBeenCalledWith("attachTaskToThread", { taskId: "task_1", threadId: "thr_test" }));
-    rendered.lifecycle.unmount(); getPluginQueryClient().clear();
-    const attached = await leftSlot([{ ...task, linkedThreadIds: ["thr_test"] }]); fireEvent.click(attached.rendered.getByRole("button", { name: task.title }));
-    await waitFor(() => expect(attached.call).toHaveBeenCalledWith("detachTaskFromThread", { taskId: "task_1", threadId: "thr_test" })); attached.rendered.lifecycle.unmount();
+  it("keeps title clicks selection-only so thread links change through the explicit picker", async () => {
+    const { rendered, call } = await leftSlot();
+    const title = rendered.getByRole("button", { name: task.title });
+    fireEvent.click(title, { ctrlKey: true });
+    fireEvent.click(title, { metaKey: true });
+    fireEvent.click(title);
+    expect(call).not.toHaveBeenCalled();
+    expect(title.getAttribute("aria-pressed")).toBe("true");
+    rendered.lifecycle.unmount();
   });
 
   it("keeps a binding-owned Queue row selectable while clearly preventing a destructive detach", async () => {
@@ -366,6 +491,15 @@ describe("Tasks registered controls", () => {
     expect(bindingDescription?.getAttribute("role")).toBeNull();
     fireEvent.click(row);
     expect(call).not.toHaveBeenCalled();
+    fireEvent.click(
+      rendered.getByRole("button", { name: "Edit threads for WORK-1" }),
+    );
+    expect(
+      rendered.getByRole("option", { name: "Fixture thread" }),
+    ).toHaveProperty("disabled", true);
+    expect(
+      rendered.getByRole("option", { name: "Second thread" }),
+    ).toHaveProperty("disabled", false);
     rendered.lifecycle.unmount();
   });
 

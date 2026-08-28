@@ -6,13 +6,11 @@ export function BranchName({
   className,
   icon,
   title,
-  typography,
 }: {
   name: string | null;
   className?: string;
   icon?: IconName;
   title?: string;
-  typography?: "context";
 }) {
   const branch = name?.trim() || null;
   if (!branch) {
@@ -30,7 +28,6 @@ export function BranchName({
       copyValue={`Branch ${branch}`}
       label="branch name"
       className={`ws-branch-name${className ? ` ${className}` : ""}`}
-      typography={typography}
       variant="text"
       title={title ?? `Branch ${branch}`}
     >

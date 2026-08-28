@@ -1,13 +1,14 @@
 import type { StatusPresentation } from "../../components/ui/status";
 
 export type PullRequestCheckState = "failed" | "passing" | "pending" | "none" | "unknown";
-export type PullRequestReviewState = "approved" | "changes_requested" | "changes_requested_review_requested" | "review_requested" | "review_required" | "none";
+export type PullRequestReviewState = "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
 export type PullRequestState = "closed" | "draft" | "merged" | "open";
 export type StatusTone = "open" | "draft" | "closed" | "merged" | "success" | "destructive" | "warning" | "muted";
 
 export type PullRequestSignal = {
   checks: PullRequestCheckState;
   review: PullRequestReviewState;
+  requestedReviewers?: string[];
   reviewCommentCount: number;
 };
 
@@ -40,7 +41,6 @@ export function pullRequestSignalPresentation(signal: PullRequestSignal): { chec
   const review: Record<PullRequestReviewState, StatusPresentation> = {
     approved: { icon: "Check", label: "Approved", tone: "success" },
     changes_requested: { icon: "Wrench", label: "Changes requested", tone: "destructive" },
-    changes_requested_review_requested: { icon: "Eye", overlayIcon: "Wrench", label: "Changes requested; re-review requested", tone: "warning" },
     review_requested: { icon: "Eye", label: "Review requested", tone: "warning" },
     review_required: { icon: "Eye", label: "Review required", tone: "muted" },
     none: { icon: "UserClock", label: "No reviewer requested", tone: "muted" },
@@ -61,7 +61,7 @@ export function normalizePullRequestSignal(input: {
           : input.checks.state === "unknown" ? "unknown" : "none";
   const review = typeof input.review === "string"
     ? input.review
-    : input.review.state === "changes_requested" && input.review.reviewRequestCount > 0 ? "changes_requested_review_requested"
+    : input.review.state === "changes_requested" && input.review.reviewRequestCount > 0 ? "review_required"
       : input.review.state;
   return { checks, review, reviewCommentCount: Math.max(0, input.reviewCommentCount ?? 0) };
 }

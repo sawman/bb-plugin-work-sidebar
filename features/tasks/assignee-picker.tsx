@@ -6,15 +6,18 @@ export function AssigneePicker({
   value,
   onChange,
   disabled = false,
+  taskKey,
 }: {
   value: SidebarTask["assignee"];
   onChange(value: SidebarTask["assignee"]): void;
   disabled?: boolean;
+  taskKey?: string;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLSpanElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const label = value === "agent" ? "Agent assigned" : "Human assigned";
+  const label = `${value === "agent" ? "Agent" : "Human"} assigned${taskKey ? ` to ${taskKey}` : ""}`;
+  const listLabel = `Task assignee${taskKey ? ` for ${taskKey}` : ""}`;
 
   useEffect(() => {
     if (!open) return;
@@ -54,7 +57,7 @@ export function AssigneePicker({
         <span
           className="ws-assignee-options"
           role="listbox"
-          aria-label="Task assignee"
+          aria-label={listLabel}
         >
           <button
             type="button"

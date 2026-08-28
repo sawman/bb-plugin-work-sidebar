@@ -1,6 +1,15 @@
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Icon } from "../../components/ui/icon";
 import { Status } from "../../components/ui/status";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuInfo,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "../../components/ui/context-menu";
 import {
   pullRequestPresentation,
   pullRequestSignalPresentation,
@@ -9,6 +18,11 @@ import {
 import { orderStackLayers, type SidebarStack } from "../../work-model";
 import { PullRequestIdentifierBadge } from "./identifier-badge";
 import { StackNumberBadge } from "./stack-number";
+import { ThreadProviderLogo } from "../../components/threads/thread-provider-logo";
+import {
+  linkedThreadForStack,
+  type PullRequestThreadReference,
+} from "./thread-link";
 
 export type AuthoredPullRequest = {
   number: number;
@@ -21,6 +35,7 @@ export type AuthoredPullRequest = {
   base: string;
   checks: PullRequestSignal["checks"];
   review: PullRequestSignal["review"];
+  requestedReviewers?: string[];
   reviewCommentCount: number;
   stack: SidebarStack | null;
 };
@@ -30,101 +45,151 @@ export function AuthoredPullRequestRow({
   pullRequest,
   stackControl,
   stackNumber,
+  linkedThread,
   changingDraft,
+  onOpenPullRequest,
+  onOpenThread,
   onToggleDraft,
 }: {
   pullRequest: AuthoredRow;
   stackControl?: ReactNode;
   stackNumber?: number | null;
+  linkedThread?: PullRequestThreadReference;
   changingDraft: boolean;
+  onOpenPullRequest?(url: string): void;
+  onOpenThread?(threadId: string): void;
   onToggleDraft(pullRequest: AuthoredRow): void;
 }) {
+  const threadTooltipId = useId();
   const signal = pullRequestSignalPresentation(pullRequest);
   const state = pullRequestPresentation({
     state: pullRequest.state,
     draft: pullRequest.draft,
   });
+  const stateAction = pullRequest.draft ? "Mark open" : "Mark draft";
+  const reviewers = pullRequest.requestedReviewers?.filter(Boolean) ?? [];
   return (
-    <article className="ws-pr-row ws-pr-compact-row ws-sidebar-row">
-      <span className="ws-pr-stack-slot">{stackControl}</span>
-      <a
-        className="ws-pr-target ws-sidebar-row-main"
-        href={pullRequest.url}
-        target="_blank"
-        rel="noreferrer"
-        aria-label={`Open pull request #${pullRequest.number}: ${pullRequest.title}`}
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <article className="ws-pr-row ws-pr-compact-row ws-sidebar-row">
+          <span className="ws-pr-stack-slot">{stackControl}</span>
+          <div className="ws-pr-target ws-sidebar-row-main">
+            <a
+              className="ws-pr-target-title ws-sidebar-row-title"
+              href={pullRequest.url}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Open pull request #${pullRequest.number}: ${pullRequest.title}`}
+            >
+              {pullRequest.title}
+            </a>
+            <span className="ws-pr-context ws-pr-target-context ws-sidebar-row-meta">
+              <ContextMenuTrigger asChild>
+                <PullRequestIdentifierBadge
+                  kind="pull-request"
+                  number={pullRequest.number}
+                  presentation={state}
+                />
+              </ContextMenuTrigger>
+              {stackNumber != null && <StackNumberBadge number={stackNumber} />}
+              <PullRequestIdentifierBadge kind="branch" name={pullRequest.head} />
+            </span>
+          </div>
+          <span className="ws-pr-status-icons ws-sidebar-row-trailing">
+            {linkedThread && onOpenThread ? (
+              <button
+                type="button"
+                className="ws-pr-thread-provider-link"
+                aria-label={`Open linked thread ${linkedThread.title}`}
+                aria-describedby={threadTooltipId}
+                onClick={() => onOpenThread(linkedThread.id)}
+              >
+                <ThreadProviderLogo
+                  providerId={linkedThread.providerId}
+                  provider={linkedThread.provider}
+                  title={null}
+                />
+                <span
+                  className="ws-pr-thread-tooltip"
+                  id={threadTooltipId}
+                  role="tooltip"
+                >
+                  {linkedThread.title}
+                </span>
+              </button>
+            ) : null}
+            <Status presentation={signal.checks} />
+            <Status presentation={signal.review} />
+          </span>
+        </article>
+      </ContextMenuTrigger>
+      <ContextMenuContent
+        aria-label={`Actions for pull request #${pullRequest.number}`}
       >
-        <span className="ws-pr-target-title ws-sidebar-row-title">
-          {pullRequest.title}
-        </span>
-        <span className="ws-pr-context ws-pr-target-context ws-sidebar-row-meta">
-          {stackNumber != null && <StackNumberBadge number={stackNumber} />}
-          <PullRequestIdentifierBadge
-            kind="pull-request"
-            number={pullRequest.number}
-          />
-          <PullRequestIdentifierBadge kind="branch" name={pullRequest.head} />
-        </span>
-      </a>
-      <span className="ws-pr-status-icons ws-sidebar-row-trailing">
-        <button
-          type="button"
-          className="ws-pr-state-toggle ws-pr-tooltip"
-          data-tooltip={
-            changingDraft
-              ? "Updating…"
-              : `${pullRequest.draft ? "Mark open" : "Mark draft"}`
-          }
+        <ContextMenuLabel>PR #{pullRequest.number}</ContextMenuLabel>
+        {onOpenPullRequest ? (
+          <ContextMenuItem onSelect={() => onOpenPullRequest(pullRequest.url)}>
+            Open pull request
+          </ContextMenuItem>
+        ) : null}
+        {linkedThread && onOpenThread ? (
+          <ContextMenuItem onSelect={() => onOpenThread(linkedThread.id)}>
+            Open linked thread
+          </ContextMenuItem>
+        ) : null}
+        <ContextMenuItem
           disabled={changingDraft}
-          aria-label={
-            changingDraft
-              ? "Updating pull request state"
-              : `${pullRequest.draft ? "Mark open" : "Mark draft"}`
-          }
-          onClick={() => onToggleDraft(pullRequest)}
+          onSelect={() => onToggleDraft(pullRequest)}
         >
-          <Status
-            presentation={
-              changingDraft
-                ? {
-                    ...state,
-                    icon: "LoaderCircle",
-                    label: "Updating pull request state",
-                  }
-                : state
-            }
-          />
-        </button>
-        <Status presentation={signal.checks} />
-        <Status presentation={signal.review} />
-      </span>
-    </article>
+          {changingDraft ? "Updating…" : stateAction}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuInfo>CI: {signal.checks.label}</ContextMenuInfo>
+        <ContextMenuInfo>Review: {signal.review.label}</ContextMenuInfo>
+        <ContextMenuInfo>
+          Reviewers: {reviewers.length > 0 ? reviewers.join(", ") : "None requested"}
+        </ContextMenuInfo>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
 export function AuthoredPullRequestStack({
   stack,
   changingDraftUrl,
+  onOpenPullRequest,
+  onOpenThread,
   onToggleDraft,
+  threadsByBranch,
 }: {
   stack: SidebarStack;
   changingDraftUrl: string | null;
+  onOpenPullRequest?(url: string): void;
+  onOpenThread?(threadId: string): void;
   onToggleDraft(pullRequest: AuthoredRow): void;
+  threadsByBranch?: ReadonlyMap<string, PullRequestThreadReference>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const layers = orderStackLayers(stack.pullRequests, stack.base);
   const base = layers[0];
   if (!base) return null;
+  const linkedThread = threadsByBranch
+    ? linkedThreadForStack(layers, threadsByBranch)
+    : undefined;
   const row = (
     layer: SidebarStack["pullRequests"][number],
     stackControl?: ReactNode,
     stackNumber?: number | null,
+    promotedThread?: PullRequestThreadReference,
   ) => (
     <AuthoredPullRequestRow
       key={layer.number}
       stackControl={stackControl}
       stackNumber={stackNumber}
+      linkedThread={promotedThread}
       changingDraft={changingDraftUrl === layer.url}
+      onOpenPullRequest={onOpenPullRequest}
+      onOpenThread={onOpenThread}
       onToggleDraft={onToggleDraft}
       pullRequest={{
         ...layer,
@@ -132,6 +197,7 @@ export function AuthoredPullRequestStack({
         state: layer.draft ? "draft" : "open",
         checks: layer.checks ?? "unknown",
         review: layer.review ?? "none",
+        requestedReviewers: layer.requestedReviewers,
         reviewCommentCount: layer.reviewCommentCount ?? 0,
       }}
     />
@@ -156,6 +222,7 @@ export function AuthoredPullRequestStack({
           </button>
         ) : undefined,
         stack.number,
+        linkedThread,
       )}
       {expanded &&
         layers.slice(1).map((layer) => (

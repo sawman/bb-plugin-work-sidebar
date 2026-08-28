@@ -25,14 +25,16 @@ export function SidebarWorkView({
   return (
     <>
       <div className="ws-list-toolbar">{toolbar}</div>
-      <SidebarThreadGroups
-        organization={organization}
-        activeThreadId={activeThreadId}
-        providersById={providersById}
-        onNavigate={onNavigate}
-        subtextRefreshKey={subtextRefreshKey}
-        emptyMessage={emptyMessage}
-      />
+      <div className="ws-view-content">
+        <SidebarThreadGroups
+          organization={organization}
+          activeThreadId={activeThreadId}
+          providersById={providersById}
+          onNavigate={onNavigate}
+          subtextRefreshKey={subtextRefreshKey}
+          emptyMessage={emptyMessage}
+        />
+      </div>
     </>
   );
 }

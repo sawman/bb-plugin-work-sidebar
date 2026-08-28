@@ -54,8 +54,9 @@ describe("thread workspace metadata", () => {
       { kind: "branch", icon: "GitBranch", text: "bb/r24-location" },
     ]);
 
-    for (const copyable of screen.getAllByRole("button")) {
-      expect(copyable.dataset.typography).toBe("context");
-    }
+    const copyable = screen.getAllByRole("button");
+    expect(copyable[0]?.dataset.typography).toBe("context");
+    expect(copyable[1]?.classList).toContain("ws-branch-name");
+    expect(copyable[1]?.dataset.typography).toBeUndefined();
   });
 });

@@ -69,8 +69,14 @@ describe("GitHub Stack enrichment ownership", () => {
             p0: {
               headRefName: "feature/authored-row",
               baseRefName: "main",
-              reviewDecision: "APPROVED",
-              reviewRequests: { totalCount: 0 },
+              reviewDecision: "CHANGES_REQUESTED",
+              reviewRequests: {
+                totalCount: 2,
+                nodes: [
+                  { requestedReviewer: { login: "octocat" } },
+                  { requestedReviewer: { slug: "platform-team" } },
+                ],
+              },
               commits: {
                 nodes: [
                   { commit: { statusCheckRollup: { state: "SUCCESS" } } },
@@ -94,11 +100,15 @@ describe("GitHub Stack enrichment ownership", () => {
       head: "feature/authored-row",
       base: "main",
       checks: "passing",
-      review: "approved",
+      review: "review_required",
+      requestedReviewers: ["octocat", "platform-team"],
     });
     expect(run).toHaveBeenCalledTimes(1);
     expect(run.mock.calls[0]?.[0].join(" ")).toContain(
       "headRefName baseRefName",
+    );
+    expect(run.mock.calls[0]?.[0].join(" ")).toContain(
+      "requestedReviewer",
     );
   });
 
@@ -107,13 +117,16 @@ describe("GitHub Stack enrichment ownership", () => {
     const run = vi.fn(async (args: readonly string[]) => {
       if (args[1] === "graphql") throw new Error("GraphQL unavailable");
       if (args.some((value) => value.endsWith("/reviews?per_page=100"))) {
-        return "[]";
+        return JSON.stringify([{
+          user: { login: "reviewer-one" },
+          state: "CHANGES_REQUESTED",
+        }]);
       }
       return JSON.stringify({
         head: { ref: "feature/rest-fallback", sha: null },
         base: { ref: "main" },
-        requested_reviewers: [],
-        requested_teams: [],
+        requested_reviewers: [{ login: "reviewer-one" }],
+        requested_teams: [{ slug: "platform-team" }],
       });
     });
 
@@ -129,7 +142,8 @@ describe("GitHub Stack enrichment ownership", () => {
       head: "feature/rest-fallback",
       base: "main",
       checks: "unknown",
-      review: "none",
+      review: "review_required",
+      requestedReviewers: ["reviewer-one", "platform-team"],
     });
     expect(run).toHaveBeenCalledTimes(3);
   });

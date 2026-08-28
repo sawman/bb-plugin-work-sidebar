@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   archiveDurationLabel,
+  moveThreadGroup,
+  reorderThreadGroup,
   selectThreadIds,
+  threadGroupPositions,
   threadCountPresentation,
 } from "../model";
 import { visibleThreadTreeIds } from "../thread-tree-model";
@@ -53,6 +56,53 @@ describe("thread count presentation", () => {
       subthreads: 2,
       label: "2 threads · 2 subthreads",
     });
+  });
+});
+
+describe("thread group ordering", () => {
+  const groups = [
+    { id: "group_alpha", name: "Alpha", threadIds: ["thr_a"] },
+    { id: "group_beta", name: "Beta", threadIds: ["thr_b"] },
+    { id: "group_gamma", name: "Gamma", threadIds: [] },
+  ];
+
+  it("moves one group without changing its contents", () => {
+    expect(moveThreadGroup(groups, 0, "group_gamma", -1)).toEqual({
+      groups: [groups[0], groups[2], groups[1]],
+      activeGroupPosition: 0,
+    });
+    expect(moveThreadGroup(groups, 0, "group_alpha", -1)).toEqual({
+      groups,
+      activeGroupPosition: 1,
+    });
+  });
+
+  it("returns the existing order at either boundary or for an unknown group", () => {
+    expect(moveThreadGroup(groups, 0, "active", -1)).toBeNull();
+    expect(moveThreadGroup(groups, 0, "group_gamma", 1)).toBeNull();
+    expect(moveThreadGroup(groups, 0, "group_missing", 1)).toBeNull();
+  });
+
+  it("places Active among custom groups without creating a persisted custom row", () => {
+    expect(
+      threadGroupPositions(groups, 2).map(({ id }) => id),
+    ).toEqual(["group_alpha", "group_beta", "active", "group_gamma"]);
+  });
+
+  it("reorders a dragged group directly onto another group", () => {
+    expect(reorderThreadGroup(groups, 0, "active", "group_beta")).toEqual({
+      groups: [groups[0], groups[1], groups[2]],
+      activeGroupPosition: 2,
+    });
+    expect(
+      reorderThreadGroup(groups, 2, "group_gamma", "group_alpha"),
+    ).toEqual({
+      groups: [groups[2], groups[0], groups[1]],
+      activeGroupPosition: 3,
+    });
+    expect(
+      reorderThreadGroup(groups, 0, "group_missing", "group_beta"),
+    ).toBeNull();
   });
 });
 

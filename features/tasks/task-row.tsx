@@ -9,9 +9,8 @@ import {
 } from "../../components/ui/context-menu";
 import { CopyBadge } from "../../components/ui/copy-badge";
 import { Icon } from "../../components/ui/icon";
-import {
-  ThreadProviderLogo,
-  type ThreadProvider,
+import type {
+  ThreadProvider,
 } from "../../components/threads/thread-provider-logo";
 import type {
   SidebarTask,
@@ -19,8 +18,8 @@ import type {
   ThreadTaskLink,
 } from "../../work-model";
 import { taskStatusPresentation } from "./model";
-import { AssigneePicker } from "./assignee-picker";
 import { TaskPriorityIcon } from "./priority";
+import { ThreadAssignmentPicker } from "./thread-assignment-picker";
 
 const TASK_STATUSES: readonly SidebarTask["status"][] = [
   "backlog",
@@ -53,13 +52,8 @@ export type TaskRowProps = {
   onMoveTask(taskId: string, direction: -1 | 1): void;
   onOpenThread(threadId: string, split?: boolean): void;
   onUpdateStatus(taskId: string, status: SidebarTask["status"]): Promise<void>;
-  onUpdateAssignee(
-    taskId: string,
-    assignee: SidebarTask["assignee"],
-  ): Promise<void>;
   onDelete(task: SidebarTask): Promise<void>;
   activeThreadId: string | null;
-  activeThreadTitle: string | null;
   bindingLinks: ReadonlyMap<string, ThreadTaskLink>;
   bindingOwnerLinks: ReadonlyMap<string, ThreadTaskLink>;
   ownerThreads: ReadonlyMap<
@@ -73,9 +67,9 @@ export type TaskRowProps = {
   onAttachToThread(taskId: string, threadId: string): Promise<void>;
   onDetachFromThread(taskId: string, threadId: string): Promise<void>;
   updatingTaskId: string | null;
-  updatingAssigneeTaskId: string | null;
+  updatingAttachmentTaskId: string | null;
   selectedTaskIds: ReadonlySet<string>;
-  onSelect(taskId: string, event: ReactMouseEvent<HTMLButtonElement>): boolean;
+  onSelect(taskId: string, event: ReactMouseEvent<HTMLButtonElement>): void;
 };
 
 function bindingLabel(link: ThreadTaskLink): string {
@@ -101,7 +95,6 @@ export function TaskRow(props: TaskRowProps) {
     onUpdateStatus,
     onDelete,
     activeThreadId,
-    activeThreadTitle,
     bindingLinks,
     bindingOwnerLinks,
     ownerThreads,
@@ -147,12 +140,6 @@ export function TaskRow(props: TaskRowProps) {
     const bounds = event.currentTarget.getBoundingClientRect();
     return event.clientY > bounds.top + bounds.height / 2 ? "after" : "before";
   };
-  const assign = () =>
-    activeThreadId &&
-    !bindingLink &&
-    (assigned
-      ? onDetachFromThread(task.id, activeThreadId)
-      : onAttachToThread(task.id, activeThreadId));
   const openAssignedThread = () =>
     task.linkedThreadIds[0] &&
     onOpenThread(task.linkedThreadIds[0], task.linkedThreadIds.length === 1);
@@ -208,73 +195,56 @@ export function TaskRow(props: TaskRowProps) {
             <button
               className={`ws-task-assign ${assigned ? "ws-task-assigned" : ""}`}
               type="button"
-              disabled={!activeThreadId}
+              aria-pressed={selectedTaskIds.has(task.id)}
               aria-describedby={bindingState ? bindingDescriptionId : undefined}
-              onClick={(event) => {
-                if (!onSelect(task.id, event)) void assign();
-              }}
-              title={
-                bindingLink
-                  ? `${bindingLabel(bindingLink)}. This attachment cannot be detached.`
-                  : activeThreadId
-                  ? assigned
-                    ? `Assigned to ${activeThreadTitle ?? "current thread"}`
-                    : `Assign to ${activeThreadTitle ?? "current thread"}`
-                  : "Select a thread to assign this task"
-              }
+              onClick={(event) => onSelect(task.id, event)}
+              title={task.title}
             >
               <span className="ws-task-title ws-sidebar-row-title" title={task.title}>
                 {task.title}
               </span>
             </button>
             <div className="ws-task-meta ws-sidebar-row-meta">
-              <span className="ws-task-key-badge">{task.key}</span>
               {task.dueDate && (
                 <span className="ws-task-badge">Due {task.dueDate}</span>
               )}
               {showProject && (
                 <span className="ws-task-badge">{task.projectName}</span>
               )}
-              {bindingOwnerLink?.role === "execution" && ownerThreadTitle ? (
-                <>
-                  <span id={bindingDescriptionId} className="ws-sr-only">
-                    {bindingState}
-                  </span>
-                  <CopyBadge
-                    className="ws-task-owner-badge"
-                    value={ownerThreadTitle}
-                    label="working thread"
-                    typography="context"
-                  >
-                    <ThreadProviderLogo
-                      providerId={ownerThread?.providerId ?? "agent"}
-                      provider={ownerThread?.provider}
-                    />
-                    <span>{ownerThreadTitle}</span>
-                  </CopyBadge>
-                </>
-              ) : bindingState ? (
-                <span
-                  id={bindingDescriptionId}
-                  className="ws-task-badge"
-                >
+              {bindingState ? (
+                <span id={bindingDescriptionId} className="ws-sr-only">
                   {bindingState}
                 </span>
               ) : null}
+              <ThreadAssignmentPicker
+                taskKey={task.key}
+                linkedThreadIds={task.linkedThreadIds}
+                lockedThreadId={bindingOwnerLink?.threadId ?? null}
+                threads={ownerThreads}
+                disabled={props.updatingAttachmentTaskId === task.id}
+                onToggle={(threadId, attached) =>
+                  void (attached
+                    ? onAttachToThread(task.id, threadId)
+                    : onDetachFromThread(task.id, threadId))
+                }
+              />
             </div>
           </div>
           <div className="ws-task-row-actions ws-sidebar-row-trailing">
-            <span className="ws-task-priority-slot">
-              <TaskPriorityIcon priority={task.priority} />
+            <span className="ws-task-row-primary-info">
+              <CopyBadge
+                className="ws-task-key-badge"
+                value={task.key}
+                copyValue={`Task ${task.key}`}
+                label="task"
+              >
+                {task.key}
+              </CopyBadge>
+              <span className="ws-task-priority-slot">
+                <TaskPriorityIcon priority={task.priority} />
+              </span>
             </span>
             <span className="ws-task-row-controls">
-              <AssigneePicker
-                value={task.assignee}
-                disabled={props.updatingAssigneeTaskId === task.id}
-                onChange={(assignee) =>
-                  void props.onUpdateAssignee(task.id, assignee)
-                }
-              />
               <label
                 className={`ws-task-status-picker ws-task-status-${task.status}`}
                 title={status.label}

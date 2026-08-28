@@ -6,6 +6,7 @@ import {
   type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
 import { Icon } from "../../components/ui/icon";
+import { RefreshButton } from "../../components/ui/refresh-button";
 import { TabSelector } from "../../components/ui/tab-selector";
 import { ChangesPanel } from "../changes/panel";
 import { invalidateChanges } from "../changes/queries";
@@ -116,21 +117,18 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
             <span>{status.data?.currentThread.title ?? "Active thread"}</span>
           </div>
         </div>
-        <button
-          type="button"
-          className="ws-icon-button"
-          aria-label="Refresh work context"
-          title="Refresh work context"
-          onClick={() => {
-            void invalidateWorkContextCards(queryClient, threadId);
-            void invalidateTracker(queryClient, threadId);
-            void invalidateChanges(queryClient, threadId);
-            void invalidateGitHubApiHealth(queryClient);
-          }}
+        <RefreshButton
+          label="Refresh work context"
+          onRefresh={() =>
+            Promise.all([
+              invalidateWorkContextCards(queryClient, threadId),
+              invalidateTracker(queryClient, threadId),
+              invalidateChanges(queryClient, threadId),
+              invalidateGitHubApiHealth(queryClient),
+            ])
+          }
           disabled={tab === "work" && status.isPending}
-        >
-          ↻
-        </button>
+        />
       </header>
       <TabSelector
         ariaLabel="Work context views"

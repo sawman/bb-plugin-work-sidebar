@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, waitFor } from "@testing-library/react";
+import { fireEvent, waitFor, within } from "@testing-library/react";
 import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { rpcContract } from "../../../contracts";
@@ -238,7 +238,10 @@ describe("registered Work context cards", () => {
       rootThreadId: "thr_one",
     });
     await waitFor(() => expect(getWorkPlan).toHaveBeenCalledTimes(2));
-    fireEvent.click(slot.getByRole("button", { name: "Refresh work context" }));
+    const refresh = slot.getByRole("button", { name: "Refresh work context" });
+    expect(refresh.classList).toContain("ws-refresh-button");
+    expect(refresh.querySelector('[data-icon="RefreshCw"]')).not.toBeNull();
+    fireEvent.click(refresh);
     await waitFor(() => expect(getWorkPlan).toHaveBeenCalledTimes(3));
     for (const method of [
       getWorkStatus,
@@ -514,6 +517,10 @@ describe("registered Work context cards", () => {
         },
       ],
     };
+    const updateTaskAssignee = vi.fn(() => ({
+      taskId: "task_1",
+      assignee: "agent" as const,
+    }));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
       { threadId: "thr_one", params: null },
@@ -549,6 +556,7 @@ describe("registered Work context cards", () => {
             ],
           }),
           getWorkOutcome: () => boundOutcome,
+          updateTaskAssignee,
         }),
       },
     );
@@ -564,6 +572,24 @@ describe("registered Work context cards", () => {
       expect(slot.queryByRole("button", { name: "Detach WORK-1 from this thread" })).toBeNull();
       expect(slot.queryByRole("button", { name: "Detach WORK-2 from this thread" })).toBeNull();
       expect(slot.getByRole("button", { name: "Detach WORK-3 from this thread" })).toBeTruthy();
+      const outcomeAssignee = slot.getByRole("button", {
+        name: "Human assigned to WORK-1",
+      });
+      expect(
+        slot.getByRole("button", { name: "Agent assigned to WORK-2" }),
+      ).toBeTruthy();
+      fireEvent.click(outcomeAssignee);
+      fireEvent.click(
+        within(
+          slot.getByRole("listbox", { name: "Task assignee for WORK-1" }),
+        ).getByRole("option", { name: "Agent" }),
+      );
+      await waitFor(() =>
+        expect(updateTaskAssignee).toHaveBeenCalledWith({
+          taskId: "task_1",
+          assignee: "agent",
+        }),
+      );
     } finally {
       slot.lifecycle.unmount();
       getPluginQueryClient().clear();

@@ -1,10 +1,8 @@
-import {
-  useCallback,
-  useMemo,
-} from "react";
-import { useRpc, useSettings } from "@get-bb/plugin-sdk/app";
+import { useCallback, useMemo } from "react";
+import { useBbNavigate, useRpc, useSettings } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Icon } from "@/components/ui/icon";
+import { RefreshButton } from "@/components/ui/refresh-button";
 import { SidebarListActions } from "@/components/ui/sidebar-list-actions";
 import {
   AuthoredPullRequestRow,
@@ -19,20 +17,29 @@ import {
   useGitHubApiHealth,
   useSetAuthoredPullRequestDraft,
 } from "./queries";
+import {
+  uniqueThreadsByBranch,
+  type PullRequestThreadReference,
+} from "./thread-link";
 
 const EMPTY_PULL_REQUESTS: AuthoredPullRequest[] = [];
 
 export interface PullRequestsLeftSidebarProps {
   active: boolean;
   searchQuery: string;
+  threads: readonly PullRequestThreadReference[];
+  onOpenThread(threadId: string): void;
 }
 
 /** The Pull Requests slice owns authored-PR loading, drafting, grouping and selection. */
 export function PullRequestsLeftSidebar({
   active,
   searchQuery,
+  threads,
+  onOpenThread,
 }: PullRequestsLeftSidebarProps) {
   const rpc = useRpc<typeof rpcContract>();
+  const navigate = useBbNavigate();
   const { values: settings } = useSettings();
   // Left sidebar tabs intentionally warm independently so opening PRs can use
   // the shared authored cache immediately instead of starting a cold fetch.
@@ -40,8 +47,16 @@ export function PullRequestsLeftSidebar({
     intervalMs: Number(settings?.githubLeftListRefreshSeconds ?? "300") * 1_000,
   });
   const draft = useSetAuthoredPullRequestDraft(rpc);
-  const healthQuery = useGitHubApiHealth(rpc, { poll: active, enabled: active });
-  const pullRequests = (list.data ?? EMPTY_PULL_REQUESTS) as AuthoredPullRequest[];
+  const healthQuery = useGitHubApiHealth(rpc, {
+    poll: active,
+    enabled: active,
+  });
+  const pullRequests = (list.data ??
+    EMPTY_PULL_REQUESTS) as AuthoredPullRequest[];
+  const threadsByBranch = useMemo(
+    () => uniqueThreadsByBranch(threads),
+    [threads],
+  );
   const visible = useMemo(
     () =>
       pullRequests.filter((pullRequest) => {
@@ -123,25 +138,22 @@ export function PullRequestsLeftSidebar({
           {visible.length} open pull request{visible.length === 1 ? "" : "s"}
         </span>
         <SidebarListActions
-          context={health ? (
-            <span
-              className={`ws-github-api-indicator ws-github-api-${health.tone}`}
-              title={healthState.message ?? health.label}
-            >
-              <Icon name={health.icon} aria-hidden />
-              {health.label}
-            </span>
-          ) : undefined}
+          context={
+            health ? (
+              <span
+                className={`ws-github-api-indicator ws-github-api-${health.tone}`}
+                title={healthState.message ?? health.label}
+              >
+                <Icon name={health.icon} aria-hidden />
+                {health.label}
+              </span>
+            ) : undefined
+          }
           refresh={
-            <button
-              className="ws-icon-button"
-              title="Refresh pull requests"
-              aria-label="Refresh pull requests"
-              disabled={list.isFetching}
-              onClick={() => void list.refresh().catch(() => undefined)}
-            >
-              <Icon name="RefreshCw" aria-hidden />
-            </button>
+            <RefreshButton
+              label="Refresh pull requests"
+              onRefresh={list.refresh}
+            />
           }
         />
       </div>
@@ -168,7 +180,10 @@ export function PullRequestsLeftSidebar({
                     key={stack.id}
                     stack={stack}
                     changingDraftUrl={changingDraftUrl}
+                    onOpenPullRequest={(url) => navigate.openUrl(url)}
                     onToggleDraft={toggleDraft}
+                    onOpenThread={onOpenThread}
+                    threadsByBranch={threadsByBranch}
                   />
                 ))}
                 {group.ordinary.map((pullRequest) => (
@@ -178,7 +193,10 @@ export function PullRequestsLeftSidebar({
                   >
                     <AuthoredPullRequestRow
                       pullRequest={pullRequest}
+                      linkedThread={threadsByBranch.get(pullRequest.head)}
                       changingDraft={changingDraftUrl === pullRequest.url}
+                      onOpenPullRequest={(url) => navigate.openUrl(url)}
+                      onOpenThread={onOpenThread}
                       onToggleDraft={toggleDraft}
                     />
                   </section>

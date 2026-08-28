@@ -174,6 +174,7 @@ describe("R2 server registration and disposal", () => {
       "getChanges", "getChangesFingerprint", "checkoutStackBranch", "getWorkingTreeFileDiff",
       "getSidebarOrder", "saveSiblingOrder",
       "getLaterThreads", "saveLaterThreads", "getThreadGroups", "saveThreadGroups",
+      "getSidebarAppearance", "saveSidebarAppearance",
       "sidebarTasks", "sidebarTaskLinks", "sidebarPullRequestStacks", "sidebarThreadPullRequests",
       "sidebarAuthoredPullRequests", "sidebarAuthoredPullRequestStacks", "setAuthoredPullRequestDraft",
       "sidebarArchivedThreads", "unarchiveSidebarThread", "getWorkContext", "getWorkStatus", "getWorkOutcome", "getWorkGoal", "getWorkPlan", "getWorkBackgroundJobs", "getGitHubPollingPolicy", "getWorkTracker", "linkLinearIssue", "searchLinearIssues", "unlinkLinearIssue", "updateLinearIssueStatus", "getWorkProviderStatus",

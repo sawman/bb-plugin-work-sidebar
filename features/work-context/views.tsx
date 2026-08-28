@@ -213,10 +213,24 @@ function ProviderHealth({
   );
 }
 
-function OutcomeCard({ threadId }: { threadId: string }) {
+type TasksRead = ReturnType<typeof useTasksRead>;
+type TasksMutations = ReturnType<typeof useTasksMutations>;
+
+function OutcomeCard({
+  threadId,
+  tasks,
+  taskMutations,
+}: {
+  threadId: string;
+  tasks: TasksRead;
+  taskMutations: TasksMutations;
+}) {
   const query = useWorkOutcome(threadId);
   const mutation = useWorkOutcomeMutation(threadId);
   const outcome = query.data?.outcome;
+  const sidebarOutcome = tasks.data?.tasks.find(
+    (task) => task.id === outcome?.id,
+  );
   const legacy = query.data?.legacy;
   const previous = outcome ? previousOutcomeStatus(outcome.status) : null;
   const next = outcome ? nextOutcomeStatus(outcome.status) : null;
@@ -260,6 +274,18 @@ function OutcomeCard({ threadId }: { threadId: string }) {
           <OutcomeHeading
             taskKey={outcome.key}
             priority={outcome.priority}
+            assignee={sidebarOutcome?.assignee}
+            updatingAssignee={taskMutations.assignment.isPending}
+            onUpdateAssignee={(assignee) =>
+              void report(
+                taskMutations.assignment.mutateAsync({
+                  taskId: outcome.id,
+                  assignee,
+                }),
+                "Outcome assignee updated",
+                "Could not update outcome assignee",
+              )
+            }
           />
         ) : undefined
       }
@@ -368,9 +394,15 @@ function OutcomeCard({ threadId }: { threadId: string }) {
 function OutcomeHeading({
   taskKey,
   priority,
+  assignee,
+  updatingAssignee,
+  onUpdateAssignee,
 }: {
   taskKey: string;
   priority: "urgent" | "high" | "medium" | "low" | "none";
+  assignee?: "agent" | "human";
+  updatingAssignee: boolean;
+  onUpdateAssignee(assignee: "agent" | "human"): void;
 }) {
   return (
     <span className="ws-outcome-heading-meta">
@@ -382,6 +414,14 @@ function OutcomeHeading({
         {taskKey}
       </CopyBadge>
       <TaskPriorityIcon priority={priority} />
+      {assignee ? (
+        <AssigneePicker
+          value={assignee}
+          taskKey={taskKey}
+          disabled={updatingAssignee}
+          onChange={onUpdateAssignee}
+        />
+      ) : null}
     </span>
   );
 }
@@ -520,11 +560,16 @@ function PlanCard({ threadId }: { threadId: string }) {
   );
 }
 
-function TasksCard({ threadId }: { threadId: string }) {
-  const rpc = useRpc<typeof rpcContract>();
-  const tasks = useTasksRead();
+function TasksCard({
+  threadId,
+  tasks,
+  mutations,
+}: {
+  threadId: string;
+  tasks: TasksRead;
+  mutations: TasksMutations;
+}) {
   const outcome = useWorkOutcome(threadId);
-  const mutations = useTasksMutations(rpc);
   const [selection, setSelection] = useState("");
   const { bindingOwnedTaskIds, currentThreadBindingTaskIds } =
     projectWorkTaskBindingOwnership(threadId, outcome.data?.bindings ?? []);
@@ -648,8 +693,11 @@ function TasksCard({ threadId }: { threadId: string }) {
             role="group"
             aria-label="Execution tasks"
           >
-            {outcome.data.executionTasks.map((task) => (
-              <div key={task.id} className="ws-work-card-row">
+            {outcome.data.executionTasks.map((task) => {
+              const sidebarTask = tasks.data?.tasks.find(
+                (candidate) => candidate.id === task.id,
+              );
+              return <div key={task.id} className="ws-work-card-row">
                 <span
                   className={`ws-status-dot ws-status-dot-${task.status}`}
                   aria-hidden
@@ -662,8 +710,24 @@ function TasksCard({ threadId }: { threadId: string }) {
                     {task.key} · {readableStatus(task.status)}
                   </small>
                 </span>
-              </div>
-            ))}
+                {sidebarTask ? (
+                  <AssigneePicker
+                    value={sidebarTask.assignee}
+                    taskKey={task.key}
+                    disabled={mutations.assignment.isPending}
+                    onChange={(assignee) =>
+                      report(
+                        mutations.assignment.mutateAsync({
+                          taskId: task.id,
+                          assignee,
+                        }),
+                        "Could not update task assignee",
+                      )
+                    }
+                  />
+                ) : null}
+              </div>;
+            })}
           </div>
         ) : null}
       </div>
@@ -672,11 +736,18 @@ function TasksCard({ threadId }: { threadId: string }) {
 }
 
 export function WorkContextCards({ threadId }: { threadId: string }) {
+  const rpc = useRpc<typeof rpcContract>();
+  const tasks = useTasksRead();
+  const taskMutations = useTasksMutations(rpc);
   return (
     <section className="ws-work-context-cards" aria-label="Work context">
       <StatusCard threadId={threadId} />
-      <OutcomeCard threadId={threadId} />
-      <TasksCard threadId={threadId} />
+      <OutcomeCard
+        threadId={threadId}
+        tasks={tasks}
+        taskMutations={taskMutations}
+      />
+      <TasksCard threadId={threadId} tasks={tasks} mutations={taskMutations} />
       <GoalCard threadId={threadId} />
       <PlanCard threadId={threadId} />
       <BackgroundJobsCard threadId={threadId} />

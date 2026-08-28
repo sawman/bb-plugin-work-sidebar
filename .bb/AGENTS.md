@@ -122,6 +122,15 @@ decision appear different.
 - Avoid one-line JSX components and deeply nested conditional markup; extract
   named components with one responsibility.
 
+## Remote Git identity
+
+- Before any remote Git operation, switch the GitHub CLI to the `sawman`
+  account with `gh auth switch --user sawman` and verify it is active.
+- After the remote operation finishes, including on failure, switch the GitHub
+  CLI back to `matthew-se` and verify that account is active again.
+- Local Git reads, diffs, staging, commits, and tags do not require an account
+  switch.
+
 ## Verification
 
 For implementation changes, run:
@@ -133,6 +142,13 @@ npm run build
 bb plugin reload work-sidebar
 git diff --check
 ```
+
+For live light/dark checks, do not navigate through Settings or foreground BB.
+Use `npm run theme-control -- matrix -- <capture-or-check-command>` to apply
+light and dark directly to the running desktop renderer. The command receives
+`BB_TEST_THEME`, and the utility restores the exact original `bb.theme`
+preference and closes its temporary loopback inspector even when the command
+fails. Use `npm run theme-control -- probe` for a read-only state check.
 
 `npm run build` deliberately runs `env -u BB_CLI bb plugin build .`: the
 standalone artifact builder must resolve the ordinary PATH entrypoint rather

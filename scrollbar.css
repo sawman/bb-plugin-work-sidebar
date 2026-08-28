@@ -1,9 +1,21 @@
-/* Reserve the scroll gutter before results load, so the tab grid never reflows. */
+/* Keep the tab selector and pane header full-width. Only the active pane body
+   scrolls and reserves a gutter before expanding content needs one. */
 .ws-list.ws-list {
   box-sizing: border-box;
+  display: grid;
+  gap: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
   height: 100%;
   min-height: 100%;
+  overflow: hidden;
+}
+
+.ws-list > .ws-view-content {
+  align-content: start;
+  min-height: 0;
   overflow-y: auto;
+  /* R17 important: host view padding otherwise leaves a gap before the first group divider. */
+  padding-top: 0 !important;
   scrollbar-gutter: stable;
 }
 

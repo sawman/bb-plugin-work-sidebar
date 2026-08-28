@@ -14,6 +14,7 @@ describe("R2 app registration and Query lifecycle", () => {
     const app = await loadPluginApp(() => import("../../app"));
 
     expect(app.settingsSections.map(({ id }) => id)).toEqual([
+      "sidebar-appearance",
       "github-polling",
     ]);
     expect(app.threadLists.map(({ id }) => id)).toEqual(["work-queue"]);
@@ -94,6 +95,16 @@ describe("R2 app registration and Query lifecycle", () => {
         Boolean(left.getByRole("button", { name }).closest(".ws-list")),
       ),
     ).toEqual([true, true, true]);
+    const leftRoot = left.container.querySelector(".ws-list");
+    expect(leftRoot?.querySelector(":scope > .ws-tabs-sticky")).toBeTruthy();
+    expect(leftRoot?.querySelector(":scope > .ws-list-toolbar")).toBeTruthy();
+    expect(leftRoot?.querySelector(":scope > .ws-view-content")).toBeTruthy();
+    expect(
+      leftRoot?.querySelector(".ws-tabs-sticky .ws-view-content"),
+    ).toBeNull();
+    expect(
+      leftRoot?.querySelector(".ws-list-toolbar .ws-view-content"),
+    ).toBeNull();
     expect(
       ["Work", "Changes", "Agents"].map((name) =>
         right.getByRole("tab", { name }).getAttribute("aria-controls"),
@@ -107,7 +118,7 @@ describe("R2 app registration and Query lifecycle", () => {
     expect(mount).toHaveBeenCalledTimes(2);
     // Changes owns no cache entries until its tab mounts the panel; once
     // selected, the file query remains hook-stable and disabled until opened.
-    expect(client.getQueryCache().getAll()).toHaveLength(17);
+    expect(client.getQueryCache().getAll()).toHaveLength(18);
     expect(
       client
         .getQueryCache()
@@ -118,6 +129,14 @@ describe("R2 app registration and Query lifecycle", () => {
       client
         .getQueryCache()
         .find({ queryKey: ["work-sidebar", "sidebar", "threads", "groups"] })
+        ?.getObserversCount(),
+    ).toBe(1);
+    expect(
+      client
+        .getQueryCache()
+        .find({
+          queryKey: ["work-sidebar", "sidebar", "threads", "appearance"],
+        })
         ?.getObserversCount(),
     ).toBe(1);
     expect(
