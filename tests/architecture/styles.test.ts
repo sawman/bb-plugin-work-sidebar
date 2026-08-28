@@ -589,6 +589,20 @@ describe("shared surface and list-row architecture", () => {
     expect(workCards?.declarations).toContain("gap: 0.58rem");
   });
 
+  test("centers the stale clock over the left thread activity indicator", () => {
+    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const working = rules.find(({ selector }) => selector === ".ws-status-working");
+    const clock = rules.find(
+      ({ selector }) => selector === ".ws-status-stale-clock",
+    );
+
+    expect(working?.declarations).toContain("position: relative");
+    expect(clock?.declarations).toContain("position: absolute");
+    expect(clock?.declarations).toContain("bottom: 100%");
+    expect(clock?.declarations).toContain("left: 50%");
+    expect(clock?.declarations).toContain("transform: translateX(-50%)");
+  });
+
   test("keeps archived-thread context menus outside the dimmed stacking context", () => {
     const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
     const archivedRow = rules.find(({ selector }) => selector === ".ws-archived-thread");

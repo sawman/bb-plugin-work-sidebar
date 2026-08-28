@@ -953,8 +953,9 @@
 }
 .ws-status-stale-clock {
   position: absolute;
-  top: -0.48rem;
-  right: -0.36rem;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
   width: 0.52rem;
   height: 0.52rem;
   color: var(--foreground);
