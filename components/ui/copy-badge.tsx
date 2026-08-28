@@ -15,6 +15,7 @@ type CopyBadgeProps = {
   children: ReactNode;
   title?: string;
   tone?: string;
+  typography?: "context";
   variant?: "badge" | "text";
 } & Omit<
   HTMLAttributes<HTMLSpanElement>,
@@ -39,6 +40,7 @@ export function CopyBadge({
   children,
   title,
   tone,
+  typography,
   variant = "badge",
   ...spanProps
 }: CopyBadgeProps) {
@@ -70,6 +72,7 @@ export function CopyBadge({
       aria-label={`Copy ${label} ${value}`}
       title={title ?? `Copy ${value}`}
       data-tone={tone}
+      data-typography={typography}
       data-variant={variant}
       onPointerDown={(event: ReactPointerEvent<HTMLSpanElement>) => {
         event.stopPropagation();

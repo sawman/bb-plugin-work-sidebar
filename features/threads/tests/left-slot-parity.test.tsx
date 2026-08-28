@@ -464,12 +464,12 @@ describe("R18 registered left sidebar parity", () => {
     expect(duration?.parentElement?.classList).toContain("ws-thread-trailing");
     expect(archivedLink.querySelector(".ws-thread-leading .ws-thread-agent-placeholder")).toBeTruthy();
     expect(archivedLink.querySelector('.ws-thread-provider[data-provider-id="codex"]')).toBeTruthy();
-    expect(archivedLink.querySelector(".ws-thread-worktree")?.textContent).toBe("feature/archive");
-    expect(archivedLink.querySelector(".ws-thread-worktree svg")).toBeNull();
+    expect(archivedLink.querySelector(".ws-thread-location")?.textContent).toBe("feature/archive");
+    expect(archivedLink.querySelector(".ws-thread-location svg")?.getAttribute("data-icon")).toBe("GitBranch");
     expect(archivedLink.querySelector(".ws-thread-meta")?.textContent).toBe("feature/archive");
     const worktreeLink = slot.getByRole("link", { name: /Archived worktree thread/ });
     expect(worktreeLink.querySelector('.ws-thread-provider[data-provider-id="claude-code"]')).toBeTruthy();
-    expect(worktreeLink.querySelector(".ws-thread-worktree")?.textContent).toBe("Managed checkout");
+    expect(worktreeLink.querySelector(".ws-thread-location")?.textContent).toBe("Managed checkout");
     expect(worktreeLink.querySelector(".ws-thread-meta")?.textContent).toBe("Managed checkout");
     expect(archivedLink.querySelector(".ws-thread-drag-handle")).toBeNull();
     fireEvent.keyDown(archivedLink, { key: "F10", shiftKey: true });

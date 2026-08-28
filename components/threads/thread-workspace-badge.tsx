@@ -12,6 +12,45 @@ type WorkspaceDisplayKind =
   | "unmanaged-worktree"
   | "other";
 
+type ThreadLocation = {
+  copyLabel: "workspace name" | "worktree name" | null;
+  copyValue: string | null;
+  icon: "Columns2" | "FolderGit" | "Laptop";
+  kind: "personal" | "repository" | "worktree";
+  value: string;
+};
+
+function fallbackLocation({
+  project,
+  projectLabel,
+  workspace,
+  workspaceDisplayKind,
+}: {
+  project?: ThreadWorkspaceProject;
+  projectLabel: string;
+  workspace: string | null;
+  workspaceDisplayKind?: WorkspaceDisplayKind;
+}): ThreadLocation {
+  const isWorktree = workspaceDisplayKind?.includes("worktree") ?? false;
+  if (workspace && isWorktree) {
+    return {
+      copyLabel: "worktree name",
+      copyValue: `Worktree ${workspace}`,
+      icon: "Columns2",
+      kind: "worktree",
+      value: workspace,
+    };
+  }
+  const isPersonal = project?.isPersonal ?? false;
+  return {
+    copyLabel: workspace ? "workspace name" : null,
+    copyValue: workspace ? `Workspace ${workspace}` : null,
+    icon: isPersonal ? "Laptop" : "FolderGit",
+    kind: isPersonal ? "personal" : "repository",
+    value: workspace ?? (isPersonal ? "Personal" : projectLabel),
+  };
+}
+
 export function ThreadWorkspaceBadge({
   branchName,
   environmentName,
@@ -27,40 +66,49 @@ export function ThreadWorkspaceBadge({
 }) {
   const branch = branchName?.trim() || null;
   const workspace = environmentName?.trim() || null;
+  const contextTitle = `${projectLabel} ${project?.isPersonal ? "work" : "project"}`;
   if (branch) {
     return (
-      <BranchName
-        name={branch}
-        className="ws-thread-worktree"
-        title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${branch}`}
-      />
+      <span className="ws-thread-location" data-location-kind="branch">
+        <BranchName
+          name={branch}
+          icon="GitBranch"
+          typography="context"
+          title={`${contextTitle} · ${branch}`}
+        />
+      </span>
     );
   }
-  const value = workspace;
-  const isWorktree = workspaceDisplayKind?.includes("worktree") ?? false;
-  const label = isWorktree ? "worktree name" : "workspace name";
-  const copyValue = workspace
-    ? `${isWorktree ? "Worktree" : "Workspace"} ${workspace}`
-    : null;
-  return value && copyValue ? (
-    <CopyBadge
-      value={value}
-      copyValue={copyValue}
-      label={label}
-      className="ws-thread-worktree"
-      variant="text"
-      title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${value}`}
-    >
-      <Icon name={project?.isPersonal ? "Laptop" : "FolderGit"} aria-hidden />
-      <span>{value}</span>
-    </CopyBadge>
-  ) : (
+  const location = fallbackLocation({
+    project,
+    projectLabel,
+    workspace,
+    workspaceDisplayKind,
+  });
+  return (
     <span
-      className="ws-thread-worktree"
-      title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${project?.isPersonal ? "Personal" : projectLabel}`}
+      className="ws-thread-location"
+      data-location-kind={location.kind}
+      title={`${contextTitle} · ${location.value}`}
     >
-      <Icon name={project?.isPersonal ? "Laptop" : "FolderGit"} aria-hidden />
-      <span>{project?.isPersonal ? "Personal" : projectLabel}</span>
+      {location.copyLabel && location.copyValue ? (
+        <CopyBadge
+          value={location.value}
+          copyValue={location.copyValue}
+          label={location.copyLabel}
+          title={`${contextTitle} · ${location.value}`}
+          typography="context"
+          variant="text"
+        >
+          <Icon name={location.icon} aria-hidden />
+          <span className="ws-thread-location-label">{location.value}</span>
+        </CopyBadge>
+      ) : (
+        <>
+          <Icon name={location.icon} aria-hidden />
+          <span className="ws-thread-location-label">{location.value}</span>
+        </>
+      )}
     </span>
   );
 }

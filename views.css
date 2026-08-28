@@ -552,6 +552,9 @@
   padding: 0;
   color: inherit;
 }
+.ws-identifier-badge[data-typography="context"] {
+  font: inherit;
+}
 .ws-identifier-badge svg {
   width: 0.62rem;
   height: 0.62rem;
@@ -952,7 +955,7 @@
   width: 0.57rem;
   height: 0.57rem;
 }
-.ws-thread-meta .ws-thread-worktree {
+.ws-thread-meta .ws-thread-location {
   display: inline-flex;
   min-width: 2.75rem;
   max-width: 100%;
@@ -960,13 +963,18 @@
   align-items: center;
   gap: 0.16rem;
 }
-.ws-thread-worktree svg {
+.ws-thread-location > .ws-identifier-badge {
+  min-width: 0;
+  max-width: 100%;
+}
+.ws-thread-location svg {
   width: 0.58rem;
   height: 0.58rem;
   flex: none;
   color: var(--muted-foreground);
 }
-.ws-thread-worktree > span {
+.ws-thread-location-label,
+.ws-thread-location .ws-branch-name > span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

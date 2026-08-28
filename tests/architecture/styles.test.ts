@@ -502,13 +502,19 @@ describe("shared surface and list-row architecture", () => {
     expect(text?.declarations).toContain("padding: 0");
     expect(text?.declarations).toContain("color: inherit");
 
+    const contextualTypography = rules.find(
+      ({ selector }) =>
+        selector === '.ws-identifier-badge[data-typography="context"]',
+    );
+    expect(contextualTypography?.declarations).toContain("font: inherit");
+
     for (const selector of [
       ".ws-pr-identifier-badge",
       ".ws-pr-number-badge",
       ".ws-stack-number",
       ".ws-work-header-badge",
       ".ws-agent-workspace-badge",
-      ".ws-thread-meta .ws-thread-worktree",
+      ".ws-thread-meta .ws-thread-location",
     ]) {
       const variant = rules.find((rule) => rule.selector === selector);
       expect(variant?.declarations, selector).not.toMatch(
@@ -733,7 +739,7 @@ describe("shared surface and list-row architecture", () => {
       ({ selector }) => selector === ".ws-status-stale-clock",
     );
     const branch = rules.find(
-      ({ selector }) => selector === ".ws-thread-meta .ws-thread-worktree",
+      ({ selector }) => selector === ".ws-thread-meta .ws-thread-location",
     );
 
     expect(working?.declarations).not.toContain("position: relative");
