@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -22,6 +22,8 @@ const host = vi.hoisted(() => ({
     draft: { isEmpty: true },
   } as unknown,
 }));
+
+const clipboardWrite = vi.fn(() => Promise.resolve());
 
 vi.mock("@get-bb/plugin-sdk/app", async () => {
   const actual = await vi.importActual<typeof import("@get-bb/plugin-sdk/app")>(
@@ -151,9 +153,48 @@ afterEach(() => {
   host.stackNumber = null;
   host.rpcCall.mockReset();
   host.composerView = { scope: { kind: "none" }, draft: { isEmpty: true } };
+  clipboardWrite.mockClear();
 });
 
 describe("R21D ThreadRow characterization", () => {
+  it("copies metadata badges before the row can select, open, or drag", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: clipboardWrite },
+    });
+    host.pullRequest = {
+      number: 42,
+      title: "M7",
+      url: "https://example.test/pull/42",
+      state: "open",
+      attention: "none",
+    };
+    host.stackNumber = 17;
+    const view = renderRow();
+
+    for (const name of [
+      "Copy PR number #42",
+      "Copy stack number #17",
+      "Copy branch name feature/m7",
+    ]) {
+      const badge = await view.findByRole("button", { name });
+      fireEvent.pointerDown(badge, { button: 0, pointerId: 9 });
+      fireEvent.click(badge);
+      fireEvent.contextMenu(badge, { ctrlKey: true });
+    }
+
+    await waitFor(() =>
+      expect(clipboardWrite.mock.calls).toEqual([
+        ["#42"],
+        ["#17"],
+        ["feature/m7"],
+      ]),
+    );
+    expect(view.onSelect).not.toHaveBeenCalled();
+    expect(host.actions.open).not.toHaveBeenCalled();
+    expect(view.onDragThreadChange).not.toHaveBeenCalled();
+  });
+
   it("bolds only attention states instead of generic unread updates", () => {
     const genericUnread = renderRow({
       threadOverrides: {
@@ -205,7 +246,9 @@ describe("R21D ThreadRow characterization", () => {
     expect(view.getByText("feature/m7")).toBeTruthy();
     expect(view.queryByText("WORK-1")).toBeNull();
     expect(view.getByText("#42")).toBeTruthy();
-    expect((await view.findByLabelText("Stack #17")).textContent).toBe("#17");
+    expect(
+      (await view.findByLabelText("Copy stack number #17")).textContent,
+    ).toBe("#17");
     expect(view.getByTitle("PR #42 · Open")).toBeTruthy();
     expect(view.getByRole("img", { name: "Thread is running" })).toBeTruthy();
     expect(view.getByRole("img", { name: "Unsent draft" })).toBeTruthy();

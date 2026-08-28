@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthoredPullRequestStack } from "../authored-pull-requests";
 import { StackNumberBadge } from "../stack-number";
 import type { SidebarStack } from "../../../work-model";
@@ -26,6 +32,16 @@ const stack = {
   ],
 } satisfies SidebarStack;
 
+const clipboardWrite = vi.fn(() => Promise.resolve());
+
+beforeEach(() => {
+  clipboardWrite.mockClear();
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText: clipboardWrite },
+  });
+});
+
 describe("pull-request stack number presentation", () => {
   afterEach(cleanup);
 
@@ -40,17 +56,61 @@ describe("pull-request stack number presentation", () => {
       />,
     );
 
-    expect(screen.getByLabelText("Stack #17").textContent).toBe("#17");
-    expect(screen.getByLabelText("Stack #17").querySelector("svg")).toBeTruthy();
+    const stackNumber = screen.getByLabelText("Copy stack number #17");
+    expect(stackNumber.textContent).toBe("#17");
+    expect(stackNumber.querySelector("svg")).toBeTruthy();
   });
 
   it("uses the same compact stack icon and number across surfaces", () => {
     const { rerender } = render(<StackNumberBadge number={17} compact />);
-    expect(screen.getByLabelText("Stack #17").textContent).toBe("#17");
-    expect(screen.getByLabelText("Stack #17").querySelector("svg")).toBeTruthy();
+    expect(screen.getByLabelText("Copy stack number #17").textContent).toBe(
+      "#17",
+    );
+    expect(
+      screen.getByLabelText("Copy stack number #17").querySelector("svg"),
+    ).toBeTruthy();
 
     rerender(<StackNumberBadge number={17} />);
-    expect(screen.getByLabelText("Stack #17").textContent).toBe("#17");
-    expect(screen.getByLabelText("Stack #17").querySelector("svg")).toBeTruthy();
+    expect(screen.getByLabelText("Copy stack number #17").textContent).toBe(
+      "#17",
+    );
+    expect(
+      screen.getByLabelText("Copy stack number #17").querySelector("svg"),
+    ).toBeTruthy();
+  });
+
+  it("copies PR, stack, and branch values without selecting or opening the row", async () => {
+    const onSelect = vi.fn(() => false);
+    render(
+      <AuthoredPullRequestStack
+        stack={stack}
+        selectedIds={new Set()}
+        changingDraftUrl={null}
+        onSelect={onSelect}
+        onToggleDraft={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Copy PR number #42" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Copy stack number #17" }),
+    );
+    const branch = screen.getByRole("button", {
+      name: "Copy branch name feature/stack-number",
+    });
+    fireEvent.keyDown(branch, { key: "Enter" });
+    fireEvent.keyDown(branch, { key: " " });
+
+    await waitFor(() =>
+      expect(clipboardWrite.mock.calls).toEqual([
+        ["#42"],
+        ["#17"],
+        ["feature/stack-number"],
+        ["feature/stack-number"],
+      ]),
+    );
+    expect(onSelect).not.toHaveBeenCalled();
   });
 });

@@ -325,7 +325,7 @@ describe("R13 registered Changes Work slot", () => {
         stack.getByRole("list", { name: "GitHub Stack based on main" }),
       ).toBeTruthy(),
     );
-    const stackNumber = stack.getByLabelText("Stack #17");
+    const stackNumber = stack.getByLabelText("Copy stack number #17");
     expect(stackNumber.textContent).toBe("#17");
     expect(stackNumber.querySelector("svg")).toBeTruthy();
     const disclosure = stack.getByRole("button", {

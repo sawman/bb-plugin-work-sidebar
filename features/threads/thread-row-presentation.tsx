@@ -4,6 +4,7 @@ import type {
   PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
+import { CopyBadge } from "@/components/ui/copy-badge";
 import { normalizeIndicator } from "@/work-model";
 import { pullRequestPresentation } from "@/features/pull-requests/presentation";
 import { threadIsWorking, useStaleWorking } from "./thread-attention";
@@ -45,26 +46,37 @@ export function ThreadMetadata({
   return (
     <span className="ws-thread-meta">
       {pullRequest && pullRequestStatus && (
-        <span
+        <CopyBadge
+          value={`#${pullRequest.number}`}
+          label="PR number"
           className="ws-pr-meta ws-thread-token ws-thread-pr-token"
-          data-tone={pullRequestStatus.tone}
+          tone={pullRequestStatus.tone}
           title={`PR #${pullRequest.number} · ${pullRequestStatus.label}`}
         >
           <Icon name={pullRequestStatus.icon} aria-hidden />
           <span>#{pullRequest.number}</span>
-        </span>
+        </CopyBadge>
       )}
       {stackNumber}
-      <span
-        className="ws-thread-worktree"
-        title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${thread.environment?.branchName || (project?.isPersonal ? "Personal" : projectLabel)}`}
-      >
-        <Icon name={project?.isPersonal ? "Laptop" : "FolderGit"} aria-hidden />
-        <span>
-          {thread.environment?.branchName ||
-            (project?.isPersonal ? "Personal" : projectLabel)}
+      {thread.environment?.branchName ? (
+        <CopyBadge
+          value={thread.environment.branchName}
+          label="branch name"
+          className="ws-thread-worktree"
+          title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${thread.environment.branchName}`}
+        >
+          <Icon name={project?.isPersonal ? "Laptop" : "FolderGit"} aria-hidden />
+          <span>{thread.environment.branchName}</span>
+        </CopyBadge>
+      ) : (
+        <span
+          className="ws-thread-worktree"
+          title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${project?.isPersonal ? "Personal" : projectLabel}`}
+        >
+          <Icon name={project?.isPersonal ? "Laptop" : "FolderGit"} aria-hidden />
+          <span>{project?.isPersonal ? "Personal" : projectLabel}</span>
         </span>
-      </span>
+      )}
       {pullRequestLoading && (
         <span className="ws-pr-meta" role="status" aria-label="Pull request loading">
           PR loading…

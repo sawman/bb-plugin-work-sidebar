@@ -1,4 +1,5 @@
 import { Icon } from "../../components/ui/icon";
+import { CopyBadge } from "../../components/ui/copy-badge";
 
 export function StackNumberBadge({
   number,
@@ -9,13 +10,14 @@ export function StackNumberBadge({
 }) {
   const label = `Stack #${number}`;
   return (
-    <span
+    <CopyBadge
+      value={`#${number}`}
+      label="stack number"
       className={`ws-stack-number${compact ? " ws-stack-number-compact" : ""}`}
-      aria-label={label}
       title={label}
     >
       <Icon name="Layers" aria-hidden />
       <span aria-hidden>{`#${number}`}</span>
-    </span>
+    </CopyBadge>
   );
 }

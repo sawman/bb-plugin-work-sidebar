@@ -537,6 +537,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.ws-copy-badge {
+  cursor: copy;
+}
+.ws-copy-badge:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
 .ws-pr-number {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }

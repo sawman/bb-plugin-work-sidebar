@@ -5,6 +5,7 @@ import {
   type ReactNode,
 } from "react";
 import { Icon } from "../../components/ui/icon";
+import { CopyBadge } from "../../components/ui/copy-badge";
 import { Status } from "../../components/ui/status";
 import {
   pullRequestPresentation,
@@ -84,10 +85,24 @@ export function AuthoredPullRequestRow({
         </strong>
         <span className="ws-pr-context ws-pr-target-context">
           {stackNumber != null && <StackNumberBadge number={stackNumber} />}
-          <span className="ws-pr-number">#{pullRequest.number}</span>
-          <span className="ws-pr-branch">
-            {pullRequest.head || "Authored by you"}
-          </span>
+          <CopyBadge
+            value={`#${pullRequest.number}`}
+            label="PR number"
+            className="ws-pr-number"
+          >
+            #{pullRequest.number}
+          </CopyBadge>
+          {pullRequest.head ? (
+            <CopyBadge
+              value={pullRequest.head}
+              label="branch name"
+              className="ws-pr-branch"
+            >
+              {pullRequest.head}
+            </CopyBadge>
+          ) : (
+            <span className="ws-pr-branch">Authored by you</span>
+          )}
         </span>
       </a>
       <span className="ws-pr-status-icons">
