@@ -545,6 +545,9 @@ describe("shared surface and list-row architecture", () => {
     const tabs = rules.find(({ selector }) => selector === ".ws-tabs");
     const buttons = rules.find(({ selector }) => selector === ".ws-tabs button");
     const sticky = rules.find(({ selector }) => selector === ".ws-tabs-sticky");
+    const workCards = rules.find(
+      ({ selector }) => selector === ".ws-work-context-cards",
+    );
     const active = rules.find(
       ({ selector }) =>
         selector ===
@@ -553,8 +556,11 @@ describe("shared surface and list-row architecture", () => {
 
     expect(tabs?.declarations).toContain("grid-template-columns: repeat(3, 1fr)");
     expect(buttons?.declarations).toContain("min-height: 2rem");
+    expect(buttons?.declarations).toContain("border-radius: 0");
     expect(sticky?.declarations).toContain("position: sticky !important");
     expect(active?.declarations).toContain("background: var(--accent) !important");
+    expect(workCards?.declarations).toContain("display: grid");
+    expect(workCards?.declarations).toContain("gap: 0.58rem");
   });
 
   test("keeps archived-thread context menus outside the dimmed stacking context", () => {

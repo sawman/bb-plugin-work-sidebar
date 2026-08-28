@@ -356,7 +356,7 @@
   min-width: 0;
   min-height: 2rem;
   border: 0;
-  border-radius: calc(var(--radius) - 2px);
+  border-radius: 0;
   padding: 0.35rem 0.5rem;
   background: transparent;
   color: var(--muted-foreground);
@@ -1550,6 +1550,10 @@
   font-style: normal;
 }
 .ws-section-stack {
+  gap: 0.58rem;
+}
+.ws-work-context-cards {
+  display: grid;
   gap: 0.58rem;
 }
 .ws-section-stack > header {
