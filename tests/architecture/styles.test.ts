@@ -569,6 +569,9 @@ describe("shared surface and list-row architecture", () => {
     const archivedAnchor = rules.find(
       ({ selector }) => selector === ".ws-archived-thread > .ws-thread-anchor",
     );
+    const archivedAge = rules.find(
+      ({ selector }) => selector === ".ws-archived-thread .ws-thread-archive-age",
+    );
 
     expect(
       archivedRow?.declarations ?? "",
@@ -578,6 +581,13 @@ describe("shared surface and list-row architecture", () => {
       archivedAnchor?.declarations,
       "only the archived thread anchor should be visually dimmed",
     ).toContain("opacity: 0.8");
+    expect(archivedAnchor?.declarations).toContain(
+      "grid-template-columns: 2.15rem 0.8rem minmax(0, 1fr) auto",
+    );
+    expect(archivedAge?.declarations).toContain("grid-column: 1");
+    expect(archivedAge?.declarations).toContain(
+      "font-variant-numeric: tabular-nums",
+    );
   });
 
   test("constructs card roots and headings only through the shared primitive", () => {

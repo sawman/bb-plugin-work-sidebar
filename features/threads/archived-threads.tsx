@@ -6,6 +6,7 @@ import {
   type ArchivedThread,
 } from "@/components/threads/archived-thread-row";
 import type { SidebarThreadGroup } from "./model";
+import { archiveDurationLabel } from "./model";
 import { useArchivedThreads } from "./queries";
 
 type Project = { id: string; name: string; isPersonal: boolean };
@@ -38,6 +39,7 @@ export function ArchivedThreads({
   onRoster(ids: ReadonlySet<string>): void;
 }) {
   const [open, setOpen] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   const fingerprint = useMemo(
     () =>
       threads
@@ -53,6 +55,12 @@ export function ArchivedThreads({
     [archived],
   );
   useEffect(() => onRoster(ids), [ids, onRoster]);
+  useEffect(() => {
+    if (!open || archived.length === 0) return undefined;
+    setNow(Date.now());
+    const interval = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(interval);
+  }, [archived.length, open]);
   const state = query.archive.isPending
     ? "loading"
     : query.archive.isError
@@ -125,6 +133,7 @@ export function ArchivedThreads({
             <ArchivedThreadRow
               key={thread.id}
               thread={thread}
+              duration={archiveDurationLabel(thread.archivedAt, now)}
               project={projectsById.get(thread.projectId)}
               groups={groups}
               onUnarchive={unarchive}

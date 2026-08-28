@@ -341,6 +341,7 @@ describe("R18 registered left sidebar parity", () => {
   });
 
   it("restores an archived thread with Enter or Space on its drag handle", async () => {
+    const archivedAt = Date.now() - 3 * 3_600_000;
     const unarchive = vi.fn(({ threadId }: { threadId: string }) => ({ threadId }));
     const slot = await leftSlot({
       rpc: {
@@ -358,13 +359,18 @@ describe("R18 registered left sidebar parity", () => {
             isUnread: false,
             createdAt: 0,
             updatedAt: 0,
-            archivedAt: 0,
+            archivedAt,
           }],
         }),
         unarchiveSidebarThread: unarchive,
       },
     });
     fireEvent.click(slot.container.querySelector(".ws-archived summary")!);
+    const archivedLink = await slot.findByRole("link", { name: /Archived thread/ });
+    const duration = archivedLink.querySelector("time");
+    expect(duration?.textContent).toBe("3h");
+    expect(duration?.getAttribute("aria-label")).toBe("Archived 3h ago");
+    expect(archivedLink.firstElementChild).toBe(duration);
     const restore = await slot.findByRole("button", { name: "Restore Archived thread" });
     fireEvent.keyDown(restore, { key: "Enter" });
     await waitFor(() =>

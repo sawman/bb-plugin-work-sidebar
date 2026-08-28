@@ -78,3 +78,18 @@ export function sidebarViewLabel(id: SidebarView): string {
     default: return "Threads";
   }
 }
+
+/** Compact elapsed time from BB's exact archival timestamp for narrow rows. */
+export function archiveDurationLabel(
+  archivedAt: number,
+  now: number,
+): string | null {
+  if (!Number.isFinite(archivedAt) || archivedAt <= 0 || now < archivedAt)
+    return null;
+  const minutes = Math.floor((now - archivedAt) / 60_000);
+  if (minutes < 1) return "<1m";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}

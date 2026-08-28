@@ -28,6 +28,7 @@ export type ArchivedThread = {
 
 export function ArchivedThreadRow({
   thread,
+  duration,
   project,
   groups,
   onUnarchive,
@@ -36,6 +37,7 @@ export function ArchivedThreadRow({
   onDropTargetChange,
 }: {
   thread: ArchivedThread;
+  duration: string | null;
   project?: { name: string; isPersonal: boolean };
   groups: readonly { id: string; name: string }[];
   onUnarchive(threadId: string, destination: string | null): void;
@@ -65,6 +67,16 @@ export function ArchivedThreadRow({
               onNavigate();
             }}
           >
+            {duration ? (
+              <time
+                className="ws-thread-archive-age"
+                dateTime={new Date(thread.archivedAt).toISOString()}
+                aria-label={`Archived ${duration} ago`}
+                title={`Archived ${duration} ago`}
+              >
+                {duration}
+              </time>
+            ) : null}
             <Icon
               name={project?.isPersonal ? "Laptop" : "FolderGit"}
               className="ws-project-icon"

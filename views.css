@@ -877,7 +877,26 @@
   padding-left: 0;
 }
 .ws-archived-thread > .ws-thread-anchor {
+  grid-template-columns: 2.15rem 0.8rem minmax(0, 1fr) auto;
   opacity: 0.8;
+}
+.ws-archived-thread .ws-thread-archive-age {
+  grid-column: 1;
+  justify-self: start;
+  color: var(--muted-foreground);
+  font-size: 0.52rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+.ws-archived-thread .ws-project-icon {
+  grid-column: 2;
+}
+.ws-archived-thread .ws-thread-main {
+  grid-column: 3;
+}
+.ws-archived-thread .ws-thread-trailing {
+  grid-column: 4;
 }
 .ws-active-threads {
   margin-top: 0.3rem;
