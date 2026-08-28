@@ -67,37 +67,34 @@ export function AuthoredPullRequestRow({
         </span>
       </a>
       <span className="ws-pr-status-icons">
-        <span
+        <button
+          type="button"
+          className="ws-pr-state-toggle ws-pr-tooltip"
           data-tooltip={
             changingDraft
               ? "Updating…"
               : `${pullRequest.draft ? "Mark open" : "Mark draft"}`
           }
+          disabled={changingDraft}
+          aria-label={
+            changingDraft
+              ? "Updating pull request state"
+              : `${pullRequest.draft ? "Mark open" : "Mark draft"}`
+          }
+          onClick={() => onToggleDraft(pullRequest)}
         >
-          <button
-            type="button"
-            className="ws-pr-state-toggle"
-            disabled={changingDraft}
-            aria-label={
+          <Status
+            presentation={
               changingDraft
-                ? "Updating pull request state"
-                : `${pullRequest.draft ? "Mark open" : "Mark draft"}`
+                ? {
+                    ...state,
+                    icon: "LoaderCircle",
+                    label: "Updating pull request state",
+                  }
+                : state
             }
-            onClick={() => onToggleDraft(pullRequest)}
-          >
-            <Status
-              presentation={
-                changingDraft
-                  ? {
-                      ...state,
-                      icon: "LoaderCircle",
-                      label: "Updating pull request state",
-                    }
-                  : state
-              }
-            />
-          </button>
-        </span>
+          />
+        </button>
         <Status presentation={signal.checks} />
         <Status presentation={signal.review} />
       </span>

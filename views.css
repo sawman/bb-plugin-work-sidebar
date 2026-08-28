@@ -630,39 +630,6 @@
   gap: 0.28rem;
   padding-right: 0.08rem;
 }
-.ws-pr-status-icons > span {
-  position: relative;
-  display: inline-flex;
-}
-.ws-pr-status-icons > span::after {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 0.3rem);
-  z-index: 20;
-  content: attr(data-tooltip);
-  width: max-content;
-  max-width: 11rem;
-  padding: 0.18rem 0.3rem;
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 3px);
-  background: var(--popover);
-  box-shadow: 0 0.25rem 0.8rem
-    color-mix(in srgb, var(--foreground) 18%, transparent);
-  color: var(--popover-foreground);
-  font-size: 0.58rem;
-  line-height: 1.15;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(0.12rem);
-  transition:
-    opacity 0.06s ease,
-    transform 0.06s ease;
-}
-.ws-pr-status-icons > span:hover::after,
-.ws-pr-status-icons > span:focus-within::after {
-  opacity: 1;
-  transform: translateY(0);
-}
 .ws-pr-stack {
   border-left: 0;
   background: none;

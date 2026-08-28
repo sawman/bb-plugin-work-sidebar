@@ -201,4 +201,36 @@ describe("pull-request stack number presentation", () => {
     expect(title.tagName).toBe("SPAN");
     expect(title.classList.contains("ws-pr-title")).toBe(true);
   });
+
+  it("gives custom tooltips only to interactive controls with text", () => {
+    const { container } = render(
+      <AuthoredPullRequestRow
+        pullRequest={{
+          number: 93,
+          title: "Tooltip ownership",
+          url: "https://github.com/acme/repo/pull/93",
+          repository: "acme/repo",
+          state: "open",
+          draft: false,
+          head: "feature/tooltips",
+          base: "main",
+          checks: "passing",
+          review: "approved",
+          reviewCommentCount: 0,
+        }}
+        changingDraft={false}
+        onToggleDraft={vi.fn()}
+      />,
+    );
+
+    const tooltipOwners = [...container.querySelectorAll("[data-tooltip]")];
+    expect(tooltipOwners).toHaveLength(1);
+    for (const owner of tooltipOwners) {
+      expect(owner.matches("button, a")).toBe(true);
+      expect(owner.getAttribute("data-tooltip")?.trim()).not.toBe("");
+    }
+    expect(container.querySelectorAll(".ws-status[data-tooltip]")).toHaveLength(
+      0,
+    );
+  });
 });

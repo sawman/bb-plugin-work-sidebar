@@ -266,6 +266,41 @@ function undocumentedIconButtons(sourceFile: ts.SourceFile) {
   return undocumented;
 }
 
+function customTooltipOwnershipViolations(sourceFile: ts.SourceFile) {
+  const violations: string[] = [];
+  const visit = (node: ts.Node) => {
+    if (ts.isJsxOpeningLikeElement(node)) {
+      const tooltip = node.attributes.properties.find(
+        (attribute): attribute is ts.JsxAttribute =>
+          ts.isJsxAttribute(attribute) &&
+          attribute.name.getText() === "data-tooltip",
+      );
+      if (tooltip) {
+        const tagName = node.tagName.getText();
+        const line =
+          sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+        if (!new Set(["a", "button"]).has(tagName)) {
+          violations.push(
+            `${sourceFile.fileName}:${line}: ${tagName} is not interactive`,
+          );
+        }
+        if (
+          !tooltip.initializer ||
+          (ts.isStringLiteral(tooltip.initializer) &&
+            tooltip.initializer.text.trim() === "")
+        ) {
+          violations.push(
+            `${sourceFile.fileName}:${line}: tooltip text is empty`,
+          );
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return violations;
+}
+
 describe("stylesheet architecture baseline", () => {
   test("every plugin stylesheet parses and stays diffable", () => {
     const parseErrors: string[] = [];
@@ -800,5 +835,44 @@ describe("shared surface and list-row architecture", () => {
       ts.createSourceFile(relative(root, file), readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true, scriptKind(file)),
     ));
     expect(undocumented).toEqual([]);
+  });
+
+  test("keeps custom tooltip bubbles on interactive controls with text", () => {
+    const fixture = ts.createSourceFile(
+      "fixture.tsx",
+      `
+        const controls = <>
+          <span data-tooltip="Static badge">Badge</span>
+          <button data-tooltip="" type="button">Empty</button>
+          <button data-tooltip="Copy value" type="button">Copy</button>
+        </>;
+      `,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    );
+    expect(customTooltipOwnershipViolations(fixture)).toEqual([
+      "fixture.tsx:3: span is not interactive",
+      "fixture.tsx:4: tooltip text is empty",
+    ]);
+
+    const violations = productionSourcePaths(root).flatMap((file) =>
+      customTooltipOwnershipViolations(
+        ts.createSourceFile(
+          relative(root, file),
+          readFileSync(file, "utf8"),
+          ts.ScriptTarget.Latest,
+          true,
+          scriptKind(file),
+        ),
+      ),
+    );
+    expect(violations).toEqual([]);
+
+    const selectors = stylesheetRules(
+      readFileSync(join(root, "views.css"), "utf8"),
+    ).map(({ selector }) => selector);
+    expect(selectors).toContain(".ws-pr-tooltip::after");
+    expect(selectors).not.toContain(".ws-pr-status-icons > span::after");
   });
 });
