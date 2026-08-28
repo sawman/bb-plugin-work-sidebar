@@ -1671,7 +1671,6 @@
 .ws-outcome-status-canceled {
   color: var(--destructive);
 }
-.ws-outcome-status-current.ws-outcome-status-in_progress svg,
 .ws-outcome-status-updating svg {
   animation: ws-status-runtime-spin 1.2s linear infinite;
 }
@@ -1999,6 +1998,7 @@ button.ws-provider-health:focus-visible {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .ws-outcome-status-updating svg,
   .ws-runtime-state-working {
     animation: none;
   }

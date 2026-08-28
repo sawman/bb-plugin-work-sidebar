@@ -19,6 +19,12 @@ const paths: Record<string, React.ReactNode> = {
   ChevronDown: <path d="m6 9 6 6 6-6" />,
   ChevronRight: <path d="m9 18 6-6-6-6" />,
   Circle: <circle cx="12" cy="12" r="8" />,
+  CircleHalf: (
+    <>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 4a8 8 0 0 0 0 16Z" fill="currentColor" stroke="none" />
+    </>
+  ),
   Clock: (
     <>
       <circle cx="12" cy="12" r="9" />
@@ -192,6 +198,7 @@ export function Icon({
       strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
+      data-icon={name}
       aria-hidden={ariaHidden ?? !ariaLabel}
       aria-label={ariaLabel}
       role={ariaLabel ? "img" : undefined}

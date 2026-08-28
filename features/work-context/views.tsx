@@ -402,6 +402,7 @@ function OutcomeStatusControls({
   onMove(status: TaskStatus): void;
 }) {
   const current = taskStatusPresentation(status);
+  const currentIcon = status === "in_progress" ? "CircleHalf" : current.icon;
   const previousLabel = previous
     ? `Move ${title} back to ${taskStatusPresentation(previous).label}`
     : `No previous outcome status for ${title}`;
@@ -432,7 +433,7 @@ function OutcomeStatusControls({
         aria-label={`Current outcome status: ${current.label}`}
         title={current.label}
       >
-        <Icon name={current.icon} aria-hidden />
+        <Icon name={currentIcon} aria-hidden />
         <span aria-hidden>{current.label}</span>
       </span>
       <button

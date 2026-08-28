@@ -543,6 +543,20 @@ describe("shared surface and list-row architecture", () => {
     expect(source).toContain("transform: rotate(360deg)");
   });
 
+  test("keeps outcome progress static while animating pending mutations", () => {
+    const rules = stylesheetRules(readFileSync(join(root, "views.css"), "utf8"));
+    const animated = rules.filter(({ declarations }) =>
+      declarations.includes("animation: ws-status-runtime-spin 1.2s linear infinite"),
+    );
+
+    expect(animated.map(({ selector }) => selector).join("\n")).not.toContain(
+      "ws-outcome-status-in_progress",
+    );
+    expect(
+      animated.some(({ selector }) => selector === ".ws-outcome-status-updating svg"),
+    ).toBe(true);
+  });
+
   test("places visible review-comment counts beside shared status icons", () => {
     const source = readFileSync(join(root, "views.css"), "utf8");
     const rules = stylesheetRules(source);

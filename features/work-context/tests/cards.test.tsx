@@ -921,6 +921,9 @@ describe("registered Work context cards", () => {
       const controls = slot.getByRole("group", {
         name: "Outcome status: In Progress",
       });
+      const current = slot.getByRole("img", {
+        name: "Current outcome status: In Progress",
+      });
       expect(
         slot.container
           .querySelector('[data-card="outcome"] .ws-card-heading-info')
@@ -928,6 +931,7 @@ describe("registered Work context cards", () => {
       ).toBe(false);
       expect(previous.querySelector("svg")).toBeTruthy();
       expect(next.querySelector("svg")).toBeTruthy();
+      expect(current.querySelector('svg[data-icon="CircleHalf"]')).toBeTruthy();
       fireEvent.click(previous);
       await waitFor(() =>
         expect(updateWorkTask).toHaveBeenCalledWith({
