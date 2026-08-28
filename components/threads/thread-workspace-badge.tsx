@@ -1,4 +1,5 @@
 import { CopyBadge } from "../ui/copy-badge";
+import { BranchName } from "../ui/branch-name";
 import { Icon } from "../ui/icon";
 
 export type ThreadWorkspaceProject = {
@@ -26,14 +27,21 @@ export function ThreadWorkspaceBadge({
 }) {
   const branch = branchName?.trim() || null;
   const workspace = environmentName?.trim() || null;
-  const value = branch ?? workspace;
+  if (branch) {
+    return (
+      <BranchName
+        name={branch}
+        className="ws-thread-worktree"
+        title={`${projectLabel} ${project?.isPersonal ? "work" : "project"} · ${branch}`}
+      />
+    );
+  }
+  const value = workspace;
   const isWorktree = workspaceDisplayKind?.includes("worktree") ?? false;
-  const label = branch ? "branch name" : isWorktree ? "worktree name" : "workspace name";
-  const copyValue = branch
-    ? `Branch ${branch}`
-    : workspace
-      ? `${isWorktree ? "Worktree" : "Workspace"} ${workspace}`
-      : null;
+  const label = isWorktree ? "worktree name" : "workspace name";
+  const copyValue = workspace
+    ? `${isWorktree ? "Worktree" : "Workspace"} ${workspace}`
+    : null;
   return value && copyValue ? (
     <CopyBadge
       value={value}

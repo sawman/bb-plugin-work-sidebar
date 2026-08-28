@@ -45,6 +45,8 @@ export type GitHubPullRequest = {
 export type GitHubSignal = {
   checks: "failed" | "passing" | "pending" | "none" | "unknown";
   review: "approved" | "changes_requested" | "changes_requested_review_requested" | "review_requested" | "review_required" | "none";
+  head?: string;
+  base?: string;
 };
 
 export type GitHubApiRunner = (args: readonly string[], maxBuffer: number) => Promise<string>;

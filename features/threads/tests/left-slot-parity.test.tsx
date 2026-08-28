@@ -444,7 +444,7 @@ describe("R18 registered left sidebar parity", () => {
     expect(archivedLink.querySelector(".ws-thread-leading .ws-thread-agent-placeholder")).toBeTruthy();
     expect(archivedLink.querySelector('.ws-thread-provider[data-provider-id="codex"]')).toBeTruthy();
     expect(archivedLink.querySelector(".ws-thread-worktree")?.textContent).toBe("feature/archive");
-    expect(archivedLink.querySelector(".ws-thread-worktree svg")).toBeTruthy();
+    expect(archivedLink.querySelector(".ws-thread-worktree svg")).toBeNull();
     expect(archivedLink.querySelector(".ws-thread-meta")?.textContent).toBe("feature/archive");
     const worktreeLink = slot.getByRole("link", { name: /Archived worktree thread/ });
     expect(worktreeLink.querySelector('.ws-thread-provider[data-provider-id="claude-code"]')).toBeTruthy();

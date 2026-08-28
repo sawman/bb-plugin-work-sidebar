@@ -7,7 +7,12 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AuthoredPullRequestStack } from "../authored-pull-requests";
+import {
+  AuthoredPullRequestRow,
+  AuthoredPullRequestStack,
+} from "../authored-pull-requests";
+import { ThreadWorkspaceBadge } from "../../../components/threads/thread-workspace-badge";
+import { PullRequestIdentifierBadge } from "../identifier-badge";
 import { StackNumberBadge } from "../stack-number";
 import type { SidebarStack } from "../../../work-model";
 
@@ -115,7 +120,7 @@ describe("pull-request stack number presentation", () => {
     expect(pullRequest.getAttribute("data-tone")).toBeNull();
     expect(branch.getAttribute("data-tone")).toBeNull();
     expect(pullRequest.querySelector("svg")).toBeTruthy();
-    expect(branch.querySelector("svg")).toBeTruthy();
+    expect(branch.querySelector("svg")).toBeNull();
     fireEvent.keyDown(branch, { key: "Enter" });
     fireEvent.keyDown(branch, { key: " " });
 
@@ -128,5 +133,54 @@ describe("pull-request stack number presentation", () => {
       ]),
     );
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("uses one quiet branch-name presentation in PR and thread metadata", () => {
+    render(
+      <>
+        <PullRequestIdentifierBadge kind="branch" name="feature/shared" />
+        <ThreadWorkspaceBadge
+          branchName="feature/shared"
+          projectLabel="Work sidebar"
+        />
+      </>,
+    );
+
+    const branches = screen.getAllByRole("button", {
+      name: "Copy branch name feature/shared",
+    });
+    expect(branches).toHaveLength(2);
+    for (const branch of branches) {
+      expect(branch.classList.contains("ws-branch-name")).toBe(true);
+      expect(branch.getAttribute("data-variant")).toBe("text");
+      expect(branch.textContent).toBe("feature/shared");
+    }
+  });
+
+  it("keeps the authored row metadata shape when branch data is unavailable", () => {
+    render(
+      <AuthoredPullRequestRow
+        pullRequest={{
+          number: 91,
+          title: "Unavailable branch",
+          url: "https://github.com/acme/repo/pull/91",
+          repository: "acme/repo",
+          state: "open",
+          draft: false,
+          head: "",
+          base: "",
+          checks: "unknown",
+          review: "none",
+          reviewCommentCount: 0,
+        }}
+        selected={false}
+        changingDraft={false}
+        onSelect={() => false}
+        onToggleDraft={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText("Authored by you")).toBeNull();
+    expect(screen.getByText("Branch unavailable")).toBeTruthy();
   });
 });

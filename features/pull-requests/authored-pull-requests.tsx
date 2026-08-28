@@ -89,14 +89,7 @@ export function AuthoredPullRequestRow({
             kind="pull-request"
             number={pullRequest.number}
           />
-          {pullRequest.head ? (
-            <PullRequestIdentifierBadge
-              kind="branch"
-              name={pullRequest.head}
-            />
-          ) : (
-            <span className="ws-pr-context-note">Authored by you</span>
-          )}
+          <PullRequestIdentifierBadge kind="branch" name={pullRequest.head} />
         </span>
       </a>
       <span className="ws-pr-status-icons">

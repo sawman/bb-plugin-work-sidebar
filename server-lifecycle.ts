@@ -13,6 +13,8 @@ export type GitHubPullRequestSignal = {
     | "review_requested"
     | "review_required"
     | "none";
+  head?: string;
+  base?: string;
 };
 export type LegacyWorkContext = {
   state: "none" | "adoptable" | "ambiguous" | "project_mismatch";

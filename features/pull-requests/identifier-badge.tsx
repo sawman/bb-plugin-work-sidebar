@@ -1,3 +1,4 @@
+import { BranchName } from "../../components/ui/branch-name";
 import { CopyBadge } from "../../components/ui/copy-badge";
 import { Icon } from "../../components/ui/icon";
 
@@ -8,21 +9,25 @@ type PullRequestIdentifier =
 export function PullRequestIdentifierBadge(
   identifier: PullRequestIdentifier,
 ) {
-  const pullRequest = identifier.kind === "pull-request";
-  const value = pullRequest ? `#${identifier.number}` : identifier.name;
-  const label = pullRequest ? "PR number" : "branch name";
-  const copyValue = pullRequest ? `PR ${value}` : `Branch ${value}`;
+  if (identifier.kind === "branch") {
+    return (
+      <BranchName
+        name={identifier.name}
+        className="ws-pr-identifier-badge"
+      />
+    );
+  }
+  const value = `#${identifier.number}`;
 
   return (
     <CopyBadge
       value={value}
-      copyValue={copyValue}
-      label={label}
+      copyValue={`PR ${value}`}
+      label="PR number"
       className="ws-pr-identifier-badge"
-      variant={pullRequest ? "badge" : "text"}
-      title={copyValue}
+      title={`PR ${value}`}
     >
-      <Icon name={pullRequest ? "GitPullRequest" : "GitBranch"} aria-hidden />
+      <Icon name="GitPullRequest" aria-hidden />
       <span>{value}</span>
     </CopyBadge>
   );

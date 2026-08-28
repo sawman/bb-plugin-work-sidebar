@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   fetchGitHubStack,
+  readGitHubSignals,
   readGitHubPullRequestDiff,
 } from "../../features/pull-requests/server-stack.js";
 import { createThreadStackService } from "../../features/pull-requests/server-thread-stack.js";
@@ -57,6 +58,80 @@ describe("GitHub Stack enrichment ownership", () => {
       number: 7, checks: "passing", review: "approved",
     })]);
     expect(lifecycle.githubReadCache.size).toBe(0);
+  });
+
+  it("includes branch metadata in the existing authored PR signal read", async () => {
+    const lifecycle = createServerLifecycle();
+    const run = vi.fn(async (_args: readonly string[], _maxBuffer: number) =>
+      JSON.stringify({
+        data: {
+          repository: {
+            p0: {
+              headRefName: "feature/authored-row",
+              baseRefName: "main",
+              reviewDecision: "APPROVED",
+              reviewRequests: { totalCount: 0 },
+              commits: {
+                nodes: [
+                  { commit: { statusCheckRollup: { state: "SUCCESS" } } },
+                ],
+              },
+            },
+          },
+        },
+      }),
+    );
+
+    const signals = await readGitHubSignals(
+      "acme",
+      "repo",
+      [91],
+      lifecycle,
+      run,
+    );
+
+    expect(signals.get(91)).toEqual({
+      head: "feature/authored-row",
+      base: "main",
+      checks: "passing",
+      review: "approved",
+    });
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run.mock.calls[0]?.[0].join(" ")).toContain(
+      "headRefName baseRefName",
+    );
+  });
+
+  it("retains branch metadata when authored PR signals fall back to REST", async () => {
+    const lifecycle = createServerLifecycle();
+    const run = vi.fn(async (args: readonly string[]) => {
+      if (args[1] === "graphql") throw new Error("GraphQL unavailable");
+      if (args.some((value) => value.endsWith("/reviews?per_page=100"))) {
+        return "[]";
+      }
+      return JSON.stringify({
+        head: { ref: "feature/rest-fallback", sha: null },
+        base: { ref: "main" },
+        requested_reviewers: [],
+        requested_teams: [],
+      });
+    });
+
+    const signals = await readGitHubSignals(
+      "acme",
+      "repo",
+      [92],
+      lifecycle,
+      run,
+    );
+
+    expect(signals.get(92)).toEqual({
+      head: "feature/rest-fallback",
+      base: "main",
+      checks: "unknown",
+      review: "none",
+    });
+    expect(run).toHaveBeenCalledTimes(3);
   });
 
   it("recovers a missing stack-layer diff from the pull request files endpoint", async () => {

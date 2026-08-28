@@ -123,7 +123,14 @@ function signalFromGraphql(value: unknown): GitHubSignal | null {
   const checks = state === "SUCCESS" ? "passing"
     : state === "FAILURE" || state === "ERROR" ? "failed"
       : state ? "pending" : "none";
-  return { checks, review };
+  const head = typeof value.headRefName === "string" && value.headRefName ? value.headRefName : null;
+  const base = typeof value.baseRefName === "string" && value.baseRefName ? value.baseRefName : null;
+  return {
+    checks,
+    review,
+    ...(head ? { head } : {}),
+    ...(base ? { base } : {}),
+  };
 }
 
 function signalKey(owner: string, repo: string, number: number) {
@@ -151,7 +158,7 @@ export async function readGitHubSignals(
   }
   if (missing.length && Date.now() >= lifecycle.githubGraphqlBackoffUntil) {
     const selections = missing.map((number, index) =>
-      `p${index}: pullRequest(number: ${number}) { reviewDecision reviewRequests(first: 1) { totalCount } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } }`,
+      `p${index}: pullRequest(number: ${number}) { headRefName baseRefName reviewDecision reviewRequests(first: 1) { totalCount } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } }`,
     ).join(" ");
     try {
       const stdout = await run(["api", "graphql", "-f", `query=query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${selections} } }`], 4_000_000);
@@ -198,6 +205,14 @@ async function readRestSignal(
     const pullRequest = JSON.parse(pullRequestText) as unknown;
     const reviews = JSON.parse(reviewsText) as unknown;
     if (!isRecord(pullRequest)) return null;
+    const head = isRecord(pullRequest.head) && typeof pullRequest.head.ref === "string" && pullRequest.head.ref
+      ? pullRequest.head.ref : null;
+    const base = isRecord(pullRequest.base) && typeof pullRequest.base.ref === "string" && pullRequest.base.ref
+      ? pullRequest.base.ref : null;
+    const metadata = {
+      ...(head ? { head } : {}),
+      ...(base ? { base } : {}),
+    };
     const requestedReviewers = Array.isArray(pullRequest.requested_reviewers) ? pullRequest.requested_reviewers.length : 0;
     const requestedTeams = Array.isArray(pullRequest.requested_teams) ? pullRequest.requested_teams.length : 0;
     const latestReviewByUser = new Map<string, string>();
@@ -212,7 +227,7 @@ async function readRestSignal(
       : reviewStates.includes("APPROVED") ? "approved"
         : requests > 0 ? "review_requested" : "none";
     const sha = isRecord(pullRequest.head) && typeof pullRequest.head.sha === "string" ? pullRequest.head.sha : null;
-    if (!sha) return { checks: "unknown", review };
+    if (!sha) return { checks: "unknown", review, ...metadata };
     const checks = JSON.parse(await run([
       "api", "--method", "GET", `repos/${owner}/${repo}/commits/${sha}/check-runs?per_page=100`,
       ...headers,
@@ -221,7 +236,7 @@ async function readRestSignal(
     const conclusions = runs.map((item) => isRecord(item) ? String(item.conclusion ?? "") : "");
     const failed = conclusions.some((state) => ["FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE"].includes(state));
     const pending = runs.some((item) => !isRecord(item) || item.status !== "completed" || item.conclusion === null);
-    const signal = { checks: failed ? "failed" : pending ? "pending" : runs.length ? "passing" : "none", review } satisfies GitHubSignal;
+    const signal = { checks: failed ? "failed" : pending ? "pending" : runs.length ? "passing" : "none", review, ...metadata } satisfies GitHubSignal;
     lifecycle.cacheGitHubPullRequestSignal(signalKey(owner, repo, number), signal, Date.now() + GITHUB_SIGNAL_CACHE_MS);
     return signal;
   } catch {

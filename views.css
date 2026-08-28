@@ -555,6 +555,16 @@
   height: 0.62rem;
   flex: none;
 }
+.ws-branch-name {
+  min-width: 0;
+  font-weight: 400;
+}
+.ws-branch-name-unavailable {
+  overflow: hidden;
+  color: var(--muted-foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .ws-pr-identifier-badge {
   min-width: 0;
   max-width: 100%;
@@ -718,13 +728,6 @@
 .ws-pr-row {
   min-height: 2.35rem;
 }
-.ws-pr-context .ws-pr-context-note {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Keep project creation available without turning it into a full-width footer. */
 .ws-work-toolbar-actions {
   display: flex;
