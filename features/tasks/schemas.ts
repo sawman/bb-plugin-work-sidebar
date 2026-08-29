@@ -25,7 +25,12 @@ export const taskSummarySchema = z.object({
   priority: taskPrioritySchema,
   dueDate: z.string().nullable(),
   parentTaskId: z.string().nullable(),
+  updatedAt: z.string().optional(),
 });
+export const executionTaskSummarySchema = taskSummarySchema.extend({
+  updatedAt: z.string(),
+  assignee: z.enum(["agent", "human"]),
+}).strict();
 export const sidebarTaskSchema = taskSummarySchema.extend({
   position: z.number().optional(),
   linkedThreadIds: z.array(z.string()),

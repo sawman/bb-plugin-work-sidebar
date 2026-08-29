@@ -27,6 +27,8 @@ export interface TaskSummary {
   priority: "urgent" | "high" | "medium" | "low" | "none";
   dueDate: string | null;
   parentTaskId: string | null;
+  /** Tasks adapter projects this durable recency field when available. */
+  updatedAt?: string;
 }
 
 export interface SidebarTask extends TaskSummary {

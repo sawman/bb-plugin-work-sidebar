@@ -705,16 +705,17 @@ function TasksCard({
   const owners: TaskWorkflowOwner[] = (outcome.data?.bindings ?? [])
     .filter((binding) => binding.executionTaskId !== null)
     .map((binding) => {
+      const projectedOwner = binding.owner;
       const thread = binding.ownerThreadId ? threadById.get(binding.ownerThreadId) : null;
-      const liveStatus = thread?.status === "active" ? "working" : thread?.status === "starting" ? "starting" : thread?.status === "completed" ? "completed" : thread?.status === "failed" ? "failed" : "idle";
+      const liveStatus = projectedOwner?.liveStatus ?? (thread?.status === "active" ? "working" : thread?.status === "starting" ? "starting" : thread?.status === "completed" ? "completed" : thread?.status === "failed" ? "failed" : "idle");
       return {
         taskId: binding.executionTaskId!,
         threadId: binding.ownerThreadId,
-        threadTitle: thread?.title ?? binding.ownerThreadId,
-        providerId: thread?.providerId ?? null,
+        threadTitle: projectedOwner?.title ?? thread?.title ?? binding.ownerThreadId,
+        providerId: projectedOwner?.providerId ?? thread?.providerId ?? null,
         liveStatus,
-        isArchived: thread?.isArchived ?? binding.ownerThreadId !== null,
-        unavailable: !thread,
+        isArchived: projectedOwner?.isArchived ?? thread?.isArchived ?? binding.ownerThreadId !== null,
+        unavailable: binding.owner === undefined ? !thread : projectedOwner === null,
       };
     });
   const workflow = projectTaskWorkflow({

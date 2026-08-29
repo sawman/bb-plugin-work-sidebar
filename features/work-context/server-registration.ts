@@ -3,6 +3,7 @@ import { rpcContract } from "../../contracts.js";
 import type { WorkContextCompositionDependencies } from "../../shared/server-composition-dependencies.js";
 import { createWorkContextReadService } from "./server-reads.js";
 import { createBackgroundJobsReadService } from "./background-jobs-server.js";
+import { projectWorkBindingOwner } from "./server-owner-projection.js";
 
 type WorkContextHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
@@ -125,14 +126,17 @@ export function createWorkContextRegistration(
       };
     }
     const snapshot = await tasks.context(root.id, root.projectId);
-    const [byId, projects] = await Promise.all([
+    const [byId, projects, assignees, descendants] = await Promise.all([
       tasks.allTasksById(),
       tasks.projects(),
+      tasks.readAssignees(),
+      tasks.descendants(root.id),
     ]);
     const saved = snapshot.bindings;
     const names = new Map(projects.map((project) => [project.id, project.name]));
     const outcomeBinding = saved.outcomes.find((binding) => binding.rootThreadId === root.id) ?? null;
     const executions = saved.executions.filter((binding) => binding.rootThreadId === root.id);
+    const threadById = new Map([root, ...descendants.map(({ thread }) => thread)].map((thread) => [thread.id, thread]));
     const outcome = outcomeBinding ? byId.get(outcomeBinding.outcomeTaskId) ?? null : null;
     return {
       rootThreadId: root.id,
@@ -143,11 +147,11 @@ export function createWorkContextRegistration(
       } : null,
       executionTasks: executions.flatMap((binding) => {
         const task = byId.get(binding.executionTaskId);
-        return task ? [{ ...task, projectName: names.get(task.projectId) ?? "Work" }] : [];
+        return task ? [{ ...tasks.projectTaskSummary(task, names.get(task.projectId) ?? "Work"), assignee: assignees[task.id] ?? "human" }] : [];
       }),
       bindings: [
-        ...(outcomeBinding ? [tasks.summarize(outcomeBinding)] : []),
-        ...executions.map(tasks.summarize),
+        ...(outcomeBinding ? [projectWorkBindingOwner(tasks.summarize(outcomeBinding), threadById)] : []),
+        ...executions.map((binding) => projectWorkBindingOwner(tasks.summarize(binding), threadById)),
       ],
       legacy: snapshot.legacy,
     };
@@ -184,12 +188,15 @@ export function createWorkContextRegistration(
     const [byId, projects] = available
       ? await Promise.all([tasks.allTasksById(), tasks.projects()])
       : [new Map(), []];
+    const assignees: Record<string, "agent" | "human"> = available
+      ? await tasks.readAssignees()
+      : {};
     const names = new Map(projects.map((project) => [project.id, project.name]));
     const outcome = outcomeBinding ? byId.get(outcomeBinding.outcomeTaskId) ?? null : null;
     const executions = saved.executions.filter((binding) => binding.rootThreadId === root.id);
     const executionTasks = executions.flatMap((binding) => {
       const task = byId.get(binding.executionTaskId);
-      return task ? [{ ...task, projectName: names.get(task.projectId) ?? "Work" }] : [];
+      return task ? [{ ...tasks.projectTaskSummary(task, names.get(task.projectId) ?? "Work"), assignee: assignees[task.id] ?? "human" }] : [];
     });
     return {
       rootThreadId: root.id,

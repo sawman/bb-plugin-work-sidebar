@@ -1,24 +1,21 @@
 import { z } from "zod";
 import { agentRpcSchemas } from "./features/agents/schemas.js";
 import { authoredPullRequest, pullRequestReviewerRpcSchemas, sidebarStack, sidebarStackLayer } from "./features/pull-requests/schemas.js";
-import { sidebarTaskProjectSchema, sidebarTaskSchema, taskLinkSchema, taskPrioritySchema, taskStatusSchema, taskSummarySchema } from "./features/tasks/schemas.js";
+import { executionTaskSummarySchema, sidebarTaskProjectSchema, sidebarTaskSchema, taskLinkSchema, taskPrioritySchema, taskStatusSchema, taskSummarySchema } from "./features/tasks/schemas.js";
 import { threadArchiveSchemas, threadHierarchySchemas, threadPreferenceSchemas } from "./features/threads/schemas.js";
 import { trackerRpcSchemas } from "./features/tracker/schemas.js";
 import { changesRpcSchemas, githubStackBranchSchema } from "./features/changes/schemas.js";
 import { workContextRpcSchemas } from "./features/work-context/schemas.js";
 const taskStatus = taskStatusSchema; const taskPriority = taskPrioritySchema;
 const taskSummary = taskSummarySchema; const sidebarTask = sidebarTaskSchema;
+const executionTaskSummary = executionTaskSummarySchema;
 const sidebarTaskProject = sidebarTaskProjectSchema; const taskLink = taskLinkSchema;
+const bindingOwner = z.object({ threadId: z.string(), title: z.string(), providerId: z.string(),
+  liveStatus: z.enum(["starting", "working", "idle", "completed", "failed"]), isArchived: z.boolean() }).strict();
 const binding = z.object({
-  rootThreadId: z.string(),
-  outcomeTaskId: z.string(),
-  taskProjectId: z.string(),
-  executionTaskId: z.string().nullable(),
-  ownerThreadId: z.string().nullable(),
-  mode: z.enum(["direct", "delegated"]).nullable(),
-  idempotencyKey: z.string().nullable(),
-  dispatchState: z.enum(["ready", "pending_spawn", "pending_attachment", "recovery_required"]),
-  recoveryMessage: z.string().nullable(),
+  rootThreadId: z.string(), outcomeTaskId: z.string(), taskProjectId: z.string(), executionTaskId: z.string().nullable(), ownerThreadId: z.string().nullable(),
+  mode: z.enum(["direct", "delegated"]).nullable(), idempotencyKey: z.string().nullable(), dispatchState: z.enum(["ready", "pending_spawn", "pending_attachment", "recovery_required"]),
+  recoveryMessage: z.string().nullable(), owner: bindingOwner.nullable().optional(),
 });
 const legacyContext = z.object({
   state: z.enum(["none", "adoptable", "ambiguous", "project_mismatch"]),
@@ -53,7 +50,7 @@ const workStatus = z.object({ rootThreadId: z.string(),
 const workOutcome = z.object({ rootThreadId: z.string(),
   tasksAvailable: z.boolean(),
   outcome: taskSummary.nullable(),
-  executionTasks: z.array(taskSummary),
+  executionTasks: z.array(executionTaskSummary),
   bindings: z.array(binding),
   legacy: legacyContext,
 });
@@ -127,7 +124,7 @@ export const rpcSchemas = {
       tasks: z.array(taskSummary),
       subtasks: z.array(taskSummary),
       outcome: taskSummary.nullable(),
-      executionTasks: z.array(taskSummary),
+      executionTasks: z.array(executionTaskSummary),
       bindings: z.array(binding),
       legacy: legacyContext,
       goal: z.object({
@@ -200,8 +197,9 @@ export const rpcSchemas = {
     input: z.object({
       rootThreadId: z.string(), title: z.string().trim().min(1), description: z.string().default(""),
       idempotencyKey: z.string().trim().min(1).max(200),
+      assignee: z.enum(["agent", "human"]),
     }).strict(),
-    output: z.object({ task: taskSummary, binding: binding, reused: z.boolean() }),
+    output: z.object({ task: executionTaskSummary, binding: binding, reused: z.boolean() }),
   },
   bindExecutionOwner: {
     input: z.object({

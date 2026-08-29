@@ -736,6 +736,7 @@ describe("durable Work/Tasks binding parity", () => {
         title: "Reuse execution task",
         description: "",
         idempotencyKey: "agent-created-execution",
+        assignee: "human",
       },
       { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
     );
@@ -756,6 +757,7 @@ describe("durable Work/Tasks binding parity", () => {
         title: "Create delegated execution",
         description: "",
         idempotencyKey: "delegated-owner",
+        assignee: "agent",
       },
       { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
     );
