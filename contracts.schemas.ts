@@ -185,14 +185,14 @@ export const rpcSchemas = {
       title: z.string().trim().min(1),
       description: z.string().default(""),
       parentTaskId: z.string().nullable().default(null),
-      taskProjectId: z.string().nullable().optional(),
+      taskProjectId: z.string().nullable().optional(), priority: taskPriority.optional(),
     }).strict(),
     output: z.object({ task: taskSummary }),
   },
   ensureOutcomeContext: {
     input: z.object({
       rootThreadId: z.string(), title: z.string().trim().min(1), description: z.string().default(""),
-      taskProjectId: z.string().nullable().optional(),
+      taskProjectId: z.string().nullable().optional(), priority: taskPriority.optional(),
     }).strict(),
     output: z.object({ task: taskSummary, binding: binding }),
   },

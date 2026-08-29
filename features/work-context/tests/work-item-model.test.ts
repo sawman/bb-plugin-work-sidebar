@@ -100,4 +100,22 @@ describe("unified work item projection", () => {
       }).primaryLinearKey,
     ).toBe("LIN-3");
   });
+
+  it("maps Linear priority once through the exact case-insensitive BB vocabulary", () => {
+    for (const [linearPriority, taskPriority] of [
+      ["URGENT", "urgent"],
+      [" medium ", "medium"],
+      ["Low", "low"],
+      ["No priority", "none"],
+      [null, "none"],
+    ] as const)
+      expect(
+        projectWorkItem({
+          outcome: null,
+          linked: [linear("LIN-priority", linearPriority)],
+          primaryLinearKey: null,
+          legacyState: "none",
+        }).createFromLinear?.priority,
+      ).toBe(taskPriority);
+  });
 });

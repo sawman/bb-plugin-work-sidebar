@@ -232,6 +232,7 @@ describe("R2 server registration and disposal", () => {
       "linkLinearIssue",
       "searchLinearIssues",
       "unlinkLinearIssue",
+      "setPrimaryLinearIssue",
       "updateLinearIssueStatus",
       "getWorkProviderStatus",
       "getGitHubApiHealth",

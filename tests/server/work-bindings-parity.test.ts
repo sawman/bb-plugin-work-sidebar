@@ -818,4 +818,29 @@ describe("durable Work/Tasks binding parity", () => {
       legacy: { state: "none", taskIds: [], message: null },
     });
   });
+
+  it("persists an optional outcome priority exactly once and never remaps a reused outcome", async () => {
+    const { host } = createBindingsFixture();
+    await plugin(host.bb);
+
+    await expect(
+      host.harness.behavior.callRpc("createWorkTask", {
+        threadId: ROOT_THREAD_ID,
+        title: "Create from Linear",
+        description: "",
+        parentTaskId: null,
+        priority: "urgent",
+      }),
+    ).resolves.toMatchObject({ task: { priority: "urgent" } });
+
+    await expect(
+      host.harness.behavior.callRpc("createWorkTask", {
+        threadId: ROOT_THREAD_ID,
+        title: "Later Linear edit",
+        description: "",
+        parentTaskId: null,
+        priority: "low",
+      }),
+    ).resolves.toMatchObject({ task: { priority: "urgent" } });
+  });
 });

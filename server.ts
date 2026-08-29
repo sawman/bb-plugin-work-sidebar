@@ -70,6 +70,7 @@ export default function plugin(
     linkLinearIssue: tracker.linkLinearIssue,
     searchLinearIssues: tracker.searchLinearIssues,
     unlinkLinearIssue: tracker.unlinkLinearIssue,
+    setPrimaryLinearIssue: tracker.setPrimaryLinearIssue,
     updateLinearIssueStatus: tracker.updateLinearIssueStatus,
     getWorkProviderStatus: workContext.getWorkProviderStatus,
     getGitHubApiHealth: pullRequests.getGitHubApiHealth,

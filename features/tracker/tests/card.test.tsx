@@ -19,6 +19,7 @@ const unlinked = {
   visible: true,
   available: true,
   message: null,
+  primaryKey: null,
   suggestions: [
     { key: "LIN-1", title: "Suggested", url: "https://linear.app/issue/LIN-1" },
   ],
