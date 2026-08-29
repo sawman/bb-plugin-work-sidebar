@@ -14,8 +14,8 @@ import { changesInteractionStore } from "../changes/store";
 import { AgentsView } from "../agents/views";
 import { invalidateGitHubApiHealth } from "../pull-requests/queries";
 import { threadInteractionStore, type WorkTab } from "../threads/store";
-import { TrackerCard, TrackerHeaderBadge } from "../tracker/card";
-import { invalidateTracker } from "../tracker/queries";
+import { TrackerHeaderBadge } from "../tracker/card";
+import { invalidateTracker, useTracker } from "../tracker/queries";
 import { invalidateWorkContextCards, useWorkStatus } from "./queries";
 import { parseWorkSidebarRealtimeEvent } from "../../shared/work-realtime";
 import { WorkContextCards } from "./views";
@@ -55,6 +55,7 @@ function queueRootEvent(scope: WorkPanelScope, rootThreadId: string) {
 export function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const queryClient = useQueryClient();
   const status = useWorkStatus(threadId);
+  const tracker = useTracker(threadId);
   const workScopeRef = useRef<WorkPanelScope>({
     threadId,
     rootThreadId: null,
@@ -153,11 +154,10 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
                 <h2>Work</h2>
               </div>
               <span className="ws-work-header-badges">
-                <TrackerHeaderBadge threadId={threadId} />
+                <TrackerHeaderBadge items={tracker.data} />
               </span>
             </header>
-            <WorkContextCards threadId={threadId} />
-            <TrackerCard threadId={threadId} />
+            <WorkContextCards threadId={threadId} tracker={tracker} />
           </div>
         )}
       </div>

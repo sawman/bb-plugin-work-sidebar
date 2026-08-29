@@ -1,48 +1,21 @@
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useState } from "react";
 import { SearchCombobox } from "../../components/ui/combobox";
-import {
-  SurfaceCard,
-  SurfaceCardHeading,
-} from "../../components/ui/surface-card";
 import type { TrackerContext } from "./schemas";
 import type { useTrackerSearch } from "./queries";
-
-export function TrackerLoading() {
-  return (
-    <SurfaceCard className="ws-empty-state-card" aria-busy="true">
-      <SurfaceCardHeading title="Linear" />
-      <p className="ws-card-note">Loading linked work…</p>
-    </SurfaceCard>
-  );
-}
-
-export function TrackerError({
-  message,
-  retry,
-}: {
-  message: string;
-  retry(): void;
-}) {
-  return (
-    <SurfaceCard className="ws-linear-card" role="alert">
-      <SurfaceCardHeading title="Linear" />
-      <small className="ws-linear-error">{message}</small>
-      <button type="button" className="ws-text-button" onClick={retry}>
-        Try again
-      </button>
-    </SurfaceCard>
-  );
-}
 
 export function LinkedTrackerRow({
   linked,
   busy,
+  primary = false,
+  onSetPrimary,
   onStatus,
   onUnlink,
 }: {
   linked: TrackerContext["items"][number];
   busy: boolean;
+  primary?: boolean;
+  onSetPrimary?(): void;
   onStatus(statusId: string): void;
   onUnlink(): void;
 }) {
@@ -62,6 +35,18 @@ export function LinkedTrackerRow({
         <span>{item.title}</span>
       </button>
       <div className="ws-linear-controls">
+        {onSetPrimary ? (
+          <button
+            type="button"
+            className="ws-text-button"
+            aria-label={primary ? `${item.key} is the primary Linear issue` : `Make ${item.key} the primary Linear issue`}
+            aria-pressed={primary}
+            disabled={busy || primary}
+            onClick={onSetPrimary}
+          >
+            {primary ? "Primary" : "Make primary"}
+          </button>
+        ) : null}
         <select
           aria-label={`${item.key} status`}
           value={currentStatus}
