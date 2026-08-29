@@ -124,11 +124,16 @@ export function registerTasksTools(
       body: z.string().trim().min(1),
       notify: z.boolean().default(false),
     }).strict(),
-    async execute({ key, body, notify }) {
+    async execute({ key, body, notify }, context) {
       const task = await findTask(key);
+      const comment = await tasks.comment(task.id, body, notify);
+      bb.realtime.publish("work-sidebar:changed", {
+        family: "tasks",
+        threadId: context.threadId,
+      });
       return JSON.stringify({
         taskKey: task.key,
-        comment: await tasks.comment(task.id, body, notify),
+        comment,
       });
     },
   });
