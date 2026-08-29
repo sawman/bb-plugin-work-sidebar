@@ -18,7 +18,8 @@
   justify-content: space-between;
   padding: 0.35rem 0.5rem;
   color: var(--muted-foreground);
-  font-size: 0.7rem;
+  font: var(--ws-text-primary);
+  line-height: inherit;
 }
 .ws-list-toolbar button,
 .ws-track-action {
@@ -62,13 +63,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.8rem;
+  font: var(--ws-text-primary);
+  line-height: inherit;
 }
 .ws-thread-meta {
   gap: 0.35rem;
   overflow: hidden;
   color: var(--muted-foreground);
-  font-size: 0.65rem;
+  font: var(--ws-text-subtext);
+  line-height: inherit;
 }
 .ws-thread-meta span {
   overflow: hidden;
@@ -85,7 +88,8 @@
 .ws-callout {
   padding: 1rem;
   color: var(--muted-foreground);
-  font-size: 0.8rem;
+  font: var(--ws-text-primary);
+  line-height: inherit;
 }
 .ws-callout {
   border: 1px dashed var(--border);
@@ -110,12 +114,13 @@
   justify-content: space-between;
 }
 .ws-section-stack h2 {
-  font-size: 0.85rem;
-  font-weight: 700;
+  font: var(--ws-text-title);
+  line-height: inherit;
 }
 .ws-section-stack header span {
   color: var(--muted-foreground);
-  font-size: 0.68rem;
+  font: var(--ws-text-subtext);
+  line-height: inherit;
 }
 .ws-pill {
   border: 1px solid var(--border);
@@ -130,14 +135,16 @@
   display: flex;
   gap: 0.55rem;
   padding: 0.45rem 0.25rem;
-  font-size: 0.78rem;
+  font: var(--ws-text-primary);
+  line-height: inherit;
 }
 .ws-plan-completed {
   color: var(--muted-foreground);
   text-decoration: line-through;
 }
 .ws-plan-in_progress {
-  font-weight: 650;
+  font: var(--ws-text-title);
+  line-height: inherit;
 }
 .ws-stack-layer {
   display: grid;
@@ -159,7 +166,8 @@
 .ws-agent-card small {
   display: block;
   color: var(--muted-foreground);
-  font-size: 0.65rem;
+  font: var(--ws-text-subtext);
+  line-height: inherit;
 }
 .ws-agent-card {
   width: 100%;
@@ -184,7 +192,8 @@
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) - 2px);
   padding: 0.3rem 0.45rem;
-  font-size: 0.68rem;
+  font: var(--ws-text-subtext);
+  line-height: inherit;
 }
 .ws-track-action:hover {
   background: var(--accent);
@@ -208,7 +217,7 @@
 .ws-context-menu-info {
   padding: 0.3rem 0.45rem;
   color: var(--muted-foreground);
-  font-size: 0.64rem;
+  font: var(--ws-text-subtext);
   line-height: 1.25;
 }
 .ws-context-menu-label {
@@ -216,8 +225,8 @@
   overflow: hidden;
   padding: 0.32rem 0.45rem 0.38rem;
   color: var(--muted-foreground);
-  font-size: 0.62rem;
-  font-weight: 600;
+  font: var(--ws-text-metadata);
+  line-height: inherit;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -231,7 +240,7 @@
   color: inherit;
   text-align: left;
   font: inherit;
-  font-size: 0.7rem;
+  font: var(--ws-text-primary);
   line-height: 1.25;
   cursor: pointer;
 }
