@@ -1,8 +1,14 @@
 # Work management and thread hierarchy specification
 
-Status: Proposed for incremental implementation
+Status: Amended implementation specification
 Date: 2026-08-29
-Owners: `BBPLUG-158`, `BBPLUG-160`, `BBPLUG-161`
+Documentation owner: `BBPLUG-166`
+Implementation owners: `BBPLUG-158`, `BBPLUG-160`, `BBPLUG-161`
+Durable outcome: `BBPLUG-1` (the historical `BBPLUGINWO` namespace remains
+only in historical handoff records)
+Base checkpoint: `9a3329b` on `bb/work-management-integration`; 74 files and
+407 tests passing, typecheck clean, and `git diff --check` clean at the
+2026-08-29 baseline.
 
 ## Purpose
 
@@ -18,14 +24,26 @@ state, BB Tasks remains the durable execution record, Linear remains an
 external tracker, TanStack Query owns remote state, and Zustand owns only
 cross-component presentation state.
 
+## Implementation status at the baseline
+
+R31 is landed end to end at the baseline: hierarchy model and server service,
+context/picker/menu integration, the `moveSidebarThread` handler, the
+`useThreadHierarchyMutation` hook, and the existing happy-path hierarchy tests
+are present. R32.1 and R33.1 are also present as pure models with tests, but
+they have no production consumers yet. The legacy `TasksCard` and separate
+`TrackerCard` remain the rendered path until their owning implementation loops
+replace them. This document is therefore an amendment plan against a partially
+landed tree, not a claim that all three slices are unstarted.
+
 ## Current product audit
 
 ### Thread hierarchy
 
-The host data already contains `parentThreadId`, and the BB SDK can update it,
-but the enhanced sidebar has no safe interaction for promoting a child to a
-root thread or moving a thread under another parent. Custom groups and durable
-Work bindings make a raw `parentThreadId` write unsafe:
+The host data already contains `parentThreadId`, and the BB SDK can update it.
+The landed hierarchy path now provides guarded menu operations, while the
+remaining work is cache correctness, candidate computation, accessibility, and
+drag parity. Custom groups and durable Work bindings make a raw
+`parentThreadId` write unsafe:
 
 - nesting a root with an outcome under another managed root would create two
   competing outcomes for one host hierarchy;
@@ -92,15 +110,39 @@ Managed work encourages a canonical outcome; it does not block ordinary chat.
 
 ### Supported interactions
 
-The thread context menu gains a **Move in hierarchy…** interaction:
+The thread context menu provides a **Move in hierarchy…** interaction:
 
-- a child can choose **Make top-level**;
-- a root or child can choose **Move under…** and search active compatible
-  threads;
+- a child can choose **To Top**, which is announced with the description
+  "Move this thread out of its parent and make it a top-level thread";
+- a root or child can choose **Move under…**, which opens a compact inline
+  anchored combobox — not a modal dialog — prepopulated with every active,
+  non-archived, same-project, non-descendant thread whose move would not
+  invalidate a durable binding. Root threads sort first, and each candidate
+  shows its current root so the user can see the depth being created. Deep
+  host hierarchies remain allowed; the picker offers all valid non-descendants.
 - the current thread, its descendants, archived threads, and threads from
   another project are not candidates;
 - keyboard search, selection, Escape, outside dismissal, and focus return use
-  the existing combobox/dialog accessibility contract.
+  the shared search shell. Candidate computation occurs only while the picker
+  is open.
+
+The same two operations are also reachable by drag:
+
+- dropping a row onto another row's parent affordance makes it a child of that
+  row;
+- dropping a row onto the group's top-level drop zone makes it top-level.
+
+Drag reparenting is a distinct hit target from reorder, cross-group move, and
+BB's native drag-to-open/split. Reorder remains the default whole-row gesture;
+reparenting requires the explicit affordance. A drag that leaves the sidebar
+always yields to BB's native split handling. Rejected drops show the same
+actionable error as the menu path and leave order and grouping unchanged.
+
+Both surfaces use one label. The menu item and drag target are **To Top** and
+carry the accessible description "Move this thread out of its parent and make
+it a top-level thread", also exposed as the tooltip. The success toast and
+rejection copy use the same wording. **Make top-level** is retired and must
+not survive as an alias.
 
 The operation preserves the selected thread and does not implicitly open or
 split it.
@@ -131,8 +173,17 @@ rebound first. A future binding-migration wizard is a separate product decision.
 - The mutation uses the BB SDK for `parentThreadId`, then reconciles plugin
   group preferences. If preference persistence fails, the server attempts to
   restore the original parent and reports the failure.
-- Success publishes one Threads-family invalidation. BB host state remains the
-  source of truth; no thread record is copied into Query or Zustand.
+- A successful move publishes one thread-preference invalidation and one
+  work-family invalidation for both the previous and the new root. The client
+  invalidates the work, tracker, and tasks query families for every thread in
+  the affected subtree, because outcome, execution-task, and Linear records
+  are root-scoped on the server. The mutation result carries
+  `oldRootThreadId`, `newRootThreadId`, and `affectedThreadIds` so this scope is
+  explicit. BB host state remains the source of truth; no thread record is
+  copied into Query or Zustand.
+- The server reads at most one project roster per move. If the roster is
+  truncated or an ancestor is not loaded, the move is rejected as **hierarchy
+  not fully loaded**, distinctly from a cycle or other invalid hierarchy.
 
 ## Unified Work item card
 
@@ -145,7 +196,9 @@ The separate Outcome and Linear cards become one **Work item** card:
 3. linked Linear issues, with the primary issue first when one is selected;
 4. actions to create/adopt the BB outcome and link, unlink, or search Linear.
 
-The Work panel order remains:
+The unified card intentionally changes the current layout: the separate
+Tracker card currently renders after Background, while the unified card moves
+its tracker content into slot 2. The resulting Work panel order is:
 
 1. Status
 2. Work item
@@ -176,6 +229,24 @@ systems clearly when their statuses differ.
 Multiple Linear links remain supported. A primary link affects ordering and
 the compact header badge only; it does not delete or demote other links.
 
+### Linked tracker records
+
+One linked Linear issue may be marked primary. The primary key is stored beside
+the link list in plugin server storage and exposed through one typed
+`setPrimaryLinearIssue` operation. Migrate `work-linear-links:v1` to
+`work-linear-links:v2` with `{ keys, primaryKey }`; the reader remains
+forward-compatible with v1 data and treats its first key as the presentation
+primary. Unlinking the primary demotes it and makes the first remaining link
+primary for presentation only; no other link is deleted or reordered.
+
+**Create BB outcome from Linear** copies title and mapped priority exactly once
+through the outcome-creation contract, which carries an optional `priority`.
+The mapping is case-insensitive for `urgent|high|medium|low`; all other values
+map to `none`. It is never re-applied on later Linear edits.
+
+If the tracker is unavailable, the Work item card still renders the BB outcome
+and shows the tracker error inside its linked-records section only.
+
 ## Tasks workflow
 
 ### Relationship to Outcome
@@ -189,15 +260,26 @@ children and are projected by workflow rather than by raw Tasks nesting.
 The card answers “what needs to happen for this work?” and uses four sections:
 
 1. **Needs you** — active Human-assigned tasks, decisions, reviews, and
-   operations. This is first and visually distinct without being destructive.
+   operations. This is first and visually distinct without using a destructive
+   tone.
 2. **In progress** — active Agent-assigned tasks with their owner thread,
    provider icon, live execution state, and an open-thread interaction.
 3. **Next** — backlog or to-do tasks not currently owned by an active worker.
 4. **Completed** — collapsed by default, showing a count and only a bounded
    recent preview after expansion. A full-history action opens the Tasks app.
 
-Each task appears exactly once. The card removes the duplicate thread count,
-the prose-only bound-task count, and the second incompatible row system.
+Each task appears exactly once. When the same task ID arrives from both the
+generic task list and the outcome's execution-task list, the execution record
+wins. Within each section, tasks sort by owner liveness (for In progress),
+then priority, then status, then key — the same precedence as the left queue.
+Completed shows at most five recent entries after expansion, with a count and a
+full-history action. Canceled tasks appear in Completed with a distinct status
+icon and are named as canceled in their accessible label. Next includes tasks
+whose owner thread is archived, showing that owner as unavailable rather than
+silently dropping the task.
+
+The card removes the duplicate thread count, the prose-only bound-task count,
+and the second incompatible row system.
 
 Human/Agent assignment is edited here because it expresses responsibility.
 Owner-thread assignment is a separate searchable control. A Human task may
@@ -211,7 +293,9 @@ The left pane is the project-wide queue manager:
 - show priority before status and keep titles unbolded;
 - show the owner thread and provider when one exists;
 - allow adding, replacing, or removing the linked/owner thread;
-- keep Human/Agent assignment read-only here and edit it in the Work card;
+- keep Human/Agent assignment read-only here and edit it in the Work card when
+  the task has an owner thread or belongs to an outcome. A task with neither is
+  editable from the left row's context menu, so no task is unreachable;
 - preserve create, status, priority, delete, modifier selection, and reorder
   behavior.
 
@@ -220,14 +304,15 @@ the human-readable owner thread and its provider instead.
 
 ### Status workflow
 
-`in_review` remains a supported BB Tasks state for compatibility, but the
-default agent workflow is:
+`in_review` remains a supported BB Tasks state and projects into In progress
+for Agent-assigned work and Needs you for Human-assigned work. BB Tasks has no
+reviewer or gate field, so the UI does not distinguish a gated from an ungated
+review; the named-reviewer/concrete-gate rule is a working convention for
+agents, not a modelled attribute. The default agent workflow is:
 
 `backlog` -> `todo` -> `in_progress` -> `done`
 
-Use `in_review` only while a named reviewer or concrete acceptance gate is
-actually pending. Completion or thread idleness never changes task status
-implicitly.
+Completion or thread idleness never changes task status implicitly.
 
 ### Agent automation surface
 
@@ -259,15 +344,61 @@ requested by the caller. Explicit user follow-up is assigned Human.
 
 ## Accessibility and interaction requirements
 
-- Hierarchy and task pickers are searchable combobox/dialog interactions with
-  valid roles, active-descendant behavior, visible focus, Escape and outside
-  dismissal, and focus restoration.
+- Every compact search and single- or multi-select picker is an instance of the
+  shared inline shell. It uses valid combobox/listbox/option roles,
+  active-descendant behavior, visible focus, Escape and outside dismissal, and
+  focus restoration to the invoking control. `aria-expanded` reflects real
+  open state, never a literal feature value.
+- The hierarchy picker is a compact anchored popover, not an `aria-modal`
+  dialog. The **To Top** menu item and drag zone carry the description "Move
+  this thread out of its parent and make it a top-level thread"; row controls
+  consume activation before parent navigation or drag.
 - Row-level controls consume activation before parent navigation or drag.
 - Status and assignment are not conveyed by color alone.
 - Loading keeps stable card structure; error and retry are local to the owning
   card or section.
 - Empty sections are omitted when their absence is obvious; “No work” copy is
   used only when it provides an action.
+
+## Shared search shell
+
+One plugin-local primitive owns every compact inline search and single- or
+multi-select combobox in both sidebars: the left toolbar search, task-to-thread
+assignment, PR reviewer selection, Linear issue search, task attachment, and
+the hierarchy parent picker. It owns the input, the anchored portalled list,
+`role="combobox"`/`role="listbox"`/`role="option"`, `aria-expanded` derived
+from real open state, active-descendant movement, Home/End/Arrow/Enter/Escape,
+outside dismissal, focus restoration, and busy/empty/error states. Features
+supply options, selection, and mutation state only. No feature slice declares
+its own search input, and no consumer hardcodes `aria-expanded`.
+
+## Typography system
+
+Six semantic text roles replace ad-hoc sizes: primary, title, subtext,
+metadata, label, and code. Each role is one plugin token pair (size and weight)
+derived from a single root scale variable over host theme tokens, per ADR 0005.
+Primitives apply roles; feature selectors never declare `font-size` or
+`font-weight`. Migration is per slice and removes that slice's raw declarations
+in the same change, including `font-size: 0.6rem !important`.
+
+An architecture test rejects any `font-size` or `font-weight` declaration
+outside the typography token block. The six roles preserve semantic hierarchy
+across left Threads/Tasks/PRs and right Work/Changes/Agents without exposing
+per-feature type controls.
+
+## Settings surface
+
+The only typography preference exposed to users is one bounded text-scale
+choice: compact, default, or comfortable (implemented as a clamped numeric
+multiplier). It is stored as a plugin-server preference through the typed
+RPC/Query path already used by sidebar row height, not through `bb.settings`,
+because ADR 0002 assigns plugin-only durable preferences to server storage.
+The preference applies live to both sidebars without reload, and the smallest
+role at the smallest scale remains above the declared accessible minimum.
+
+Per-role font sizes, font family, line height, letter spacing, weight, and
+colour are deliberately not exposed: each is arbitrary CSS surface area that
+breaks the primitive contract or can push text below an accessible minimum.
 
 ## Non-goals
 
@@ -285,15 +416,26 @@ requested by the caller. Explicit user follow-up is assigned Human.
   cross-project moves, archived targets, and binding-invalidating moves fail
   closed with actionable errors.
 - Custom-group membership is reconciled with the resulting hierarchy.
-- One Work item card presents the canonical outcome and all linked Linear
-  records without duplicating persistence semantics.
+- The unified card renders the BB outcome status control and the Linear status
+  control as separately labelled controls, and mutating one issues no request
+  to the other system.
 - The right Tasks card has one deterministic projection into Needs you, In
   progress, Next, and bounded Completed sections.
-- The left Tasks pane and right Work card expose distinct, understandable
-  responsibilities while reading the same Query records.
+- The left pane exposes create, delete, reorder, priority, status, owner-thread
+  add/replace/remove, and modifier selection; the right card exposes
+  Human/Agent assignment and section membership. No control appears on both
+  surfaces.
+- The Needs you section is the first rendered section and carries no
+  destructive tone token.
 - Agent tools and UI mutations preserve one outcome and direct execution
   children only.
+- A reparent invalidates the work, tracker, and tasks families for the affected
+  subtree; the right panel of a moved thread shows the new root's outcome
+  without a manual refresh.
+- Every compact search and combobox in both sidebars resolves to the shared
+  shell; no feature slice declares its own search input.
+- No stylesheet declares `font-size` or `font-weight` outside the typography
+  token block.
 - Focused tests, full serial tests, typecheck, SDK compatibility, build,
   verified-source reload, `git diff --check`, and affected live light/dark,
   narrow/wide interaction checks pass.
-
