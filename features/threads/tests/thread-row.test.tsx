@@ -2,6 +2,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, waitFor } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
+import { toast } from "sonner";
+
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
 
 describe("R9 production ThreadRow host behavior", () => {
   it("mounts the registered left slot and preserves host actions, modifier selection, and split handoff", async () => {
@@ -197,14 +202,23 @@ describe("R9 production ThreadRow host behavior", () => {
     );
     const childLink = await slot.findByRole("link", { name: /Child/ });
     fireEvent.contextMenu(childLink);
-    fireEvent.click(
-      await slot.findByRole("menuitem", { name: "Make top-level" }),
+    const toTop = await slot.findByRole("menuitem", { name: "To Top" });
+    expect(toTop.getAttribute("title")).toBe(
+      "Move this thread out of its parent and make it a top-level thread",
     );
+    expect(toTop.getAttribute("aria-describedby")).toBeTruthy();
+    expect(slot.getByRole("tooltip").textContent).toBe(
+      "Move this thread out of its parent and make it a top-level thread",
+    );
+    fireEvent.click(toTop);
     await waitFor(() =>
       expect(moveThread).toHaveBeenCalledWith({
         threadId: "thr_child",
         parentThreadId: null,
       }),
+    );
+    expect(toast.success).toHaveBeenCalledWith(
+      "Move this thread out of its parent and make it a top-level thread",
     );
     fireEvent.contextMenu(slot.getByRole("link", { name: /Parent/ }));
     const renameAfterHierarchy = await slot.findByRole("menuitem", {

@@ -84,8 +84,8 @@ what is already there.
   parent and make it a top-level thread", searchable Move under, candidate
   exclusions, keyboard selection, busy/error/recovery, Escape/outside
   dismissal, focus return, and prevention of row open/select, drag, or native
-  context-menu fallthrough. **Make top-level** is retired at the menu, toast,
-  test, and documentation sites; no test may assert the old string.
+  context-menu fallthrough. The former promotion label is retired at the menu,
+  toast, test, and documentation sites; no test may assert the old string.
 - **Green:** retain the landed Threads-owned hierarchy picker opened from the
   existing thread context menu. React owns search/open state; Query owns
   mutation state; BB hooks supply the roster. Complete only the missing
