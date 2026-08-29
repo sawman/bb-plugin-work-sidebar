@@ -34,6 +34,7 @@ export function SidebarSearch({
       <SearchCombobox
         anchorRef={triggerRef}
         ariaLabel={`Search ${label}`}
+        autoFocus
         className="ws-sidebar-search-popover"
         emptyMessage=""
         hideResults

@@ -88,7 +88,7 @@ export function TrackerSearch({
   onLink(key: string): void;
   search: ReturnType<typeof useTrackerSearch>;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const linkedKeys = new Set(
     data.items.map(({ item }) => item.key.toUpperCase()),
   );

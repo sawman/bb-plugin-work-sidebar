@@ -40,6 +40,7 @@ export type SearchComboboxProps = {
   anchor?: HTMLElement | null;
   anchorRef?: RefObject<HTMLElement | null>;
   anchorRect?: AnchorRect | null;
+  autoFocus?: boolean;
   busy?: boolean;
   className?: string;
   closeOnSelect?: boolean;
@@ -76,6 +77,7 @@ export function SearchCombobox({
   anchorRef,
   anchorRect = null,
   ariaLabel,
+  autoFocus = false,
   busy = false,
   className = "",
   closeOnSelect = true,
@@ -112,6 +114,8 @@ export function SearchCombobox({
   const contentRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const restoreFocus = useRef(false);
+  const focusInputOnOpen = useRef(false);
+  const wasOpen = useRef(false);
   const dismissedByPointer = useRef(false);
   const listId = useId();
   const activeOptionId =
@@ -122,6 +126,7 @@ export function SearchCombobox({
   const inputValue =
     open || searchOnly ? query ?? uncontrolledQuery : selectedLabel;
   const visible = useMemo(() => {
+    if (query !== undefined) return options;
     const needle = inputValue.trim().toLocaleLowerCase();
     if (!needle) return options;
     return options.filter((option) =>
@@ -133,8 +138,9 @@ export function SearchCombobox({
   const showListbox = open && !hideResults && !busy && !error && visible.length > 0;
   const hasListbox =
     open && !hideResults && (visible.length > 0 || emptyOption);
-  const inputIsSearchOnly = searchOnly || (open && !hasListbox);
+  const inputIsSearchOnly = searchOnly;
   const showPopup = open && (Boolean(anchor || anchorRef) || portal);
+  const inputInContent = showPopup && Boolean(anchor || anchorRef);
 
   const setQuery = (next: string) => {
     if (query === undefined) setUncontrolledQuery(next);
@@ -149,13 +155,18 @@ export function SearchCombobox({
 
   useEffect(() => {
     if (open) {
-      inputRef.current?.focus();
+      const openedByUser = focusInputOnOpen.current;
+      if ((autoFocus && !wasOpen.current) || openedByUser)
+        inputRef.current?.focus();
+      focusInputOnOpen.current = false;
+      wasOpen.current = true;
       return;
     }
+    wasOpen.current = false;
     if (!restoreFocus.current) return;
     restoreFocus.current = false;
     (anchor ?? anchorRef?.current ?? inputRef.current)?.focus();
-  }, [anchor, anchorRef, open]);
+  }, [anchor, anchorRef, autoFocus, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -238,19 +249,28 @@ export function SearchCombobox({
       aria-autocomplete={inputIsSearchOnly ? undefined : "list"}
       aria-controls={hasListbox && !inputIsSearchOnly ? listId : undefined}
       aria-activedescendant={showListbox ? activeOptionId : undefined}
-      aria-expanded={inputIsSearchOnly ? undefined : open}
+      aria-expanded={inputIsSearchOnly ? undefined : hasListbox}
       onFocus={() => {
         if (disabled) return;
-        if (!open && query === undefined) setUncontrolledQuery("");
+        if (!open) {
+          focusInputOnOpen.current = true;
+          if (query === undefined) setUncontrolledQuery("");
+        }
         onOpenChange(true);
       }}
       onClick={() => {
-        if (!disabled) onOpenChange(true);
+        if (!disabled) {
+          if (!open) focusInputOnOpen.current = true;
+          onOpenChange(true);
+        }
       }}
       onChange={(event) => {
         setQuery(event.target.value);
         setActiveIndex(null);
-        if (!disabled) onOpenChange(true);
+        if (!disabled) {
+          if (!open) focusInputOnOpen.current = true;
+          onOpenChange(true);
+        }
       }}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
@@ -378,7 +398,7 @@ export function SearchCombobox({
       onPointerDown={(event) => event.stopPropagation()}
     >
       {header ? <div className="ws-search-shell-header">{header}</div> : null}
-      {anchorRef ? input : null}
+      {inputInContent ? input : null}
       {open ? results : null}
       {footer ? <div className="ws-search-shell-footer">{footer}</div> : null}
     </div>
@@ -399,13 +419,13 @@ export function SearchCombobox({
   if (showPopup && typeof document !== "undefined")
     return (
       <div ref={rootRef} className="ws-search-shell" onBlur={dismissOnBlur}>
-        {!anchorRef && input}
+        {!inputInContent && input}
         {createPortal(content, document.body)}
       </div>
     );
   return (
     <div ref={rootRef} className="ws-search-shell" onBlur={dismissOnBlur}>
-      {!anchorRef && input}
+      {!inputInContent && input}
       {content}
     </div>
   );

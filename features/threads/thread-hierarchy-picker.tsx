@@ -46,6 +46,7 @@ export function ThreadHierarchyPicker({
       anchorRect={anchorRect}
       ariaDescribedBy={titleId}
       ariaLabel={`New parent for ${title}`}
+      autoFocus
       busy={moving || pendingThreadId === threadId}
       className="ws-hierarchy-combobox"
       closeOnSelect={false}

@@ -80,6 +80,7 @@ export function PullRequestReviewerPicker({
     <SearchCombobox
       anchorRef={anchorRef}
       ariaLabel="Search reviewers"
+      autoFocus
       busy={directory.isPending}
       closeOnSelect={false}
       emptyMessage="No matching reviewers."

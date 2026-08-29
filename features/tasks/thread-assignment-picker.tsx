@@ -130,6 +130,7 @@ export function ThreadAssignmentPicker({
       <SearchCombobox
         anchorRef={triggerRef}
         ariaLabel={`Search threads for ${taskKey}`}
+        autoFocus
         closeOnSelect
         emptyMessage="No matching threads."
         listboxLabel={`Thread assignment for ${taskKey}`}
