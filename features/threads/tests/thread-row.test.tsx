@@ -190,6 +190,14 @@ describe("R9 production ThreadRow host behavior", () => {
     });
     fireEvent.focus(parentPicker);
     expect(slot.queryByRole("option", { name: "Child" })).toBeNull();
+    fireEvent.keyDown(parentPicker, { key: "Escape" });
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        slot.getByRole("link", { name: /Parent/ }),
+      ),
+    );
+    fireEvent.contextMenu(slot.getByRole("link", { name: /Parent/ }));
+    fireEvent.click(await slot.findByRole("menuitem", { name: "Move under…" }));
     fireEvent.click(await slot.findByRole("option", { name: "Other" }));
     await waitFor(() =>
       expect(moveThread).toHaveBeenCalledWith({

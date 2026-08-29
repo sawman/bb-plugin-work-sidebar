@@ -1,5 +1,6 @@
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { Input } from "../../components/ui/input";
+import { useState } from "react";
+import { SearchCombobox } from "../../components/ui/combobox";
 import {
   SurfaceCard,
   SurfaceCardHeading,
@@ -102,6 +103,7 @@ export function TrackerSearch({
   onLink(key: string): void;
   search: ReturnType<typeof useTrackerSearch>;
 }) {
+  const [open, setOpen] = useState(true);
   const linkedKeys = new Set(
     data.items.map(({ item }) => item.key.toUpperCase()),
   );
@@ -118,55 +120,32 @@ export function TrackerSearch({
     );
   return (
     <>
-      <div className="ws-linear-search-row">
-        <Input
-          id="ws-linear-key"
-          aria-label="Search Linear issues"
-          value={query}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder="Search issues by key or title"
-          disabled={busy}
-        />
-      </div>
-      {search.isFetching && <small>Searching…</small>}
-      {search.isError && (
-        <div className="ws-linear-error" role="alert">
-          <small>{search.error.message}</small>
-          <button
-            type="button"
-            className="ws-text-button"
-            onClick={() => void search.refetch()}
-          >
-            Try again
-          </button>
-        </div>
-      )}
-      {!search.isFetching && !search.isError && suggestions.length === 0 && (
-        <small>
-          {query ? "No matching issues." : "No related issues found."}
-        </small>
-      )}
-      {suggestions.length > 0 && (
-        <div
-          className="ws-linear-options"
-          role="listbox"
-          aria-label="Suggested Linear issues"
-        >
-          {suggestions.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              role="option"
-              aria-selected="false"
-              onClick={() => onLink(item.key)}
-              disabled={busy}
-            >
-              <b>{item.key}</b>
-              <span>{item.title}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      <SearchCombobox
+        ariaLabel="Search Linear issues"
+        busy={search.isFetching}
+        closeOnSelect={false}
+        emptyMessage={query ? "No matching issues." : "No related issues found."}
+        error={search.isError ? { message: search.error.message } : null}
+        listboxLabel="Suggested Linear issues"
+        onOpenChange={setOpen}
+        onQueryChange={onChange}
+        onRetry={() => void search.refetch()}
+        onSelectionChange={(values) => {
+          const key = values[0];
+          if (key) onLink(key);
+        }}
+        open={open}
+        options={suggestions.map((item) => ({
+          value: item.key,
+          label: item.key,
+          detail: item.title,
+          disabled: busy,
+        }))}
+        placeholder="Search issues by key or title"
+        portal
+        query={query}
+        selectedValues={[]}
+      />
     </>
   );
 }

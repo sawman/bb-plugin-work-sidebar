@@ -173,7 +173,9 @@ export function ContextMenuItem({
   onKeyDown,
   className,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { onSelect?(): void }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  onSelect?(event: React.MouseEvent<HTMLButtonElement>): void;
+}) {
   const menu = useContext(MenuContext);
   return (
     <button
@@ -183,7 +185,7 @@ export function ContextMenuItem({
       role="menuitem"
       onClick={(event) => {
         onClick?.(event);
-        onSelect?.();
+        onSelect?.(event);
         menu?.close();
       }}
       onKeyDown={(event) => {

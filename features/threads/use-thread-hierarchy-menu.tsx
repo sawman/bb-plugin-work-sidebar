@@ -15,6 +15,7 @@ export function useThreadHierarchyMenu({
 }) {
   const hierarchy = useThreadHierarchy();
   const [open, setOpen] = useState(false);
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const descriptionId = useId();
   const close = useCallback(() => {
     setOpen(false);
@@ -36,7 +37,10 @@ export function useThreadHierarchyMenu({
   };
   return {
     disabled: !hierarchy.ready || hierarchy.pendingThreadId === threadId,
-    open: () => setOpen(true),
+    open: (nextAnchor: HTMLElement) => {
+      setAnchor(nextAnchor);
+      setOpen(true);
+    },
     promote,
     toTopDescription: THREAD_TO_TOP_DESCRIPTION,
     toTopDescriptionId: descriptionId,
@@ -44,6 +48,7 @@ export function useThreadHierarchyMenu({
       <ThreadHierarchyPicker
         threadId={threadId}
         title={title}
+        anchor={anchor}
         open={open}
         onClose={close}
       />

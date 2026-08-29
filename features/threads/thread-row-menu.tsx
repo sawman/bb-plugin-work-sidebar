@@ -75,7 +75,7 @@ export function ThreadRowMenu({
           ) : null}
           <ContextMenuItem
             disabled={hierarchy.disabled}
-            onSelect={hierarchy.open}
+            onSelect={(event) => hierarchy.open(event.currentTarget)}
           >
             Move under…
           </ContextMenuItem>

@@ -150,12 +150,10 @@ describe("Tasks registered controls", () => {
     const picker = await rendered.findByRole("combobox", {
       name: "Add task to this thread",
     });
-    expect(picker.closest(".ws-combobox")?.classList).toContain(
-      "ws-task-attachment-picker",
-    );
 
     fireEvent.focus(picker);
-    await rendered.findByRole("listbox");
+    const listbox = await rendered.findByRole("listbox");
+    expect(listbox.closest("[data-portalled=true]")).toBeTruthy();
     fireEvent.click(document.body);
 
     await waitFor(() => expect(rendered.queryByRole("listbox")).toBeNull());

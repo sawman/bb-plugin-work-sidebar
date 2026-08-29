@@ -551,8 +551,9 @@ describe("R18 registered left sidebar parity", () => {
     fireEvent.contextMenu(title);
     fireEvent.click(slot.getByRole("menuitem", { name: "Request reviewers…" }));
     expect(
-      await slot.findByRole("dialog", { name: "Reviewers for PR #153" }),
+      await slot.findByRole("combobox", { name: "Search reviewers" }),
     ).toBeTruthy();
+    expect(slot.queryByRole("dialog")).toBeNull();
     fireEvent.click(await slot.findByRole("option", { name: /bob.*Bob/i }));
     fireEvent.click(slot.getByRole("button", { name: "Save reviewers" }));
     await waitFor(() =>
@@ -562,7 +563,9 @@ describe("R18 registered left sidebar parity", () => {
         reviewers: ["alice", "bob"],
       }),
     );
-    await waitFor(() => expect(slot.queryByRole("dialog")).toBeNull());
+    await waitFor(() =>
+      expect(slot.queryByRole("combobox", { name: "Search reviewers" })).toBeNull(),
+    );
 
     fireEvent.click(
       slot.getByRole("button", {
@@ -570,7 +573,7 @@ describe("R18 registered left sidebar parity", () => {
       }),
     );
     expect(
-      await slot.findByRole("dialog", { name: "Reviewers for PR #153" }),
+      await slot.findByRole("combobox", { name: "Search reviewers" }),
     ).toBeTruthy();
     slot.lifecycle.unmount();
   });

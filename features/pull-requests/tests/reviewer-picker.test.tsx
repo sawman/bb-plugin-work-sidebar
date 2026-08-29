@@ -85,15 +85,18 @@ describe("pull-request reviewer picker", () => {
       { wrapper: wrapper(client) },
     );
 
-    expect(
-      await screen.findByRole("dialog", { name: "Reviewers for PR #42" }),
-    ).toBeTruthy();
+    expect(await screen.findByText("Reviewers for PR #42")).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(
       (
         await screen.findByRole("option", { name: /alice.*Alice Example/i })
       ).getAttribute("aria-selected"),
     ).toBe("true");
     const search = screen.getByRole("combobox", { name: "Search reviewers" });
+    const listbox = screen.getByRole("listbox", { name: "Available reviewers" });
+    expect(listbox.closest("[data-portalled=true]")).toBeTruthy();
+    expect(search.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.keyDown(search, { key: "ArrowDown" });
     expect(search.getAttribute("aria-activedescendant")).toBe(
       screen.getByRole("option", { name: /alice.*Alice Example/i }).id,
     );
@@ -127,7 +130,7 @@ describe("pull-request reviewer picker", () => {
     client.clear();
   });
 
-  it("omits the listbox for an empty search result", async () => {
+  it("keeps the empty reviewer search announced without a stale listbox", async () => {
     const rpc = {
       call: vi.fn(async () => ({
         available: true,
@@ -157,6 +160,7 @@ describe("pull-request reviewer picker", () => {
     await screen.findByRole("option", { name: "alice" });
     fireEvent.change(search, { target: { value: "missing" } });
     expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.getByRole("searchbox", { name: "Search reviewers" })).toBe(search);
     expect(search.hasAttribute("aria-controls")).toBe(false);
     expect(screen.getByText("No matching reviewers.")).toBeTruthy();
     await expectNoAriaViolations();
@@ -206,7 +210,7 @@ describe("pull-request reviewer picker", () => {
     expect((await screen.findByRole("alert")).textContent).toContain(
       "Directory failed",
     );
-    fireEvent.click(screen.getByRole("button", { name: "Retry reviewers" }));
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("option", { name: "alice" })).toBeTruthy();
     fireEvent.click(screen.getByRole("option", { name: "alice" }));
     fireEvent.click(screen.getByRole("button", { name: "Save reviewers" }));
@@ -214,7 +218,7 @@ describe("pull-request reviewer picker", () => {
       "GitHub refused reviewers",
     );
     expect(close).not.toHaveBeenCalled();
-    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Search reviewers" }), { key: "Escape" });
     expect(close).toHaveBeenCalledOnce();
     client.clear();
   });
@@ -265,22 +269,19 @@ describe("pull-request reviewer picker", () => {
     fireEvent.click(
       screen.getByRole("menuitem", { name: "Request reviewers…" }),
     );
-    expect(
-      await screen.findByRole("dialog", { name: "Reviewers for PR #42" }),
-    ).toBeTruthy();
+    expect(await screen.findByRole("combobox", { name: "Search reviewers" })).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
     fireEvent.click(
-      screen.getByRole("button", { name: "Close reviewer picker" }),
+      screen.getByRole("button", { name: "Cancel" }),
     );
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("combobox", { name: "Search reviewers" })).toBeNull());
 
     fireEvent.click(
       screen.getByRole("button", {
         name: "Manage reviewers: Review required",
       }),
     );
-    expect(
-      await screen.findByRole("dialog", { name: "Reviewers for PR #42" }),
-    ).toBeTruthy();
+    expect(await screen.findByRole("combobox", { name: "Search reviewers" })).toBeTruthy();
     expect(
       screen.queryByRole("menuitem", { name: "Reviewers: alice" }),
     ).toBeNull();
