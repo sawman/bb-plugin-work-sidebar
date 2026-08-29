@@ -2,6 +2,7 @@
 import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, waitFor, within } from "@testing-library/react";
+import { configureAxe } from "vitest-axe";
 import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { rpcContract } from "../../../contracts";
@@ -9,6 +10,7 @@ import { getPluginQueryClient } from "../../../query-runtime";
 
 type Rpc = NonNullable<RenderSlotOptions<typeof rpcContract>["rpc"]>;
 const taskResult = { available: true, tasks: [], projects: [], error: null };
+const axe = configureAxe({ runOnly: { type: "tag", values: ["cat.aria", "cat.name-role-value"] } });
 const aggregate = {
   rootThreadId: "thr_one",
   tasksAvailable: true,
@@ -480,17 +482,10 @@ describe("registered Work context cards", () => {
     expect(slot.getByText("Ship cards")).toBeTruthy();
     expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(6);
     expect(slot.container.querySelector(".ws-thread-task-card")).toBeTruthy();
-    const tasksInfo = slot.container.querySelector(
-      '[data-card="tasks"] .ws-card-heading-info',
-    );
-    expect(tasksInfo?.querySelector("[aria-hidden]")?.textContent).toBe("1");
-    const taskId = slot.getByRole("button", {
-      name: "Copy task ID WORK-1",
-    });
+    expect(slot.getByRole("heading", { name: "Needs you" })).toBeTruthy();
     const outcomeInfo = slot.container.querySelector(
       '[data-card="work item"] .ws-card-heading-info',
     );
-    expect(outcomeInfo?.contains(taskId)).toBe(true);
     const priority = slot.getByRole("img", { name: "High priority" });
     expect(priority.getAttribute("data-priority")).toBe("high");
     expect(priority.querySelectorAll('[data-priority-bar="active"]')).toHaveLength(3);
@@ -604,11 +599,7 @@ describe("registered Work context cards", () => {
     );
     try {
       await waitFor(() => expect(slot.getByText("Unrelated linked task")).toBeTruthy());
-      expect(
-        slot.container.querySelector(
-          '[data-card="tasks"] .ws-card-heading-info [aria-hidden]',
-        )?.textContent,
-      ).toBe("3");
+      expect(slot.queryByText(/work tasks are bound/i)).toBeNull();
       for (const title of ["Ship cards", "Run validation", "Unrelated linked task"])
         expect(slot.getAllByText(title)).toHaveLength(1);
       expect(slot.queryByRole("button", { name: "Detach WORK-1 from this thread" })).toBeNull();
@@ -618,7 +609,7 @@ describe("registered Work context cards", () => {
         name: "Human assigned to WORK-1",
       });
       expect(
-        slot.getByRole("button", { name: "Agent assigned to WORK-2" }),
+        slot.getByRole("button", { name: "Agent assigned" }),
       ).toBeTruthy();
       fireEvent.click(outcomeAssignee);
       fireEvent.click(
@@ -744,12 +735,7 @@ describe("registered Work context cards", () => {
     );
     try {
       await waitFor(() => expect(root.getByText("Unbound root task")).toBeTruthy());
-    expect(
-      root.container.querySelector(
-        '[data-card="tasks"] .ws-card-heading-info [aria-hidden]',
-      )?.textContent,
-    ).toBe("3");
-      expect(root.getByText("2 work tasks are bound to this thread.")).toBeTruthy();
+      expect(root.queryByText(/work tasks are bound/i)).toBeNull();
     } finally {
       root.lifecycle.unmount();
       getPluginQueryClient().clear();
@@ -762,12 +748,7 @@ describe("registered Work context cards", () => {
     );
     try {
       await waitFor(() => expect(child.getByText("Unbound child task")).toBeTruthy());
-      expect(
-        child.container.querySelector(
-          '[data-card="tasks"] .ws-card-heading-info [aria-hidden]',
-        )?.textContent,
-      ).toBe("2");
-      expect(child.getByText("1 work task is bound to this thread.")).toBeTruthy();
+      expect(child.queryByText(/work tasks are bound/i)).toBeNull();
       const picker = child.getByRole("combobox", { name: "Add task to this thread" });
       fireEvent.focus(picker);
       await waitFor(() => expect(child.getByRole("option", { name: /WORK-4/ })).toBeTruthy());
@@ -1104,5 +1085,99 @@ describe("registered Work context cards", () => {
     );
     returned.lifecycle.unmount();
     getPluginQueryClient().clear();
+  });
+
+  it("projects the registered Work Tasks card into one deterministic four-section workflow", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const execution = {
+      id: "task_execution",
+      projectId: "project_1",
+      projectName: "Work",
+      key: "WORK-2",
+      title: "Run the agent work",
+      status: "in_progress" as const,
+      priority: "high" as const,
+      dueDate: null,
+      parentTaskId: "task_outcome",
+      position: 2,
+    };
+    const workflowOutcome = {
+      ...outcome,
+      outcome: { ...populatedOutcome.outcome!, id: "task_outcome" },
+      executionTasks: [execution, { ...execution, id: "task_archived", key: "WORK-20", title: "Archived owner follow-up", status: "todo" as const }],
+      bindings: [{
+        rootThreadId: "thr_one",
+        outcomeTaskId: "task_outcome",
+        taskProjectId: "project_1",
+        executionTaskId: "task_execution",
+        ownerThreadId: "thr_owner",
+        mode: "delegated" as const,
+        idempotencyKey: "workflow",
+        dispatchState: "ready" as const,
+        recoveryMessage: null,
+      }, {
+        rootThreadId: "thr_one", outcomeTaskId: "task_outcome", taskProjectId: "project_1", executionTaskId: "task_archived", ownerThreadId: "thr_archived", mode: "delegated" as const, idempotencyKey: "archived", dispatchState: "ready" as const, recoveryMessage: null,
+      }],
+    };
+    const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_one", params: null }, {
+      rpc: fixture({
+        sidebarTasks: () => ({
+          available: true,
+          projects: [{ id: "project_1", name: "Work" }],
+          error: null,
+          tasks: [
+            { ...execution, title: "Stale duplicate", linkedThreadIds: ["thr_one"], assignee: "agent" as const },
+            { ...execution, id: "task_human", key: "WORK-3", title: "Approve the release", status: "in_review" as const, parentTaskId: null, linkedThreadIds: ["thr_one"], assignee: "human" as const },
+            { ...execution, id: "task_next", key: "WORK-4", title: "Prepare the follow-up", status: "backlog" as const, parentTaskId: null, linkedThreadIds: ["thr_one"], assignee: "agent" as const },
+            { ...execution, id: "task_done", key: "WORK-5", title: "Completed evidence", status: "done" as const, parentTaskId: null, linkedThreadIds: ["thr_one"], assignee: "agent" as const, completedAt: 10 },
+            ...Array.from({ length: 6 }, (_, index) => ({ ...execution, id: `task_done_${index}`, key: `WORK-${index + 6}`, title: `Completed ${index}`, status: index === 5 ? "canceled" as const : "done" as const, parentTaskId: null, linkedThreadIds: ["thr_one"], assignee: "agent" as const, completedAt: index + 20 })),
+          ],
+        }),
+        getWorkOutcome: () => workflowOutcome,
+        getWorkStatus: () => ({
+          ...status,
+          children: [{ id: "thr_owner", title: "Validation worker", depth: 1, status: "active" as const, runtimeStatus: "working", providerId: "codex", isArchived: false, task: null }, { id: "thr_archived", title: "Archived worker", depth: 1, status: "idle" as const, runtimeStatus: "idle", providerId: "codex", isArchived: true, task: null }],
+        }),
+      }),
+    });
+    await waitFor(() => expect(slot.getByRole("heading", { name: "Needs you" })).toBeTruthy());
+    expect([...slot.container.querySelectorAll(".ws-task-workflow h3")].map((heading) => heading.textContent)).toEqual([
+      "Needs you", "In progress", "Next", "Completed (7)",
+    ]);
+    expect(slot.getByText("Approve the release")).toBeTruthy();
+    expect(slot.getByText("Run the agent work")).toBeTruthy();
+    expect(slot.queryByText("Stale duplicate")).toBeNull();
+    const openOwner = slot.getByRole("button", { name: "Open Validation worker" });
+    fireEvent.click(openOwner);
+    expect(slot.inspection.navigateCalls).toContainEqual({ method: "toThread", threadId: "thr_owner" });
+    expect(slot.getByRole("img", { name: /codex provider/ })).toBeTruthy();
+    expect(slot.getByText("Prepare the follow-up")).toBeTruthy();
+    expect(slot.getByText("Archived owner follow-up")).toBeTruthy();
+    expect(slot.getAllByText("Owner unavailable")).toHaveLength(2);
+    expect(slot.queryByRole("button", { name: "Open Archived worker" })).toBeNull();
+    expect(slot.getByRole("button", { name: /Completed \(7\)/ }).getAttribute("aria-expanded")).toBe("false");
+    expect(slot.queryByText("Completed 5")).toBeNull();
+    fireEvent.click(slot.getByRole("button", { name: /Completed \(7\)/ }));
+    expect(slot.getByText("Completed 5")).toBeTruthy();
+    expect(slot.getByRole("article", { name: /Canceled/ })).toBeTruthy();
+    expect(slot.container.querySelectorAll(".ws-task-workflow-section:last-of-type .ws-task-workflow-row")).toHaveLength(5);
+    expect(slot.getByText("Older completed tasks are available in BB Tasks.")).toBeTruthy();
+    expect(slot.queryByText(/bound to this thread/i)).toBeNull();
+    expect(slot.queryByRole("group", { name: "Execution tasks" })).toBeNull();
+    slot.lifecycle.unmount();
+    getPluginQueryClient().clear();
+  });
+
+  it("keeps workflow IDs unique and ARIA-valid across two mounted Work panels", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const first = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_one", params: null }, { rpc: fixture() });
+    const second = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_two", params: null }, { rpc: fixture() });
+    await waitFor(() => expect(second.getByRole("heading", { name: "Needs you" })).toBeTruthy());
+    const ids = [...document.querySelectorAll(".ws-task-workflow [id]")].map((element) => element.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect((await axe(document.body)).violations).toEqual([]);
+    first.lifecycle.unmount(); second.lifecycle.unmount(); getPluginQueryClient().clear();
   });
 });
