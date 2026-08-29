@@ -27,15 +27,19 @@ export function buildRendererThemeScript(theme) {
       url: location.href,
     }));
     return new Promise((resolve) => {
-      const finish = () => resolve({
-        preference: localStorage.getItem(key),
-        dark: document.documentElement.classList.contains("dark"),
-      });
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        resolve({
+          preference: localStorage.getItem(key),
+          dark: document.documentElement.classList.contains("dark"),
+        });
+      };
+      if (typeof setTimeout === "function") setTimeout(finish, 100);
       if (typeof requestAnimationFrame === "function") {
         requestAnimationFrame(() => requestAnimationFrame(finish));
-      } else {
-        setTimeout(finish, 0);
-      }
+      } else finish();
     });
   })()`;
 }

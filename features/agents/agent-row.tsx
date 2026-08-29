@@ -1,4 +1,10 @@
-import { useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type PropsWithChildren,
+} from "react";
 import {
   experimental_useSidebarThreadActions,
   experimental_useSidebarThreadSplit,
@@ -20,13 +26,27 @@ export type AgentAnnotation = {
   recoveryMessage: string | null;
 };
 
-function AgentDuration({ createdAt }: { createdAt: number }) {
+const AgentClockContext = createContext(0);
+
+export function AgentDurationClock({
+  active,
+  children,
+}: PropsWithChildren<{ active: boolean }>) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (createdAt <= 0) return undefined;
+    if (!active) return undefined;
     const interval = window.setInterval(() => setNow(Date.now()), 1_000);
     return () => window.clearInterval(interval);
-  }, [createdAt]);
+  }, [active]);
+  return (
+    <AgentClockContext.Provider value={now}>
+      {children}
+    </AgentClockContext.Provider>
+  );
+}
+
+function AgentDuration({ createdAt }: { createdAt: number }) {
+  const now = useContext(AgentClockContext);
   const duration = agentDurationLabel(createdAt, now);
   return duration ? (
     <time
@@ -40,7 +60,10 @@ function AgentDuration({ createdAt }: { createdAt: number }) {
   ) : null;
 }
 
-const runtimeIcons: Record<ReturnType<typeof agentRuntimePresentation>["tone"], IconName> = {
+const runtimeIcons: Record<
+  ReturnType<typeof agentRuntimePresentation>["tone"],
+  IconName
+> = {
   working: "Bot",
   waiting: "UserClock",
   blocked: "AlertCircle",
@@ -48,7 +71,10 @@ const runtimeIcons: Record<ReturnType<typeof agentRuntimePresentation>["tone"], 
   idle: "Zzz",
 };
 
-const workspaceIcons: Record<NonNullable<ReturnType<typeof agentWorkspacePresentation>>["kind"], IconName> = {
+const workspaceIcons: Record<
+  NonNullable<ReturnType<typeof agentWorkspacePresentation>>["kind"],
+  IconName
+> = {
   "managed-worktree": "FolderGit",
   "unmanaged-worktree": "GitBranch",
   workspace: "Laptop",
@@ -65,10 +91,13 @@ export function AgentRow({
   model: string | null;
 }) {
   const actions = experimental_useSidebarThreadActions();
-  const { splitProps, isAvailable } = experimental_useSidebarThreadSplit(child.thread.id);
+  const { splitProps, isAvailable } = experimental_useSidebarThreadSplit(
+    child.thread.id,
+  );
   const runtime = agentRuntimePresentation(child.thread);
   const workspace = agentWorkspacePresentation(child.thread);
-  const title = child.thread.title ?? child.thread.titleFallback ?? "Untitled agent";
+  const title =
+    child.thread.title ?? child.thread.titleFallback ?? "Untitled agent";
   const open = (split: boolean) => actions.open(child.thread.id, { split });
   return (
     <article
@@ -117,10 +146,15 @@ export function AgentRow({
             </CopyBadge>
           ) : null}
           {annotation.taskKey ? (
-            <span className="ws-agent-fact ws-agent-task" title="Assigned task">
+            <span
+              className="ws-agent-fact ws-agent-task"
+              title="Assigned task"
+            >
               <Icon name="ListTodo" aria-hidden />
               <b>{annotation.taskKey}</b>
-              {annotation.taskTitle ? <span>{annotation.taskTitle}</span> : null}
+              {annotation.taskTitle ? (
+                <span>{annotation.taskTitle}</span>
+              ) : null}
             </span>
           ) : null}
         </span>

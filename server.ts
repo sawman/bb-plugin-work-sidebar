@@ -30,7 +30,7 @@ export default function plugin(
   const pullRequests = createPullRequestRegistration(bb, lifecycle);
   const dependencies: ServerCompositionDependencies = { bb, lifecycle, pullRequests, tasks };
   const changes = createChangesRegistration(dependencies);
-  const threads = createThreadRegistration(bb);
+  const threads = createThreadRegistration(bb, tasks);
   const workContext = createWorkContextRegistration(dependencies);
   const tracker = createTrackerRegistration(dependencies);
   bb.rpc.register(rpcContract, {
@@ -47,6 +47,7 @@ export default function plugin(
     saveThreadGroups: threads.saveThreadGroups,
     getSidebarAppearance: threads.getSidebarAppearance,
     saveSidebarAppearance: threads.saveSidebarAppearance,
+    moveSidebarThread: threads.moveSidebarThread,
     sidebarTasks: tasks.sidebarTasks,
     sidebarTaskLinks: tasks.sidebarTaskLinks,
     sidebarPullRequestStacks: pullRequests.sidebarPullRequestStacks,
@@ -54,6 +55,8 @@ export default function plugin(
     sidebarAuthoredPullRequests: pullRequests.sidebarAuthoredPullRequests,
     sidebarAuthoredPullRequestStacks: pullRequests.sidebarAuthoredPullRequestStacks,
     setAuthoredPullRequestDraft: pullRequests.setAuthoredPullRequestDraft,
+    getPullRequestReviewers: pullRequests.getPullRequestReviewers,
+    updatePullRequestReviewers: pullRequests.updatePullRequestReviewers,
     sidebarArchivedThreads: threads.sidebarArchivedThreads,
     unarchiveSidebarThread: threads.unarchiveSidebarThread,
     getWorkContext: workContext.getWorkContext,
@@ -100,7 +103,6 @@ export default function plugin(
     skills: [],
     instructions: WORK_AGENT_INSTRUCTIONS,
   }));
-  bb.log.info("Work Sidebar backend loaded");
 }
 
 export { fetchGitHubStack, createServerLifecycle };

@@ -2,10 +2,9 @@ import { useMemo } from "react";
 import { experimental_useSidebarThreads } from "@get-bb/plugin-sdk/app";
 import { useTaskLinksRead } from "../tasks/queries";
 import { useWorkOutcome } from "../work-context/queries";
-import { AgentRow } from "./agent-row";
+import { AgentDurationClock, AgentRow } from "./agent-row";
 import { projectAgentChildren } from "./model";
 import { useAgentDetails } from "./queries";
-
 
 export function AgentsView({ threadId }: { threadId: string }) {
   const hostThreads = experimental_useSidebarThreads();
@@ -18,16 +17,30 @@ export function AgentsView({ threadId }: { threadId: string }) {
     () => projectAgentChildren(hostThreads.threads, threadId),
     [hostThreads.threads, threadId],
   );
-  const detailTargets = useMemo(
-    () => children.map(({ thread }) => ({ id: thread.id, updatedAt: thread.updatedAt })),
+  const detailThreadIds = useMemo(
+    () => children.map(({ thread }) => thread.id),
     [children],
   );
-  const agentDetails = useAgentDetails(detailTargets);
+  const agentDetails = useAgentDetails(detailThreadIds);
   const modelsByThread = useMemo(
-    () => new Map(
-      (agentDetails.data?.agents ?? []).map(({ threadId: id, model }) => [id, model]),
-    ),
+    () =>
+      new Map(
+        (agentDetails.data?.agents ?? []).map(({ threadId: id, model }) => [
+          id,
+          model,
+        ]),
+      ),
     [agentDetails.data?.agents],
+  );
+  const bindingsByOwner = useMemo(
+    () =>
+      new Map(
+        (outcome.data?.bindings ?? []).map((binding) => [
+          binding.ownerThreadId,
+          binding,
+        ]),
+      ),
+    [outcome.data?.bindings],
   );
 
   if (hostThreads.status === "loading")
@@ -51,26 +64,28 @@ export function AgentsView({ threadId }: { threadId: string }) {
         </div>
         <span className="ws-section-count">{children.length}</span>
       </header>
-      {children.map((child) => {
-        const taskLink = taskLinks.data?.links[child.thread.id]?.[0];
-        const binding = outcome.data?.bindings.find(
-          (candidate) => candidate.ownerThreadId === child.thread.id,
-        );
-        return (
-          <AgentRow
-            key={child.thread.id}
-            child={child}
-            annotation={{
-              taskKey: taskLink?.task.key ?? null,
-              taskTitle: taskLink?.task.title ?? null,
-              taskStatus: taskLink?.task.status ?? null,
-              dispatchState: binding?.dispatchState ?? null,
-              recoveryMessage: binding?.recoveryMessage ?? null,
-            }}
-            model={modelsByThread.get(child.thread.id) ?? null}
-          />
-        );
-      })}
+      <AgentDurationClock
+        active={children.some(({ thread }) => thread.createdAt > 0)}
+      >
+        {children.map((child) => {
+          const taskLink = taskLinks.data?.links[child.thread.id]?.[0];
+          const binding = bindingsByOwner.get(child.thread.id);
+          return (
+            <AgentRow
+              key={child.thread.id}
+              child={child}
+              annotation={{
+                taskKey: taskLink?.task.key ?? null,
+                taskTitle: taskLink?.task.title ?? null,
+                taskStatus: taskLink?.task.status ?? null,
+                dispatchState: binding?.dispatchState ?? null,
+                recoveryMessage: binding?.recoveryMessage ?? null,
+              }}
+              model={modelsByThread.get(child.thread.id) ?? null}
+            />
+          );
+        })}
+      </AgentDurationClock>
       {children.length === 0 ? (
         <div className="ws-empty">
           No active delegated child threads are attached to this thread.

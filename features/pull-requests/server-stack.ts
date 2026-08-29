@@ -66,6 +66,16 @@ export function githubStackApiArgs(owner: string, repo: string, pullRequest: num
   ];
 }
 
+export function githubStacksApiArgs(owner: string, repo: string): string[] {
+  return [
+    "api", "--method", "GET", `repos/${owner}/${repo}/stacks`,
+    "-f", "per_page=100",
+    "--paginate", "--slurp",
+    "-H", `Accept: ${GITHUB_ACCEPT_HEADER}`,
+    "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`,
+  ];
+}
+
 function parseStackPullRequest(value: unknown): GitHubPullRequest {
   if (!isRecord(value)) throw new Error("GitHub Stack response has an invalid pull request");
   const head = isRecord(value.head) ? value.head.ref : undefined;
@@ -82,18 +92,29 @@ function parseStackPullRequest(value: unknown): GitHubPullRequest {
   };
 }
 
+export function parseGitHubStacksResponse(value: unknown): Array<{ number: number; base: string; pullRequests: GitHubPullRequest[] }> {
+  const response = Array.isArray(value)
+    ? value
+    : isRecord(value) && Array.isArray(value.stacks)
+      ? value.stacks
+      : [value];
+  const candidates = response.every(Array.isArray) ? response.flat() : response;
+  return candidates.map((candidate) => {
+    if (!isRecord(candidate))
+      throw new Error("GitHub Stack response contains an invalid stack");
+    const base = isRecord(candidate.base) ? candidate.base.ref : undefined;
+    if (!Array.isArray(candidate.pull_requests))
+      throw new Error("GitHub Stack response is missing pull_requests");
+    return {
+      number: requiredNumber(candidate.number, "stack number"),
+      base: requiredString(base, "stack base"),
+      pullRequests: candidate.pull_requests.map(parseStackPullRequest),
+    };
+  });
+}
+
 export function parseGitHubStackResponse(value: unknown): { number: number; base: string; pullRequests: GitHubPullRequest[] } | null {
-  const candidates = Array.isArray(value) ? value : isRecord(value) && Array.isArray(value.stacks) ? value.stacks : [value];
-  const first = candidates[0];
-  if (!first) return null;
-  if (!isRecord(first)) throw new Error("GitHub Stack response contains an invalid stack");
-  const base = isRecord(first.base) ? first.base.ref : undefined;
-  if (!Array.isArray(first.pull_requests)) throw new Error("GitHub Stack response is missing pull_requests");
-  return {
-    number: requiredNumber(first.number, "stack number"),
-    base: requiredString(base, "stack base"),
-    pullRequests: first.pull_requests.map(parseStackPullRequest),
-  };
+  return parseGitHubStacksResponse(value)[0] ?? null;
 }
 
 export async function readGitHubPullRequestDiff(

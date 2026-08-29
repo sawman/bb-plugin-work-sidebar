@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useSidebarAppearancePreferences } from "./queries";
 import {
@@ -8,49 +8,81 @@ import {
   validateSidebarRowHeight,
 } from "./sidebar-appearance";
 
-const INPUT_ID = "work-sidebar-row-height";
-const HELP_ID = `${INPUT_ID}-help`;
-const ERROR_ID = `${INPUT_ID}-error`;
+type SidebarRowHeightEditorProps = {
+  saved: number | undefined;
+  pending: boolean;
+  compact?: boolean;
+  onSave(rowHeight: number): Promise<{ rowHeight: number }>;
+};
 
-export function SidebarAppearanceSettings() {
-  const preferences = useSidebarAppearancePreferences();
+export function SidebarRowHeightEditor({
+  saved,
+  pending,
+  compact = false,
+  onSave,
+}: SidebarRowHeightEditorProps) {
+  const inputId = useId();
+  const errorId = `${inputId}-error`;
   const [draft, setDraft] = useState(String(DEFAULT_SIDEBAR_ROW_HEIGHT));
   const [dirty, setDirty] = useState(false);
+  const latestDraft = useRef(draft);
+  const lastAttemptedDraft = useRef<string | null>(null);
   const validation = validateSidebarRowHeight(draft);
-  const saved = preferences.appearance.data?.rowHeight;
 
   useEffect(() => {
-    if (saved !== undefined && !dirty) setDraft(String(saved));
+    if (saved === undefined || dirty) return;
+    const next = String(saved);
+    latestDraft.current = next;
+    lastAttemptedDraft.current = null;
+    setDraft(next);
   }, [dirty, saved]);
 
-  return (
-    <form
-      className="ws-settings-card ws-sidebar-appearance-settings"
-      noValidate
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (validation.value === null) return;
-        preferences.saveAppearance.mutate(validation.value, {
-          onSuccess: ({ rowHeight }) => {
-            setDraft(String(rowHeight));
-            setDirty(false);
-            toast.success(`Sidebar rows set to ${rowHeight}px`);
-          },
-          onError: (error) => {
-            toast.error(
-              error instanceof Error
-                ? error.message
-                : "Could not save sidebar row height",
-            );
-          },
+  useEffect(() => {
+    if (!dirty || pending || validation.value === null) return;
+    if (validation.value === saved) {
+      lastAttemptedDraft.current = null;
+      setDirty(false);
+      return;
+    }
+    const requested = validation.value;
+    const attemptedDraft = draft;
+    if (lastAttemptedDraft.current === attemptedDraft) return;
+    const timer = window.setTimeout(() => {
+      lastAttemptedDraft.current = attemptedDraft;
+      void onSave(requested)
+        .then(({ rowHeight }) => {
+          if (latestDraft.current !== attemptedDraft) return;
+          const next = String(rowHeight);
+          latestDraft.current = next;
+          setDraft(next);
+          setDirty(false);
+          toast.success(`Sidebar rows set to ${rowHeight}px`);
+        })
+        .catch((error: unknown) => {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : "Could not save sidebar row height",
+          );
         });
-      }}
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [dirty, draft, onSave, pending, saved, validation.value]);
+
+  return (
+    <div
+      data-layout={compact ? undefined : "narrow"}
+      className={
+        compact
+          ? "ws-sidebar-row-height-editor"
+          : "ws-settings-card ws-sidebar-appearance-settings"
+      }
     >
-      <strong>Sidebar appearance</strong>
-      <label htmlFor={INPUT_ID}>Row height</label>
+      {compact ? null : <strong>Sidebar appearance</strong>}
+      <label htmlFor={inputId}>Row height</label>
       <div className="ws-settings-input-row">
         <input
-          id={INPUT_ID}
+          id={inputId}
           type="number"
           min={MIN_SIDEBAR_ROW_HEIGHT}
           max={MAX_SIDEBAR_ROW_HEIGHT}
@@ -58,33 +90,32 @@ export function SidebarAppearanceSettings() {
           inputMode="decimal"
           value={draft}
           aria-invalid={validation.error ? "true" : undefined}
-          aria-describedby={`${HELP_ID}${validation.error ? ` ${ERROR_ID}` : ""}`}
+          aria-describedby={validation.error ? errorId : undefined}
           onChange={(event) => {
-            setDraft(event.currentTarget.value);
+            latestDraft.current = event.currentTarget.value;
+            lastAttemptedDraft.current = null;
+            setDraft(latestDraft.current);
             setDirty(true);
           }}
         />
         <span aria-hidden>px</span>
-        <button
-          type="submit"
-          disabled={
-            validation.value === null ||
-            validation.value === saved ||
-            preferences.saveAppearance.isPending
-          }
-        >
-          {preferences.saveAppearance.isPending ? "Saving…" : "Save"}
-        </button>
       </div>
-      <small id={HELP_ID}>
-        Enter a value with up to one decimal place from {MIN_SIDEBAR_ROW_HEIGHT} to{" "}
-        {MAX_SIDEBAR_ROW_HEIGHT}px. The default is {DEFAULT_SIDEBAR_ROW_HEIGHT}px.
-      </small>
       {validation.error ? (
-        <small id={ERROR_ID} className="ws-settings-error" role="alert">
+        <small id={errorId} className="ws-settings-error" role="alert">
           {validation.error}
         </small>
       ) : null}
-    </form>
+    </div>
+  );
+}
+
+export function SidebarAppearanceSettings() {
+  const preferences = useSidebarAppearancePreferences();
+  return (
+    <SidebarRowHeightEditor
+      saved={preferences.appearance.data?.rowHeight}
+      pending={preferences.saveAppearance.isPending}
+      onSave={preferences.saveAppearance.mutateAsync}
+    />
   );
 }

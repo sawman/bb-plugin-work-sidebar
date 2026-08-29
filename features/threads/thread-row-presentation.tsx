@@ -6,20 +6,50 @@ import type {
 import { Icon } from "@/components/ui/icon";
 import { CopyBadge } from "@/components/ui/copy-badge";
 import { ThreadWorkspaceBadge } from "@/components/threads/thread-workspace-badge";
-import { normalizeIndicator } from "@/work-model";
+import {
+  ThreadProviderLogo,
+  type ThreadProvider,
+} from "@/components/threads/thread-provider-logo";
 import { pullRequestPresentation } from "@/features/pull-requests/presentation";
-import { threadIsWorking, useStaleWorking } from "./thread-attention";
 import type { ThreadProject } from "./thread-row-types";
+import {
+  threadProviderRuntimeState,
+  threadProviderStatusLabel,
+} from "./thread-runtime";
 
-function indicatorGlyph(value: string): string {
-  switch (normalizeIndicator(value)) {
-    case "unread-error":
-      return "!";
-    case "waiting-for-input":
-      return "?";
-    default:
-      return "";
-  }
+export function ThreadRuntimeProvider({
+  thread,
+  provider,
+  activeChildren = 0,
+  staleWorking,
+  staleWorkingMinutes = 30,
+}: {
+  thread: PluginSidebarThread;
+  provider?: ThreadProvider;
+  activeChildren?: number;
+  staleWorking: boolean;
+  staleWorkingMinutes?: number;
+}) {
+  const runtimeState = threadProviderRuntimeState(
+    thread,
+    staleWorking,
+    activeChildren,
+  );
+  const statusLabel = threadProviderStatusLabel(
+    thread,
+    staleWorking,
+    activeChildren,
+    runtimeState,
+    staleWorkingMinutes,
+  );
+  return (
+    <ThreadProviderLogo
+      providerId={thread.providerId}
+      provider={provider}
+      runtimeState={runtimeState}
+      statusLabel={statusLabel}
+    />
+  );
 }
 
 export function ThreadMetadata({
@@ -83,17 +113,14 @@ export function ThreadMetadata({
 export function ThreadStatus({
   thread,
   hasComposerDraft,
+  staleWorking = false,
+  staleWorkingMinutes = 30,
 }: {
   thread: PluginSidebarThread;
   hasComposerDraft: boolean;
+  staleWorking?: boolean;
+  staleWorkingMinutes?: number;
 }) {
-  const indicator = normalizeIndicator(String(thread.indicator));
-  const working = threadIsWorking(thread);
-  const staleWorking = useStaleWorking(thread);
-  const glyph = indicatorGlyph(String(thread.indicator));
-  const statusLabel = staleWorking
-    ? `${thread.indicatorLabel ?? "Thread is working"}; no agent update for 30 minutes`
-    : thread.indicatorLabel;
   return (
     <span className="ws-thread-trailing ws-sidebar-row-trailing">
       {hasComposerDraft && (
@@ -107,27 +134,11 @@ export function ThreadStatus({
         <Icon name="Pin" className="ws-thread-pin" aria-label="Pinned" />
       )}
       {staleWorking && (
-        <Icon name="Clock" className="ws-status-stale-clock" aria-hidden />
-      )}
-      {indicator === "unread-success" && thread.indicatorLabel && (
-        <span className="ws-sr-only">{thread.indicatorLabel}</span>
-      )}
-      {(working || glyph) && (
-        <span
-          className={`ws-status ws-status-${indicator} ${working ? "ws-status-working" : ""}`}
-          role={statusLabel ? "img" : undefined}
-          aria-label={statusLabel ?? undefined}
-        >
-          {working ? (
-            <span className="ws-status-dots" aria-hidden>
-              <i />
-              <i />
-              <i />
-            </span>
-          ) : (
-            glyph
-          )}
-        </span>
+        <Icon
+          name="Clock"
+          className="ws-status-stale-clock"
+          aria-label={`${thread.indicatorLabel ?? "Thread activity"}; no agent update for ${staleWorkingMinutes} minutes`}
+        />
       )}
     </span>
   );

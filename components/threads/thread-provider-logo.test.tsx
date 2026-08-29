@@ -2,7 +2,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ThreadProviderLogo, type ThreadProvider } from "./thread-provider-logo";
+import {
+  ThreadProviderLogo,
+  type ThreadProvider,
+} from "./thread-provider-logo";
 
 const provider: ThreadProvider = {
   id: "codex",
@@ -10,10 +13,22 @@ const provider: ThreadProvider = {
   logoUrl: "/api/v1/system/providers/codex/logo",
 };
 
-function renderLogo(client: QueryClient) {
+function renderLogo(
+  client: QueryClient,
+  input: {
+    provider?: ThreadProvider;
+    providerId?: string;
+    runtimeState?: "idle" | "working";
+  } = {},
+) {
+  const selectedProvider = input.provider ?? provider;
   return render(
     <QueryClientProvider client={client}>
-      <ThreadProviderLogo providerId="codex" provider={provider} />
+      <ThreadProviderLogo
+        providerId={input.providerId ?? selectedProvider.id}
+        provider={selectedProvider}
+        runtimeState={input.runtimeState}
+      />
     </QueryClientProvider>,
   );
 }
@@ -49,12 +64,57 @@ describe("ThreadProviderLogo immutable asset cache", () => {
     const view = renderLogo(client);
     const providerIcon = view.getByRole("img", { name: "Codex provider" });
     await waitFor(() =>
-      expect(providerIcon.querySelector(".ws-thread-provider-mark")).toBeTruthy(),
+      expect(
+        providerIcon.querySelector(".ws-thread-provider-mark"),
+      ).toBeTruthy(),
     );
     expect(providerIcon.querySelector("img")).toBeNull();
     expect(providerLogoMask(providerIcon)).toMatch(
       /^url\("data:image\/svg\+xml/,
     );
+  });
+
+  it("keeps the official provider mark while working state changes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        blob: async () =>
+          new Blob(["<svg xmlns='http://www.w3.org/2000/svg' />"], {
+            type: "image/svg+xml",
+          }),
+      })),
+    );
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const claude: ThreadProvider = {
+      id: "claude-code",
+      displayName: "Claude",
+      logoUrl: "/api/v1/system/providers/claude-code/logo",
+    };
+
+    const view = renderLogo(client, {
+      provider: claude,
+      runtimeState: "working",
+    });
+    const providerIcon = view.getByRole("img", {
+      name: "Claude provider",
+    });
+    expect(providerIcon.getAttribute("data-runtime-state")).toBe("working");
+    await waitFor(() =>
+      expect(
+        providerIcon.querySelector(
+          ".ws-thread-provider-glyph > .ws-thread-provider-mark",
+        ),
+      ).toBeTruthy(),
+    );
+    expect(
+      providerIcon.querySelector(
+        ".ws-thread-provider-glyph > .ws-thread-provider-fallback-shine",
+      ),
+    ).toBeTruthy();
   });
 
   it("fetches one logo asset across component remounts", async () => {
@@ -74,9 +134,7 @@ describe("ThreadProviderLogo immutable asset cache", () => {
     const active = renderLogo(client);
     await waitFor(() =>
       expect(
-        providerLogoMask(
-          active.getByRole("img", { name: "Codex provider" }),
-        ),
+        providerLogoMask(active.getByRole("img", { name: "Codex provider" })),
       ).toMatch(/^url\("data:image\/svg\+xml/),
     );
     active.unmount();
@@ -84,9 +142,7 @@ describe("ThreadProviderLogo immutable asset cache", () => {
     const archived = renderLogo(client);
     await waitFor(() =>
       expect(
-        providerLogoMask(
-          archived.getByRole("img", { name: "Codex provider" }),
-        ),
+        providerLogoMask(archived.getByRole("img", { name: "Codex provider" })),
       ).toMatch(/^url\("data:image\/svg\+xml/),
     );
     expect(fetchLogo).toHaveBeenCalledTimes(1);

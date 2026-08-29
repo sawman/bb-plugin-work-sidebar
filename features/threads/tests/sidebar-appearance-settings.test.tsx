@@ -14,8 +14,8 @@ afterEach(() => {
 });
 
 describe("sidebar appearance settings", () => {
-  it("validates 40px to 60px in tenth-pixel steps without clamping", () => {
-    expect(validateSidebarRowHeight("40")).toEqual({ value: 40, error: null });
+  it("validates 35px to 60px in tenth-pixel steps without clamping", () => {
+    expect(validateSidebarRowHeight("35")).toEqual({ value: 35, error: null });
     expect(validateSidebarRowHeight("47.5")).toEqual({
       value: 47.5,
       error: null,
@@ -25,16 +25,16 @@ describe("sidebar appearance settings", () => {
       error: null,
     });
     expect(validateSidebarRowHeight("60")).toEqual({ value: 60, error: null });
-    expect(validateSidebarRowHeight("39.5")).toMatchObject({ value: null });
+    expect(validateSidebarRowHeight("34.9")).toMatchObject({ value: null });
     expect(validateSidebarRowHeight("60.5")).toMatchObject({ value: null });
     expect(validateSidebarRowHeight("47.25")).toEqual({
       value: null,
       error: "Enter a number with at most one decimal place.",
     });
-    expect(normalizeSidebarRowHeight("invalid")).toBe(45);
+    expect(normalizeSidebarRowHeight("invalid")).toBe(40);
   });
 
-  it("highlights invalid input and persists only an exact valid value", async () => {
+  it("highlights invalid input and automatically persists only an exact valid value", async () => {
     const save = vi.fn(({ rowHeight }: { rowHeight: number }) => ({
       rowHeight,
     }));
@@ -55,28 +55,24 @@ describe("sidebar appearance settings", () => {
     const input = (await slot.findByRole("spinbutton", {
       name: "Row height",
     })) as HTMLInputElement;
-    const saveButton = slot.getByRole("button", {
-      name: "Save",
-    }) as HTMLButtonElement;
-    expect(input.getAttribute("min")).toBe("40");
+    expect(
+      input.closest(".ws-settings-card")?.getAttribute("data-layout"),
+    ).toBe("narrow");
+    expect(input.getAttribute("min")).toBe("35");
     expect(input.getAttribute("max")).toBe("60");
     expect(input.getAttribute("step")).toBe("0.1");
 
-    fireEvent.change(input, { target: { value: "39.5" } });
+    fireEvent.change(input, { target: { value: "34.9" } });
     expect(input.getAttribute("aria-invalid")).toBe("true");
-    expect(saveButton.disabled).toBe(true);
     expect(slot.getByRole("alert").textContent).toContain(
-      "Enter a value from 40 to 60px.",
+      "Enter a value from 35 to 60px.",
     );
     expect(save).not.toHaveBeenCalled();
+    expect(slot.queryByRole("button", { name: /save/i })).toBeNull();
+    expect(slot.queryByText(/default is/i)).toBeNull();
 
     fireEvent.change(input, { target: { value: "47.1" } });
     expect(input.hasAttribute("aria-invalid")).toBe(false);
-    expect(saveButton.disabled).toBe(false);
-    fireEvent.click(saveButton);
-    await waitFor(() =>
-      expect(save).toHaveBeenCalledWith({ rowHeight: 47.1 }),
-    );
-    await waitFor(() => expect(saveButton.disabled).toBe(true));
+    await waitFor(() => expect(save).toHaveBeenCalledWith({ rowHeight: 47.1 }));
   });
 });

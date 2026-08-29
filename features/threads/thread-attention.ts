@@ -3,7 +3,8 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
 import { normalizeIndicator } from "@/work-model";
 
-export const STALE_WORKING_MS = 30 * 60 * 1_000;
+export const DEFAULT_STALE_WORKING_MINUTES = 30;
+export const STALE_WORKING_MS = DEFAULT_STALE_WORKING_MINUTES * 60 * 1_000;
 
 export function threadNeedsAttention(thread: PluginSidebarThread): boolean {
   const indicator = normalizeIndicator(String(thread.indicator));
@@ -18,6 +19,7 @@ export function threadNeedsAttention(thread: PluginSidebarThread): boolean {
 export function threadIsWorking(thread: PluginSidebarThread): boolean {
   const indicator = normalizeIndicator(String(thread.indicator));
   return (
+    Object.values(thread.activity ?? {}).some((count) => count > 0) ||
     indicator === "runtime" ||
     indicator === "workflow" ||
     indicator === "background-agent" ||
@@ -28,6 +30,19 @@ export function threadIsWorking(thread: PluginSidebarThread): boolean {
   );
 }
 
+export function threadReportsComposerDraft(
+  thread: PluginSidebarThread,
+): boolean {
+  // SDK 0.4.28+ supplies the durable signal. Older hosts retain only their
+  // historical row indicator values; never infer a row from the mounted
+  // composer, which is selection-dependent client state.
+  if ("hasComposerDraft" in thread) {
+    return thread.hasComposerDraft === true;
+  }
+  const indicator = normalizeIndicator(String(thread.indicator));
+  return indicator === "draft" || indicator === "working-draft";
+}
+
 function lastThreadUpdateAt(thread: PluginSidebarThread): number {
   return Math.max(
     thread.createdAt || 0,
@@ -36,11 +51,15 @@ function lastThreadUpdateAt(thread: PluginSidebarThread): number {
   );
 }
 
-export function useStaleWorking(thread: PluginSidebarThread): boolean {
+export function useStaleWorking(
+  thread: PluginSidebarThread,
+  staleWorkingMinutes = DEFAULT_STALE_WORKING_MINUTES,
+): boolean {
   const [, refreshClock] = useReducer((revision: number) => revision + 1, 0);
   const working = threadIsWorking(thread);
   const lastUpdateAt = lastThreadUpdateAt(thread);
-  const remaining = lastUpdateAt + STALE_WORKING_MS - Date.now();
+  const remaining =
+    lastUpdateAt + staleWorkingMinutes * 60 * 1_000 - Date.now();
   const stale = working && lastUpdateAt > 0 && remaining <= 0;
 
   useEffect(() => {

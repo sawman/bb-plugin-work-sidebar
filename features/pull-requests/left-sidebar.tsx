@@ -1,9 +1,11 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useBbNavigate, useRpc, useSettings } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Icon } from "@/components/ui/icon";
 import { RefreshButton } from "@/components/ui/refresh-button";
 import { SidebarListActions } from "@/components/ui/sidebar-list-actions";
+import { SidebarTable } from "@/components/ui/sidebar-table";
+import { SidebarSearch } from "@/components/ui/sidebar-search";
 import {
   AuthoredPullRequestRow,
   AuthoredPullRequestStack,
@@ -23,12 +25,19 @@ import {
 } from "./thread-link";
 
 const EMPTY_PULL_REQUESTS: AuthoredPullRequest[] = [];
+const EMPTY_THREADS_BY_BRANCH = new Map<string, PullRequestThreadReference>();
+const EMPTY_GROUPS: {
+  repository: string;
+  stacks: SidebarStack[];
+  ordinary: AuthoredPullRequest[];
+}[] = [];
 
 export interface PullRequestsLeftSidebarProps {
   active: boolean;
   searchQuery: string;
   threads: readonly PullRequestThreadReference[];
   onOpenThread(threadId: string): void;
+  settingsControl: ReactNode;
 }
 
 /** The Pull Requests slice owns authored-PR loading, drafting, grouping and selection. */
@@ -37,10 +46,13 @@ export function PullRequestsLeftSidebar({
   searchQuery,
   threads,
   onOpenThread,
+  settingsControl,
 }: PullRequestsLeftSidebarProps) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   const { values: settings } = useSettings();
+  const [localSearchQuery, setLocalSearchQuery] = useState("");
+  const effectiveSearchQuery = localSearchQuery || searchQuery;
   // Left sidebar tabs intentionally warm independently so opening PRs can use
   // the shared authored cache immediately instead of starting a cold fetch.
   const list = useAuthoredPullRequests(rpc, {
@@ -54,31 +66,34 @@ export function PullRequestsLeftSidebar({
   const pullRequests = (list.data ??
     EMPTY_PULL_REQUESTS) as AuthoredPullRequest[];
   const threadsByBranch = useMemo(
-    () => uniqueThreadsByBranch(threads),
-    [threads],
+    () => (active ? uniqueThreadsByBranch(threads) : EMPTY_THREADS_BY_BRANCH),
+    [active, threads],
   );
   const visible = useMemo(
     () =>
-      pullRequests.filter((pullRequest) => {
-        const needle = searchQuery.trim().toLocaleLowerCase();
-        return (
-          !needle ||
-          [
-            pullRequest.repository,
-            `#${pullRequest.number}`,
-            pullRequest.title,
-            pullRequest.head,
-            pullRequest.base,
-            pullRequest.state,
-          ]
-            .join(" ")
-            .toLocaleLowerCase()
-            .includes(needle)
-        );
-      }),
-    [pullRequests, searchQuery],
+      active
+        ? pullRequests.filter((pullRequest) => {
+            const needle = effectiveSearchQuery.trim().toLocaleLowerCase();
+            return (
+              !needle ||
+              [
+                pullRequest.repository,
+                `#${pullRequest.number}`,
+                pullRequest.title,
+                pullRequest.head,
+                pullRequest.base,
+                pullRequest.state,
+              ]
+                .join(" ")
+                .toLocaleLowerCase()
+                .includes(needle)
+            );
+          })
+        : EMPTY_PULL_REQUESTS,
+    [active, effectiveSearchQuery, pullRequests],
   );
   const groups = useMemo(() => {
+    if (!active) return EMPTY_GROUPS;
     const result = new Map<
       string,
       {
@@ -102,7 +117,7 @@ export function PullRequestsLeftSidebar({
       ...group,
       stacks: [...group.stacks.values()],
     }));
-  }, [visible]);
+  }, [active, visible]);
   const toggleDraft = useCallback(
     (pullRequest: Omit<AuthoredPullRequest, "stack">) => {
       draft.mutate(
@@ -149,9 +164,18 @@ export function PullRequestsLeftSidebar({
               </span>
             ) : undefined
           }
+          search={
+            <SidebarSearch
+              label="pull requests"
+              value={localSearchQuery}
+              onValueChange={setLocalSearchQuery}
+            />
+          }
+          settings={settingsControl}
           refresh={
             <RefreshButton
               label="Refresh pull requests"
+              refreshing={list.isFetching}
               onRefresh={list.refresh}
             />
           }
@@ -175,40 +199,45 @@ export function PullRequestsLeftSidebar({
                 key={group.repository}
               >
                 <h3>{group.repository}</h3>
-                {group.stacks.map((stack) => (
-                  <AuthoredPullRequestStack
-                    key={stack.id}
-                    stack={stack}
-                    changingDraftUrl={changingDraftUrl}
-                    onOpenPullRequest={(url) => navigate.openUrl(url)}
-                    onToggleDraft={toggleDraft}
-                    onOpenThread={onOpenThread}
-                    threadsByBranch={threadsByBranch}
-                  />
-                ))}
-                {group.ordinary.map((pullRequest) => (
-                  <section
-                    className="ws-pr-stack ws-pr-stack-singleton"
-                    key={pullRequest.url}
-                  >
-                    <AuthoredPullRequestRow
-                      pullRequest={pullRequest}
-                      linkedThread={threadsByBranch.get(pullRequest.head)}
-                      changingDraft={changingDraftUrl === pullRequest.url}
+                <SidebarTable>
+                  {group.stacks.map((stack) => (
+                    <AuthoredPullRequestStack
+                      key={stack.id}
+                      stack={stack}
+                      repository={group.repository}
+                      rpc={rpc}
+                      changingDraftUrl={changingDraftUrl}
                       onOpenPullRequest={(url) => navigate.openUrl(url)}
-                      onOpenThread={onOpenThread}
                       onToggleDraft={toggleDraft}
+                      onOpenThread={onOpenThread}
+                      threadsByBranch={threadsByBranch}
                     />
-                  </section>
-                ))}
+                  ))}
+                  {group.ordinary.map((pullRequest) => (
+                    <section
+                      className="ws-pr-stack ws-pr-stack-singleton"
+                      key={pullRequest.url}
+                    >
+                      <AuthoredPullRequestRow
+                        rpc={rpc}
+                        pullRequest={pullRequest}
+                        linkedThread={threadsByBranch.get(pullRequest.head)}
+                        changingDraft={changingDraftUrl === pullRequest.url}
+                        onOpenPullRequest={(url) => navigate.openUrl(url)}
+                        onOpenThread={onOpenThread}
+                        onToggleDraft={toggleDraft}
+                      />
+                    </section>
+                  ))}
+                </SidebarTable>
               </section>
             ))}
             {!visible.length && (
               <div className="ws-empty">
                 <strong>No open pull requests</strong>
                 <span>
-                  {searchQuery
-                    ? `No pull requests match “${searchQuery}”.`
+                  {effectiveSearchQuery
+                    ? `No pull requests match “${effectiveSearchQuery}”.`
                     : "Open pull requests you author on GitHub appear here."}
                 </span>
               </div>

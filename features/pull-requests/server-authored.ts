@@ -4,8 +4,13 @@ import type { ServerLifecycle } from "../../server-lifecycle.js";
 import { clearGitHubReadCache, githubReadHealth } from "../../shared/github/read-cache.js";
 import type { GitHubCommandService } from "./server-github-read.js";
 import { createPullRequestService } from "./server.js";
-import { readGitHubSignals, fetchGitHubStack } from "./server-stack.js";
+import {
+  githubStacksApiArgs,
+  parseGitHubStacksResponse,
+  readGitHubSignals,
+} from "./server-stack.js";
 import type { AuthoredPullRequest, GitHubReadRunner, GitHubSignal } from "./server-types.js";
+import { createPullRequestReviewerService } from "./server-reviewers.js";
 
 const GITHUB_SEARCH_CACHE_MS = 5 * 60_000;
 
@@ -15,6 +20,8 @@ type AuthoredHandlers = Pick<
   | "sidebarAuthoredPullRequests"
   | "sidebarAuthoredPullRequestStacks"
   | "setAuthoredPullRequestDraft"
+  | "getPullRequestReviewers"
+  | "updatePullRequestReviewers"
 >;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -76,42 +83,78 @@ function createAuthoredReader(lifecycle: ServerLifecycle, read: GitHubReadRunner
   };
 }
 
-function createAuthoredStackReader(bb: BbPluginApi, lifecycle: ServerLifecycle, read: GitHubReadRunner) {
+function createAuthoredStackReader(read: GitHubReadRunner) {
   return async (base: AuthoredPullRequest[]): Promise<AuthoredPullRequest[]> => {
     const byPullRequest = new Map(base.map((item) => [`${item.repository}#${item.number}`, item]));
-    const describe = async (item: AuthoredPullRequest): Promise<AuthoredPullRequest> => {
-      const [owner, repo] = item.repository.split("/", 2);
-      if (!owner || !repo) return item;
+    const byRepository = new Map<string, AuthoredPullRequest[]>();
+    for (const item of base) {
+      const items = byRepository.get(item.repository) ?? [];
+      items.push(item);
+      byRepository.set(item.repository, items);
+    }
+    const enriched = new Map<string, AuthoredPullRequest>();
+    const failures: unknown[] = [];
+    const describeRepository = async (
+      repository: string,
+      authoredItems: readonly AuthoredPullRequest[],
+    ): Promise<void> => {
+      const [owner, repo] = repository.split("/", 2);
+      if (!owner || !repo) return;
+      const authoredNumbers = new Set(
+        authoredItems.map((item) => item.number),
+      );
       try {
-        const stack = await fetchGitHubStack(owner, repo, item.number, (args, buffer) => read(args, buffer), lifecycle);
-        if (!stack) return item;
-        const pullRequests = stack.pullRequests.flatMap((layer) => {
-          const known = byPullRequest.get(`${item.repository}#${layer.number}`);
-          return known ? [{
-            ...known,
-            head: layer.head,
-            base: layer.base || stack.base,
-            checks: layer.checks,
-            review: layer.review,
-            ...(layer.requestedReviewers?.length
-              ? { requestedReviewers: layer.requestedReviewers }
-              : {}),
-          }] : [];
-        });
-        return pullRequests.length ? {
-          ...item,
-          stack: { id: `github-stack:${item.repository}:${stack.number}`, number: stack.number, base: stack.base, currentPullRequest: item.number, pullRequests },
-        } : item;
-      } catch {
-        return item;
+        const stacks = parseGitHubStacksResponse(
+          JSON.parse(
+            await read(githubStacksApiArgs(owner, repo), 12_000_000),
+          ) as unknown,
+        );
+        for (const stack of stacks) {
+          const pullRequests = stack.pullRequests.flatMap((layer) => {
+            const known = byPullRequest.get(`${repository}#${layer.number}`);
+            return known
+              ? [
+                  {
+                    ...known,
+                    head: layer.head,
+                    base: layer.base || stack.base,
+                  },
+                ]
+              : [];
+          });
+          if (pullRequests.length === 0) continue;
+          for (const item of pullRequests) {
+            if (!authoredNumbers.has(item.number)) continue;
+            enriched.set(`${repository}#${item.number}`, {
+              ...item,
+              stack: {
+                id: `github-stack:${repository}:${stack.number}`,
+                number: stack.number,
+                base: stack.base,
+                currentPullRequest: item.number,
+                pullRequests,
+              },
+            });
+          }
+        }
+      } catch (error) {
+        failures.push(error);
       }
     };
-    const output: AuthoredPullRequest[] = [];
-    for (let start = 0; start < base.length; start += 4) {
-      output.push(...await Promise.all(base.slice(start, start + 4).map(describe)));
+    const repositories = [...byRepository.entries()];
+    for (let start = 0; start < repositories.length; start += 4) {
+      await Promise.all(
+        repositories
+          .slice(start, start + 4)
+          .map(([repository, items]) =>
+            describeRepository(repository, items),
+          ),
+      );
     }
-    bb.log.info(`resolved ${output.length} authored PRs; ${output.filter((item) => item.stack).length} Stack memberships`);
-    return output;
+    if (failures.length > 0) throw failures[0];
+    return base.map(
+      (item) => enriched.get(`${item.repository}#${item.number}`) ?? item,
+    );
   };
 }
 
@@ -125,7 +168,7 @@ export function createAuthoredPullRequestService(
   const authored = createPullRequestService<AuthoredPullRequest>({
     now: () => Date.now(),
     readAuthored: createAuthoredReader(lifecycle, commands.read),
-    readStacks: createAuthoredStackReader(bb, lifecycle, commands.read),
+    readStacks: createAuthoredStackReader(commands.read),
     archivedRepositories: async (items) => archivedRepositories(items.map((item) => item.repository)),
     setDraft: async (url, draft) => {
       await commands.execute(["pr", "ready", url, ...(draft ? ["--undo"] : [])], 1_000_000);
@@ -133,6 +176,11 @@ export function createAuthoredPullRequestService(
       return { draft };
     },
   });
+  const reviewers = createPullRequestReviewerService(
+    lifecycle,
+    commands,
+    () => authored.clear(),
+  );
   bb.onDispose(() => authored.dispose());
   return {
     async getGitHubApiHealth() { return githubReadHealth(lifecycle); },
@@ -149,5 +197,23 @@ export function createAuthoredPullRequestService(
       catch (error) { return { available: false, pullRequests: [], error: error instanceof Error ? error.message : String(error) }; }
     },
     async setAuthoredPullRequestDraft({ url, draft }) { return authored.setDraft(url, draft); },
+    async getPullRequestReviewers({ repository, force }) {
+      try {
+        return {
+          available: true,
+          reviewers: await reviewers.list(repository, force),
+          error: null,
+        };
+      } catch (error) {
+        return {
+          available: false,
+          reviewers: [],
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+    async updatePullRequestReviewers({ repository, number, reviewers: desired }) {
+      return { reviewers: await reviewers.update(repository, number, desired) };
+    },
   };
 }

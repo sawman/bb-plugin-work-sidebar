@@ -9,6 +9,10 @@ describe("R9 production ThreadRow host behavior", () => {
     const saveGroups = vi.fn((input: { groups: unknown[] }) => ({
       groups: input.groups,
     }));
+    const moveThread = vi.fn((input: {
+      threadId: string;
+      parentThreadId: string | null;
+    }) => input);
     const slot = renderSlot(
       app.threadLists[0]!,
       {
@@ -84,6 +88,36 @@ describe("R9 production ThreadRow host behavior", () => {
               lastReadAt: null,
               latestAttentionAt: 0,
             },
+            {
+              id: "thr_other",
+              projectId: "project",
+              title: "Other",
+              titleFallback: null,
+              parentThreadId: null,
+              sectionId: null,
+              originKind: null,
+              originPluginId: null,
+              providerId: "codex",
+              hasPendingInteraction: false,
+              activity: {
+                workflows: 0,
+                backgroundAgents: 0,
+                backgroundCommands: 0,
+                planMode: 0,
+                goals: 0,
+              },
+              indicator: "none",
+              indicatorLabel: null,
+              isUnread: false,
+              isPinned: false,
+              isArchived: false,
+              environment: null,
+              host: null,
+              createdAt: 0,
+              updatedAt: 0,
+              lastReadAt: null,
+              latestAttentionAt: 0,
+            },
           ],
         },
         rpc: {
@@ -99,6 +133,7 @@ describe("R9 production ThreadRow host behavior", () => {
             groups: [{ id: "group_later", name: "Later", threadIds: [] }],
           }),
           saveThreadGroups: saveGroups,
+          moveSidebarThread: moveThread,
           sidebarArchivedThreads: () => ({
             available: true,
             threads: [],
@@ -132,8 +167,50 @@ describe("R9 production ThreadRow host behavior", () => {
       threadId: "thr_parent",
       options: { split: true },
     });
+    await waitFor(() =>
+      expect(slot.queryByRole("menuitem", { name: "Rename" })).toBeNull(),
+    );
     fireEvent.contextMenu(slot.getByRole("link", { name: /Parent/ }));
-    fireEvent.click(await slot.findByRole("menuitem", { name: "Rename" }));
+    const rename = await slot.findByRole("menuitem", { name: "Rename" });
+    expect(rename.nextElementSibling?.tagName).toBe("HR");
+    const moveUnder = slot.getByRole("menuitem", { name: "Move under…" });
+    expect(moveUnder.previousElementSibling).toBe(rename.nextElementSibling);
+    expect(moveUnder.nextElementSibling?.tagName).toBe("HR");
+    expect(moveUnder.nextElementSibling?.nextElementSibling?.textContent).toBe(
+      "Active",
+    );
+    fireEvent.click(moveUnder);
+    const parentPicker = await slot.findByRole("combobox", {
+      name: "New parent for Parent",
+    });
+    fireEvent.focus(parentPicker);
+    expect(slot.queryByRole("option", { name: "Child" })).toBeNull();
+    fireEvent.click(await slot.findByRole("option", { name: "Other" }));
+    await waitFor(() =>
+      expect(moveThread).toHaveBeenCalledWith({
+        threadId: "thr_parent",
+        parentThreadId: "thr_other",
+      }),
+    );
+    fireEvent.click(
+      slot.getByRole("button", { name: "1 child agent, collapsed" }),
+    );
+    const childLink = await slot.findByRole("link", { name: /Child/ });
+    fireEvent.contextMenu(childLink);
+    fireEvent.click(
+      await slot.findByRole("menuitem", { name: "Make top-level" }),
+    );
+    await waitFor(() =>
+      expect(moveThread).toHaveBeenCalledWith({
+        threadId: "thr_child",
+        parentThreadId: null,
+      }),
+    );
+    fireEvent.contextMenu(slot.getByRole("link", { name: /Parent/ }));
+    const renameAfterHierarchy = await slot.findByRole("menuitem", {
+      name: "Rename",
+    });
+    fireEvent.click(renameAfterHierarchy);
     fireEvent.change(slot.getByLabelText("Thread title"), {
       target: { value: "Renamed" },
     });

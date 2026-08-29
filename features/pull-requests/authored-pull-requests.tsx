@@ -1,5 +1,6 @@
-import { useId, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { Icon } from "../../components/ui/icon";
+import { BbUrlLink } from "../../components/ui/url-link";
 import { Status } from "../../components/ui/status";
 import {
   ContextMenu,
@@ -11,6 +12,7 @@ import {
   ContextMenuTrigger,
 } from "../../components/ui/context-menu";
 import {
+  pullRequestAttentionFromSignal,
   pullRequestPresentation,
   pullRequestSignalPresentation,
   type PullRequestSignal,
@@ -23,6 +25,8 @@ import {
   linkedThreadForStack,
   type PullRequestThreadReference,
 } from "./thread-link";
+import { PullRequestReviewerPicker } from "./reviewer-picker";
+import type { PullRequestRpc } from "./queries";
 
 export type AuthoredPullRequest = {
   number: number;
@@ -39,7 +43,9 @@ export type AuthoredPullRequest = {
   reviewCommentCount: number;
   stack: SidebarStack | null;
 };
-type AuthoredRow = Omit<AuthoredPullRequest, "stack">;
+type AuthoredRow = Omit<AuthoredPullRequest, "stack"> & {
+  attention?: string | null;
+};
 
 export function AuthoredPullRequestRow({
   pullRequest,
@@ -50,6 +56,7 @@ export function AuthoredPullRequestRow({
   onOpenPullRequest,
   onOpenThread,
   onToggleDraft,
+  rpc,
 }: {
   pullRequest: AuthoredRow;
   stackControl?: ReactNode;
@@ -59,30 +66,48 @@ export function AuthoredPullRequestRow({
   onOpenPullRequest?(url: string): void;
   onOpenThread?(threadId: string): void;
   onToggleDraft(pullRequest: AuthoredRow): void;
+  rpc?: PullRequestRpc;
 }) {
   const threadTooltipId = useId();
+  const reviewerTriggerRef = useRef<HTMLButtonElement>(null);
+  const [reviewerPickerOpen, setReviewerPickerOpen] = useState(false);
   const signal = pullRequestSignalPresentation(pullRequest);
   const state = pullRequestPresentation({
     state: pullRequest.state,
     draft: pullRequest.draft,
+    attention:
+      pullRequest.attention ?? pullRequestAttentionFromSignal(pullRequest),
   });
   const stateAction = pullRequest.draft ? "Mark open" : "Mark draft";
   const reviewers = pullRequest.requestedReviewers?.filter(Boolean) ?? [];
   return (
-    <ContextMenu>
+    <>
+      <ContextMenu>
       <ContextMenuTrigger asChild>
         <article className="ws-pr-row ws-pr-compact-row ws-sidebar-row">
           <span className="ws-pr-stack-slot">{stackControl}</span>
           <div className="ws-pr-target ws-sidebar-row-main">
-            <a
+            <BbUrlLink
               className="ws-pr-target-title ws-sidebar-row-title"
               href={pullRequest.url}
-              target="_blank"
-              rel="noreferrer"
               aria-label={`Open pull request #${pullRequest.number}: ${pullRequest.title}`}
+              onClick={(event) => {
+                if (
+                  !onOpenPullRequest ||
+                  event.defaultPrevented ||
+                  event.button !== 0 ||
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  event.shiftKey ||
+                  event.altKey
+                )
+                  return;
+                event.preventDefault();
+                onOpenPullRequest(pullRequest.url);
+              }}
             >
               {pullRequest.title}
-            </a>
+            </BbUrlLink>
             <span className="ws-pr-context ws-pr-target-context ws-sidebar-row-meta">
               <ContextMenuTrigger asChild>
                 <PullRequestIdentifierBadge
@@ -92,7 +117,10 @@ export function AuthoredPullRequestRow({
                 />
               </ContextMenuTrigger>
               {stackNumber != null && <StackNumberBadge number={stackNumber} />}
-              <PullRequestIdentifierBadge kind="branch" name={pullRequest.head} />
+              <PullRequestIdentifierBadge
+                kind="branch"
+                name={pullRequest.head}
+              />
             </span>
           </div>
           <span className="ws-pr-status-icons ws-sidebar-row-trailing">
@@ -119,7 +147,21 @@ export function AuthoredPullRequestRow({
               </button>
             ) : null}
             <Status presentation={signal.checks} />
-            <Status presentation={signal.review} />
+            {rpc && pullRequest.repository ? (
+              <button
+                ref={reviewerTriggerRef}
+                type="button"
+                className="ws-pr-reviewer-trigger"
+                aria-label={`Manage reviewers: ${signal.review.label}`}
+                aria-haspopup="dialog"
+                aria-expanded={reviewerPickerOpen}
+                onClick={() => setReviewerPickerOpen(true)}
+              >
+                <Status presentation={signal.review} />
+              </button>
+            ) : (
+              <Status presentation={signal.review} />
+            )}
           </span>
         </article>
       </ContextMenuTrigger>
@@ -143,14 +185,34 @@ export function AuthoredPullRequestRow({
         >
           {changingDraft ? "Updating…" : stateAction}
         </ContextMenuItem>
+        {rpc && pullRequest.repository ? (
+          <ContextMenuItem onSelect={() => setReviewerPickerOpen(true)}>
+            Request reviewers…
+          </ContextMenuItem>
+        ) : null}
         <ContextMenuSeparator />
         <ContextMenuInfo>CI: {signal.checks.label}</ContextMenuInfo>
         <ContextMenuInfo>Review: {signal.review.label}</ContextMenuInfo>
-        <ContextMenuInfo>
-          Reviewers: {reviewers.length > 0 ? reviewers.join(", ") : "None requested"}
-        </ContextMenuInfo>
+        {!rpc ? (
+          <ContextMenuInfo>
+            Reviewers:{" "}
+            {reviewers.length > 0 ? reviewers.join(", ") : "None requested"}
+          </ContextMenuInfo>
+        ) : null}
       </ContextMenuContent>
-    </ContextMenu>
+      </ContextMenu>
+      {reviewerPickerOpen && rpc ? (
+        <PullRequestReviewerPicker
+          rpc={rpc}
+          repository={pullRequest.repository}
+          number={pullRequest.number}
+          title={pullRequest.title}
+          requestedReviewers={reviewers}
+          anchorRef={reviewerTriggerRef}
+          onClose={() => setReviewerPickerOpen(false)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -161,6 +223,8 @@ export function AuthoredPullRequestStack({
   onOpenThread,
   onToggleDraft,
   threadsByBranch,
+  repository = "",
+  rpc,
 }: {
   stack: SidebarStack;
   changingDraftUrl: string | null;
@@ -168,6 +232,8 @@ export function AuthoredPullRequestStack({
   onOpenThread?(threadId: string): void;
   onToggleDraft(pullRequest: AuthoredRow): void;
   threadsByBranch?: ReadonlyMap<string, PullRequestThreadReference>;
+  repository?: string;
+  rpc?: PullRequestRpc;
 }) {
   const [expanded, setExpanded] = useState(false);
   const layers = orderStackLayers(stack.pullRequests, stack.base);
@@ -191,9 +257,10 @@ export function AuthoredPullRequestStack({
       onOpenPullRequest={onOpenPullRequest}
       onOpenThread={onOpenThread}
       onToggleDraft={onToggleDraft}
+      rpc={rpc}
       pullRequest={{
         ...layer,
-        repository: "",
+        repository,
         state: layer.draft ? "draft" : "open",
         checks: layer.checks ?? "unknown",
         review: layer.review ?? "none",

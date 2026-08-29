@@ -28,4 +28,36 @@ describe("shared refresh button", () => {
     await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false));
     expect(button.getAttribute("aria-busy")).toBeNull();
   });
+
+  it("stays busy while its owner is still resolving a staged refresh", () => {
+    const refresh = vi.fn();
+    const { rerender } = render(
+      <RefreshButton
+        label="Refresh staged data"
+        refreshing
+        onRefresh={refresh}
+      />,
+    );
+
+    const button = screen.getByRole("button", { name: "Refresh staged data" });
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(
+      button
+        .querySelector('[data-icon="RefreshCw"]')
+        ?.getAttribute("data-motion"),
+    ).toBe("spin");
+    fireEvent.click(button);
+    expect(refresh).not.toHaveBeenCalled();
+
+    rerender(
+      <RefreshButton
+        label="Refresh staged data"
+        refreshing={false}
+        onRefresh={refresh}
+      />,
+    );
+    expect(button.getAttribute("aria-busy")).toBeNull();
+    expect(button.hasAttribute("disabled")).toBe(false);
+  });
 });

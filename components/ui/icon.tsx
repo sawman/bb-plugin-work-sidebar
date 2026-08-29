@@ -140,6 +140,12 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M21 20v-5h-5" />
     </>
   ),
+  Search: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m16 16 4 4" />
+    </>
+  ),
   Pin: (
     <>
       <path d="m14 4 6 6-3 2-3 5-2-2-5 3-2-2 3-5-2-3z" />

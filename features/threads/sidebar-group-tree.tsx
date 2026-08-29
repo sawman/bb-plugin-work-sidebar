@@ -3,6 +3,7 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { ArchivedThreads } from "./archived-threads";
 import type { SidebarThreadOrganization } from "./sidebar-organization";
 import type { ThreadProviderDirectory } from "@/components/threads/thread-provider-logo";
+import { SidebarTable } from "@/components/ui/sidebar-table";
 import { WorkThreadTree } from "./thread-tree";
 
 type SidebarGroupTreeProps = {
@@ -11,6 +12,8 @@ type SidebarGroupTreeProps = {
   providersById: ThreadProviderDirectory;
   onNavigate(): void;
   subtextRefreshKey: number;
+  staleWorkingMinutes: number;
+  searchQuery: string;
   emptyMessage: string;
 };
 
@@ -20,6 +23,7 @@ type ThreadTreeProps = Pick<
   | "providersById"
   | "onNavigate"
   | "subtextRefreshKey"
+  | "staleWorkingMinutes"
 > & {
   organization: SidebarThreadOrganization;
   roots: readonly PluginSidebarThread[];
@@ -35,35 +39,38 @@ function ThreadTree({
   providersById,
   onNavigate,
   subtextRefreshKey,
+  staleWorkingMinutes,
   label,
 }: ThreadTreeProps) {
   return (
     <section className="ws-hierarchy" aria-label={label}>
-      {roots.map((thread) => (
-        <WorkThreadTree
-          key={thread.id}
-          thread={thread}
-          childrenByThread={childrenByThread}
-          activeThreadId={activeThreadId}
-          selectedThreadIds={organization.selectedThreadIds}
-          groupIds={organization.groupIds}
-          groups={organization.groups}
-          projectsById={organization.projectsById}
-          providersById={providersById}
-          onNavigate={onNavigate}
-          onSelect={organization.selectThread}
-          onMoveToGroup={organization.moveToGroup}
-          orderedSiblings={roots}
-          reorderDisabled={organization.reorderDisabled}
-          dragThreadId={organization.dragThreadId}
-          onDragThreadChange={organization.setDragThreadId}
-          dropTarget={organization.dropTarget}
-          onDropTargetChange={organization.setDropTarget}
-          onDropThread={organization.reorder}
-          onMoveThread={organization.move}
-          subtextRefreshKey={subtextRefreshKey}
-        />
-      ))}
+      <SidebarTable>
+        {roots.map((thread) => (
+          <WorkThreadTree
+            key={thread.id}
+            thread={thread}
+            childrenByThread={childrenByThread}
+            activeThreadId={activeThreadId}
+            selectedThreadIds={organization.selectedThreadIds}
+            groupIds={organization.groupIds}
+            groups={organization.groups}
+            projectsById={organization.projectsById}
+            providersById={providersById}
+            onNavigate={onNavigate}
+            onSelect={organization.selectThread}
+            onMoveToGroup={organization.moveToGroup}
+            orderedSiblings={roots}
+            reorderDisabled={organization.reorderDisabled}
+            dragThreadId={organization.dragThreadId}
+            onDragThreadChange={organization.setDragThreadId}
+            dropTarget={organization.dropTarget}
+            onDropTargetChange={organization.setDropTarget}
+            onDropThread={organization.reorder}
+            subtextRefreshKey={subtextRefreshKey}
+            staleWorkingMinutes={staleWorkingMinutes}
+          />
+        ))}
+      </SidebarTable>
     </section>
   );
 }
@@ -78,6 +85,8 @@ export function SidebarThreadGroups({
   providersById,
   onNavigate,
   subtextRefreshKey,
+  staleWorkingMinutes,
+  searchQuery,
   emptyMessage,
 }: SidebarGroupTreeProps) {
   const [activeOpen, setActiveOpen] = useState(true);
@@ -85,6 +94,7 @@ export function SidebarThreadGroups({
     ReadonlySet<string>
   >(new Set());
   const dropTargetId = organization.dropTarget?.threadId;
+  const searching = searchQuery.trim().length > 0;
   const clearDrop = () => {
     organization.setDragThreadId(null);
     organization.setDropTarget(null);
@@ -116,8 +126,10 @@ export function SidebarThreadGroups({
                 className="ws-thread-group ws-active-threads"
                 data-ws-thread-drop-zone="active"
                 data-drop-target={dropTargetId === "active" || undefined}
-                open={activeOpen}
-                onToggle={(event) => setActiveOpen(event.currentTarget.open)}
+                open={searching || activeOpen}
+                onToggle={(event) => {
+                  if (!searching) setActiveOpen(event.currentTarget.open);
+                }}
                 onDragOver={(event) => {
                   if (allowActiveDrop(event))
                     organization.setDropTarget({
@@ -145,6 +157,7 @@ export function SidebarThreadGroups({
                   providersById={providersById}
                   onNavigate={onNavigate}
                   subtextRefreshKey={subtextRefreshKey}
+                  staleWorkingMinutes={staleWorkingMinutes}
                   label="Work threads"
                 />
               </details>
@@ -186,11 +199,14 @@ export function SidebarThreadGroups({
                   providersById={providersById}
                   onNavigate={onNavigate}
                   subtextRefreshKey={subtextRefreshKey}
+                  staleWorkingMinutes={staleWorkingMinutes}
                   label={`${group.name} threads`}
                 />
               ) : (
                 <div className="ws-thread-group-empty">
-                  Right-click a thread to move it here.
+                  {searching
+                    ? `No matches in ${group.name}.`
+                    : "Right-click a thread to move it here."}
                 </div>
               )}
             </details>
@@ -209,9 +225,10 @@ export function SidebarThreadGroups({
           onDropTargetChange={organization.setDropTarget}
           onArchive={organization.archiveThread}
           onRoster={setArchivedThreadIds}
+          searchQuery={searchQuery}
         />
       </section>
-      {organization.filtered.length === 0 && (
+      {!searching && organization.filtered.length === 0 && (
         <div className="ws-empty">{emptyMessage}</div>
       )}
     </>

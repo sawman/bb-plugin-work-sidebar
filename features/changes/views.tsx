@@ -9,6 +9,7 @@ import {
 import type { CurrentPullRequestView } from "../../work-model.js";
 import {
   normalizePullRequestSignal,
+  pullRequestAttentionFromSignal,
   pullRequestPresentation,
   pullRequestSignalPresentation,
   type PullRequestSignal,
@@ -284,12 +285,16 @@ export function ChangesCurrentPullRequestRow({
 }) {
   const rowBranch = currentPullRequestBranch(pullRequest, branch);
   return (
-    <ol className="ws-stack-rail" aria-label={`Pull request #${pullRequest.number}`}>
+    <ol
+      className="ws-stack-rail"
+      aria-label={`Pull request #${pullRequest.number}`}
+    >
       <ChangesStackBranchRow
         branch={rowBranch}
         signals={{
           state: pullRequest.state,
           draft: pullRequest.state === "draft",
+          attention: pullRequest.attention,
           checks: pullRequest.signal.checks,
           review: pullRequest.signal.review,
           reviewCommentCount: pullRequest.signal.reviewCommentCount,
@@ -298,7 +303,9 @@ export function ChangesCurrentPullRequestRow({
         checkingOut={false}
         onToggle={onToggle}
         onCheckout={() => undefined}
-        expandedDetails={<CurrentPullRequestDetails pullRequest={pullRequest} />}
+        expandedDetails={
+          <CurrentPullRequestDetails pullRequest={pullRequest} />
+        }
       />
     </ol>
   );
@@ -357,11 +364,18 @@ export function ChangesStackBranchRow({
       })
     : null;
   const presented = signal ? pullRequestSignalPresentation(signal) : null;
+  const attention = branch.needsRebase
+    ? "blocked"
+    : signals?.attention && signals.attention !== "none"
+      ? signals.attention
+      : signal
+        ? pullRequestAttentionFromSignal(signal)
+        : undefined;
   const statePresentation = pullRequestPresentation({
     state: status === "blocked" ? "open" : status,
     draft: status === "draft",
     mergedLayer: merged,
-    attention: branch.needsRebase ? "blocked" : undefined,
+    attention,
   });
   const visibleTitle = `${pr ? `#${pr.number} ` : ""}${title}`;
   const filesLabel = `${expanded ? "Hide" : "Show"} changed files for ${pr ? `pull request #${pr.number}` : branch.name}`;

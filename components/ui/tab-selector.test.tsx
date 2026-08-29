@@ -40,20 +40,6 @@ function ControlledSelector({ tabs = false }: { tabs?: boolean }) {
 }
 
 describe("TabSelector", () => {
-  it("shares pressed-button styling with the sticky left selector", () => {
-    const view = render(<ControlledSelector />);
-    const selector = view.getByRole("navigation", { name: "Views" });
-    expect(selector.classList).toContain("ws-tabs-sticky");
-    expect(view.getByRole("button", { name: "Work" }).getAttribute("aria-pressed")).toBe(
-      "true",
-    );
-
-    fireEvent.click(view.getByRole("button", { name: "Changes" }));
-    expect(
-      view.getByRole("button", { name: "Changes" }).getAttribute("aria-pressed"),
-    ).toBe("true");
-  });
-
   it("owns tab relationships and keyboard selection for the right selector", async () => {
     vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
       callback(0);

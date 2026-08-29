@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import {
   childrenByParent,
   filterThreadsWithAncestors,
-  moveThreadSibling,
   reconcileThreadOrder,
   reorderThreadSibling,
   rootThreads,
@@ -30,8 +29,13 @@ type ThreadTree = {
   roots: PluginSidebarThread[];
   children: Map<string, PluginSidebarThread[]>;
 };
+type ThreadPartitions = {
+  active: readonly PluginSidebarThread[];
+  grouped: ReadonlyMap<string, readonly PluginSidebarThread[]>;
+};
 
 type SidebarOrganizationInput = {
+  active: boolean;
   threads: readonly PluginSidebarThread[];
   projects: readonly ThreadProject[];
   order: readonly string[];
@@ -72,18 +76,38 @@ export type SidebarThreadOrganization = {
     targetId: string,
     placement: "before" | "after",
   ): void;
-  move(threadId: string, direction: -1 | 1): void;
   archiveSelected(): Promise<void>;
   archiveThread(threadId: string): void;
   saveGroups(groups: SidebarThreadGroup[]): void;
   addGroup(name: string): boolean;
   moveGroup(groupId: string, direction: -1 | 1): void;
-  reorderGroup(sourceId: string, targetId: string): void;
+  reorderGroup(
+    sourceId: string,
+    targetId: string,
+    placement: "before" | "after",
+  ): void;
   renameGroup(group: SidebarThreadGroup): void;
   removeGroup(group: SidebarThreadGroup): void;
 };
 
+const EMPTY_THREADS: readonly PluginSidebarThread[] = [];
+const EMPTY_GROUPS: readonly SidebarThreadGroup[] = [];
+const EMPTY_GROUP_POSITIONS: readonly SidebarThreadGroupPosition[] = [];
+const EMPTY_ORDER: readonly string[] = [];
+const EMPTY_THREAD_TREE = new Map<string, PluginSidebarThread[]>();
+const EMPTY_GROUP_TREES = new Map<string, ThreadTree>();
+const EMPTY_GROUP_IDS = new Map<string, string>();
+const EMPTY_PROJECTS = new Map<string, ThreadProject>();
+const EMPTY_PROJECT_NAMES: Readonly<Record<string, string>> = {};
+const EMPTY_SELECTION = new Set<string>();
+const EMPTY_GROUP_ID_SET = new Set<string>();
+const EMPTY_THREAD_PARTITIONS: ThreadPartitions = {
+  active: EMPTY_THREADS,
+  grouped: new Map(),
+};
+
 export function useSidebarThreadOrganization({
+  active,
   threads,
   projects,
   order,
@@ -97,34 +121,43 @@ export function useSidebarThreadOrganization({
 }: SidebarOrganizationInput): SidebarThreadOrganization {
   const dragThreadId = useStore(
     threadInteractionStore,
-    (state) => state.dragThreadId,
+    (state) => (active ? state.dragThreadId : null),
   );
   const dropTarget = useStore(
     threadInteractionStore,
-    (state) => state.dropTarget,
+    (state) => (active ? state.dropTarget : null),
   );
   const selectedThreadIds = useStore(
     threadInteractionStore,
-    (state) => state.selectedThreadIds,
+    (state) => (active ? state.selectedThreadIds : EMPTY_SELECTION),
   );
   const effectiveOrder = useMemo(
-    () => reconcileThreadOrder(order, threads),
-    [order, threads],
+    () => (active ? reconcileThreadOrder(order, threads) : EMPTY_ORDER),
+    [active, order, threads],
   );
   const allChildren = useMemo(
-    () => childrenByParent(threads, effectiveOrder),
-    [effectiveOrder, threads],
+    () =>
+      active ? childrenByParent(threads, effectiveOrder) : EMPTY_THREAD_TREE,
+    [active, effectiveOrder, threads],
   );
   const projectsById = useMemo(
-    () => new Map(projects.map((project) => [project.id, project])),
-    [projects],
+    () =>
+      active
+        ? new Map(projects.map((project) => [project.id, project]))
+        : EMPTY_PROJECTS,
+    [active, projects],
   );
   const projectNames = useMemo(
     () =>
-      Object.fromEntries(projects.map((project) => [project.id, project.name])),
-    [projects],
+      active
+        ? Object.fromEntries(
+            projects.map((project) => [project.id, project.name]),
+          )
+        : EMPTY_PROJECT_NAMES,
+    [active, projects],
   );
   const groupIds = useMemo(() => {
+    if (!active) return EMPTY_GROUP_IDS;
     const result = new Map<string, string>();
     const includeDescendants = (threadId: string, groupId: string) => {
       if (result.has(threadId)) return;
@@ -136,54 +169,94 @@ export function useSidebarThreadOrganization({
       for (const threadId of group.threadIds)
         includeDescendants(threadId, group.id);
     return result;
-  }, [allChildren, groups]);
+  }, [active, allChildren, groups]);
+  const threadPartitions = useMemo(() => {
+    if (!active) return EMPTY_THREAD_PARTITIONS;
+    const activeThreads: PluginSidebarThread[] = [];
+    const grouped = new Map<string, PluginSidebarThread[]>();
+    for (const thread of threads) {
+      const groupId = groupIds.get(thread.id);
+      if (!groupId) {
+        activeThreads.push(thread);
+        continue;
+      }
+      const groupThreads = grouped.get(groupId) ?? [];
+      groupThreads.push(thread);
+      grouped.set(groupId, groupThreads);
+    }
+    return { active: activeThreads, grouped };
+  }, [active, groupIds, threads]);
   const filtered = useMemo(
     () =>
-      filterThreadsWithAncestors(
-        threads.filter((thread) => !groupIds.has(thread.id)),
-        projectNames,
-        searchQuery,
-      ),
-    [groupIds, projectNames, searchQuery, threads],
+      active
+        ? filterThreadsWithAncestors(
+            threadPartitions.active,
+            projectNames,
+            searchQuery,
+          )
+        : EMPTY_THREADS,
+    [active, projectNames, searchQuery, threadPartitions.active],
   );
   const activeRoots = useMemo(
-    () => rootThreads(filtered, effectiveOrder),
-    [effectiveOrder, filtered],
+    () =>
+      active ? rootThreads(filtered, effectiveOrder) : EMPTY_THREADS,
+    [active, effectiveOrder, filtered],
   );
   const activeChildren = useMemo(
-    () => childrenByParent(filtered, effectiveOrder),
-    [effectiveOrder, filtered],
+    () =>
+      active
+        ? childrenByParent(filtered, effectiveOrder)
+        : EMPTY_THREAD_TREE,
+    [active, effectiveOrder, filtered],
   );
   const groupedTrees = useMemo(
     () =>
-      new Map(
-        groups.map((group) => {
-          const groupThreads = threads.filter(
-            (thread) => groupIds.get(thread.id) === group.id,
-          );
-          return [
-            group.id,
-            {
-              roots: rootThreads(groupThreads, effectiveOrder),
-              children: childrenByParent(groupThreads, effectiveOrder),
-            },
-          ] as const;
-        }),
-      ),
-    [effectiveOrder, groupIds, groups, threads],
+      active
+        ? new Map(
+            groups.map((group) => {
+              const groupThreads = filterThreadsWithAncestors(
+                threadPartitions.grouped.get(group.id) ?? EMPTY_THREADS,
+                projectNames,
+                searchQuery,
+              );
+              return [
+                group.id,
+                {
+                  roots: rootThreads(groupThreads, effectiveOrder),
+                  children: childrenByParent(groupThreads, effectiveOrder),
+                },
+              ] as const;
+            }),
+          )
+        : EMPTY_GROUP_TREES,
+    [
+      active,
+      effectiveOrder,
+      groupIds,
+      groups,
+      projectNames,
+      searchQuery,
+      threadPartitions.grouped,
+    ],
   );
   const groupPositions = useMemo(
-    () => threadGroupPositions(groups, activeGroupPosition),
-    [activeGroupPosition, groups],
+    () =>
+      active
+        ? threadGroupPositions(groups, activeGroupPosition)
+        : EMPTY_GROUP_POSITIONS,
+    [active, activeGroupPosition, groups],
   );
   const visibleThreadIds = useMemo(
-    () => visibleThreadTreeIds(activeRoots, activeChildren),
-    [activeChildren, activeRoots],
+    () =>
+      active
+        ? visibleThreadTreeIds(activeRoots, activeChildren)
+        : EMPTY_ORDER,
+    [active, activeChildren, activeRoots],
   );
-  const reorderDisabled = searchQuery.trim().length > 0;
+  const reorderDisabled = !active || searchQuery.trim().length > 0;
   const occupiedGroupIds = useMemo(
-    () => new Set(groupIds.values()),
-    [groupIds],
+    () => (active ? new Set(groupIds.values()) : EMPTY_GROUP_ID_SET),
+    [active, groupIds],
   );
   const setDragThreadId = useCallback((threadId: string | null) => {
     const state = threadInteractionStore.getState();
@@ -276,20 +349,6 @@ export function useSidebarThreadOrganization({
     },
     [effectiveOrder, reorderDisabled, saveOrder, threads],
   );
-  const move = useCallback(
-    (threadId: string, direction: -1 | 1) => {
-      if (reorderDisabled) return;
-      const next = moveThreadSibling(
-        effectiveOrder,
-        threads,
-        threadId,
-        direction,
-      );
-      if (next.some((id, index) => id !== effectiveOrder[index]))
-        saveOrder(next);
-    },
-    [effectiveOrder, reorderDisabled, saveOrder, threads],
-  );
   const archiveSelected = useCallback(async () => {
     const byId = new Map(threads.map((thread) => [thread.id, thread]));
     const roots = [...selectedThreadIds].filter((id) => {
@@ -311,28 +370,31 @@ export function useSidebarThreadOrganization({
     },
     [archive, groupIds, moveToGroup],
   );
-  const addGroup = useCallback((input: string) => {
-    if (groups.length >= 12) {
-      toast.error("You can have up to 12 custom groups.");
-      return false;
-    }
-    const name = input.trim().slice(0, 40);
-    if (!name) return false;
-    if (
-      groups.some(
-        (group) =>
-          group.name.localeCompare(name, undefined, {
-            sensitivity: "accent",
-          }) === 0,
-      )
-    ) {
-      toast.error("A group with that name already exists.");
-      return false;
-    }
-    const id = `group_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-    saveGroups([...groups, { id, name, threadIds: [] }]);
-    return true;
-  }, [groups, saveGroups]);
+  const addGroup = useCallback(
+    (input: string) => {
+      if (groups.length >= 12) {
+        toast.error("You can have up to 12 custom groups.");
+        return false;
+      }
+      const name = input.trim().slice(0, 40);
+      if (!name) return false;
+      if (
+        groups.some(
+          (group) =>
+            group.name.localeCompare(name, undefined, {
+              sensitivity: "accent",
+            }) === 0,
+        )
+      ) {
+        toast.error("A group with that name already exists.");
+        return false;
+      }
+      const id = `group_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      saveGroups([...groups, { id, name, threadIds: [] }]);
+      return true;
+    },
+    [groups, saveGroups],
+  );
   const renameGroup = useCallback(
     (group: SidebarThreadGroup) => {
       const name = window
@@ -371,12 +433,13 @@ export function useSidebarThreadOrganization({
     [activeGroupPosition, groups, saveGroups],
   );
   const reorderGroup = useCallback(
-    (sourceId: string, targetId: string) => {
+    (sourceId: string, targetId: string, placement: "before" | "after") => {
       const next = reorderThreadGroup(
         groups,
         activeGroupPosition,
         sourceId,
         targetId,
+        placement,
       );
       if (next) saveGroups(next.groups, next.activeGroupPosition);
     },
@@ -396,8 +459,8 @@ export function useSidebarThreadOrganization({
     [groupPositions, groups, occupiedGroupIds, saveGroups],
   );
   return {
-    threads,
-    groups,
+    threads: active ? threads : EMPTY_THREADS,
+    groups: active ? groups : EMPTY_GROUPS,
     groupPositions,
     filtered,
     activeRoots,
@@ -416,7 +479,6 @@ export function useSidebarThreadOrganization({
     moveToGroup,
     unarchiveToGroup,
     reorder,
-    move,
     archiveSelected,
     archiveThread,
     saveGroups,

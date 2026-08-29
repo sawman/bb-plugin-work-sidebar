@@ -10,6 +10,8 @@ export type ThreadProvider = Pick<
 >;
 
 export type ThreadProviderDirectory = ReadonlyMap<string, ThreadProvider>;
+export type ThreadProviderRuntimeState =
+  "idle" | "working" | "stale" | "waiting" | "error" | "complete";
 
 function readBlobAsDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -56,24 +58,42 @@ export function ThreadProviderLogo({
   providerId,
   provider,
   title,
+  runtimeState = "idle",
+  statusLabel,
 }: {
   providerId: string;
   provider?: ThreadProvider;
   title?: string | null;
+  runtimeState?: ThreadProviderRuntimeState;
+  statusLabel?: string | null;
 }) {
   const displayName = provider?.displayName ?? providerId;
+  const accessibleLabel = `${displayName} provider${statusLabel ? ` status: ${statusLabel}` : ""}`;
   return (
     <span
       className="ws-thread-provider"
       data-provider-id={providerId}
+      data-runtime-state={runtimeState}
       role="img"
-      aria-label={`${displayName} provider`}
-      title={title === undefined ? displayName : (title ?? undefined)}
+      aria-label={accessibleLabel}
+      title={
+        title === undefined
+          ? statusLabel
+            ? accessibleLabel
+            : displayName
+          : (title ?? undefined)
+      }
     >
-      {provider?.logoUrl ? (
-        <CachedProviderImage logoUrl={provider.logoUrl} />
-      ) : null}
-      <Icon name="Bot" aria-hidden />
+      <span className="ws-thread-provider-glyph" aria-hidden>
+        {provider?.logoUrl ? (
+          <CachedProviderImage logoUrl={provider.logoUrl} />
+        ) : null}
+        <Icon name="Bot" className="ws-thread-provider-fallback" />
+        <Icon
+          name="Bot"
+          className="ws-thread-provider-fallback-shine"
+        />
+      </span>
     </span>
   );
 }

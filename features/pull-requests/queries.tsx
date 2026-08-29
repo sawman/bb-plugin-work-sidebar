@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { QueryKey } from "@tanstack/react-query";
+import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import { useRef } from "react";
 import type { PluginRpcClient } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
 import { queryPolicies } from "../../query-runtime";
+import type { PullRequestReviewerContract } from "./schemas";
 
 // This remains type-only: the app bundle sees neither the server contract
 // composer nor the root SDK runtime.
@@ -26,6 +27,11 @@ export const pullRequestKeys = {
     ...threadIds,
   ],
   health: (): QueryKey => [...root, "health"],
+  reviewers: (repository?: string): QueryKey => [
+    ...root,
+    "reviewers",
+    ...(repository ? [repository] : []),
+  ],
 } as const;
 
 export const pullRequestPolicies = {
@@ -40,7 +46,7 @@ export const pullRequestPolicies = {
   authoredStacks: {
     staleTime: 60_000,
     gcTime: 15 * 60_000,
-    retry: false,
+    retry: 1,
     refetchOnWindowFocus: false,
   },
   sidebarStacks: {
@@ -52,6 +58,13 @@ export const pullRequestPolicies = {
   health: {
     ...queryPolicies.health,
     refetchInterval: 30_000,
+  },
+  reviewers: {
+    staleTime: 24 * 60 * 60_000,
+    gcTime: 24 * 60 * 60_000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   },
 } as const;
 
@@ -84,8 +97,47 @@ async function sidebarPullRequestStacks(
     threadIds: [...threadIds],
   });
   if (!result.available)
-    throw new Error(result.error ?? "GitHub pull-request stacks are unavailable.");
+    throw new Error(
+      result.error ?? "GitHub pull-request stacks are unavailable.",
+    );
   return result.stacks;
+}
+
+async function pullRequestReviewers(
+  rpc: PullRequestRpc,
+  repository: string,
+  force = false,
+): Promise<PullRequestReviewerContract[]> {
+  const result = await rpc.call(
+    "getPullRequestReviewers",
+    force ? { repository, force: true } : { repository },
+  );
+  if (!result.available)
+    throw new Error(result.error ?? "GitHub reviewers are unavailable.");
+  return result.reviewers;
+}
+
+async function refreshLoadedReviewerDirectories(
+  client: QueryClient,
+  rpc: PullRequestRpc,
+) {
+  const loaded = client.getQueriesData({
+    queryKey: pullRequestKeys.reviewers(),
+  });
+  await Promise.all(
+    loaded.flatMap(([queryKey]) => {
+      const repository = queryKey[3];
+      if (typeof repository !== "string") return [];
+      return [
+        client.fetchQuery({
+          queryKey: pullRequestKeys.reviewers(repository),
+          queryFn: () => pullRequestReviewers(rpc, repository, true),
+          ...pullRequestPolicies.reviewers,
+          staleTime: 0,
+        }),
+      ];
+    }),
+  );
 }
 
 export function useSidebarPullRequestStacks(
@@ -103,7 +155,9 @@ export function useSidebarPullRequestStacks(
 }
 
 export function invalidateSidebarPullRequestStacks(client: {
-  invalidateQueries(filters: { queryKey: QueryKey }): Promise<unknown> | unknown;
+  invalidateQueries(filters: {
+    queryKey: QueryKey;
+  }): Promise<unknown> | unknown;
 }) {
   return client.invalidateQueries({
     queryKey: [...root, "sidebar-stacks"],
@@ -139,7 +193,15 @@ export function useAuthoredPullRequests(
     ]);
     forceRefresh.current = true;
     try {
-      await base.refetch({ throwOnError: true });
+      const refreshedBase = await base.refetch({ throwOnError: true });
+      await Promise.all([
+        client.fetchQuery({
+          queryKey: pullRequestKeys.authoredStacks(refreshedBase.dataUpdatedAt),
+          queryFn: () => authoredPullRequestStacks(rpc),
+          ...pullRequestPolicies.authoredStacks,
+        }),
+        refreshLoadedReviewerDirectories(client, rpc),
+      ]);
     } finally {
       forceRefresh.current = false;
     }
@@ -188,6 +250,42 @@ export function useSetAuthoredPullRequestDraft(rpc: PullRequestRpc) {
         client.invalidateQueries({ queryKey: pullRequestKeys.authored() }),
         client.invalidateQueries({
           queryKey: pullRequestKeys.authoredStacks(),
+        }),
+      ]);
+    },
+  });
+}
+
+export function usePullRequestReviewers(
+  rpc: PullRequestRpc,
+  repository: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: pullRequestKeys.reviewers(repository),
+    queryFn: () => pullRequestReviewers(rpc, repository),
+    ...pullRequestPolicies.reviewers,
+    enabled: enabled && repository.length > 0,
+  });
+}
+
+export function useUpdatePullRequestReviewers(rpc: PullRequestRpc) {
+  const client = useQueryClient();
+  return useMutation({
+    scope: { id: "pull-request-reviewers" },
+    mutationFn: (input: {
+      repository: string;
+      number: number;
+      reviewers: string[];
+    }) => rpc.call("updatePullRequestReviewers", input),
+    onSettled: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: pullRequestKeys.authored() }),
+        client.invalidateQueries({
+          queryKey: pullRequestKeys.authoredStacks(),
+        }),
+        client.invalidateQueries({
+          queryKey: [...root, "sidebar-stacks"],
         }),
       ]);
     },

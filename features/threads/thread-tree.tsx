@@ -23,17 +23,14 @@ export function WorkThreadTree({
   dropTarget,
   onDropTargetChange,
   onDropThread,
-  onMoveThread,
   subtextRefreshKey,
+  staleWorkingMinutes,
   depth = 0,
 }: WorkThreadTreeProps) {
   const children = childrenByThread.get(thread.id) ?? [];
   const activeChildren = children.filter(threadIsWorking).length;
   const childrenExpanded = useStore(threadInteractionStore, (state) =>
     state.expandedThreadIds.has(thread.id),
-  );
-  const siblingIndex = orderedSiblings.findIndex(
-    (sibling) => sibling.id === thread.id,
   );
   return (
     <>
@@ -43,6 +40,7 @@ export function WorkThreadTree({
         active={thread.id === activeThreadId}
         children={children.length}
         activeChildren={activeChildren}
+        staleWorkingMinutes={staleWorkingMinutes}
         childrenExpanded={childrenExpanded}
         selected={selectedThreadIds.has(thread.id)}
         groupId={groupIds.get(thread.id) ?? null}
@@ -56,10 +54,6 @@ export function WorkThreadTree({
         provider={providersById.get(thread.providerId)}
         onNavigate={onNavigate}
         reorderDisabled={reorderDisabled}
-        canMoveUp={siblingIndex > 0}
-        canMoveDown={
-          siblingIndex >= 0 && siblingIndex < orderedSiblings.length - 1
-        }
         dragThreadId={dragThreadId}
         onDragThreadChange={onDragThreadChange}
         dropTarget={dropTarget}
@@ -68,7 +62,6 @@ export function WorkThreadTree({
           orderedSiblings.some((sibling) => sibling.id === sourceId)
         }
         onDropThread={onDropThread}
-        onMoveThread={onMoveThread}
       />
       {childrenExpanded &&
         children.map((child) => (
@@ -95,8 +88,8 @@ export function WorkThreadTree({
               dropTarget={dropTarget}
               onDropTargetChange={onDropTargetChange}
               onDropThread={onDropThread}
-              onMoveThread={onMoveThread}
               subtextRefreshKey={subtextRefreshKey}
+              staleWorkingMinutes={staleWorkingMinutes}
               depth={depth + 1}
             />
           </div>

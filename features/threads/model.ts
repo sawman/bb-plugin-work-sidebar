@@ -68,6 +68,7 @@ export function reorderThreadGroup(
   activeGroupPosition: number,
   sourceId: string,
   targetId: string,
+  placement: "before" | "after",
 ): SidebarThreadGroupPreferences | null {
   const positions = threadGroupPositions(groups, activeGroupPosition);
   const source = positions.findIndex((position) => position.id === sourceId);
@@ -75,7 +76,15 @@ export function reorderThreadGroup(
   if (source < 0 || target < 0 || source === target) return null;
   const [moved] = positions.splice(source, 1);
   if (!moved) return null;
-  positions.splice(target, 0, moved);
+  const remainingTarget = positions.findIndex(
+    (position) => position.id === targetId,
+  );
+  if (remainingTarget < 0) return null;
+  positions.splice(
+    remainingTarget + (placement === "after" ? 1 : 0),
+    0,
+    moved,
+  );
   return {
     groups: positions.flatMap((position) =>
       position.group ? [position.group] : [],

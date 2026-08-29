@@ -64,9 +64,6 @@
   white-space: nowrap;
   font-size: 0.8rem;
 }
-.ws-thread-attention {
-  font-weight: 700;
-}
 .ws-thread-meta {
   gap: 0.35rem;
   overflow: hidden;
@@ -243,6 +240,14 @@
   background: var(--accent);
   color: var(--accent-foreground);
   outline: 0;
+}
+.ws-context-menu-item[data-tone="destructive"] {
+  color: var(--destructive);
+}
+.ws-context-menu-item[data-tone="destructive"]:hover:not(:disabled),
+.ws-context-menu-item[data-tone="destructive"]:focus-visible {
+  background: color-mix(in srgb, var(--destructive) 12%, transparent);
+  color: var(--destructive);
 }
 .ws-context-menu-item:disabled {
   cursor: not-allowed;

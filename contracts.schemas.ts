@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { agentRpcSchemas } from "./features/agents/schemas.js";
-import { authoredPullRequest, sidebarStack, sidebarStackLayer } from "./features/pull-requests/schemas.js";
+import { authoredPullRequest, pullRequestReviewerRpcSchemas, sidebarStack, sidebarStackLayer } from "./features/pull-requests/schemas.js";
 import { sidebarTaskProjectSchema, sidebarTaskSchema, taskLinkSchema, taskPrioritySchema, taskStatusSchema, taskSummarySchema } from "./features/tasks/schemas.js";
-import { threadArchiveSchemas, threadPreferenceSchemas } from "./features/threads/schemas.js";
+import { threadArchiveSchemas, threadHierarchySchemas, threadPreferenceSchemas } from "./features/threads/schemas.js";
 import { trackerRpcSchemas } from "./features/tracker/schemas.js";
 import { changesRpcSchemas, githubStackBranchSchema } from "./features/changes/schemas.js";
 import { workContextRpcSchemas } from "./features/work-context/schemas.js";
@@ -64,7 +64,7 @@ export type GitHubStackSignal = z.infer<typeof sidebarStackLayer>;
 export const rpcSchemas = {
   ...agentRpcSchemas,
   ...changesRpcSchemas,
-  ...threadPreferenceSchemas,
+  ...threadPreferenceSchemas, ...threadHierarchySchemas,
   sidebarTasks: {
     input: z.null(),
     output: z.object({
@@ -113,7 +113,7 @@ export const rpcSchemas = {
     input: z.object({ url: z.string().url(), draft: z.boolean() }).strict(),
     output: z.object({ draft: z.boolean() }).strict(),
   },
-  ...threadArchiveSchemas,
+  ...pullRequestReviewerRpcSchemas, ...threadArchiveSchemas,
   getWorkContext: {
     input: z.object({ threadId: z.string() }).strict(),
     output: z.object({ rootThreadId: z.string(),

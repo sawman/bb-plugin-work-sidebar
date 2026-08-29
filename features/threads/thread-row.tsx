@@ -1,14 +1,15 @@
 import { useRef } from "react";
-import {
-  experimental_useSidebarThreadPullRequest,
-  useComposerView,
-} from "@get-bb/plugin-sdk/app";
-import { Icon } from "@/components/ui/icon";
+import { experimental_useSidebarThreadPullRequest } from "@get-bb/plugin-sdk/app";
 import { Input } from "@/components/ui/input";
 import { ThreadRowContent } from "@/components/threads/thread-row-content";
 import { threadTitle } from "@/work-model";
-import { threadNeedsAttention } from "./thread-attention";
+import {
+  threadNeedsAttention,
+  threadReportsComposerDraft,
+  useStaleWorking,
+} from "./thread-attention";
 import { ThreadRowMenu } from "./thread-row-menu";
+import { ThreadAgentControl } from "./thread-agent-control";
 import { ThreadMetadata, ThreadStatus } from "./thread-row-presentation";
 import { ThreadRowStackNumber } from "./thread-row-stack-number";
 import type { ThreadRowProps } from "./thread-row-types";
@@ -20,6 +21,7 @@ export function ThreadRow({
   active,
   children,
   activeChildren,
+  staleWorkingMinutes = 30,
   childrenExpanded,
   selected,
   groupId,
@@ -31,21 +33,17 @@ export function ThreadRow({
   provider,
   onNavigate,
   reorderDisabled,
-  canMoveUp,
-  canMoveDown,
   dragThreadId,
   onDragThreadChange,
   dropTarget,
   onDropTargetChange,
   canDropThread,
   onDropThread,
-  onMoveThread,
 }: ThreadRowProps) {
   const controlClick = useRef(false);
   // Per-row opt-in: never turn this into a list-wide PR metadata read.
   const { pullRequest, isLoading: pullRequestLoading } =
     experimental_useSidebarThreadPullRequest(thread.id);
-  const composerView = useComposerView();
   const rowActions = useThreadRowActions({
     thread,
     groupId,
@@ -67,10 +65,8 @@ export function ThreadRow({
     ? "Personal"
     : (project?.name ?? "Project");
   const title = threadTitle(thread);
-  const hasComposerDraft =
-    composerView.scope.kind === "thread" &&
-    composerView.scope.threadId === thread.id &&
-    !composerView.draft.isEmpty;
+  const hasComposerDraft = threadReportsComposerDraft(thread);
+  const staleWorking = useStaleWorking(thread, staleWorkingMinutes);
   return (
     <div
       className={`ws-thread ${active ? "ws-thread-active" : ""} ${selected ? "ws-thread-selected" : ""} ${dragThreadId === thread.id ? "ws-thread-dragging" : ""}`}
@@ -102,15 +98,12 @@ export function ThreadRow({
         <ThreadRowMenu
           title={title}
           threadId={thread.id}
+          parentThreadId={thread.parentThreadId}
           isPinned={thread.isPinned}
           isUnread={thread.isUnread}
           isAvailable={isAvailable}
-          reorderDisabled={reorderDisabled}
-          canMoveUp={canMoveUp}
-          canMoveDown={canMoveDown}
           groupId={groupId}
           groups={groups}
-          onMoveThread={onMoveThread}
           onMoveToGroup={onMoveToGroup}
           actions={rowActions}
         >
@@ -159,29 +152,16 @@ export function ThreadRow({
           >
             <ThreadRowContent
               leading={
-                children > 0 ? (
-                  <button
-                    type="button"
-                    className={`ws-thread-agent-badge ${childrenExpanded ? "ws-thread-agent-badge-expanded" : ""}`}
-                    aria-label={`${children} child agent${children === 1 ? "" : "s"}${childrenExpanded ? ", expanded" : ", collapsed"}`}
-                    aria-expanded={childrenExpanded}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      onToggleChildren();
-                    }}
-                  >
-                    <Icon
-                      name="Bot"
-                      className={
-                        activeChildren ? "ws-child-agent-working" : undefined
-                      }
-                      aria-hidden
-                    />
-                    <small>{children}</small>
-                  </button>
-                ) : undefined
+                <ThreadAgentControl
+                  thread={thread}
+                  provider={provider}
+                  childCount={children}
+                  activeChildren={activeChildren}
+                  expanded={childrenExpanded}
+                  staleWorking={staleWorking}
+                  staleWorkingMinutes={staleWorkingMinutes}
+                  onToggle={onToggleChildren}
+                />
               }
               providerId={thread.providerId}
               provider={provider}
@@ -205,6 +185,8 @@ export function ThreadRow({
                 <ThreadStatus
                   thread={thread}
                   hasComposerDraft={hasComposerDraft}
+                  staleWorking={staleWorking}
+                  staleWorkingMinutes={staleWorkingMinutes}
                 />
               }
             />

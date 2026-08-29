@@ -145,6 +145,46 @@ describe("R13 Changes error presentation", () => {
     ).toBe(true);
   });
 
+  it("uses PR review and CI signals for the summary status badge", () => {
+    const { rerender } = render(
+      <ChangesStackBranchRow
+        branch={stackBranch()}
+        signals={{
+          state: "open",
+          draft: false,
+          checks: "failed",
+          review: "approved",
+          reviewCommentCount: 0,
+        }}
+        expanded={false}
+        checkingOut={false}
+        onToggle={() => undefined}
+        onCheckout={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "CI failure" })).toBeTruthy();
+
+    rerender(
+      <ChangesStackBranchRow
+        branch={stackBranch()}
+        signals={{
+          state: "open",
+          draft: false,
+          checks: "passing",
+          review: "approved",
+          reviewCommentCount: 0,
+        }}
+        expanded={false}
+        checkingOut={false}
+        onToggle={() => undefined}
+        onCheckout={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "Ready to merge" })).toBeTruthy();
+  });
+
   it.each([
     { name: "ordinary", branch: stackBranch(), checkingOut: false },
     { name: "busy checkout", branch: stackBranch(), checkingOut: true },
@@ -301,10 +341,17 @@ describe("R13 Changes error presentation", () => {
 
     const additions = screen.getAllByLabelText(/lines? added$/);
     const deletions = screen.getAllByLabelText(/lines? deleted$/);
-    expect(additions.map((count) => count.textContent)).toEqual(["+1", "+1234"]);
+    expect(additions.map((count) => count.textContent)).toEqual([
+      "+1",
+      "+1234",
+    ]);
     expect(deletions.map((count) => count.textContent)).toEqual(["−23", "−4"]);
-    expect(additions.every((count) => count.classList.contains("ws-file-additions"))).toBe(true);
-    expect(deletions.every((count) => count.classList.contains("ws-file-deletions"))).toBe(true);
+    expect(
+      additions.every((count) => count.classList.contains("ws-file-additions")),
+    ).toBe(true);
+    expect(
+      deletions.every((count) => count.classList.contains("ws-file-deletions")),
+    ).toBe(true);
   });
 
   it("keeps title, checkout, and trailing disclosure interactions isolated", () => {

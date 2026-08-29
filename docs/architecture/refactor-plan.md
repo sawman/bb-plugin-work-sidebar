@@ -701,6 +701,198 @@ than normalizing the difference.
   populated states at narrow/wide widths and light/dark themes where the host
   exposes suitable background activity.
 
+#### Loop R25 — authored PR progressive loading and navigation intent
+
+- **Red:** extend the shared refresh-control, authored-query, and registered
+  left-slot tests to prove that base PR rows paint eagerly while the refresh
+  icon remains busy until stack enrichment settles. Add a PR-badge matrix that
+  asserts every left-list status label, tone, icon, and non-empty hover title.
+- **Green:** expose Query's combined base/stack fetching state to the shared
+  refresh control, make manual refresh await the newly keyed stack projection,
+  and apply the same semantic tone selectors used by thread-row PR badges.
+- **Refactor/removal:** keep stack records in Query and PR presentation in the
+  existing Pull Requests slice; do not add component request state or a second
+  status mapping. Keep ordinary URLs on BB's `UrlLink` primitive.
+- **Validation/evidence:** focused query/component/registered-slot/style tests,
+  the full serial suite twice, typecheck, SDK check, build, verified-source
+  reload, diff check, and live partial/loading plus light/dark badge inspection
+  pass. A true preference-inverting Command-click remains outside the pinned
+  SDK 0.4.21 contract: `UrlLink` preserves modifiers and `openUrl` exposes only
+  preference-following navigation. Implement it only after BB exposes explicit
+  in-app and external HTTP destinations; never mutate the client's global
+  browser preference transiently from plugin code.
+
+#### Loop R26 — authored PR reviewer management
+
+- **Red 1 — server contract:** extend the Pull Requests server tests with a
+  strict reviewer-directory response and an exact requested-reviewer diff.
+  The test first fails because no typed RPC can list repository reviewers or
+  add and remove requested reviewers. It covers invalid payload rejection,
+  deduped/sorted projection, no-op mutation, exact GitHub REST calls, partial
+  add/remove failure, cache clearing, and lifecycle-safe error classification.
+- **Green 1:** add the smallest browser-safe reviewer schemas, server-owned
+  GitHub adapter, and registered RPC handlers. Reviewer discovery and mutation
+  remain behind the existing GitHub command/rate-limit boundary; the frontend
+  never calls GitHub directly.
+- **Refactor 1:** keep registration files composition-only, reuse the existing
+  PR repository/number identity, and remove no legacy path outside this slice.
+  Focused server/schema tests and strict-JSON registration checks are the
+  acceptance evidence.
+- **Red 2 — Query lifecycle:** add hook tests that fail until the reviewer
+  directory has a repository-scoped key, 24-hour stale/GC policy, no polling,
+  no focus refetch, and an enabled-on-picker-open query. Prove repeated picker
+  mounts reuse one response while the explicit authored-PR refresh invalidates
+  the directory and the next open refetches it.
+- **Green 2:** add the directory query and requested-reviewer mutation beside
+  the existing authored queries. Mutation settlement invalidates the authored
+  base/stack projections and the narrow reviewer directory only when needed;
+  no reviewer records enter Zustand or component caches.
+- **Refactor 2:** centralize the reviewer key/policy in the Pull Requests slice
+  and make the existing manual refresh own the explicit directory refresh
+  contract. Focused fake-timer/query-observer tests prove one request, cache
+  reuse, explicit invalidation, and zero observers after unmount.
+- **Red 3 — interaction and accessibility:** extend the registered left-slot
+  and PR-row tests so both `Request reviewers…` in the context menu and the
+  review-status badge open the same searchable multi-select. Cover initially
+  requested reviewers, filtering, keyboard selection, add/remove staging,
+  save busy/error/recovery, Escape/outside dismissal, focus return, prevention
+  of row navigation, empty/error/loading states, and axe validity.
+- **Green 3:** introduce one PR-owned reviewer picker and make the shared
+  status primitive optionally interactive without changing non-interactive
+  consumers. The picker uses local React state for search/staged values and
+  Query for all remote records and mutation state.
+- **Refactor 3:** remove the context menu's read-only reviewer line once the
+  interaction conveys the same information, retain the existing PR title,
+  draft, stack, and navigation behavior, and keep styling plugin-local over
+  host tokens. Acceptance is focused UI tests, full serial tests, typecheck,
+  SDK check, build/bundle/source inspection, verified-source reload,
+  `git diff --check`, and live light/dark plus narrow/wide interaction checks
+  where background desktop access is available. The dirty pre-loop checkout
+  is the rollback boundary; no commit is created without user authorization.
+
+#### Loop R27 — unified left-sidebar search
+
+- **Red — registered interaction:** extend the registered left-slot coverage
+  so Threads, Tasks, and PRs expose the same accessible magnifier control and
+  search field. Prove a Thread query finds matches in Active, custom groups,
+  and Archive even when those disclosures were collapsed; Tasks and PRs filter
+  their existing rows without changing row navigation or mutation controls;
+  Escape clears and closes the search control.
+- **Green:** add one plugin-local search control shared by the three tab
+  toolbars, keep its text as ephemeral React state in the Threads composition,
+  and pass the effective query to each owning slice. Filter custom-group and
+  archived-thread projections from their existing BB/Query records and force
+  matching collapsed disclosures open only for the duration of the query.
+- **Refactor/removal:** centralize normalized text matching in the owning
+  feature models, preserve the host-provided `searchQuery` as a compatibility
+  fallback, and keep reorder/drag disabled only while an effective query is
+  active. Do not copy thread, task, PR, or archive records into Zustand and do
+  not introduce another remote cache.
+- **Validation/evidence:** the focused registered search test passes twice;
+  the serial full suite passes twice; typecheck, SDK check, build/bundle/source,
+  verified-source reload, accessibility, and `git diff --check` pass. Exercise
+  all three tabs in light/dark and narrow/wide live layouts without taking
+  foreground control of BB. The exact pre-edit dirty checkout recorded on
+  `BBPLUG-154` is the rollback boundary; no commit is created without explicit
+  authorization.
+
+#### Loop R28 — cross-sidebar performance and logging hygiene
+
+- **Red 1 — inactive left-slice work:** add a hook-level characterization that
+  fails while the Threads organization traverses host threads, projects group
+  trees, or subscribes to drag/selection changes when the Threads tab is
+  inactive. Extend the registered Tasks/PR tests to preserve their intentional
+  Query observers while their hidden views perform no list/group projection.
+- **Green 1:** pass explicit activity into the Threads organization and return
+  stable empty projections/selectors off-tab. Gate Tasks and PR presentation
+  projections the same way while retaining the single Tasks realtime owner and
+  the deliberately warm authored-PR Query cache.
+- **Refactor 1:** keep remote records in Query and host records in BB hooks;
+  introduce no mirror cache and no blanket `React.memo`. Centralize only the
+  stable empty projection values needed by the three left slices.
+- **Red 2 — right Agents lifecycle:** add registered coverage proving multiple
+  visible agent rows share one duration clock, an activity-only host update
+  does not refetch immutable model metadata, a roster change does refetch, and
+  the clock/query observers clean up on tab exit and unmount.
+- **Green 2:** hoist the one-second duration tick to the Agents view and pass
+  its timestamp to rows. Key model metadata by the stable thread-id roster and
+  retain it for the frontend bundle generation; do not key it by `updatedAt`
+  or create one timer per row.
+- **Refactor 2:** keep model lookup server-owned, remove the obsolete versioned
+  target type and per-row clock component, and preserve all status, workspace,
+  task, open, split, and accessibility behavior.
+- **Red 3 — logging:** use the official fake host to prove plugin registration
+  and successful authored-PR/stack reads produce no info/debug entries. Keep
+  actionable warning/error behavior available for genuine failures and keep
+  CLI script stdout/stderr outside this server-runtime contract.
+- **Green 3:** remove lifecycle-success and request-cardinality info logs from
+  the server entrypoint and the normal authored stack polling path. Do not
+  replace them with browser console output or another per-request log.
+- **Validation/evidence:** focused red/green tests pass twice; the full serial
+  suite passes twice and its duration/output are recorded against the R28
+  baseline; typecheck, SDK compatibility, build and artifact-size inspection,
+  verified-source reload, plugin-log inspection, and `git diff --check` pass.
+  Exercise all six tabs in light/dark and narrow/wide layouts to confirm that
+  lifecycle optimization did not alter visible or interactive behavior.
+
+#### Loop R29 — left PR title preference-aware navigation
+
+- **Red — title activation contract:** extend the authored-PR row
+  characterization so an unmodified primary click is consumed by the row's
+  BB navigation callback, while Cmd/Ctrl/Shift/Alt activation remains native
+  on the semantic URL anchor. Preserve the row context menu and linked-thread
+  interaction in the same fixture.
+- **Green:** route only the ordinary PR-title activation through
+  `useBbNavigate().openUrl`, which follows the current client's BB/external
+  browser preference. Keep `UrlLink` as the anchor so copying, accessibility,
+  unsupported targets, and modifier-click behavior remain host-owned.
+- **Refactor/removal:** centralize the modifier/primary-button guard in the PR
+  row rather than adding a second navigation setting or browser API. Do not
+  alter context-menu actions or right-sidebar navigation.
+- **Validation/evidence:** run the focused PR row and registered left-slot
+  suites twice, full serial tests, typecheck, SDK compatibility, build/source
+  verification, verified-source reload, and `git diff --check`. Live-check an
+  ordinary title click with the BB browser preference enabled without taking
+  foreground control of the app.
+
+#### Loop R30 — minimum-width sidebar search popover
+
+- **Red — registered narrow interaction:** extend the shared left-slot search
+  characterization so the magnifying-glass trigger remains a fixed-size
+  toolbar action after opening, the search editor is portalled outside the
+  pane header, and Threads, Tasks, and PRs keep their existing filtering and
+  Escape behavior. Assert the trigger renders a real magnifying-glass path
+  rather than the icon fallback.
+- **Green:** keep the shared trigger mounted and render the editor in one
+  viewport-fitted, anchored search popover. Add the missing `Search` glyph to
+  the plugin icon vocabulary and preserve focus-on-open, Escape/close clearing,
+  outside-click dismissal, and trigger focus restoration.
+- **Refactor/removal:** replace the inline-width search state in all three
+  panes through the existing `SidebarSearch` component only; do not add
+  slice-specific fields or another toolbar layout. Keep search text in the
+  current component-local/slice-local React ownership.
+- **Validation/evidence:** run the registered search and accessibility suites
+  twice, full serial tests, typecheck, SDK compatibility, build/source checks,
+  verified-source reload, and `git diff --check`. Inspect the minimum-width
+  left sidebar in light and dark themes without foreground navigation.
+
+#### Loops R31-R34 — work management and thread hierarchy
+
+The next product stage is specified in
+[work-management-spec.md](work-management-spec.md), with strict executable
+loops in [work-management-rgr-plan.md](work-management-rgr-plan.md). It covers:
+
+- safe root/child thread hierarchy manipulation without corrupting durable
+  outcome or execution bindings;
+- one Work item card that keeps BB Tasks canonical and presents Linear as
+  linked external records; and
+- a Tasks workflow organized around Needs you, In progress, Next, and bounded
+  Completed sections rather than duplicate raw task lists.
+
+The durable execution tasks are `BBPLUG-158`, `BBPLUG-160`, and `BBPLUG-161`.
+The detailed plan is kept separate so this historical refactor plan remains
+readable; BB Tasks, not either document, is the executable work queue.
+
 ### BB child execution protocol
 
 G0 is complete. Each new code-editing loop receives one direct BB execution

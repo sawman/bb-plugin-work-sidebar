@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  MAX_SIDEBAR_ROW_HEIGHT,
+  MIN_SIDEBAR_ROW_HEIGHT,
+} from "./sidebar-appearance";
 
 const sidebarThreadGroup = z.object({
   id: z.string().regex(/^group_[a-z0-9_-]{1,48}$/),
@@ -75,13 +79,33 @@ export const threadPreferenceSchemas = {
   },
   getSidebarAppearance: {
     input: z.null(),
-    output: z.object({ rowHeight: z.number().min(40).max(60) }).strict(),
+    output: z
+      .object({
+        rowHeight: z
+          .number()
+          .min(MIN_SIDEBAR_ROW_HEIGHT)
+          .max(MAX_SIDEBAR_ROW_HEIGHT),
+      })
+      .strict(),
   },
   saveSidebarAppearance: {
     input: z
-      .object({ rowHeight: z.number().min(40).max(60).multipleOf(0.1) })
+      .object({
+        rowHeight: z
+          .number()
+          .min(MIN_SIDEBAR_ROW_HEIGHT)
+          .max(MAX_SIDEBAR_ROW_HEIGHT)
+          .multipleOf(0.1),
+      })
       .strict(),
-    output: z.object({ rowHeight: z.number().min(40).max(60) }).strict(),
+    output: z
+      .object({
+        rowHeight: z
+          .number()
+          .min(MIN_SIDEBAR_ROW_HEIGHT)
+          .max(MAX_SIDEBAR_ROW_HEIGHT),
+      })
+      .strict(),
   },
 } as const;
 
@@ -102,7 +126,25 @@ export const threadArchiveSchemas = {
   },
 } as const;
 
+export const threadHierarchySchemas = {
+  moveSidebarThread: {
+    input: z
+      .object({
+        threadId: z.string().startsWith("thr_"),
+        parentThreadId: z.string().startsWith("thr_").nullable(),
+      })
+      .strict(),
+    output: z
+      .object({
+        threadId: z.string().startsWith("thr_"),
+        parentThreadId: z.string().startsWith("thr_").nullable(),
+      })
+      .strict(),
+  },
+} as const;
+
 export const threadSchemas = {
   ...threadPreferenceSchemas,
   ...threadArchiveSchemas,
+  ...threadHierarchySchemas,
 } as const;

@@ -1,12 +1,12 @@
-export const DEFAULT_SIDEBAR_ROW_HEIGHT = 45;
-export const MIN_SIDEBAR_ROW_HEIGHT = 40;
+export const DEFAULT_SIDEBAR_ROW_HEIGHT = 40;
+export const MIN_SIDEBAR_ROW_HEIGHT = 35;
 export const MAX_SIDEBAR_ROW_HEIGHT = 60;
 
 const TENTH_PIXEL = /^\d+(?:\.\d)?$/;
 
-export function validateSidebarRowHeight(value: string):
-  | { value: number; error: null }
-  | { value: null; error: string } {
+export function validateSidebarRowHeight(
+  value: string,
+): { value: number; error: null } | { value: null; error: string } {
   const normalized = value.trim();
   if (!TENTH_PIXEL.test(normalized)) {
     return {

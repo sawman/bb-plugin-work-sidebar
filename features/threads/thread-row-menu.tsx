@@ -9,71 +9,74 @@ import {
 } from "@/components/ui/context-menu";
 import type { SidebarThreadGroup } from "./model";
 import type { ThreadRowActions } from "./use-thread-row-actions";
+import { useThreadHierarchyMenu } from "./use-thread-hierarchy-menu";
 
 export function ThreadRowMenu({
   children,
   title,
   threadId,
+  parentThreadId,
   isPinned,
   isUnread,
   isAvailable,
-  reorderDisabled,
-  canMoveUp,
-  canMoveDown,
   groupId,
   groups,
-  onMoveThread,
   onMoveToGroup,
   actions,
 }: {
   children: ReactElement<HTMLAttributes<HTMLElement>>;
   title: string;
   threadId: string;
+  parentThreadId: string | null;
   isPinned: boolean;
   isUnread: boolean;
   isAvailable: boolean;
-  reorderDisabled: boolean;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
   groupId: string | null;
   groups: readonly SidebarThreadGroup[];
-  onMoveThread(threadId: string, direction: -1 | 1): void;
   onMoveToGroup(threadId: string, groupId: string | null): void;
   actions: ThreadRowActions;
 }) {
+  const hierarchy = useThreadHierarchyMenu({ threadId, title });
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent aria-label={`Actions for ${title}`}>
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+        <ContextMenuContent aria-label={`Actions for ${title}`}>
         <ContextMenuLabel>{title}</ContextMenuLabel>
-        <ContextMenuItem onSelect={() => actions.open(false)}>Open</ContextMenuItem>
+        <ContextMenuItem onSelect={() => actions.setPinned(!isPinned)}>
+          {isPinned ? "Unpin" : "Pin"}
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => actions.open(false)}>
+          Open
+        </ContextMenuItem>
         {isAvailable && (
           <ContextMenuItem onSelect={() => actions.open(true)}>
             Open in split
           </ContextMenuItem>
         )}
         <ContextMenuSeparator />
-        <ContextMenuItem
-          disabled={reorderDisabled || !canMoveUp}
-          onSelect={() => onMoveThread(threadId, -1)}
-        >
-          Move up
-        </ContextMenuItem>
-        <ContextMenuItem
-          disabled={reorderDisabled || !canMoveDown}
-          onSelect={() => onMoveThread(threadId, 1)}
-        >
-          Move down
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem onSelect={() => actions.setPinned(!isPinned)}>
-          {isPinned ? "Unpin" : "Pin"}
-        </ContextMenuItem>
         <ContextMenuItem onSelect={() => actions.setRead(isUnread)}>
           {isUnread ? "Mark read" : "Mark unread"}
         </ContextMenuItem>
-        <ContextMenuItem onSelect={actions.startRename}>Rename</ContextMenuItem>
+          <ContextMenuItem onSelect={actions.startRename}>Rename</ContextMenuItem>
+          <ContextMenuSeparator />
+          {parentThreadId ? (
+            <ContextMenuItem
+              disabled={hierarchy.disabled}
+              onSelect={() => void hierarchy.promote()}
+            >
+              Make top-level
+            </ContextMenuItem>
+          ) : null}
+          <ContextMenuItem
+            disabled={hierarchy.disabled}
+            onSelect={hierarchy.open}
+          >
+            Move under…
+          </ContextMenuItem>
+        <ContextMenuSeparator />
         <ContextMenuItem
+          className="ws-thread-menu-destination"
           disabled={groupId === null}
           onSelect={() => onMoveToGroup(threadId, null)}
         >
@@ -82,21 +85,26 @@ export function ThreadRowMenu({
         {groups.map((group) => (
           <ContextMenuItem
             key={group.id}
+            className="ws-thread-menu-destination"
             disabled={group.id === groupId}
             onSelect={() => onMoveToGroup(threadId, group.id)}
           >
             {group.name}
           </ContextMenuItem>
         ))}
-        <ContextMenuItem onSelect={actions.archiveTree}>Archive</ContextMenuItem>
+        <ContextMenuItem onSelect={actions.archiveTree}>
+          Archive
+        </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
-          className="text-destructive focus:text-destructive"
+          data-tone="destructive"
           onSelect={actions.requestDeleteTree}
         >
           Delete
         </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+        </ContextMenuContent>
+      </ContextMenu>
+      {hierarchy.picker}
+    </>
   );
 }

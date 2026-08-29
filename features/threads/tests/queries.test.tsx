@@ -10,6 +10,7 @@ import {
   threadQueryPolicies,
   saveThreadGroups,
   useArchivedThreadsQuery,
+  useThreadHierarchyMutation,
   type ThreadsRpc,
 } from "../queries";
 
@@ -153,5 +154,36 @@ describe("R9 Threads query ownership", () => {
     expect(rpc.call).toHaveBeenCalledTimes(4);
     view.unmount();
     client.clear();
+  });
+
+  it("moves one thread and invalidates only thread preference projections", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const rpc = {
+      call: vi.fn(async () => ({
+        threadId: "thr_child",
+        parentThreadId: null,
+      })),
+    };
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const view = renderHook(
+      () => useThreadHierarchyMutation(rpc as unknown as ThreadsRpc),
+      { wrapper: queryWrapper(client) },
+    );
+
+    await act(async () => {
+      await view.result.current.mutateAsync({
+        threadId: "thr_child",
+        parentThreadId: null,
+      });
+    });
+
+    expect(rpc.call).toHaveBeenCalledWith("moveSidebarThread", {
+      threadId: "thr_child",
+      parentThreadId: null,
+    });
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: threadQueryKeys.root });
   });
 });
