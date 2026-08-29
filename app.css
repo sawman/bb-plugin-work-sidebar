@@ -239,7 +239,6 @@
   background: transparent;
   color: inherit;
   text-align: left;
-  font: inherit;
   font: var(--ws-text-primary);
   line-height: 1.25;
   cursor: pointer;

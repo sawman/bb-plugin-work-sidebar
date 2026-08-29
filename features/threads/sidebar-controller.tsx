@@ -45,6 +45,7 @@ import { SidebarWorkView } from "./sidebar-work-view";
 import { ThreadListSettings } from "./sidebar-group-settings";
 import { ThreadHierarchyProvider } from "./thread-hierarchy-context";
 import { ThreadHierarchyPickerHost } from "./thread-hierarchy-picker-host";
+import { TextScaleProvider, textScaleStyle } from "../../shared/text-scale";
 
 const SIDEBAR_TABS: readonly { id: SidebarView; label: string }[] = (
   ["work", "queue", "prs"] as const
@@ -209,17 +210,19 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   if (status !== "ready") return <Original />;
 
   const taskLinks = taskLinksData?.links ?? {};
+  const textScale =
+    threadPreferences.appearance.data?.textScale ?? DEFAULT_TEXT_SCALE;
   const settings = (
     <ThreadListSettings
       rowHeight={threadPreferences.appearance.data?.rowHeight}
-      rowHeightPending={threadPreferences.saveAppearance.isPending}
+      rowHeightPending={threadPreferences.saveRowHeight.isPending}
       onSaveRowHeight={(rowHeight) =>
-        threadPreferences.saveAppearance.mutateAsync({ rowHeight })
+        threadPreferences.saveRowHeight.mutateAsync(rowHeight)
       }
       textScale={threadPreferences.appearance.data?.textScale}
-      textScalePending={threadPreferences.saveAppearance.isPending}
+      textScalePending={threadPreferences.saveTextScale.isPending}
       onSaveTextScale={(textScale) =>
-        threadPreferences.saveAppearance.mutateAsync({ textScale })
+        threadPreferences.saveTextScale.mutateAsync(textScale)
       }
       groups={
         view === "work"
@@ -254,67 +257,67 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     />
   );
   return (
-    <div
-      className="ws-list"
-      style={
-        {
-          "--ws-sidebar-row-height": `${threadPreferences.appearance.data?.rowHeight ?? DEFAULT_SIDEBAR_ROW_HEIGHT}px`,
-          "--ws-text-scale": String(
-            threadPreferences.appearance.data?.textScale ?? DEFAULT_TEXT_SCALE,
-          ),
-        } as CSSProperties
-      }
-    >
-      <TabSelector
-        ariaLabel="Sidebar views"
-        idPrefix="ws-sidebar"
-        items={SIDEBAR_TABS}
-        sticky
-        value={view}
-        onValueChange={activateView}
-      />
-      <TasksLeftSidebar
-        active={view === "queue"}
-        activeThreadId={props.activeThreadId}
-        taskLinks={taskLinks}
-        ownerThreads={taskOwnerThreads}
-        onOpenThread={navigateToThread}
-        searchQuery={props.searchQuery}
-        settingsControl={settings}
-      />
-      <PullRequestsLeftSidebar
-        active={view === "prs"}
-        searchQuery={props.searchQuery}
-        threads={pullRequestThreads}
-        onOpenThread={navigateToThread}
-        settingsControl={settings}
-      />
-      {view === "work" && (
-        <ThreadHierarchyProvider
-          threads={threads}
+    <TextScaleProvider scale={textScale}>
+      <div
+        className="ws-list"
+        style={
+          {
+            "--ws-sidebar-row-height": `${threadPreferences.appearance.data?.rowHeight ?? DEFAULT_SIDEBAR_ROW_HEIGHT}px`,
+            ...textScaleStyle(textScale),
+          } as CSSProperties
+        }
+      >
+        <TabSelector
+          ariaLabel="Sidebar views"
+          idPrefix="ws-sidebar"
+          items={SIDEBAR_TABS}
+          sticky
+          value={view}
+          onValueChange={activateView}
+        />
+        <TasksLeftSidebar
+          active={view === "queue"}
+          activeThreadId={props.activeThreadId}
           taskLinks={taskLinks}
-          ready={taskLinksData !== undefined}
-        >
-          <SidebarWorkView
-            toolbar={toolbar}
-            organization={organization}
-            activeThreadId={props.activeThreadId}
-            providersById={providersById}
-            onNavigate={props.onNavigate}
-            subtextRefreshKey={subtextRefreshKey}
-            staleWorkingMinutes={Number(
-              pluginSettings.values?.stuckThreadMinutes ?? "30",
-            )}
-            searchQuery={effectiveThreadSearchQuery}
-            emptyMessage={
-              effectiveThreadSearchQuery
-                ? `No threads match “${effectiveThreadSearchQuery}”.`
-                : "No active threads."
-            }
-          />
-          <ThreadHierarchyPickerHost />
-        </ThreadHierarchyProvider>
-      )}
-    </div>
+          ownerThreads={taskOwnerThreads}
+          onOpenThread={navigateToThread}
+          searchQuery={props.searchQuery}
+          settingsControl={settings}
+        />
+        <PullRequestsLeftSidebar
+          active={view === "prs"}
+          searchQuery={props.searchQuery}
+          threads={pullRequestThreads}
+          onOpenThread={navigateToThread}
+          settingsControl={settings}
+        />
+        {view === "work" && (
+          <ThreadHierarchyProvider
+            threads={threads}
+            taskLinks={taskLinks}
+            ready={taskLinksData !== undefined}
+          >
+            <SidebarWorkView
+              toolbar={toolbar}
+              organization={organization}
+              activeThreadId={props.activeThreadId}
+              providersById={providersById}
+              onNavigate={props.onNavigate}
+              subtextRefreshKey={subtextRefreshKey}
+              staleWorkingMinutes={Number(
+                pluginSettings.values?.stuckThreadMinutes ?? "30",
+              )}
+              searchQuery={effectiveThreadSearchQuery}
+              emptyMessage={
+                effectiveThreadSearchQuery
+                  ? `No threads match “${effectiveThreadSearchQuery}”.`
+                  : "No active threads."
+              }
+            />
+            <ThreadHierarchyPickerHost />
+          </ThreadHierarchyProvider>
+        )}
+      </div>
+    </TextScaleProvider>
   );
 }

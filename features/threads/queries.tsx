@@ -83,10 +83,18 @@ export async function saveSidebarAppearance(
   return result;
 }
 
-function useSaveSidebarAppearance(rpc: ThreadsRpc, client: QueryClient) {
+function useSaveSidebarAppearance(
+  rpc: ThreadsRpc,
+  client: QueryClient,
+  field: "rowHeight" | "textScale",
+) {
   return useMutation({
-    mutationFn: (update: SidebarAppearanceUpdate) =>
-      saveSidebarAppearance(client, rpc, update),
+    mutationFn: (value: number) =>
+      saveSidebarAppearance(
+        client,
+        rpc,
+        field === "rowHeight" ? { rowHeight: value } : { textScale: value },
+      ),
   });
 }
 
@@ -94,8 +102,9 @@ export function useSidebarAppearancePreferences() {
   const rpc = useRpc<typeof rpcContract>();
   const client = useQueryClient();
   const appearance = useQuery(sidebarAppearanceQuery(rpc));
-  const saveAppearance = useSaveSidebarAppearance(rpc, client);
-  return { appearance, saveAppearance };
+  const saveRowHeight = useSaveSidebarAppearance(rpc, client, "rowHeight");
+  const saveTextScale = useSaveSidebarAppearance(rpc, client, "textScale");
+  return { appearance, saveRowHeight, saveTextScale };
 }
 
 export async function saveThreadGroups(
@@ -143,7 +152,8 @@ export function useThreadPreferences() {
   });
   const appearancePreferences = useSidebarAppearancePreferences();
   const appearance = appearancePreferences.appearance;
-  const saveAppearance = appearancePreferences.saveAppearance;
+  const saveRowHeight = appearancePreferences.saveRowHeight;
+  const saveTextScale = appearancePreferences.saveTextScale;
   useRealtime("sidebar-order:changed", () => {
     for (const key of [
       threadQueryKeys.order(),
@@ -165,7 +175,15 @@ export function useThreadPreferences() {
       return result.threadIds;
     },
   });
-  return { order, groups, appearance, saveAppearance, saveGroups, saveOrder };
+  return {
+    order,
+    groups,
+    appearance,
+    saveRowHeight,
+    saveTextScale,
+    saveGroups,
+    saveOrder,
+  };
 }
 
 export const archivedThreadQueryPolicy = {
