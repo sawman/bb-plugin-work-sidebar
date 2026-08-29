@@ -14,6 +14,7 @@ type TrackerHandlers = Pick<
   | "linkLinearIssue"
   | "searchLinearIssues"
   | "unlinkLinearIssue"
+  | "setPrimaryLinearIssue"
   | "updateLinearIssueStatus"
 >;
 
@@ -33,7 +34,7 @@ export function createTrackerRegistration(
       input: PluginRpcInput,
       outputSchema: z.ZodType<T>,
     ) => callPluginRpc("taskboard", method, input, outputSchema),
-    getStorage: () => bb.storage.kv.get<unknown>(TRACKER_LINKS_KEY),
+    getStorage: (key) => bb.storage.kv.get<unknown>(key),
     setStorage: (value) => bb.storage.kv.set(TRACKER_LINKS_KEY, value),
     rootThread: tasks.rootThread,
     threadTitle: async (threadId) => {
@@ -58,6 +59,9 @@ export function createTrackerRegistration(
     },
     async unlinkLinearIssue({ threadId, key }) {
       return tracker.unlink(threadId, key);
+    },
+    async setPrimaryLinearIssue({ threadId, key }) {
+      return tracker.setPrimary(threadId, key);
     },
     async updateLinearIssueStatus({ threadId, key, statusId }) {
       return tracker.updateStatus(threadId, key, statusId);

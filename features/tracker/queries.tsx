@@ -26,6 +26,7 @@ export function useTrackerMutations(rpc: Rpc, threadId: string) {
   return {
     link: useMutation({ mutationKey: [...trackerKeys.context(threadId), "link"], mutationFn: (key: string) => rpc.call("linkLinearIssue", { threadId, key }) }),
     unlink: useMutation({ mutationKey: [...trackerKeys.context(threadId), "unlink"], mutationFn: (key: string) => rpc.call("unlinkLinearIssue", { threadId, key }) }),
+    primary: useMutation({ mutationKey: [...trackerKeys.context(threadId), "set-primary"], mutationFn: (key: string) => rpc.call("setPrimaryLinearIssue", { threadId, key }) }),
     status: useMutation({ mutationKey: [...trackerKeys.context(threadId), "status"], mutationFn: ({ key, statusId }: { key: string; statusId: string }) => rpc.call("updateLinearIssueStatus", { threadId, key, statusId }) }),
   };
 }

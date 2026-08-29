@@ -1,20 +1,11 @@
 import type { TaskSummary } from "../../work-model";
+import type { TrackerContext } from "../tracker/schemas";
 
-export type WorkItemTrackerRecord = Readonly<{
-  key: string;
-  title: string;
-  url: string;
-  status: string;
-  stateCategory: "backlog" | "todo" | "in_progress" | "done" | "canceled";
-  priority: string | null;
-  assignee: string | null;
-  project: string | null;
-  statusOptions: readonly Readonly<{
-    id: string;
-    name: string;
-    current: boolean;
-  }>[];
-}>;
+export type WorkItemTrackerRecord = Readonly<
+  TrackerContext["items"][number]["item"] & {
+    statusOptions: TrackerContext["items"][number]["statusOptions"];
+  }
+>;
 
 type WorkItemState =
   | "empty"

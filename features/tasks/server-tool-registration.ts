@@ -46,6 +46,7 @@ export function registerTasksTools(
       description: z.string(),
       taskProjectId: z.string().nullable().optional(),
       assignee: z.enum(["agent", "human"]).optional(),
+      priority: z.enum(["urgent", "high", "medium", "low", "none"]).optional(),
     }).strict(),
     instructions: "Call get_work_context first. Outcomes are top-level only; execution units are direct children created with create_execution_task. Assign agent-owned work to Agent and explicit user follow-up to Human.",
     async execute(params, context) {
@@ -56,6 +57,7 @@ export function registerTasksTools(
         description: params.description,
         taskProjectId: params.taskProjectId,
         assignee: params.assignee,
+        priority: params.priority,
       });
       const task = await namedTask(result.task);
       const assignment = await assignedTo(result.task.id);

@@ -15,8 +15,8 @@ function setup(rpc = { call: vi.fn().mockResolvedValue({}) }) {
 describe("tracker Query mutations", () => {
   it("calls each exact RPC mutation and leaves its server realtime signal as the sole invalidation owner", async () => {
     const { client, rpc, hook } = setup(); const invalidate = vi.spyOn(client, "invalidateQueries");
-    await hook.result.current.link.mutateAsync("LIN-1"); await hook.result.current.unlink.mutateAsync("LIN-1"); await hook.result.current.status.mutateAsync({ key: "LIN-1", statusId: "done" });
-    expect(rpc.call.mock.calls).toEqual([["linkLinearIssue", { threadId: "thr_1", key: "LIN-1" }], ["unlinkLinearIssue", { threadId: "thr_1", key: "LIN-1" }], ["updateLinearIssueStatus", { threadId: "thr_1", key: "LIN-1", statusId: "done" }]]);
+    await hook.result.current.link.mutateAsync("LIN-1"); await hook.result.current.primary.mutateAsync("LIN-2"); await hook.result.current.unlink.mutateAsync("LIN-1"); await hook.result.current.status.mutateAsync({ key: "LIN-1", statusId: "done" });
+    expect(rpc.call.mock.calls).toEqual([["linkLinearIssue", { threadId: "thr_1", key: "LIN-1" }], ["setPrimaryLinearIssue", { threadId: "thr_1", key: "LIN-2" }], ["unlinkLinearIssue", { threadId: "thr_1", key: "LIN-1" }], ["updateLinearIssueStatus", { threadId: "thr_1", key: "LIN-1", statusId: "done" }]]);
     expect(invalidate).not.toHaveBeenCalled();
     await invalidateTracker(client, "thr_2"); expect(invalidate).toHaveBeenLastCalledWith({ queryKey: trackerKeys.context("thr_2") });
   });

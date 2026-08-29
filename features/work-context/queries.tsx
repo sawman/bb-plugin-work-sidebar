@@ -140,12 +140,16 @@ export function useWorkOutcomeMutation(threadId: string) {
     }),
     create: useMutation({
       mutationKey: [...queryKeys.work.outcome(threadId), "create"],
-      mutationFn: ({ title }: { title: string }) =>
+      mutationFn: ({ title, priority }: {
+        title: string;
+        priority?: NonNullable<WorkOutcome["outcome"]>["priority"];
+      }) =>
         rpc.call("createWorkTask", {
           threadId,
           title,
           description: "Created from the Work sidebar.",
           parentTaskId: null,
+          ...(priority ? { priority } : {}),
         }),
       onSuccess: invalidate,
     }),
