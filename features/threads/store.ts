@@ -1,10 +1,17 @@
 import { createStore } from "zustand/vanilla";
 
 export type WorkTab = "work" | "changes" | "agents";
-export type ThreadDropTarget = {
-  threadId: string;
-  placement: "before" | "after";
-} | null;
+export type ThreadDropTarget =
+  | {
+      kind: "reorder";
+      threadId: string;
+      placement: "before" | "after";
+    }
+  | {
+      kind: "reparent";
+      parentThreadId: string | null;
+    }
+  | null;
 
 const MAX_THREAD_VIEW_ENTRIES = 40;
 
@@ -93,9 +100,14 @@ export function createThreadInteractionStore() {
             ? current.dragThreadId
             : null;
         const dropTarget =
-          current.dropTarget && roster.has(current.dropTarget.threadId)
-            ? current.dropTarget
-            : null;
+          current.dropTarget?.kind === "reparent"
+            ? !current.dropTarget.parentThreadId ||
+              roster.has(current.dropTarget.parentThreadId)
+              ? current.dropTarget
+              : null
+            : current.dropTarget && roster.has(current.dropTarget.threadId)
+              ? current.dropTarget
+              : null;
         return {
           selectedThreadIds,
           selectionAnchorId,

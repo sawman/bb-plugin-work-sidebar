@@ -55,7 +55,10 @@ export function ArchivedThreadRow({
   dragging: boolean;
   onDragThreadChange(threadId: string | null): void;
   onDropTargetChange(
-    target: { threadId: string; placement: "before" | "after" } | null,
+    target:
+      | { kind: "reorder"; threadId: string; placement: "before" | "after" }
+      | { kind: "reparent"; parentThreadId: string | null }
+      | null,
   ): void;
 }) {
   const actions = experimental_useSidebarThreadActions();

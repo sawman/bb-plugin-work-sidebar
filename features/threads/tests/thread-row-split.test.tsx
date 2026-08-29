@@ -84,6 +84,14 @@ afterEach(() => {
 });
 
 describe("ThreadRow split ownership", () => {
+  it("exposes an explicit, accessible reparent drop target", () => {
+    const view = renderRow(false);
+
+    expect(
+      view.getByRole("note", { name: "Move a thread under One" }),
+    ).toBeTruthy();
+  });
+
   it("keeps native split off excluded targets and non-primary pointers, but hands primary row pointers to BB before optional reorder", () => {
     const disabled = renderRow(true);
     const row = disabled.container.querySelector<HTMLElement>(
@@ -176,6 +184,38 @@ describe("ThreadRow split ownership", () => {
     expect(view.onDropTargetChange).toHaveBeenLastCalledWith(null);
 
     fireEvent.pointerUp(window, { pointerId: 5, clientX: 10, clientY: 10 });
+    expect(view.onDropThread).not.toHaveBeenCalled();
+  });
+
+  it("cleans up an active pointer drag when the browser cancels it", () => {
+    const view = renderRow(false);
+    const row = view.container.querySelector<HTMLElement>(
+      "[data-ws-thread-id]",
+    )!;
+    const target = document.createElement("div");
+    target.dataset.wsThreadId = "thr_two";
+    row.parentElement!.append(target);
+    Object.defineProperty(document, "elementFromPoint", {
+      configurable: true,
+      value: () => target,
+    });
+    vi.spyOn(target, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      height: 100,
+    } as DOMRect);
+
+    fireEvent.pointerDown(row, {
+      button: 0,
+      pointerId: 6,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { pointerId: 6, clientX: 10, clientY: 10 });
+    fireEvent.pointerCancel(window, { pointerId: 6, clientX: 10, clientY: 10 });
+
+    expect(view.onDragThreadChange).toHaveBeenLastCalledWith(null);
+    expect(view.onDropTargetChange).toHaveBeenLastCalledWith(null);
+    fireEvent.pointerUp(window, { pointerId: 6, clientX: 10, clientY: 10 });
     expect(view.onDropThread).not.toHaveBeenCalled();
   });
 });

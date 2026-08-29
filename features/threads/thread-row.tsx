@@ -15,6 +15,11 @@ import { ThreadRowStackNumber } from "./thread-row-stack-number";
 import type { ThreadRowProps } from "./thread-row-types";
 import { useThreadRowActions } from "./use-thread-row-actions";
 import { useThreadRowPointerDrag } from "./use-thread-row-pointer-drag";
+import { useThreadHierarchy } from "./thread-hierarchy-context";
+import {
+  THREAD_TO_TOP_DESCRIPTION,
+} from "./use-thread-hierarchy-menu";
+import { toast } from "sonner";
 
 export function ThreadRow({
   thread,
@@ -42,6 +47,7 @@ export function ThreadRow({
 }: ThreadRowProps) {
   const controlClick = useRef(false);
   const anchorRef = useRef<HTMLAnchorElement>(null);
+  const hierarchy = useThreadHierarchy();
   // Per-row opt-in: never turn this into a list-wide PR metadata read.
   const { pullRequest, isLoading: pullRequestLoading } =
     experimental_useSidebarThreadPullRequest(thread.id);
@@ -61,6 +67,22 @@ export function ThreadRow({
     onMoveToGroup,
     onDropThread,
     onArchive: rowActions.archiveTree,
+    onReparentThread: (sourceId, parentThreadId) => {
+      void hierarchy
+        .move(sourceId, parentThreadId)
+        .then(() =>
+          toast.success(
+            parentThreadId
+              ? "Thread hierarchy updated"
+              : THREAD_TO_TOP_DESCRIPTION,
+          ),
+        )
+        .catch((error: unknown) =>
+          toast.error(
+            error instanceof Error ? error.message : "Could not move thread",
+          ),
+        );
+    },
   });
   const projectLabel = project?.isPersonal
     ? "Personal"
@@ -75,10 +97,25 @@ export function ThreadRow({
       data-ws-thread-group={groupId ?? "active"}
       data-depth={thread.parentThreadId ? "child" : "root"}
       data-drop-placement={
-        dropTarget?.threadId === thread.id ? dropTarget.placement : undefined
+        dropTarget?.kind === "reorder" && dropTarget.threadId === thread.id
+          ? dropTarget.placement
+          : undefined
+      }
+      data-reparent-target={
+        dropTarget?.kind === "reparent" &&
+        dropTarget.parentThreadId === thread.id
+          ? "true"
+          : undefined
       }
       onPointerDown={startUnifiedDrag}
     >
+      <span
+        className="ws-thread-reparent-target"
+        data-ws-thread-reparent-target={thread.id}
+        role="note"
+        aria-label={`Move a thread under ${title}`}
+        title={`Drop to make ${title} the parent`}
+      />
       {rowActions.renaming ? (
         <div className="ws-rename">
           <Input

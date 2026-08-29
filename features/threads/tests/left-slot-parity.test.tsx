@@ -1561,6 +1561,183 @@ describe("R18 registered left sidebar parity", () => {
     crossGroup.lifecycle.unmount();
   });
 
+  it("reparents through the existing hierarchy mutation, promotes through To Top, and leaves rejected hierarchy drops unchanged", async () => {
+    const moveThread = vi.fn((input: {
+      threadId: string;
+      parentThreadId: string | null;
+    }) => ({
+      ...input,
+      oldRootThreadId: "thr_one",
+      newRootThreadId: input.parentThreadId ?? input.threadId,
+      affectedThreadIds: [input.threadId],
+    }));
+    const saveOrder = vi.fn(({ threadIds }: { threadIds: string[] }) => ({
+      threadIds,
+    }));
+    const reparent = await leftSlot({
+      rpc: { moveSidebarThread: moveThread, saveSiblingOrder: saveOrder },
+    });
+    await waitFor(() =>
+      expect(reparent.getByRole("link", { name: /One/ })).toBeTruthy(),
+    );
+    const source = reparent.container.querySelector<HTMLElement>(
+      '[data-ws-thread-id="thr_one"]',
+    )!;
+    const target = reparent.container.querySelector<HTMLElement>(
+      '[data-ws-thread-reparent-target="thr_two"]',
+    )!;
+    const elementAt = mockElementAt(target);
+    fireEvent.pointerDown(source, {
+      button: 0,
+      pointerId: 31,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { pointerId: 31, clientX: 10, clientY: 20 });
+    const targetRow = reparent.container.querySelector<HTMLElement>(
+      '[data-ws-thread-id="thr_two"]',
+    )!;
+    expect(targetRow.getAttribute("data-reparent-target")).toBe("true");
+    expect(targetRow.hasAttribute("data-drop-placement")).toBe(false);
+    fireEvent.pointerUp(window, { pointerId: 31, clientX: 10, clientY: 20 });
+    await waitFor(() =>
+      expect(moveThread).toHaveBeenCalledWith({
+        threadId: "thr_one",
+        parentThreadId: "thr_two",
+      }),
+    );
+    expect(saveOrder).not.toHaveBeenCalled();
+    reparent.unmount();
+
+    const splitMove = vi.fn();
+    const splitYield = await leftSlot({ rpc: { moveSidebarThread: splitMove } });
+    const splitSource = splitYield.container.querySelector<HTMLElement>(
+      '[data-ws-thread-id="thr_one"]',
+    )!;
+    elementAt.mockReturnValue(null);
+    fireEvent.pointerDown(splitSource, {
+      button: 0,
+      pointerId: 35,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { pointerId: 35, clientX: 300, clientY: 20 });
+    fireEvent.pointerUp(window, { pointerId: 35, clientX: 300, clientY: 20 });
+    expect(splitMove).not.toHaveBeenCalled();
+    splitYield.unmount();
+
+    const promoteThread = vi.fn((input: {
+      threadId: string;
+      parentThreadId: string | null;
+    }) => ({
+      ...input,
+      oldRootThreadId: "thr_parent",
+      newRootThreadId: input.parentThreadId ?? input.threadId,
+      affectedThreadIds: [input.threadId],
+    }));
+    const promote = await leftSlot({
+      threads: [
+        thread("thr_parent", "Parent"),
+        thread("thr_child", "Child", "thr_parent"),
+      ],
+      rpc: { moveSidebarThread: promoteThread },
+    });
+    fireEvent.click(
+      promote.getByRole("button", { name: "1 child agent, collapsed" }),
+    );
+    const child = promote.container.querySelector<HTMLElement>(
+      '[data-ws-thread-id="thr_child"]',
+    )!;
+    elementAt.mockReturnValue(null);
+    fireEvent.pointerDown(child, {
+      button: 0,
+      pointerId: 32,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { pointerId: 32, clientX: 10, clientY: 20 });
+    const toTop = await promote.findByRole("note", { name: "To Top" });
+    const descriptionId = toTop.getAttribute("aria-describedby");
+    expect(descriptionId).toBeTruthy();
+    expect(document.getElementById(descriptionId!)?.textContent).toBe(
+      "Move this thread out of its parent and make it a top-level thread",
+    );
+    elementAt.mockReturnValue(toTop);
+    fireEvent.pointerMove(window, { pointerId: 32, clientX: 10, clientY: 20 });
+    expect(toTop.getAttribute("data-drop-target")).toBe("true");
+    expect(
+      promote.container.querySelector('[data-drop-placement]'),
+    ).toBeNull();
+    fireEvent.pointerUp(window, { pointerId: 32, clientX: 10, clientY: 20 });
+    await waitFor(() =>
+      expect(promoteThread).toHaveBeenCalledWith({
+        threadId: "thr_child",
+        parentThreadId: null,
+      }),
+    );
+    promote.unmount();
+
+    const rejectedMove = vi.fn();
+    const rejected = await leftSlot({
+      threads: [
+        thread("thr_parent", "Parent"),
+        thread("thr_child", "Child", "thr_parent"),
+      ],
+      rpc: { moveSidebarThread: rejectedMove },
+    });
+    if (!rejected.container.querySelector('[data-ws-thread-id="thr_child"]'))
+      fireEvent.click(
+        rejected.getByRole("button", { name: /1 child agent/ }),
+      );
+    const rejectedSource = rejected.container.querySelector<HTMLElement>(
+      '[data-ws-thread-id="thr_parent"]',
+    )!;
+    const descendantTarget = rejected.container.querySelector<HTMLElement>(
+      '[data-ws-thread-reparent-target="thr_child"]',
+    )!;
+    elementAt.mockReturnValue(descendantTarget);
+    fireEvent.pointerDown(rejectedSource, {
+      button: 0,
+      pointerId: 33,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { pointerId: 33, clientX: 10, clientY: 20 });
+    fireEvent.pointerUp(window, { pointerId: 33, clientX: 10, clientY: 20 });
+    await waitFor(() => expect(rejectedMove).not.toHaveBeenCalled());
+    rejected.unmount();
+
+    const unchangedMove = vi.fn();
+    const unchanged = await leftSlot({
+      threads: [
+        thread("thr_parent", "Parent"),
+        thread("thr_child", "Child", "thr_parent"),
+      ],
+      rpc: { moveSidebarThread: unchangedMove },
+    });
+    if (!unchanged.container.querySelector('[data-ws-thread-id="thr_child"]'))
+      fireEvent.click(
+        unchanged.getByRole("button", { name: /1 child agent/ }),
+      );
+    const unchangedSource = unchanged.container.querySelector<HTMLElement>(
+      '[data-ws-thread-id="thr_child"]',
+    )!;
+    const currentParentTarget = unchanged.container.querySelector<HTMLElement>(
+      '[data-ws-thread-reparent-target="thr_parent"]',
+    )!;
+    elementAt.mockReturnValue(currentParentTarget);
+    fireEvent.pointerDown(unchangedSource, {
+      button: 0,
+      pointerId: 34,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { pointerId: 34, clientX: 10, clientY: 20 });
+    fireEvent.pointerUp(window, { pointerId: 34, clientX: 10, clientY: 20 });
+    await waitFor(() => expect(unchangedMove).not.toHaveBeenCalled());
+    unchanged.unmount();
+  });
+
   it("refreshes exactly the advertised thread, archive, subtext, and authored-PR domains", async () => {
     const getOrder = vi.fn(() => ({ threadIds: ["thr_one", "thr_two"] }));
     const getGroups = vi.fn(() => ({

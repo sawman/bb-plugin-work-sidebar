@@ -49,7 +49,11 @@ describe("Threads organization lifecycle", () => {
       ]);
       threadInteractionStore
         .getState()
-        .setDrag("thr_hidden", { threadId: "thr_hidden", placement: "after" });
+        .setDrag("thr_hidden", {
+          kind: "reorder",
+          threadId: "thr_hidden",
+          placement: "after",
+        });
     });
     expect(renders).toBe(1);
 
