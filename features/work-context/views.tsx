@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Icon, type IconName } from "../../components/ui/icon";
@@ -32,6 +32,18 @@ import {
 } from "./queries";
 import { CardState } from "./card-state";
 import { BackgroundJobsCard } from "./background-jobs-view";
+import { useTrackerMutations, useTrackerSearch, type useTracker } from "../tracker/queries";
+import { LinkedTrackerRow, TrackerSearch } from "../tracker/views";
+import { projectWorkItem } from "./work-item-model";
+
+function useDebouncedValue(value: string, delay = 180) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(timer);
+  }, [delay, value]);
+  return debounced;
+}
 
 function StatusCard({ threadId }: { threadId: string }) {
   const query = useWorkStatus(threadId);
@@ -216,18 +228,30 @@ function ProviderHealth({
 type TasksRead = ReturnType<typeof useTasksRead>;
 type TasksMutations = ReturnType<typeof useTasksMutations>;
 
-function OutcomeCard({
+function WorkItemCard({
   threadId,
   tasks,
   taskMutations,
+  tracker,
 }: {
   threadId: string;
   tasks: TasksRead;
   taskMutations: TasksMutations;
+  tracker: ReturnType<typeof useTracker>;
 }) {
   const query = useWorkOutcome(threadId);
   const mutation = useWorkOutcomeMutation(threadId);
+  const rpc = useRpc<typeof rpcContract>();
+  const [trackerQuery, setTrackerQuery] = useState("");
+  const trackerSearch = useTrackerSearch(threadId, useDebouncedValue(trackerQuery));
+  const trackerMutations = useTrackerMutations(rpc, threadId);
   const outcome = query.data?.outcome;
+  const workItem = projectWorkItem({
+    outcome: outcome ?? null,
+    linked: tracker.data?.items.map(({ item, statusOptions }) => ({ ...item, statusOptions })) ?? [],
+    primaryLinearKey: tracker.data?.primaryKey ?? null,
+    legacyState: query.data?.legacy.state ?? "none",
+  });
   const sidebarOutcome = tasks.data?.tasks.find(
     (task) => task.id === outcome?.id,
   );
@@ -251,6 +275,11 @@ function OutcomeCard({
       toast.error(error instanceof Error ? error.message : failure);
     }
   };
+  const trackerBusy =
+    trackerMutations.link.isPending ||
+    trackerMutations.unlink.isPending ||
+    trackerMutations.primary.isPending ||
+    trackerMutations.status.isPending;
   const adoptLegacy = async () => {
     const taskId = legacy?.state === "adoptable" ? legacy.taskIds[0] : null;
     if (!taskId) return;
@@ -267,7 +296,7 @@ function OutcomeCard({
   };
   return (
     <CardState
-      title="Outcome"
+      title="Work item"
       className={outcome ? "ws-outcome-card" : "ws-outcome-empty"}
       trailing={
         outcome ? (
@@ -377,6 +406,26 @@ function OutcomeCard({
               {mutation.create.isPending ? "Creating…" : "Create"}
             </button>
           </div>
+          {workItem.createFromLinear ? (
+            <button
+              type="button"
+              disabled={!query.data?.tasksAvailable || mutation.create.isPending || mutation.adopt.isPending}
+              onClick={() =>
+                void report(
+                  mutation.create.mutateAsync({
+                    title: workItem.createFromLinear!.title,
+                    priority: workItem.createFromLinear!.priority,
+                  }),
+                  "Outcome created from Linear",
+                  "Could not create outcome from Linear",
+                )
+              }
+            >
+              {mutation.create.isPending
+                ? "Creating outcome…"
+                : `Create outcome from ${workItem.createFromLinear.key}`}
+            </button>
+          ) : null}
         </>
       )}
       {adoptionNotice ? (
@@ -387,6 +436,76 @@ function OutcomeCard({
           {adoptionNotice.message}
         </p>
       ) : null}
+      <section className="ws-work-item-tracker" aria-label="Linked Linear records">
+        <h3 className="ws-card-subheading">Linear</h3>
+        {tracker.isPending ? <p className="ws-card-note">Loading linked work…</p> : null}
+        {tracker.isError ? (
+          <div role="alert">
+            <p className="ws-card-note">{tracker.error.message}</p>
+            <button type="button" className="ws-text-button" onClick={() => void tracker.refetch()}>
+              Try again
+            </button>
+          </div>
+        ) : null}
+        {tracker.data && !tracker.isError ? (
+          tracker.data.visible ? (
+            <>
+              {tracker.data.items.length ? (
+                <div className="ws-linear-linked-list" role="list" aria-label="Linked Linear issues">
+                  {tracker.data.items.map((linked) => (
+                    <LinkedTrackerRow
+                      key={linked.item.key}
+                      linked={linked}
+                      busy={trackerBusy}
+                      primary={linked.item.key === tracker.data.primaryKey}
+                      onSetPrimary={() =>
+                        void report(
+                          trackerMutations.primary.mutateAsync(linked.item.key),
+                          "Primary Linear issue updated",
+                          "Could not select primary Linear issue",
+                        )
+                      }
+                      onStatus={(statusId) =>
+                        void report(
+                          trackerMutations.status
+                            .mutateAsync({ key: linked.item.key, statusId })
+                            .then((item) => toast.success(`${item.key} moved to ${item.status}`)),
+                          "Linear issue updated",
+                          "Could not update Linear issue",
+                        )
+                      }
+                      onUnlink={() =>
+                        void report(
+                          trackerMutations.unlink
+                            .mutateAsync(linked.item.key)
+                            .then(() => toast.success(`${linked.item.key} unlinked`)),
+                          "Linear issue unlinked",
+                          "Could not unlink Linear issue",
+                        )
+                      }
+                    />
+                  ))}
+                </div>
+              ) : null}
+              <TrackerSearch
+                data={tracker.data}
+                query={trackerQuery}
+                busy={trackerBusy}
+                search={trackerSearch}
+                onChange={setTrackerQuery}
+                onLink={(key) => {
+                  setTrackerQuery("");
+                  void report(
+                    trackerMutations.link.mutateAsync(key),
+                    "Linear issue linked",
+                    "Could not link Linear issue",
+                  );
+                }}
+              />
+            </>
+          ) : <p className="ws-card-note">Linear is not connected for this project.</p>
+        ) : null}
+      </section>
     </CardState>
   );
 }
@@ -737,17 +856,24 @@ function TasksCard({
   );
 }
 
-export function WorkContextCards({ threadId }: { threadId: string }) {
+export function WorkContextCards({
+  threadId,
+  tracker,
+}: {
+  threadId: string;
+  tracker: ReturnType<typeof useTracker>;
+}) {
   const rpc = useRpc<typeof rpcContract>();
   const tasks = useTasksRead();
   const taskMutations = useTasksMutations(rpc);
   return (
     <section className="ws-work-context-cards" aria-label="Work context">
       <StatusCard threadId={threadId} />
-      <OutcomeCard
+      <WorkItemCard
         threadId={threadId}
         tasks={tasks}
         taskMutations={taskMutations}
+        tracker={tracker}
       />
       <TasksCard threadId={threadId} tasks={tasks} mutations={taskMutations} />
       <GoalCard threadId={threadId} />

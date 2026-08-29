@@ -1198,9 +1198,6 @@
 .ws-pr-number-badge[data-tone="merged"] {
   color: var(--primary);
 }
-.ws-linear-card {
-  gap: 0.36rem;
-}
 .ws-linear-linked-list {
   display: grid;
   overflow: hidden;

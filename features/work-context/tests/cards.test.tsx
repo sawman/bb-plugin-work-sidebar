@@ -124,7 +124,49 @@ function fixture(overrides: Partial<Rpc> = {}): Rpc {
 }
 
 describe("registered Work context cards", () => {
-  it("orders Outcome, Tasks, Goal, Plan, then Background below Status", async () => {
+  it("renders one unified Work item card instead of separate Outcome and Linear cards", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      {
+        rpc: fixture({
+          getWorkOutcome: () => populatedOutcome,
+          getWorkTracker: () => ({
+            visible: true,
+            available: true,
+            message: null,
+            primaryKey: "LIN-1",
+            suggestions: [],
+            items: [
+              {
+                item: {
+                  key: "LIN-1",
+                  title: "Linked Linear work",
+                  url: "https://linear.app/example/issue/LIN-1",
+                  status: "Todo",
+                  stateCategory: "todo",
+                  priority: "high",
+                  assignee: null,
+                  project: null,
+                },
+                statusOptions: [{ id: "todo", name: "Todo", current: true }],
+              },
+            ],
+          }),
+        }),
+      },
+    );
+
+    await waitFor(() => expect(slot.getByText("Linked Linear work")).toBeTruthy());
+    expect(slot.queryByText("Outcome")).toBeNull();
+    expect(slot.container.querySelectorAll(".ws-linear-card")).toHaveLength(0);
+    slot.lifecycle.unmount();
+    getPluginQueryClient().clear();
+  });
+
+  it("orders Work item, Tasks, Goal, Plan, then Background below Status", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
@@ -144,7 +186,7 @@ describe("registered Work context cards", () => {
     getPluginQueryClient().clear();
     expect(cardOrder).toEqual([
       "status",
-      "outcome",
+      "work item",
       "tasks",
       "goal",
       "plan",
@@ -446,7 +488,7 @@ describe("registered Work context cards", () => {
       name: "Copy task ID WORK-1",
     });
     const outcomeInfo = slot.container.querySelector(
-      '[data-card="outcome"] .ws-card-heading-info',
+      '[data-card="work item"] .ws-card-heading-info',
     );
     expect(outcomeInfo?.contains(taskId)).toBe(true);
     const priority = slot.getByRole("img", { name: "High priority" });
@@ -952,7 +994,7 @@ describe("registered Work context cards", () => {
       });
       expect(
         slot.container
-          .querySelector('[data-card="outcome"] .ws-card-heading-info')
+          .querySelector('[data-card="work item"] .ws-card-heading-info')
           ?.contains(controls),
       ).toBe(false);
       expect(previous.querySelector("svg")).toBeTruthy();
