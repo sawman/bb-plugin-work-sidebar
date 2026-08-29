@@ -141,8 +141,8 @@ actionable error as the menu path and leave order and grouping unchanged.
 Both surfaces use one label. The menu item and drag target are **To Top** and
 carry the accessible description "Move this thread out of its parent and make
 it a top-level thread", also exposed as the tooltip. The success toast and
-rejection copy use the same wording. **Make top-level** is retired and must
-not survive as an alias.
+rejection copy use the same wording. The former promotion label is retired and
+must not survive as an alias.
 
 The operation preserves the selected thread and does not implicitly open or
 split it.

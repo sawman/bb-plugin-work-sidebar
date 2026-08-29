@@ -1,7 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useId, useState } from "react";
 import { toast } from "sonner";
 import { ThreadHierarchyPicker } from "./thread-hierarchy-picker";
 import { useThreadHierarchy } from "./thread-hierarchy-context";
+
+export const THREAD_TO_TOP_DESCRIPTION =
+  "Move this thread out of its parent and make it a top-level thread";
 
 export function useThreadHierarchyMenu({
   threadId,
@@ -12,6 +15,7 @@ export function useThreadHierarchyMenu({
 }) {
   const hierarchy = useThreadHierarchy();
   const [open, setOpen] = useState(false);
+  const descriptionId = useId();
   const close = useCallback(() => {
     setOpen(false);
     requestAnimationFrame(() => {
@@ -23,7 +27,7 @@ export function useThreadHierarchyMenu({
   const promote = async () => {
     try {
       await hierarchy.move(threadId, null);
-      toast.success(`${title} is now top-level`);
+      toast.success(THREAD_TO_TOP_DESCRIPTION);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not move thread",
@@ -34,6 +38,8 @@ export function useThreadHierarchyMenu({
     disabled: !hierarchy.ready || hierarchy.pendingThreadId === threadId,
     open: () => setOpen(true),
     promote,
+    toTopDescription: THREAD_TO_TOP_DESCRIPTION,
+    toTopDescriptionId: descriptionId,
     picker: (
       <ThreadHierarchyPicker
         threadId={threadId}

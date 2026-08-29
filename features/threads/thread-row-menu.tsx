@@ -61,12 +61,17 @@ export function ThreadRowMenu({
           <ContextMenuItem onSelect={actions.startRename}>Rename</ContextMenuItem>
           <ContextMenuSeparator />
           {parentThreadId ? (
-            <ContextMenuItem
-              disabled={hierarchy.disabled}
-              onSelect={() => void hierarchy.promote()}
-            >
-              Make top-level
-            </ContextMenuItem>
+            <>
+              <ContextMenuItem
+                aria-describedby={hierarchy.toTopDescriptionId}
+                disabled={hierarchy.disabled}
+                title={hierarchy.toTopDescription}
+                onSelect={() => void hierarchy.promote()}
+              >
+                To Top
+              </ContextMenuItem>
+              <span id={hierarchy.toTopDescriptionId} className="ws-sr-only" role="tooltip">{hierarchy.toTopDescription}</span>
+            </>
           ) : null}
           <ContextMenuItem
             disabled={hierarchy.disabled}
