@@ -5,7 +5,7 @@ import type { SidebarThreadOrganization } from "./sidebar-organization";
 import type { ThreadProviderDirectory } from "@/components/threads/thread-provider-logo";
 import { SidebarTable } from "@/components/ui/sidebar-table";
 import { WorkThreadTree } from "./thread-tree";
-
+import { ThreadToTopDropZone } from "./thread-to-top-drop-zone";
 type SidebarGroupTreeProps = {
   organization: SidebarThreadOrganization;
   activeThreadId: string | null;
@@ -42,9 +42,14 @@ function ThreadTree({
   staleWorkingMinutes,
   label,
 }: ThreadTreeProps) {
+  const showToTop = Boolean(organization.dragThreadId);
+  const reparentingToTop =
+    organization.dropTarget?.kind === "reparent" &&
+    organization.dropTarget.parentThreadId === null;
   return (
     <section className="ws-hierarchy" aria-label={label}>
       <SidebarTable>
+        {showToTop && <ThreadToTopDropZone active={reparentingToTop} />}
         {roots.map((thread) => (
           <WorkThreadTree
             key={thread.id}
@@ -90,15 +95,22 @@ export function SidebarThreadGroups({
   emptyMessage,
 }: SidebarGroupTreeProps) {
   const [activeOpen, setActiveOpen] = useState(true);
-  const [archivedThreadIds, setArchivedThreadIds] = useState<
-    ReadonlySet<string>
-  >(new Set());
-  const dropTargetId = organization.dropTarget?.threadId;
+  const [archivedThreadIds, setArchivedThreadIds] = useState<ReadonlySet<string>>(new Set());
+  const dropTargetId =
+    organization.dropTarget?.kind === "reorder"
+      ? organization.dropTarget.threadId
+      : null;
   const searching = searchQuery.trim().length > 0;
   const clearDrop = () => {
     organization.setDragThreadId(null);
     organization.setDropTarget(null);
   };
+  const setReorderTarget = (threadId: string) =>
+    organization.setDropTarget({
+      kind: "reorder",
+      threadId,
+      placement: "after",
+    });
   const allowActiveDrop = (event: DragEvent<HTMLElement>) => {
     const id = sourceId(event, organization.dragThreadId);
     if (!id || (!organization.groupIds.has(id) && !archivedThreadIds.has(id)))
@@ -131,11 +143,7 @@ export function SidebarThreadGroups({
                   if (!searching) setActiveOpen(event.currentTarget.open);
                 }}
                 onDragOver={(event) => {
-                  if (allowActiveDrop(event))
-                    organization.setDropTarget({
-                      threadId: "active",
-                      placement: "after",
-                    });
+                  if (allowActiveDrop(event)) setReorderTarget("active");
                 }}
                 onDrop={(event) => {
                   const id = allowActiveDrop(event);
@@ -172,11 +180,7 @@ export function SidebarThreadGroups({
               data-drop-target={dropTargetId === group.id || undefined}
               open
               onDragOver={(event) => {
-                if (allowGroupDrop(event, group.id))
-                  organization.setDropTarget({
-                    threadId: group.id,
-                    placement: "after",
-                  });
+                if (allowGroupDrop(event, group.id)) setReorderTarget(group.id);
               }}
               onDrop={(event) => {
                 const id = allowGroupDrop(event, group.id);

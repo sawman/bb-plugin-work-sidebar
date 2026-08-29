@@ -147,10 +147,13 @@ export function ThreadHierarchyProvider({
       candidates,
       openPicker,
       closePicker,
-      move: (threadId, parentThreadId) =>
-        mutation.mutateAsync({ threadId, parentThreadId }),
+      move: (threadId, parentThreadId) => {
+        const decision = ancestry.decide(threadId, parentThreadId);
+        if (!decision.allowed) return Promise.reject(new Error(decision.message));
+        return mutation.mutateAsync({ threadId, parentThreadId });
+      },
     }),
-    [candidates, closePicker, mutation, openPicker, picker, ready],
+    [ancestry, candidates, closePicker, mutation, openPicker, picker, ready],
   );
   return (
     <ThreadHierarchyContext.Provider value={value}>

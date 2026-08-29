@@ -12,7 +12,10 @@ import { SidebarTable } from "@/components/ui/sidebar-table";
 import type { ThreadProviderDirectory } from "@/components/threads/thread-provider-logo";
 
 type Project = { id: string; name: string; isPersonal: boolean };
-type DropTarget = { threadId: string; placement: "before" | "after" } | null;
+type DropTarget =
+  | { kind: "reorder"; threadId: string; placement: "before" | "after" }
+  | { kind: "reparent"; parentThreadId: string | null }
+  | null;
 const EMPTY_ARCHIVED_THREADS: ArchivedThread[] = [];
 
 export function ArchivedThreads({
@@ -124,7 +127,11 @@ export function ArchivedThreads({
     <details
       className="ws-thread-group ws-archived"
       data-ws-thread-drop-zone="archive"
-      data-drop-target={dropTarget?.threadId === "archive" || undefined}
+      data-drop-target={
+        (dropTarget?.kind === "reorder" &&
+          dropTarget.threadId === "archive") ||
+        undefined
+      }
       open={effectivelyOpen}
       onToggle={(event) => {
         if (!searching) setOpen(event.currentTarget.open);
@@ -134,7 +141,11 @@ export function ArchivedThreads({
         if (!id || ids.has(id)) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
-        onDropTargetChange({ threadId: "archive", placement: "after" });
+        onDropTargetChange({
+          kind: "reorder",
+          threadId: "archive",
+          placement: "after",
+        });
       }}
       onDrop={(event) => {
         const id = dragThreadId ?? event.dataTransfer.getData("text/plain");

@@ -454,6 +454,35 @@
   grid-template-columns: 0.8rem minmax(0, 1fr) auto;
   width: 100%;
 }
+.ws-thread-reparent-target {
+  grid-column: 1;
+  grid-row: 1;
+  width: 0.7rem;
+  height: 0.7rem;
+  margin-inline: 0.22rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--background);
+}
+.ws-thread[data-reparent-target="true"] .ws-thread-reparent-target {
+  border-color: var(--primary);
+  background: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 28%, transparent);
+}
+.ws-thread-to-top-drop-zone {
+  margin: 0.2rem 0.35rem;
+  border: 1px dashed var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0.18rem 0.35rem;
+  color: var(--muted-foreground);
+  font: var(--ws-text-metadata);
+  line-height: 1.2;
+}
+.ws-thread-to-top-drop-zone[data-drop-target="true"] {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--accent) 78%, var(--primary) 22%);
+}
 .ws-thread > .ws-rename {
   grid-column: 2;
   grid-row: 1;
