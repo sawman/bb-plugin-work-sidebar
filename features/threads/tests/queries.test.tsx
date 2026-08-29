@@ -4,6 +4,8 @@ import { QueryClient } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type PropsWithChildren } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { queryKeys } from "../../../query-runtime";
+import { trackerKeys } from "../../tracker/model";
 import { normalizeThreadGroups } from "../model";
 import {
   threadQueryKeys,
@@ -156,7 +158,7 @@ describe("R9 Threads query ownership", () => {
     client.clear();
   });
 
-  it("moves one thread and invalidates only thread preference projections", async () => {
+  it("reroots every affected Work projection and refreshes the shared task families", async () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
@@ -164,6 +166,9 @@ describe("R9 Threads query ownership", () => {
       call: vi.fn(async () => ({
         threadId: "thr_child",
         parentThreadId: null,
+        oldRootThreadId: "thr_root",
+        newRootThreadId: "thr_child",
+        affectedThreadIds: ["thr_child", "thr_nested"],
       })),
     };
     const invalidate = vi.spyOn(client, "invalidateQueries");
@@ -183,7 +188,22 @@ describe("R9 Threads query ownership", () => {
       threadId: "thr_child",
       parentThreadId: null,
     });
-    expect(invalidate).toHaveBeenCalledTimes(1);
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: threadQueryKeys.root });
+    const workKeys = (threadId: string) => [
+      queryKeys.work.status(threadId),
+      queryKeys.work.activity(threadId),
+      queryKeys.work.backgroundJobs(threadId),
+      queryKeys.work.outcome(threadId),
+      queryKeys.work.goal(threadId),
+      queryKeys.work.plan(threadId),
+      queryKeys.work.providerHealth(threadId),
+      trackerKeys.context(threadId),
+    ];
+    expect(invalidate.mock.calls).toEqual([
+      [{ queryKey: threadQueryKeys.root }],
+      ...workKeys("thr_child").map((queryKey) => [{ queryKey }]),
+      ...workKeys("thr_nested").map((queryKey) => [{ queryKey }]),
+      [{ queryKey: queryKeys.sidebar.tasks.list() }],
+      [{ queryKey: queryKeys.sidebar.tasks.links() }],
+    ]);
   });
 });

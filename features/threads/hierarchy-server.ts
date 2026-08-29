@@ -1,3 +1,4 @@
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import {
   evaluateThreadHierarchyMove,
   type HierarchyBinding,
@@ -37,7 +38,12 @@ type ThreadHierarchyDependencies = Readonly<{
     groups: SidebarThreadGroupPreferences["groups"],
     activeGroupPosition: number,
   ): Promise<unknown>;
+  publishWork(rootThreadId: string): void;
 }>;
+
+const HIERARCHY_LIST_LIMIT = 2_000;
+const HIERARCHY_NOT_FULLY_LOADED =
+  "The thread hierarchy is not fully loaded. Refresh the sidebar and try again.";
 
 async function projectBindings(
   stored: StoredWorkBindings,
@@ -86,6 +92,8 @@ export function createThreadHierarchyService(
         ? await dependencies.getThread(parentThreadId)
         : null;
       const listed = await dependencies.listThreads(source.projectId);
+      if (listed.length >= HIERARCHY_LIST_LIMIT)
+        throw new Error(HIERARCHY_NOT_FULLY_LOADED);
       const threads = new Map(listed.map((thread) => [thread.id, thread]));
       threads.set(source.id, source);
       if (parent) threads.set(parent.id, parent);
@@ -132,7 +140,18 @@ export function createThreadHierarchyService(
         }
         throw error;
       }
-      return { threadId, parentThreadId };
+      for (const rootThreadId of new Set([
+        decision.oldRootThreadId,
+        decision.newRootThreadId,
+      ]))
+        dependencies.publishWork(rootThreadId);
+      return {
+        threadId,
+        parentThreadId,
+        oldRootThreadId: decision.oldRootThreadId,
+        newRootThreadId: decision.newRootThreadId,
+        affectedThreadIds: decision.affectedThreadIds,
+      };
     },
   };
 }
@@ -162,7 +181,7 @@ export function createSdkThreadHierarchyService(
         projectId,
         archived: false,
         includeHidden: true,
-        limit: 2_000,
+        limit: HIERARCHY_LIST_LIMIT,
       });
       return threads.map((thread) => ({
         id: thread.id,
@@ -179,6 +198,10 @@ export function createSdkThreadHierarchyService(
     },
     readGroups: preferences.groups,
     saveGroups: preferences.saveGroups,
+    publishWork: (rootThreadId) =>
+      bb.realtime.publish("work-sidebar:changed", {
+        family: "work",
+        rootThreadId,
+      }),
   });
 }
-import type { BbPluginApi } from "@get-bb/plugin-sdk";

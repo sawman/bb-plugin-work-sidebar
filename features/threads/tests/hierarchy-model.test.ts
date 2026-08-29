@@ -178,4 +178,34 @@ describe("thread hierarchy move rules", () => {
       ),
     ).toEqual(["thr_peer"]);
   });
+
+  it("puts valid top-level parents first and distinguishes unloaded ancestry from a cycle", () => {
+    expect(
+      threadHierarchyCandidates(threads, [], "thr_child").map(
+        (thread) => thread.id,
+      ),
+    ).toEqual(["thr_other", "thr_peer"]);
+
+    expect(
+      evaluateThreadHierarchyMove({
+        threads: threads.filter((thread) => thread.id !== "thr_root"),
+        bindings: [],
+        sourceThreadId: "thr_child",
+        parentThreadId: null,
+      }),
+    ).toMatchObject({ allowed: false, code: "hierarchy_not_fully_loaded" });
+
+    expect(
+      evaluateThreadHierarchyMove({
+        threads: threads.map((thread) =>
+          thread.id === "thr_root"
+            ? { ...thread, parentThreadId: "thr_nested" }
+            : thread,
+        ),
+        bindings: [],
+        sourceThreadId: "thr_child",
+        parentThreadId: null,
+      }),
+    ).toMatchObject({ allowed: false, code: "invalid_hierarchy" });
+  });
 });

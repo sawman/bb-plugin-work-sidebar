@@ -17,6 +17,9 @@ import {
   type SidebarThreadGroup,
   type SidebarThreadGroupPreferences,
 } from "./model";
+import { invalidateTaskQueries } from "../tasks/mutations";
+import { invalidateTracker } from "../tracker/queries";
+import { invalidateWorkContextCards } from "../work-context/queries";
 
 const root = ["work-sidebar", "sidebar", "threads"] as const;
 export const threadQueryKeys = {
@@ -40,8 +43,14 @@ export function useThreadHierarchyMutation(rpc: ThreadsRpc) {
       threadId: string;
       parentThreadId: string | null;
     }) => rpc.call("moveSidebarThread", input),
-    onSuccess: () =>
-      client.invalidateQueries({ queryKey: threadQueryKeys.root }),
+    onSuccess: async (result) => {
+      await client.invalidateQueries({ queryKey: threadQueryKeys.root });
+      for (const threadId of result.affectedThreadIds) {
+        await invalidateWorkContextCards(client, threadId);
+        await invalidateTracker(client, threadId);
+      }
+      await invalidateTaskQueries(client, ["list", "links"]);
+    },
   });
 }
 

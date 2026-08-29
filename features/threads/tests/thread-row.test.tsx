@@ -17,7 +17,12 @@ describe("R9 production ThreadRow host behavior", () => {
     const moveThread = vi.fn((input: {
       threadId: string;
       parentThreadId: string | null;
-    }) => input);
+    }) => ({
+      ...input,
+      oldRootThreadId: "thr_parent",
+      newRootThreadId: input.parentThreadId ?? input.threadId,
+      affectedThreadIds: [input.threadId],
+    }));
     const slot = renderSlot(
       app.threadLists[0]!,
       {
@@ -198,7 +203,7 @@ describe("R9 production ThreadRow host behavior", () => {
     );
     fireEvent.contextMenu(slot.getByRole("link", { name: /Parent/ }));
     fireEvent.click(await slot.findByRole("menuitem", { name: "Move under…" }));
-    fireEvent.click(await slot.findByRole("option", { name: "Other" }));
+    fireEvent.click(await slot.findByRole("option", { name: /^Other/ }));
     await waitFor(() =>
       expect(moveThread).toHaveBeenCalledWith({
         threadId: "thr_parent",
@@ -225,8 +230,10 @@ describe("R9 production ThreadRow host behavior", () => {
         parentThreadId: null,
       }),
     );
-    expect(toast.success).toHaveBeenCalledWith(
-      "Move this thread out of its parent and make it a top-level thread",
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith(
+        "Move this thread out of its parent and make it a top-level thread",
+      ),
     );
     fireEvent.contextMenu(slot.getByRole("link", { name: /Parent/ }));
     const renameAfterHierarchy = await slot.findByRole("menuitem", {

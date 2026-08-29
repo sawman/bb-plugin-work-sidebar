@@ -22,6 +22,7 @@ export function ThreadRowMenu({
   groupId,
   groups,
   onMoveToGroup,
+  onFocusReturn,
   actions,
 }: {
   children: ReactElement<HTMLAttributes<HTMLElement>>;
@@ -34,12 +35,12 @@ export function ThreadRowMenu({
   groupId: string | null;
   groups: readonly SidebarThreadGroup[];
   onMoveToGroup(threadId: string, groupId: string | null): void;
+  onFocusReturn(): void;
   actions: ThreadRowActions;
 }) {
-  const hierarchy = useThreadHierarchyMenu({ threadId, title });
+  const hierarchy = useThreadHierarchyMenu({ threadId, title, onFocusReturn });
   return (
-    <>
-      <ContextMenu>
+    <ContextMenu>
         <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
         <ContextMenuContent aria-label={`Actions for ${title}`}>
         <ContextMenuLabel>{title}</ContextMenuLabel>
@@ -108,8 +109,6 @@ export function ThreadRowMenu({
           Delete
         </ContextMenuItem>
         </ContextMenuContent>
-      </ContextMenu>
-      {hierarchy.picker}
-    </>
+    </ContextMenu>
   );
 }

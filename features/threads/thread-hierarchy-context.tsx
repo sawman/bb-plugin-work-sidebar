@@ -1,7 +1,10 @@
 import {
+  useCallback,
   createContext,
   useContext,
   useMemo,
+  useRef,
+  useState,
   type ReactNode,
 } from "react";
 import {
@@ -11,16 +14,28 @@ import {
 import type { rpcContract } from "../../contracts";
 import type { ThreadTaskLink } from "../../work-model";
 import {
-  threadHierarchyCandidates,
+  createThreadHierarchyIndex,
   type HierarchyBinding,
   type HierarchyThread,
+  type ThreadHierarchyCandidate,
 } from "./hierarchy-model";
 import { useThreadHierarchyMutation } from "./queries";
+
+export type ThreadHierarchyPickerRequest = Readonly<{
+  anchor: HTMLElement;
+  anchorRect: Pick<DOMRect, "bottom" | "left" | "right" | "top">;
+  onFocusReturn(): void;
+  threadId: string;
+  title: string;
+}>;
 
 type ThreadHierarchyContextValue = Readonly<{
   ready: boolean;
   pendingThreadId: string | null;
-  candidates(threadId: string): HierarchyThread[];
+  picker: ThreadHierarchyPickerRequest | null;
+  candidates: readonly ThreadHierarchyCandidate[];
+  openPicker(request: ThreadHierarchyPickerRequest): void;
+  closePicker(): void;
   move(threadId: string, parentThreadId: string | null): Promise<unknown>;
 }>;
 
@@ -30,7 +45,10 @@ const ThreadHierarchyContext = createContext<ThreadHierarchyContextValue | null>
 const disabledThreadHierarchy: ThreadHierarchyContextValue = {
   ready: false,
   pendingThreadId: null,
-  candidates: () => [],
+  picker: null,
+  candidates: [],
+  openPicker: () => undefined,
+  closePicker: () => undefined,
   move: () => Promise.reject(new Error("Thread hierarchy is unavailable.")),
 };
 
@@ -88,25 +106,51 @@ export function ThreadHierarchyProvider({
 }) {
   const rpc = useRpc<typeof rpcContract>();
   const mutation = useThreadHierarchyMutation(rpc);
+  const [picker, setPicker] = useState<ThreadHierarchyPickerRequest | null>(null);
+  const pickerRef = useRef<ThreadHierarchyPickerRequest | null>(null);
   const projectedThreads = useMemo(() => projectThreads(threads), [threads]);
   const bindings = useMemo(
     () => projectBindings(threads, taskLinks),
     [taskLinks, threads],
   );
+  const ancestry = useMemo(
+    () => createThreadHierarchyIndex(projectedThreads, bindings),
+    [bindings, projectedThreads],
+  );
+  const candidates = useMemo(
+    () =>
+      ready && picker
+        ? ancestry.candidates(picker.threadId)
+        : ([] as ThreadHierarchyCandidate[]),
+    [ancestry, picker, ready],
+  );
+  const openPicker = useCallback((request: ThreadHierarchyPickerRequest) => {
+    pickerRef.current = request;
+    setPicker(request);
+  }, []);
+  const closePicker = useCallback(() => {
+    const returnFocus = pickerRef.current?.onFocusReturn;
+    pickerRef.current = null;
+    setPicker(null);
+    if (!returnFocus) return;
+    const focus = () => returnFocus();
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(focus);
+    else queueMicrotask(focus);
+  }, []);
   const value = useMemo<ThreadHierarchyContextValue>(
     () => ({
       ready,
       pendingThreadId: mutation.isPending
         ? (mutation.variables?.threadId ?? null)
         : null,
-      candidates: (threadId) =>
-        ready
-          ? threadHierarchyCandidates(projectedThreads, bindings, threadId)
-          : [],
+      picker,
+      candidates,
+      openPicker,
+      closePicker,
       move: (threadId, parentThreadId) =>
         mutation.mutateAsync({ threadId, parentThreadId }),
     }),
-    [bindings, mutation, projectedThreads, ready],
+    [candidates, closePicker, mutation, openPicker, picker, ready],
   );
   return (
     <ThreadHierarchyContext.Provider value={value}>
