@@ -62,22 +62,18 @@ export type TaskRowProps = {
       title: string;
       providerId: string;
       provider?: ThreadProvider;
+      unavailable?: boolean;
     }
   >;
   onAttachToThread(taskId: string, threadId: string): Promise<void>;
   onDetachFromThread(taskId: string, threadId: string): Promise<void>;
   updatingTaskId: string | null;
+  onUpdateAssignee(taskId: string, assignee: SidebarTask["assignee"]): Promise<void>;
+  updatingAssigneeTaskId: string | null;
   updatingAttachmentTaskId: string | null;
   selectedTaskIds: ReadonlySet<string>;
   onSelect(taskId: string, event: ReactMouseEvent<HTMLButtonElement>): void;
 };
-
-function bindingLabel(link: ThreadTaskLink): string {
-  if (link.role === "outcome") return "Bound outcome task";
-  return link.mode === "delegated"
-    ? "Bound delegated execution task"
-    : "Bound direct execution task";
-}
 
 export function TaskRow(props: TaskRowProps) {
   const {
@@ -101,6 +97,8 @@ export function TaskRow(props: TaskRowProps) {
     onAttachToThread,
     onDetachFromThread,
     updatingTaskId,
+    onUpdateAssignee,
+    updatingAssigneeTaskId,
     selectedTaskIds,
     onSelect,
   } = props;
@@ -108,17 +106,23 @@ export function TaskRow(props: TaskRowProps) {
   const bindingLink = bindingLinks.get(task.id) ?? null;
   const bindingOwnerLink = bindingOwnerLinks.get(task.id) ?? null;
   const bindingOwned = Boolean(bindingOwnerLink);
-  const ownerThread = bindingOwnerLink
-    ? (ownerThreads.get(bindingOwnerLink.threadId) ?? null)
-    : null;
-  const ownerThreadTitle =
-    ownerThread?.title ?? bindingOwnerLink?.threadTitle ?? null;
+  const ownerThreadId = bindingOwnerLink?.threadId ?? task.linkedThreadIds[0] ?? null;
+  const ownerThread = ownerThreadId ? (ownerThreads.get(ownerThreadId) ?? null) : null;
+  const ownerThreadTitle = ownerThread?.title ?? bindingOwnerLink?.threadTitle ?? ownerThreadId;
+  const pickerThreads = ownerThreadId && !ownerThread
+    ? new Map(ownerThreads).set(ownerThreadId, {
+        title: ownerThreadTitle ?? ownerThreadId,
+        providerId: "agent",
+        unavailable: true,
+      })
+    : ownerThreads;
   const bindingDescriptionId = `ws-task-binding-${task.id}`;
-  const bindingState = bindingOwnerLink
-    ? bindingOwnerLink.role === "execution" && ownerThreadTitle
-      ? `Working thread ${ownerThreadTitle}`
-      : bindingLabel(bindingOwnerLink)
+  const ownerState = ownerThreadId
+    ? ownerThread
+      ? `Owner thread ${ownerThread.title} via ${ownerThread.providerId}`
+      : `Owner thread unavailable${ownerThreadTitle ? `: ${ownerThreadTitle}` : ""}`
     : null;
+  const isUnowned = !ownerThreadId;
   const assigned = Boolean(
     bindingLink || (activeThreadId && task.linkedThreadIds.includes(activeThreadId)),
   );
@@ -196,7 +200,7 @@ export function TaskRow(props: TaskRowProps) {
               className={`ws-task-assign ${assigned ? "ws-task-assigned" : ""}`}
               type="button"
               aria-pressed={selectedTaskIds.has(task.id)}
-              aria-describedby={bindingState ? bindingDescriptionId : undefined}
+              aria-describedby={ownerState ? bindingDescriptionId : undefined}
               onClick={(event) => onSelect(task.id, event)}
               title={task.title}
             >
@@ -211,22 +215,21 @@ export function TaskRow(props: TaskRowProps) {
               {showProject && (
                 <span className="ws-task-badge">{task.projectName}</span>
               )}
-              {bindingState ? (
+              {ownerState ? (
                 <span id={bindingDescriptionId} className="ws-sr-only">
-                  {bindingState}
+                  {ownerState}
                 </span>
               ) : null}
               <ThreadAssignmentPicker
                 taskKey={task.key}
+                ownerThreadId={ownerThreadId}
                 linkedThreadIds={task.linkedThreadIds}
                 lockedThreadId={bindingOwnerLink?.threadId ?? null}
-                threads={ownerThreads}
+                threads={pickerThreads}
                 disabled={props.updatingAttachmentTaskId === task.id}
-                onToggle={(threadId, attached) =>
-                  void (attached
-                    ? onAttachToThread(task.id, threadId)
-                    : onDetachFromThread(task.id, threadId))
-                }
+                onToggle={(threadId, attached) => attached
+                  ? onAttachToThread(task.id, threadId)
+                  : onDetachFromThread(task.id, threadId)}
               />
             </div>
           </div>
@@ -242,6 +245,16 @@ export function TaskRow(props: TaskRowProps) {
               </CopyBadge>
               <span className="ws-task-priority-slot">
                 <TaskPriorityIcon priority={task.priority} />
+              </span>
+              <span
+                className="ws-task-assignee-readonly"
+              role="img"
+              aria-label={`${task.assignee === "agent" ? "Agent" : "Human"} assigned (read-only)`}
+                title={isUnowned
+                  ? "An unowned task can be reassigned from this row's context menu."
+                  : "Assignment is changed from the Work card when this task has an owner thread."}
+              >
+                <Icon name={task.assignee === "agent" ? "Bot" : "User"} aria-hidden />
               </span>
             </span>
             <span className="ws-task-row-controls">
@@ -326,6 +339,32 @@ export function TaskRow(props: TaskRowProps) {
         >
           Delete task
         </ContextMenuItem>
+        {isUnowned ? (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuLabel>Unowned task responsibility</ContextMenuLabel>
+            <ContextMenuItem
+              disabled={
+                task.assignee === "human" || updatingAssigneeTaskId === task.id
+              }
+              onSelect={() => {
+                void onUpdateAssignee(task.id, "human").catch(() => undefined);
+              }}
+            >
+              Assign to Human
+            </ContextMenuItem>
+            <ContextMenuItem
+              disabled={
+                task.assignee === "agent" || updatingAssigneeTaskId === task.id
+              }
+              onSelect={() => {
+                void onUpdateAssignee(task.id, "agent").catch(() => undefined);
+              }}
+            >
+              Assign to Agent
+            </ContextMenuItem>
+          </>
+        ) : null}
       </ContextMenuContent>
     </ContextMenu>
   );

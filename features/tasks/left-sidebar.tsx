@@ -196,9 +196,23 @@ export function TasksLeftSidebar({
             ? cause.message
             : `Could not ${attached ? "attach" : "detach"} task`,
         );
+        throw cause;
       }
     },
     [mutations.attachment],
+  );
+  const updateAssignee = useCallback(
+    async (taskId: string, assignee: SidebarTask["assignee"]) => {
+      try {
+        await mutations.assignment.mutateAsync({ taskId, assignee });
+      } catch (cause) {
+        toast.error(
+          cause instanceof Error ? cause.message : "Could not update assignment",
+        );
+        throw cause;
+      }
+    },
+    [mutations.assignment],
   );
   const remove = useCallback(
     async (task: SidebarTask) => {
@@ -433,6 +447,12 @@ export function TasksLeftSidebar({
                 updatingTaskId={
                   mutations.status.isPending
                     ? (mutations.status.variables?.taskId ?? null)
+                    : null
+                }
+                onUpdateAssignee={updateAssignee}
+                updatingAssigneeTaskId={
+                  mutations.assignment.isPending
+                    ? (mutations.assignment.variables?.taskId ?? null)
                     : null
                 }
                 updatingAttachmentTaskId={
