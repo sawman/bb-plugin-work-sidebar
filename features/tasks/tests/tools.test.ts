@@ -270,7 +270,7 @@ describe("agent-facing Tasks workflow tools", () => {
     });
   });
 
-  it("updates safe task fields and assignment, then publishes one Tasks invalidation", async () => {
+  it("updates safe task fields and assignment, then publishes root Work and Tasks invalidations", async () => {
     const { host, callRpc } = fixture();
     await plugin(host.bb);
 
@@ -300,6 +300,10 @@ describe("agent-facing Tasks workflow tools", () => {
       }),
     );
     expect(host.harness.inspection.realtimeSignals).toEqual([
+      {
+        channel: "work-sidebar:changed",
+        payload: { family: "work", rootThreadId: THREAD_ID },
+      },
       {
         channel: "work-sidebar:changed",
         payload: { family: "tasks", threadId: THREAD_ID },
@@ -344,6 +348,13 @@ describe("agent-facing Tasks workflow tools", () => {
         { threadId: THREAD_ID, projectId: "proj_root" },
       ),
     ).rejects.toThrow();
+    await expect(
+      host.harness.behavior.callAgentTool(
+        "bind_execution_owner",
+        { idempotencyKey: "anything", mode: "direct", leaked: true } as never,
+        { threadId: THREAD_ID, projectId: "proj_root" },
+      ),
+    ).rejects.toThrow();
   });
 
   it("runs the complete durable task journey with exact ordered invalidations", async () => {
@@ -371,6 +382,14 @@ describe("agent-facing Tasks workflow tools", () => {
       { title: "Human decision", description: "Choose the policy", idempotencyKey: "human-decision", assignee: "human" },
       context,
     );
+    await expect(
+      host.harness.behavior.callRpc("getWorkOutcome", { threadId: THREAD_ID }),
+    ).resolves.toMatchObject({
+      executionTasks: [
+        expect.objectContaining({ key: "BBPLUG-62", assignee: "agent" }),
+        expect.objectContaining({ key: "BBPLUG-63", assignee: "human" }),
+      ],
+    });
     const details = await host.harness.behavior.callAgentTool(
       "get_task",
       { key: "BBPLUG-63" },
@@ -402,7 +421,9 @@ describe("agent-facing Tasks workflow tools", () => {
       { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: THREAD_ID } },
       { channel: "work-sidebar:changed", payload: { family: "work", rootThreadId: THREAD_ID } },
       { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: THREAD_ID } },
+      { channel: "work-sidebar:changed", payload: { family: "work", rootThreadId: THREAD_ID } },
       { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: THREAD_ID } },
+      { channel: "work-sidebar:changed", payload: { family: "work", rootThreadId: THREAD_ID } },
       { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: THREAD_ID } },
     ]);
   });

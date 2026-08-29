@@ -659,15 +659,15 @@ describe("Tasks registered controls", () => {
     await waitFor(() => expect((rendered.getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(true)); rendered.lifecycle.unmount(); getPluginQueryClient().clear();
 
     const successfulAssignment = deferred<unknown>(); const successfulCall = vi.fn((method) => method === "updateTaskAssignee" ? successfulAssignment.promise : Promise.resolve({})); const successful = renderSlot(captured.threadPanelActions[0]!, { threadId: "thr_test", params: null }, { rpc: rpcFixtures(() => tasks([{ ...task, linkedThreadIds: ["thr_test"] }]), successfulCall) });
-    await waitFor(() => expect(successful.getByLabelText("Human assigned")).toBeTruthy()); fireEvent.click(successful.getByLabelText("Human assigned")); fireEvent.click(successful.getByRole("option", { name: "Agent" }));
-    await waitFor(() => expect(successfulCall).toHaveBeenCalledWith("updateTaskAssignee", { taskId: "task_1", assignee: "agent" })); expect((successful.getByLabelText("Agent assigned") as HTMLButtonElement).disabled).toBe(true); successfulAssignment.resolve({});
-    await waitFor(() => expect(successful.getByLabelText("Human assigned")).toBeTruthy()); successful.lifecycle.unmount(); getPluginQueryClient().clear();
+    await waitFor(() => expect(successful.getByLabelText("Human assigned to WORK-1")).toBeTruthy()); fireEvent.click(successful.getByLabelText("Human assigned to WORK-1")); fireEvent.click(successful.getByRole("option", { name: "Agent" }));
+    await waitFor(() => expect(successfulCall).toHaveBeenCalledWith("updateTaskAssignee", { taskId: "task_1", assignee: "agent" })); expect((successful.getByLabelText("Agent assigned to WORK-1") as HTMLButtonElement).disabled).toBe(true); successfulAssignment.resolve({});
+    await waitFor(() => expect(successful.getByLabelText("Human assigned to WORK-1")).toBeTruthy()); successful.lifecycle.unmount(); getPluginQueryClient().clear();
 
     const assignment = deferred<unknown>(); const detach = deferred<unknown>(); const toastError = vi.spyOn(toast, "error"); const rightCall = vi.fn((method) => method === "updateTaskAssignee" ? assignment.promise : method === "detachTaskFromThread" ? detach.promise : Promise.resolve({}));
     const right = renderSlot(captured.threadPanelActions[0]!, { threadId: "thr_test", params: null }, { rpc: rpcFixtures(() => tasks([{ ...task, linkedThreadIds: ["thr_test"] }]), rightCall) });
-    await waitFor(() => expect(right.getByLabelText("Human assigned")).toBeTruthy()); fireEvent.click(right.getByLabelText("Human assigned")); fireEvent.click(right.getByRole("option", { name: "Agent" }));
-    await waitFor(() => expect(rightCall).toHaveBeenCalledWith("updateTaskAssignee", { taskId: "task_1", assignee: "agent" })); expect((right.getByLabelText("Agent assigned") as HTMLButtonElement).disabled).toBe(true); assignment.reject(new Error("assignment failed"));
-    await waitFor(() => expect((right.getByLabelText("Human assigned") as HTMLButtonElement).disabled).toBe(false));
+    await waitFor(() => expect(right.getByLabelText("Human assigned to WORK-1")).toBeTruthy()); fireEvent.click(right.getByLabelText("Human assigned to WORK-1")); fireEvent.click(right.getByRole("option", { name: "Agent" }));
+    await waitFor(() => expect(rightCall).toHaveBeenCalledWith("updateTaskAssignee", { taskId: "task_1", assignee: "agent" })); expect((right.getByLabelText("Agent assigned to WORK-1") as HTMLButtonElement).disabled).toBe(true); assignment.reject(new Error("assignment failed"));
+    await waitFor(() => expect((right.getByLabelText("Human assigned to WORK-1") as HTMLButtonElement).disabled).toBe(false));
     await waitFor(() => expect(toastError).toHaveBeenCalledWith("assignment failed"));
     const detachButton = right.getByLabelText("Detach WORK-1 from this thread") as HTMLButtonElement; fireEvent.click(detachButton); await waitFor(() => expect(rightCall).toHaveBeenCalledWith("detachTaskFromThread", { taskId: "task_1", threadId: "thr_test" })); expect(detachButton.disabled).toBe(true); detach.reject(new Error("detach failed")); await waitFor(() => expect(detachButton.disabled).toBe(false));
     expect(right.container.querySelector(".ws-thread-task-card .ws-task-workflow")).toBeTruthy(); right.lifecycle.unmount();

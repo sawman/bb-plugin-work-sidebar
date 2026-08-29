@@ -526,7 +526,8 @@ describe("registered Work context cards", () => {
           priority: "medium" as const,
           dueDate: null,
           parentTaskId: "task_1",
-          position: 2,
+          updatedAt: "2026-08-29T00:00:00.000Z",
+          assignee: "agent" as const,
         },
       ],
       bindings: [
@@ -609,7 +610,7 @@ describe("registered Work context cards", () => {
         name: "Human assigned to WORK-1",
       });
       expect(
-        slot.getByRole("button", { name: "Agent assigned" }),
+        slot.getByRole("button", { name: "Agent assigned to WORK-2" }),
       ).toBeTruthy();
       fireEvent.click(outcomeAssignee);
       fireEvent.click(
@@ -642,7 +643,8 @@ describe("registered Work context cards", () => {
       priority: "medium" as const,
       dueDate: null,
       parentTaskId: "task_1",
-      position: 2,
+      updatedAt: "2026-08-29T00:00:00.000Z",
+      assignee: "agent" as const,
     };
     const delegatedExecution = {
       id: "task_delegated",
@@ -654,7 +656,8 @@ describe("registered Work context cards", () => {
       priority: "medium" as const,
       dueDate: null,
       parentTaskId: "task_1",
-      position: 3,
+      updatedAt: "2026-08-29T00:00:00.000Z",
+      assignee: "agent" as const,
     };
     const ownerScopedOutcome = {
       ...populatedOutcome,
@@ -687,11 +690,18 @@ describe("registered Work context cards", () => {
           outcomeTaskId: "task_1",
           taskProjectId: "project_1",
           executionTaskId: "task_delegated",
-          ownerThreadId: "thr_child",
+          ownerThreadId: "thr_sibling",
           mode: "delegated" as const,
           idempotencyKey: "delegated",
           dispatchState: "ready" as const,
           recoveryMessage: null,
+          owner: {
+            threadId: "thr_sibling",
+            title: "Sibling worker",
+            providerId: "codex",
+            liveStatus: "working" as const,
+            isArchived: false,
+          },
         },
       ],
       legacy: { state: "none" as const, taskIds: [], message: null },
@@ -749,6 +759,7 @@ describe("registered Work context cards", () => {
     try {
       await waitFor(() => expect(child.getByText("Unbound child task")).toBeTruthy());
       expect(child.queryByText(/work tasks are bound/i)).toBeNull();
+      expect(child.getByRole("button", { name: "Open Sibling worker" })).toBeTruthy();
       const picker = child.getByRole("combobox", { name: "Add task to this thread" });
       fireEvent.focus(picker);
       await waitFor(() => expect(child.getByRole("option", { name: /WORK-4/ })).toBeTruthy());
@@ -1100,12 +1111,13 @@ describe("registered Work context cards", () => {
       priority: "high" as const,
       dueDate: null,
       parentTaskId: "task_outcome",
-      position: 2,
+      updatedAt: "2026-08-29T01:00:00.000Z",
+      assignee: "agent" as const,
     };
     const workflowOutcome = {
       ...outcome,
       outcome: { ...populatedOutcome.outcome!, id: "task_outcome" },
-      executionTasks: [execution, { ...execution, id: "task_archived", key: "WORK-20", title: "Archived owner follow-up", status: "todo" as const }],
+      executionTasks: [execution, { ...execution, id: "task_archived", key: "WORK-20", title: "Archived owner follow-up", status: "todo" as const, assignee: "human" as const }],
       bindings: [{
         rootThreadId: "thr_one",
         outcomeTaskId: "task_outcome",
@@ -1130,8 +1142,8 @@ describe("registered Work context cards", () => {
             { ...execution, title: "Stale duplicate", linkedThreadIds: ["thr_one"], assignee: "agent" as const },
             { ...execution, id: "task_human", key: "WORK-3", title: "Approve the release", status: "in_review" as const, parentTaskId: null, linkedThreadIds: ["thr_one"], assignee: "human" as const },
             { ...execution, id: "task_next", key: "WORK-4", title: "Prepare the follow-up", status: "backlog" as const, parentTaskId: null, linkedThreadIds: ["thr_one"], assignee: "agent" as const },
-            { ...execution, id: "task_done", key: "WORK-5", title: "Completed evidence", status: "done" as const, parentTaskId: null, linkedThreadIds: ["thr_one"], assignee: "agent" as const, completedAt: 10 },
-            ...Array.from({ length: 6 }, (_, index) => ({ ...execution, id: `task_done_${index}`, key: `WORK-${index + 6}`, title: `Completed ${index}`, status: index === 5 ? "canceled" as const : "done" as const, parentTaskId: null, linkedThreadIds: ["thr_one"], assignee: "agent" as const, completedAt: index + 20 })),
+            { ...execution, id: "task_done", key: "WORK-5", title: "Completed evidence", status: "done" as const, parentTaskId: null, linkedThreadIds: ["thr_one"], assignee: "agent" as const, updatedAt: "2026-08-29T00:00:10.000Z" },
+            ...Array.from({ length: 6 }, (_, index) => ({ ...execution, id: `task_done_${index}`, key: `WORK-${index + 6}`, title: `Completed ${index}`, status: index === 5 ? "canceled" as const : "done" as const, parentTaskId: null, linkedThreadIds: ["thr_one"], assignee: "agent" as const, updatedAt: `2026-08-29T00:00:${20 + index}.000Z` })),
           ],
         }),
         getWorkOutcome: () => workflowOutcome,
@@ -1146,6 +1158,7 @@ describe("registered Work context cards", () => {
       "Needs you", "In progress", "Next", "Completed (7)",
     ]);
     expect(slot.getByText("Approve the release")).toBeTruthy();
+    expect(slot.getByText("Archived owner follow-up").closest(".ws-task-workflow-section")?.querySelector("h3")?.textContent).toBe("Needs you");
     expect(slot.getByText("Run the agent work")).toBeTruthy();
     expect(slot.queryByText("Stale duplicate")).toBeNull();
     const openOwner = slot.getByRole("button", { name: "Open Validation worker" });

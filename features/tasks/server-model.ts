@@ -19,6 +19,7 @@ export type TaskRecord = {
   dueDate: string | null;
   parentTaskId: string | null;
   position: number;
+  updatedAt: string;
 };
 
 export function projectSidebarTask(
@@ -37,6 +38,7 @@ export function projectSidebarTask(
     priority: task.priority,
     dueDate: task.dueDate,
     parentTaskId: task.parentTaskId,
+    updatedAt: task.updatedAt,
     position: task.position,
     linkedThreadIds: [...linkedThreadIds],
     assignee,
@@ -54,6 +56,7 @@ export function summarizeTask(task: TaskRecord, projectName = "Work") {
     priority: task.priority,
     dueDate: task.dueDate,
     parentTaskId: task.parentTaskId,
+    updatedAt: task.updatedAt,
   };
 }
 

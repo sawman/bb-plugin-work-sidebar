@@ -2,9 +2,6 @@ import type { TaskSummary } from "../../work-model";
 
 export type TaskWorkflowRecord = TaskSummary & {
   assignee: "agent" | "human";
-  /** Completion metadata is optional because the Tasks summary is not required to carry it. */
-  completedAt?: number | string | null;
-  updatedAt?: number | string | null;
 };
 
 export type TaskWorkflowExecutionRecord = Omit<
@@ -123,17 +120,9 @@ function compareItems(
   );
 }
 
-function timestamp(value: number | string | null | undefined): number {
-  if (typeof value === "number") return Number.isFinite(value) ? value : -Infinity;
-  if (typeof value === "string") {
-    const parsed = Date.parse(value);
-    return Number.isFinite(parsed) ? parsed : -Infinity;
-  }
-  return -Infinity;
-}
-
 function completedAt(item: TaskWorkflowItem): number {
-  return timestamp(item.task.completedAt ?? item.task.updatedAt);
+  const timestamp = item.task.updatedAt ? Date.parse(item.task.updatedAt) : NaN;
+  return Number.isFinite(timestamp) ? timestamp : -Infinity;
 }
 
 /** One deterministic projection for the Work Tasks card. */

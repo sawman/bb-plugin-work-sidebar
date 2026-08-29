@@ -17,6 +17,40 @@ describe("Work outcome RPC schema", () => {
 
     expect(result.success).toBe(false);
   });
+
+  it("requires task recency metadata and an assignee for execution records", () => {
+    const task = {
+      id: "task_execution",
+      projectId: "project_1",
+      projectName: "Work",
+      key: "WORK-2",
+      title: "Execution",
+      status: "done" as const,
+      priority: "medium" as const,
+      dueDate: null,
+      parentTaskId: "task_outcome",
+    };
+    expect(
+      rpcSchemas.getWorkOutcome.output.safeParse({
+        rootThreadId: "thr_root",
+        tasksAvailable: true,
+        outcome: null,
+        executionTasks: [{ ...task, assignee: "human" }],
+        bindings: [],
+        legacy: { state: "none", taskIds: [], message: null },
+      }).success,
+    ).toBe(false);
+    expect(
+      rpcSchemas.getWorkOutcome.output.safeParse({
+        rootThreadId: "thr_root",
+        tasksAvailable: true,
+        outcome: null,
+        executionTasks: [{ ...task, updatedAt: "2026-08-29T00:00:00.000Z", assignee: "human", leaked: true }],
+        bindings: [],
+        legacy: { state: "none", taskIds: [], message: null },
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe("R32.2 outcome and tracker RPC schemas", () => {
@@ -33,6 +67,29 @@ describe("R32.2 outcome and tracker RPC schemas", () => {
         rootThreadId: "thr_root",
         title: "Create from Linear",
         priority: "unexpected",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("keeps browser RPC execution assignment symmetric with the agent tool", () => {
+    const input = {
+      rootThreadId: "thr_root",
+      title: "Human decision",
+      idempotencyKey: "human-decision",
+      assignee: "human",
+    };
+    expect(rpcSchemas.createExecutionTask.input.safeParse(input).success).toBe(
+      true,
+    );
+    expect(
+      rpcSchemas.createExecutionTask.input.safeParse({ ...input, leaked: true })
+        .success,
+    ).toBe(false);
+    expect(
+      rpcSchemas.createExecutionTask.input.safeParse({
+        rootThreadId: "thr_root",
+        title: "Missing assignment",
+        idempotencyKey: "missing-assignment",
       }).success,
     ).toBe(false);
   });

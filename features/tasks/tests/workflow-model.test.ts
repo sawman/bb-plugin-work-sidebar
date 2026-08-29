@@ -10,7 +10,7 @@ const task = (
   status: TaskWorkflowRecord["status"],
   assignee: TaskWorkflowRecord["assignee"],
   options: Partial<Pick<TaskWorkflowRecord, "priority">> & {
-    completedAt?: number;
+    updatedAt?: string;
   } = {},
 ): TaskWorkflowRecord => ({
   id,
@@ -23,9 +23,7 @@ const task = (
   dueDate: null,
   parentTaskId: id === "outcome" ? null : "outcome",
   assignee,
-  ...(options.completedAt === undefined
-    ? {}
-    : { completedAt: options.completedAt }),
+  updatedAt: options.updatedAt ?? "2026-08-29T00:00:00.000Z",
 });
 
 const owner = (
@@ -191,13 +189,13 @@ describe("task workflow projection", () => {
     const result = projectTaskWorkflow({
       outcomeTaskId: null,
       tasks: [
-        task("old-done", "done", "agent", { completedAt: 1 }),
-        task("new-canceled", "canceled", "agent", { completedAt: 7 }),
-        task("middle-done", "done", "agent", { completedAt: 3 }),
-        task("new-done", "done", "agent", { completedAt: 6 }),
-        task("older-canceled", "canceled", "agent", { completedAt: 2 }),
-        task("latest-done", "done", "agent", { completedAt: 8 }),
-        task("middle-canceled", "canceled", "agent", { completedAt: 4 }),
+        task("old-done", "done", "agent", { updatedAt: "2026-08-29T00:00:01.000Z" }),
+        task("new-canceled", "canceled", "agent", { updatedAt: "2026-08-29T00:00:07.000Z" }),
+        task("middle-done", "done", "agent", { updatedAt: "2026-08-29T00:00:03.000Z" }),
+        task("new-done", "done", "agent", { updatedAt: "2026-08-29T00:00:06.000Z" }),
+        task("older-canceled", "canceled", "agent", { updatedAt: "2026-08-29T00:00:02.000Z" }),
+        task("latest-done", "done", "agent", { updatedAt: "2026-08-29T00:00:08.000Z" }),
+        task("middle-canceled", "canceled", "agent", { updatedAt: "2026-08-29T00:00:04.000Z" }),
       ],
       owners: [],
     });

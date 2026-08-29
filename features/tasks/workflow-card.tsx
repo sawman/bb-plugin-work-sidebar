@@ -127,7 +127,7 @@ function WorkflowRow({
           ) : <span className="ws-task-workflow-owner" data-state="unavailable">{ownerLabel}</span>
         ) : null}
       </span>
-      <AssigneePicker value={task.assignee} disabled={busy} onChange={(assignee) => onAssigneeChange(task.id, assignee)} />
+      <AssigneePicker value={task.assignee} taskKey={task.key} disabled={busy} onChange={(assignee) => onAssigneeChange(task.id, assignee)} />
       {detachable ? <button type="button" disabled={busy} aria-label={`Detach ${task.key} from this thread`} onClick={() => onDetach(task.id)}><Icon name="X" aria-hidden /></button> : null}
     </article>
   );
