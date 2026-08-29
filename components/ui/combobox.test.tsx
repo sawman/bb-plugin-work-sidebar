@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { createRef, useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { configureAxe } from "vitest-axe";
+import { TextScaleProvider } from "../../shared/text-scale";
 import { SearchCombobox } from "./combobox";
 
 const axe = configureAxe({
@@ -112,5 +113,33 @@ describe("SearchCombobox", () => {
     );
     expect(screen.getByRole("alert").textContent).toContain("Task source failed");
     expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+  });
+
+  it("carries the active sidebar scale into a portalled listbox", () => {
+    const renderScaled = (scale: number) => (
+      <TextScaleProvider scale={scale}>
+        <SearchCombobox
+          ariaLabel="Search tasks"
+          emptyMessage="No tasks"
+          listboxLabel="Tasks"
+          onOpenChange={() => undefined}
+          onSelectionChange={() => undefined}
+          open
+          options={[{ value: "task", label: "Task" }]}
+          placeholder="Search tasks…"
+          portal
+          selectedValues={[]}
+        />
+      </TextScaleProvider>
+    );
+    const { rerender } = render(renderScaled(0.9));
+    const content = () =>
+      document.querySelector<HTMLElement>(
+        ".ws-search-shell-content[data-portalled=\"true\"]",
+      );
+
+    expect(content()?.style.getPropertyValue("--ws-text-scale")).toBe("0.9");
+    rerender(renderScaled(1.1));
+    expect(content()?.style.getPropertyValue("--ws-text-scale")).toBe("1.1");
   });
 });

@@ -57,7 +57,16 @@ function NumericAppearanceEditor({
   const [changeVersion, setChangeVersion] = useState(0);
   const latestDraft = useRef(draft);
   const lastAttemptedDraft = useRef<string | null>(null);
+  const onSaveRef = useRef(onSave);
+  const successMessageRef = useRef(successMessage);
+  const labelRef = useRef(label);
   const validation = validate(draft);
+
+  useEffect(() => {
+    onSaveRef.current = onSave;
+    successMessageRef.current = successMessage;
+    labelRef.current = label;
+  }, [label, onSave, successMessage]);
 
   useEffect(() => {
     if (saved === undefined || dirty) return;
@@ -79,18 +88,20 @@ function NumericAppearanceEditor({
     if (lastAttemptedDraft.current === attemptedDraft) return;
     const timer = window.setTimeout(() => {
       lastAttemptedDraft.current = attemptedDraft;
-      void onSave(requested)
+      void onSaveRef.current(requested)
         .then((savedValue) => {
           if (latestDraft.current !== attemptedDraft) return;
           const next = String(savedValue);
           latestDraft.current = next;
           setDraft(next);
           setDirty(false);
-          toast.success(successMessage(savedValue));
+          toast.success(successMessageRef.current(savedValue));
         })
         .catch((error: unknown) => {
           toast.error(
-            error instanceof Error ? error.message : `Could not save ${label.toLowerCase()}`,
+            error instanceof Error
+              ? error.message
+              : `Could not save ${labelRef.current.toLowerCase()}`,
           );
         });
     }, 250);
@@ -99,11 +110,8 @@ function NumericAppearanceEditor({
     changeVersion,
     dirty,
     draft,
-    label,
-    onSave,
     pending,
     saved,
-    successMessage,
     validation.value,
   ]);
 
@@ -223,7 +231,6 @@ export function SidebarTextScaleEditor({
         data-layout="narrow"
         className="ws-settings-card ws-sidebar-text-scale-editor"
       >
-        <strong>Text scale</strong>
         <NumericAppearanceEditor
           saved={saved}
           pending={pending}
@@ -251,17 +258,17 @@ export function SidebarAppearanceSettings() {
       <strong>Sidebar appearance</strong>
       <SidebarRowHeightEditor
         saved={preferences.appearance.data?.rowHeight}
-        pending={preferences.saveAppearance.isPending}
+        pending={preferences.saveRowHeight.isPending}
         onSave={(rowHeight) =>
-          preferences.saveAppearance.mutateAsync({ rowHeight })
+          preferences.saveRowHeight.mutateAsync(rowHeight)
         }
         compact
       />
       <SidebarTextScaleEditor
         saved={preferences.appearance.data?.textScale}
-        pending={preferences.saveAppearance.isPending}
+        pending={preferences.saveTextScale.isPending}
         onSave={(textScale) =>
-          preferences.saveAppearance.mutateAsync({ textScale })
+          preferences.saveTextScale.mutateAsync(textScale)
         }
         compact
       />

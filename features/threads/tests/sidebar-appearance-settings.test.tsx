@@ -1,5 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  waitFor,
+} from "@testing-library/react";
 import { configureAxe } from "vitest-axe";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -8,6 +12,7 @@ import {
   DEFAULT_TEXT_SCALE,
   MAX_TEXT_SCALE,
   MIN_TEXT_SCALE,
+  MINIMUM_TEXT_ROLE_SIZE_REM,
   MIN_ACCESSIBLE_TEXT_SIZE_PX,
   normalizeSidebarRowHeight,
   normalizeTextScale,
@@ -41,7 +46,7 @@ describe("sidebar appearance settings", () => {
       error: "Enter a multiplier with at most two decimal places.",
     });
     expect(normalizeTextScale("invalid")).toBe(DEFAULT_TEXT_SCALE);
-    expect(MIN_TEXT_SCALE * 0.58 * 16).toBeGreaterThanOrEqual(
+    expect(MIN_TEXT_SCALE * MINIMUM_TEXT_ROLE_SIZE_REM * 16).toBeGreaterThanOrEqual(
       MIN_ACCESSIBLE_TEXT_SIZE_PX,
     );
     expect(MAX_TEXT_SCALE).toBe(1.1);

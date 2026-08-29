@@ -12,6 +12,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { fitContextMenuPosition } from "./context-menu";
+import { textScaleStyle, useTextScale } from "../../shared/text-scale";
 
 export type ComboboxOption = {
   value: string;
@@ -101,6 +102,7 @@ export function SearchCombobox({
   selectedValues,
   onSelectionChange,
 }: SearchComboboxProps) {
+  const textScale = useTextScale();
   const [uncontrolledQuery, setUncontrolledQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(
@@ -361,6 +363,7 @@ export function SearchCombobox({
 
   const contentStyle: CSSProperties | undefined = showPopup
     ? {
+        ...textScaleStyle(textScale),
         left: position?.left ?? 8,
         top: position?.top ?? 8,
         visibility: position ? undefined : "hidden",

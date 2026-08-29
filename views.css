@@ -2791,7 +2791,6 @@ button.ws-provider-health:focus-visible {
   padding: 0 0.34rem;
   background: transparent;
   color: var(--foreground);
-  font: inherit;
   font: var(--ws-text-metadata);
   line-height: inherit;
 }
@@ -3389,7 +3388,13 @@ button.ws-provider-health:focus-visible {
   height: 0.65rem;
 }
 /* R37 typography token block: start */
-:root {
+:root,
+:where(
+  .ws-list,
+  .ws-panel,
+  .ws-context-menu,
+  .ws-search-shell-content[data-portalled="true"]
+) {
   --ws-text-scale: 1;
   --ws-text-font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
   --ws-text-font-family-code: var(
@@ -3407,9 +3412,9 @@ button.ws-provider-health:focus-visible {
   --ws-text-subtext-weight: var(--font-weight-normal, 400);
   --ws-text-metadata-size: calc(0.61rem * var(--ws-text-scale));
   --ws-text-metadata-weight: var(--font-weight-normal, 400);
-  --ws-text-label-size: calc(0.58rem * var(--ws-text-scale));
+  --ws-text-label-size: calc(0.7rem * var(--ws-text-scale));
   --ws-text-label-weight: var(--font-weight-semibold, 600);
-  --ws-text-code-size: calc(0.58rem * var(--ws-text-scale));
+  --ws-text-code-size: calc(0.7rem * var(--ws-text-scale));
   --ws-text-code-weight: var(--font-weight-normal, 400);
   --ws-text-primary: var(--ws-text-primary-weight) var(--ws-text-primary-size) / normal
     var(--ws-text-font-family);

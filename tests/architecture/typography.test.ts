@@ -1,6 +1,11 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, test } from "vitest";
+import {
+  MINIMUM_TEXT_ROLE_SIZE_REM,
+  MIN_ACCESSIBLE_TEXT_SIZE_PX,
+  MIN_TEXT_SCALE,
+} from "../../features/threads/sidebar-appearance";
 
 const repositoryRoot = join(import.meta.dirname, "../..");
 const typographyRoles = [
@@ -150,6 +155,37 @@ describe("semantic typography architecture", () => {
         new RegExp(`--ws-text-${role}-weight: var\\(--font-weight-`),
       );
     }
+  });
+
+  test("re-resolves derived tokens in every sidebar and portal scale scope", () => {
+    const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    const tokenBlock = typographyTokenBlock(source);
+    const scope = tokenBlock.match(
+      /:root\s*,\s*:where\(([^)]*)\)\s*\{([\s\S]*?)\n\s*\}/,
+    );
+
+    expect(scope?.[1].split(",").map((selector) => selector.trim())).toEqual([
+      ".ws-list",
+      ".ws-panel",
+      ".ws-context-menu",
+      '.ws-search-shell-content[data-portalled="true"]',
+    ]);
+    expect(scope?.[2]).toContain("--ws-text-scale: 1;");
+    for (const role of typographyRoles) {
+      expect(scope?.[2]).toContain(`--ws-text-${role}-size:`);
+      expect(scope?.[2]).toContain(`--ws-text-${role}:`);
+    }
+  });
+
+  test("keeps the smallest scaled role above the accessibility floor", () => {
+    const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    const tokenBlock = typographyTokenBlock(source);
+    expect(tokenBlock).toContain(
+      `--ws-text-label-size: calc(${MINIMUM_TEXT_ROLE_SIZE_REM}rem * var(--ws-text-scale))`,
+    );
+    expect(MIN_TEXT_SCALE * MINIMUM_TEXT_ROLE_SIZE_REM * 16).toBeGreaterThanOrEqual(
+      MIN_ACCESSIBLE_TEXT_SIZE_PX,
+    );
   });
 
   test("applies every semantic role through its token instead of a raw type declaration", () => {

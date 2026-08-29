@@ -13,6 +13,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { textScaleStyle, useTextScale } from "../../shared/text-scale";
 
 type MenuState = {
   close(): void;
@@ -107,6 +108,7 @@ export function ContextMenuContent({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   const menu = useContext(MenuContext);
+  const textScale = useTextScale();
   const contentRef = useRef<HTMLDivElement>(null);
   const [fitted, setFitted] = useState<
     (Point & { anchorX: number; anchorY: number }) | null
@@ -142,6 +144,7 @@ export function ContextMenuContent({
   const isFitted =
     fitted?.anchorX === menu.position.x && fitted.anchorY === menu.position.y;
   const menuStyle: CSSProperties = {
+    ...textScaleStyle(textScale),
     position: "fixed",
     left: isFitted ? fitted.x : menu.position.x,
     top: isFitted ? fitted.y : menu.position.y,

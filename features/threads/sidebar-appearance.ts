@@ -1,12 +1,16 @@
+import { DEFAULT_TEXT_SCALE } from "../../shared/text-scale";
+
+export { DEFAULT_TEXT_SCALE } from "../../shared/text-scale";
+
 export const DEFAULT_SIDEBAR_ROW_HEIGHT = 40;
 export const MIN_SIDEBAR_ROW_HEIGHT = 35;
 export const MAX_SIDEBAR_ROW_HEIGHT = 60;
 
-export const DEFAULT_TEXT_SCALE = 1;
 export const MIN_TEXT_SCALE = 0.9;
 export const MAX_TEXT_SCALE = 1.1;
 export const TEXT_SCALE_STEP = 0.01;
-export const MIN_ACCESSIBLE_TEXT_SIZE_PX = 8;
+export const MINIMUM_TEXT_ROLE_SIZE_REM = 0.7;
+export const MIN_ACCESSIBLE_TEXT_SIZE_PX = 10;
 
 const TENTH_PIXEL = /^\d+(?:\.\d)?$/;
 const HUNDREDTH_MULTIPLIER = /^\d+(?:\.\d{1,2})?$/;
