@@ -138,6 +138,9 @@ export const threadHierarchySchemas = {
       .object({
         threadId: z.string().startsWith("thr_"),
         parentThreadId: z.string().startsWith("thr_").nullable(),
+        oldRootThreadId: z.string().startsWith("thr_"),
+        newRootThreadId: z.string().startsWith("thr_"),
+        affectedThreadIds: z.array(z.string().startsWith("thr_")).min(1),
       })
       .strict(),
   },

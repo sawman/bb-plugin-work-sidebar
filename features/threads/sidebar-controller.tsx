@@ -43,6 +43,7 @@ import { SidebarThreadToolbar } from "./sidebar-toolbar";
 import { SidebarWorkView } from "./sidebar-work-view";
 import { ThreadListSettings } from "./sidebar-group-settings";
 import { ThreadHierarchyProvider } from "./thread-hierarchy-context";
+import { ThreadHierarchyPickerHost } from "./thread-hierarchy-picker-host";
 
 const SIDEBAR_TABS: readonly { id: SidebarView; label: string }[] = (
   ["work", "queue", "prs"] as const
@@ -300,6 +301,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
                 : "No active threads."
             }
           />
+          <ThreadHierarchyPickerHost />
         </ThreadHierarchyProvider>
       )}
     </div>

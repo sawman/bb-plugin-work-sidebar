@@ -41,6 +41,7 @@ export function ThreadRow({
   onDropThread,
 }: ThreadRowProps) {
   const controlClick = useRef(false);
+  const anchorRef = useRef<HTMLAnchorElement>(null);
   // Per-row opt-in: never turn this into a list-wide PR metadata read.
   const { pullRequest, isLoading: pullRequestLoading } =
     experimental_useSidebarThreadPullRequest(thread.id);
@@ -105,9 +106,11 @@ export function ThreadRow({
           groupId={groupId}
           groups={groups}
           onMoveToGroup={onMoveToGroup}
+          onFocusReturn={() => anchorRef.current?.focus()}
           actions={rowActions}
         >
           <a
+            ref={anchorRef}
             href="#"
             data-sidebar-thread-shortcut-target=""
             data-sidebar-thread-id={thread.id}

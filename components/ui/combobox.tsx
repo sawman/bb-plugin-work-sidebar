@@ -26,6 +26,7 @@ export type ComboboxOption = {
 type AnchorRect = Pick<DOMRect, "bottom" | "left" | "right" | "top">;
 
 export type SearchComboboxProps = {
+  ariaDescribedBy?: string;
   ariaLabel: string;
   emptyMessage: string;
   listboxLabel: string;
@@ -69,6 +70,7 @@ function contains(target: EventTarget | null, element: Element | null) {
  * code owns option data and mutations; this primitive owns popup/focus/ARIA.
  */
 export function SearchCombobox({
+  ariaDescribedBy,
   anchor,
   anchorRef,
   anchorRect = null,
@@ -228,6 +230,7 @@ export function SearchCombobox({
       className={`ws-search-shell-input ${inputClassName}`}
       placeholder={placeholder}
       aria-label={ariaLabel}
+      aria-describedby={ariaDescribedBy}
       disabled={disabled}
       role={inputIsSearchOnly ? "searchbox" : "combobox"}
       aria-autocomplete={inputIsSearchOnly ? undefined : "list"}
@@ -369,6 +372,7 @@ export function SearchCombobox({
       className={`ws-search-shell-content ${className}`}
       data-portalled={showPopup || undefined}
       style={contentStyle}
+      onPointerDown={(event) => event.stopPropagation()}
     >
       {header ? <div className="ws-search-shell-header">{header}</div> : null}
       {anchorRef ? input : null}

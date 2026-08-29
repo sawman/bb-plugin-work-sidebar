@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { createThreadHierarchyService } from "../hierarchy-server";
+import {
+  createSdkThreadHierarchyService,
+  createThreadHierarchyService,
+} from "../hierarchy-server";
 import type { HierarchyThread } from "../hierarchy-model";
 
 const roster: HierarchyThread[] = [
@@ -32,6 +35,7 @@ function fixture(options: { saveRejects?: boolean; bound?: boolean } = {}) {
     if (options.saveRejects) throw new Error("preference write failed");
     return undefined;
   });
+  const publishWork = vi.fn();
   const service = createThreadHierarchyService({
     getThread: async (threadId) => roster.find((thread) => thread.id === threadId)!,
     listThreads: async () => roster,
@@ -61,8 +65,9 @@ function fixture(options: { saveRejects?: boolean; bound?: boolean } = {}) {
       activeGroupPosition: 0,
     }),
     saveGroups,
+    publishWork,
   });
-  return { service, updateThread, saveGroups };
+  return { service, updateThread, saveGroups, publishWork };
 }
 
 describe("thread hierarchy server service", () => {
@@ -77,6 +82,9 @@ describe("thread hierarchy server service", () => {
     ).resolves.toEqual({
       threadId: "thr_other",
       parentThreadId: "thr_child",
+      oldRootThreadId: "thr_other",
+      newRootThreadId: "thr_root",
+      affectedThreadIds: ["thr_other"],
     });
 
     expect(updateThread).toHaveBeenCalledTimes(1);
@@ -131,7 +139,7 @@ describe("thread hierarchy server service", () => {
   });
 
   it("restores the original parent when group persistence fails", async () => {
-    const { service, updateThread } = fixture({ saveRejects: true });
+    const { service, updateThread, publishWork } = fixture({ saveRejects: true });
 
     await expect(
       service.move({
@@ -143,5 +151,84 @@ describe("thread hierarchy server service", () => {
       [{ threadId: "thr_other", parentThreadId: "thr_child" }],
       [{ threadId: "thr_other", parentThreadId: null }],
     ]);
+    expect(publishWork).not.toHaveBeenCalled();
+  });
+
+  it("uses the exact SDK hierarchy reads and fails closed when an ancestor is absent", async () => {
+    const get = vi.fn(async ({ threadId }: { threadId: string }) =>
+      ({
+        ...roster.find((thread) => thread.id === threadId)!,
+        archivedAt: null,
+        titleFallback: null,
+      }),
+    );
+    const list = vi.fn(async () => roster);
+    const update = vi.fn(async () => undefined);
+    const publish = vi.fn();
+    const groups = vi.fn(async () => ({ groups: [], activeGroupPosition: 0 }));
+    const saveGroups = vi.fn(async () => ({
+      groups: [],
+      activeGroupPosition: 0,
+    }));
+    const service = createSdkThreadHierarchyService(
+      {
+        sdk: { threads: { get, list, update } },
+        realtime: { publish },
+      } as never,
+      {
+        bindings: async () => ({ outcomes: [], executions: [] }),
+        allTasksById: async () => new Map(),
+      },
+      { groups, saveGroups },
+    );
+
+    await service.move({ threadId: "thr_other", parentThreadId: "thr_child" });
+
+    expect(get.mock.calls).toEqual([
+      [{ threadId: "thr_other" }],
+      [{ threadId: "thr_child" }],
+    ]);
+    expect(list).toHaveBeenCalledWith({
+      projectId: "project_one",
+      archived: false,
+      includeHidden: true,
+      limit: 2_000,
+    });
+    expect(update).toHaveBeenCalledWith({
+      threadId: "thr_other",
+      parentThreadId: "thr_child",
+    });
+    expect(publish.mock.calls).toEqual([
+      [
+        "work-sidebar:changed",
+        { family: "work", rootThreadId: "thr_other" },
+      ],
+      [
+        "work-sidebar:changed",
+        { family: "work", rootThreadId: "thr_root" },
+      ],
+    ]);
+
+    get.mockImplementation(async ({ threadId }: { threadId: string }) => ({
+      ...roster.find((thread) => thread.id === threadId)!,
+      archivedAt: null,
+      titleFallback: null,
+      parentThreadId: "thr_missing",
+    }));
+    list.mockResolvedValue([roster[1]!, roster[2]!]);
+    await expect(
+      service.move({ threadId: "thr_child", parentThreadId: null }),
+    ).rejects.toThrow(/hierarchy is not fully loaded/i);
+
+    list.mockResolvedValue(
+      Array.from({ length: 2_000 }, (_, index) => ({
+        ...roster[0]!,
+        id: `thr_${index}`,
+      })),
+    );
+    await expect(
+      service.move({ threadId: "thr_other", parentThreadId: null }),
+    ).rejects.toThrow(/hierarchy is not fully loaded/i);
+    expect(update).toHaveBeenCalledTimes(1);
   });
 });
