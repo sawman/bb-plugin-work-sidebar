@@ -32,7 +32,7 @@ type ThreadHierarchyDependencies = Readonly<{
     parentThreadId: string | null;
   }): Promise<unknown>;
   readBindings(): Promise<StoredWorkBindings>;
-  taskKey(taskId: string): Promise<string | null>;
+  allTasksById(): Promise<ReadonlyMap<string, { key: string }>>;
   readGroups(): Promise<SidebarThreadGroupPreferences>;
   saveGroups(
     groups: SidebarThreadGroupPreferences["groups"],
@@ -45,33 +45,32 @@ const HIERARCHY_LIST_LIMIT = 2_000;
 const HIERARCHY_NOT_FULLY_LOADED =
   "The thread hierarchy is not fully loaded. Refresh the sidebar and try again.";
 
-async function projectBindings(
+function projectBindings(
   stored: StoredWorkBindings,
-  taskKey: ThreadHierarchyDependencies["taskKey"],
-): Promise<HierarchyBinding[]> {
-  return Promise.all([
-    ...stored.outcomes.map(async (binding): Promise<HierarchyBinding> => ({
+  tasksById: ReadonlyMap<string, { key: string }>,
+): HierarchyBinding[] {
+  const taskKey = (taskId: string) => tasksById.get(taskId)?.key ?? null;
+  return [
+    ...stored.outcomes.map((binding): HierarchyBinding => ({
       kind: "outcome",
       rootThreadId: binding.rootThreadId,
       ownerThreadId: binding.rootThreadId,
-      taskKey:
-        (await taskKey(binding.outcomeTaskId)) ?? binding.outcomeTaskId,
+      taskKey: taskKey(binding.outcomeTaskId) ?? binding.outcomeTaskId,
     })),
     ...stored.executions.flatMap((binding) =>
       binding.ownerThreadId
         ? [
-            (async (): Promise<HierarchyBinding> => ({
-              kind: "execution",
+            {
+              kind: "execution" as const,
               rootThreadId: binding.rootThreadId,
               ownerThreadId: binding.ownerThreadId!,
               taskKey:
-                (await taskKey(binding.executionTaskId)) ??
-                binding.executionTaskId,
-            }))(),
+                taskKey(binding.executionTaskId) ?? binding.executionTaskId,
+            },
           ]
         : [],
     ),
-  ]);
+  ];
 }
 
 /** Owns the validated SDK write and its top-level group reconciliation. */
@@ -97,10 +96,11 @@ export function createThreadHierarchyService(
       const threads = new Map(listed.map((thread) => [thread.id, thread]));
       threads.set(source.id, source);
       if (parent) threads.set(parent.id, parent);
-      const bindings = await projectBindings(
-        await dependencies.readBindings(),
-        dependencies.taskKey,
-      );
+      const [storedBindings, tasksById] = await Promise.all([
+        dependencies.readBindings(),
+        dependencies.allTasksById(),
+      ]);
+      const bindings = projectBindings(storedBindings, tasksById);
       const decision = evaluateThreadHierarchyMove({
         threads: [...threads.values()],
         bindings,
@@ -193,9 +193,7 @@ export function createSdkThreadHierarchyService(
     },
     updateThread: (input) => bb.sdk.threads.update(input),
     readBindings: work.bindings,
-    async taskKey(taskId) {
-      return (await work.allTasksById()).get(taskId)?.key ?? null;
-    },
+    allTasksById: work.allTasksById,
     readGroups: preferences.groups,
     saveGroups: preferences.saveGroups,
     publishWork: (rootThreadId) =>

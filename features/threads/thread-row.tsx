@@ -109,13 +109,15 @@ export function ThreadRow({
       }
       onPointerDown={startUnifiedDrag}
     >
-      <span
-        className="ws-thread-reparent-target"
-        data-ws-thread-reparent-target={thread.id}
-        role="note"
-        aria-label={`Move a thread under ${title}`}
-        title={`Drop to make ${title} the parent`}
-      />
+      {dragThreadId ? (
+        <span
+          className="ws-thread-reparent-target"
+          data-ws-thread-reparent-target={thread.id}
+          role="note"
+          aria-label={`Move a thread under ${title}`}
+          title={`Drop to make ${title} the parent`}
+        />
+      ) : null}
       {rowActions.renaming ? (
         <div className="ws-rename">
           <Input

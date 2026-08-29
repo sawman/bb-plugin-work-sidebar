@@ -42,14 +42,9 @@ function ThreadTree({
   staleWorkingMinutes,
   label,
 }: ThreadTreeProps) {
-  const showToTop = Boolean(organization.dragThreadId);
-  const reparentingToTop =
-    organization.dropTarget?.kind === "reparent" &&
-    organization.dropTarget.parentThreadId === null;
   return (
     <section className="ws-hierarchy" aria-label={label}>
       <SidebarTable>
-        {showToTop && <ThreadToTopDropZone active={reparentingToTop} />}
         {roots.map((thread) => (
           <WorkThreadTree
             key={thread.id}
@@ -101,6 +96,10 @@ export function SidebarThreadGroups({
       ? organization.dropTarget.threadId
       : null;
   const searching = searchQuery.trim().length > 0;
+  const showToTop = Boolean(organization.dragThreadId);
+  const reparentingToTop =
+    organization.dropTarget?.kind === "reparent" &&
+    organization.dropTarget.parentThreadId === null;
   const clearDrop = () => {
     organization.setDragThreadId(null);
     organization.setDropTarget(null);
@@ -129,6 +128,7 @@ export function SidebarThreadGroups({
   return (
     <>
       <section className="ws-thread-statuses" aria-label="Thread status groups">
+        {showToTop && <ThreadToTopDropZone active={reparentingToTop} />}
         {organization.groupPositions.map((position) => {
           const group = position.group;
           if (!group)

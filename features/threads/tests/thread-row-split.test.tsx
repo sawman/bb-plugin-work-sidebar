@@ -47,7 +47,10 @@ const thread = {
   environment: null,
 } as PluginSidebarThread;
 
-function renderRow(reorderDisabled: boolean) {
+function renderRow(
+  reorderDisabled: boolean,
+  dragThreadId: string | null = null,
+) {
   const onDragThreadChange = vi.fn();
   const onDropTargetChange = vi.fn();
   const onDropThread = vi.fn();
@@ -66,7 +69,7 @@ function renderRow(reorderDisabled: boolean) {
       onMoveToGroup={vi.fn()}
       onNavigate={vi.fn()}
       reorderDisabled={reorderDisabled}
-      dragThreadId={null}
+      dragThreadId={dragThreadId}
       onDragThreadChange={onDragThreadChange}
       dropTarget={null}
       onDropTargetChange={onDropTargetChange}
@@ -84,11 +87,16 @@ afterEach(() => {
 });
 
 describe("ThreadRow split ownership", () => {
-  it("exposes an explicit, accessible reparent drop target", () => {
-    const view = renderRow(false);
-
+  it("exposes an accessible reparent drop target only during a drag", () => {
+    const idle = renderRow(false);
     expect(
-      view.getByRole("note", { name: "Move a thread under One" }),
+      idle.queryByRole("note", { name: "Move a thread under One" }),
+    ).toBeNull();
+    idle.unmount();
+
+    const dragging = renderRow(false, "thr_two");
+    expect(
+      dragging.getByRole("note", { name: "Move a thread under One" }),
     ).toBeTruthy();
   });
 
@@ -217,5 +225,42 @@ describe("ThreadRow split ownership", () => {
     expect(view.onDropTargetChange).toHaveBeenLastCalledWith(null);
     fireEvent.pointerUp(window, { pointerId: 6, clientX: 10, clientY: 10 });
     expect(view.onDropThread).not.toHaveBeenCalled();
+  });
+
+  it("clears a stale reorder target when its DOM target disappears", () => {
+    const view = renderRow(false);
+    const row = view.container.querySelector<HTMLElement>(
+      "[data-ws-thread-id]",
+    )!;
+    const target = document.createElement("div");
+    target.dataset.wsThreadId = "thr_two";
+    row.parentElement!.append(target);
+    const elementAt = vi.fn(() => target);
+    Object.defineProperty(document, "elementFromPoint", {
+      configurable: true,
+      value: elementAt,
+    });
+    vi.spyOn(target, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      height: 100,
+    } as DOMRect);
+
+    fireEvent.pointerDown(row, {
+      button: 0,
+      pointerId: 7,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { pointerId: 7, clientX: 10, clientY: 10 });
+    expect(view.onDropTargetChange).toHaveBeenLastCalledWith({
+      kind: "reorder",
+      threadId: "thr_two",
+      placement: "before",
+    });
+
+    target.remove();
+    fireEvent.pointerMove(window, { pointerId: 7, clientX: 11, clientY: 11 });
+    expect(view.onDropTargetChange).toHaveBeenLastCalledWith(null);
+    fireEvent.pointerCancel(window, { pointerId: 7 });
   });
 });

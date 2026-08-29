@@ -52,8 +52,8 @@ function fixture(options: { saveRejects?: boolean; bound?: boolean } = {}) {
           ]
         : [],
     }),
-    taskKey: async (taskId) =>
-      taskId === "task_execution" ? "BBPLUG-2" : taskId,
+    allTasksById: async () =>
+      new Map([["task_execution", { key: "BBPLUG-2" }]]),
     readGroups: async () => ({
       groups: [
         {
@@ -229,6 +229,61 @@ describe("thread hierarchy server service", () => {
     await expect(
       service.move({ threadId: "thr_other", parentThreadId: null }),
     ).rejects.toThrow(/hierarchy is not fully loaded/i);
+    expect(update).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the task list once when projecting multiple durable bindings", async () => {
+    const get = vi.fn(async ({ threadId }: { threadId: string }) => ({
+      ...roster.find((thread) => thread.id === threadId)!,
+      archivedAt: null,
+      titleFallback: null,
+    }));
+    const list = vi.fn(async () => roster);
+    const update = vi.fn(async () => undefined);
+    const publish = vi.fn();
+    const groups = vi.fn(async () => ({ groups: [], activeGroupPosition: 0 }));
+    const saveGroups = vi.fn(async () => ({
+      groups: [],
+      activeGroupPosition: 0,
+    }));
+    const allTasksById = vi.fn(async () =>
+      new Map([
+        ["task_outcome", { key: "BBPLUG-1" }],
+        ["task_execution_one", { key: "BBPLUG-2" }],
+        ["task_execution_two", { key: "BBPLUG-3" }],
+      ]),
+    );
+    const service = createSdkThreadHierarchyService(
+      {
+        sdk: { threads: { get, list, update } },
+        realtime: { publish },
+      } as never,
+      {
+        bindings: async () => ({
+          outcomes: [
+            { rootThreadId: "thr_root", outcomeTaskId: "task_outcome" },
+          ],
+          executions: [
+            {
+              rootThreadId: "thr_root",
+              ownerThreadId: "thr_child",
+              executionTaskId: "task_execution_one",
+            },
+            {
+              rootThreadId: "thr_root",
+              ownerThreadId: "thr_root",
+              executionTaskId: "task_execution_two",
+            },
+          ],
+        }),
+        allTasksById,
+      },
+      { groups, saveGroups },
+    );
+
+    await service.move({ threadId: "thr_other", parentThreadId: "thr_child" });
+
+    expect(allTasksById).toHaveBeenCalledTimes(1);
     expect(update).toHaveBeenCalledTimes(1);
   });
 });
