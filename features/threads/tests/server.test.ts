@@ -22,6 +22,7 @@ describe("R9 Threads server preferences", () => {
       ],
       [THREAD_PREFERENCE_KEYS.order, ["thr_b", "thr_a", "thr_b", "bad"]],
       [THREAD_PREFERENCE_KEYS.appearance, 47.5],
+      [THREAD_PREFERENCE_KEYS.textScale, 0.9],
     ]);
     const published: unknown[] = [];
     const service = createThreadPreferencesService({
@@ -52,11 +53,23 @@ describe("R9 Threads server preferences", () => {
       ],
       activeGroupPosition: 1,
     });
-    await expect(service.appearance()).resolves.toEqual({ rowHeight: 47.5 });
+    await expect(service.appearance()).resolves.toEqual({
+      rowHeight: 47.5,
+      textScale: 0.9,
+    });
     await expect(service.saveAppearance(52.5)).resolves.toEqual({
       rowHeight: 52.5,
+      textScale: 0.9,
     });
     expect(saved.get(THREAD_PREFERENCE_KEYS.appearance)).toBe(52.5);
+    await expect(service.saveTextScale(1.1)).resolves.toEqual({
+      rowHeight: 52.5,
+      textScale: 1.1,
+    });
+    expect(saved.get(THREAD_PREFERENCE_KEYS.textScale)).toBe(1.1);
+    await expect(service.saveTextScale(1.11)).rejects.toThrow(
+      "Enter a value from 0.9 to 1.1.",
+    );
     await expect(service.saveAppearance(60.25)).rejects.toThrow(
       "Enter a number with at most one decimal place.",
     );
@@ -67,7 +80,7 @@ describe("R9 Threads server preferences", () => {
       ],
       activeGroupPosition: 1,
     });
-    expect(published.at(-2)).toEqual({
+    expect(published[1]).toEqual({
       channel: "sidebar-order:changed",
       payload: {
         groups: [
@@ -76,11 +89,15 @@ describe("R9 Threads server preferences", () => {
         activeGroupPosition: 1,
       },
     });
-    expect(published.at(-1)).toEqual({
+    expect(published[2]).toEqual({
       channel: "sidebar-order:changed",
       payload: { appearance: { rowHeight: 52.5 } },
     });
-    expect(published).toHaveLength(3);
+    expect(published[3]).toEqual({
+      channel: "sidebar-order:changed",
+      payload: { appearance: { textScale: 1.1 } },
+    });
+    expect(published).toHaveLength(4);
     expect(service).not.toHaveProperty("archivedThreads");
   });
 });

@@ -62,8 +62,9 @@ export function createThreadRegistration(
     async getSidebarAppearance() {
       return preferences.appearance();
     },
-    async saveSidebarAppearance({ rowHeight }) {
-      return preferences.saveAppearance(rowHeight);
+    async saveSidebarAppearance(input) {
+      if ("rowHeight" in input) return preferences.saveAppearance(input.rowHeight);
+      return preferences.saveTextScale(input.textScale);
     },
     async moveSidebarThread(input) {
       return hierarchy.move(input);

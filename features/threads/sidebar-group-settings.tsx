@@ -6,7 +6,10 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { SidebarListIconButton } from "@/components/ui/sidebar-list-actions";
 import { BbUrlLink } from "@/components/ui/url-link";
-import { SidebarRowHeightEditor } from "./sidebar-appearance-settings";
+import {
+  SidebarRowHeightEditor,
+  SidebarTextScaleEditor,
+} from "./sidebar-appearance-settings";
 import {
   ThreadGroupOrderSettings,
   type ThreadGroupSettingsProps,
@@ -16,6 +19,9 @@ type ThreadListSettingsProps = {
   rowHeight: number | undefined;
   rowHeightPending: boolean;
   onSaveRowHeight(rowHeight: number): Promise<{ rowHeight: number }>;
+  textScale: number | undefined;
+  textScalePending: boolean;
+  onSaveTextScale(textScale: number): Promise<{ textScale: number }>;
   groups?: ThreadGroupSettingsProps;
 };
 
@@ -23,6 +29,9 @@ export function ThreadListSettings({
   rowHeight,
   rowHeightPending,
   onSaveRowHeight,
+  textScale,
+  textScalePending,
+  onSaveTextScale,
   groups,
 }: ThreadListSettingsProps) {
   const [open, setOpen] = useState(false);
@@ -81,6 +90,12 @@ export function ThreadListSettings({
               saved={rowHeight}
               pending={rowHeightPending}
               onSave={onSaveRowHeight}
+              compact
+            />
+            <SidebarTextScaleEditor
+              saved={textScale}
+              pending={textScalePending}
+              onSave={onSaveTextScale}
               compact
             />
             <BbUrlLink

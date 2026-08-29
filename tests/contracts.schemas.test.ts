@@ -86,3 +86,35 @@ describe("R32.2 outcome and tracker RPC schemas", () => {
     ).toBe(false);
   });
 });
+
+describe("R37.2 bounded text-scale RPC schema", () => {
+  it("accepts only strict bounded appearance updates and returns both preferences", () => {
+    expect(
+      rpcSchemas.saveSidebarAppearance.input.safeParse({ textScale: 0.9 })
+        .success,
+    ).toBe(true);
+    expect(
+      rpcSchemas.saveSidebarAppearance.input.safeParse({
+        textScale: 1.11,
+      }).success,
+    ).toBe(false);
+    expect(
+      rpcSchemas.saveSidebarAppearance.input.safeParse({
+        textScale: 1.001,
+      }).success,
+    ).toBe(false);
+    expect(
+      rpcSchemas.saveSidebarAppearance.input.safeParse({ textScale: 1, leaked: true })
+        .success,
+    ).toBe(false);
+    expect(
+      rpcSchemas.saveSidebarAppearance.input.safeParse({}).success,
+    ).toBe(false);
+    expect(
+      rpcSchemas.getSidebarAppearance.output.safeParse({
+        rowHeight: 40,
+        textScale: 1.1,
+      }).success,
+    ).toBe(true);
+  });
+});

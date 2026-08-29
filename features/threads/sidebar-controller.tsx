@@ -24,6 +24,7 @@ import { PullRequestsLeftSidebar } from "@/features/pull-requests/left-sidebar";
 import { invalidateSidebarPullRequestStacks } from "@/features/pull-requests/queries";
 import type { PullRequestThreadReference } from "@/features/pull-requests/thread-link";
 import { DEFAULT_SIDEBAR_ROW_HEIGHT } from "./sidebar-appearance";
+import { DEFAULT_TEXT_SCALE } from "./sidebar-appearance";
 import "../../app.css";
 import "../../scrollbar.css";
 import "../../views.css";
@@ -212,7 +213,14 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     <ThreadListSettings
       rowHeight={threadPreferences.appearance.data?.rowHeight}
       rowHeightPending={threadPreferences.saveAppearance.isPending}
-      onSaveRowHeight={threadPreferences.saveAppearance.mutateAsync}
+      onSaveRowHeight={(rowHeight) =>
+        threadPreferences.saveAppearance.mutateAsync({ rowHeight })
+      }
+      textScale={threadPreferences.appearance.data?.textScale}
+      textScalePending={threadPreferences.saveAppearance.isPending}
+      onSaveTextScale={(textScale) =>
+        threadPreferences.saveAppearance.mutateAsync({ textScale })
+      }
       groups={
         view === "work"
           ? {
@@ -251,6 +259,9 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
       style={
         {
           "--ws-sidebar-row-height": `${threadPreferences.appearance.data?.rowHeight ?? DEFAULT_SIDEBAR_ROW_HEIGHT}px`,
+          "--ws-text-scale": String(
+            threadPreferences.appearance.data?.textScale ?? DEFAULT_TEXT_SCALE,
+          ),
         } as CSSProperties
       }
     >

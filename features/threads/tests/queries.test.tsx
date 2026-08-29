@@ -11,6 +11,7 @@ import {
   threadQueryKeys,
   threadQueryPolicies,
   saveThreadGroups,
+  saveSidebarAppearance,
   useArchivedThreadsQuery,
   useThreadHierarchyMutation,
   type ThreadsRpc,
@@ -23,6 +24,29 @@ function queryWrapper(client: QueryClient) {
 }
 
 describe("R9 Threads query ownership", () => {
+  it("round-trips text scale through the shared typed appearance query", async () => {
+    const client = new QueryClient();
+    const rpc = {
+      call: vi.fn(async (method: string, input: unknown) => {
+        expect(method).toBe("saveSidebarAppearance");
+        expect(input).toEqual({ textScale: 1.1 });
+        return { rowHeight: 40, textScale: 1.1 };
+      }),
+    };
+    await expect(
+      saveSidebarAppearance(
+        client,
+        rpc as unknown as ThreadsRpc,
+        { textScale: 1.1 },
+      ),
+    ).resolves.toEqual({ rowHeight: 40, textScale: 1.1 });
+    expect(client.getQueryData(threadQueryKeys.appearance())).toEqual({
+      rowHeight: 40,
+      textScale: 1.1,
+    });
+    client.clear();
+  });
+
   it("keeps preferences/groups/order in typed Query and normalizes groups without importing server.ts", async () => {
     expect(
       normalizeThreadGroups({

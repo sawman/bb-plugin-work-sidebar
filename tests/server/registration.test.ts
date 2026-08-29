@@ -255,6 +255,19 @@ describe("R2 server registration and disposal", () => {
       host.harness.inspection.registrations.rpcMethods,
     );
     await expect(
+      host.harness.behavior.callRpc("getSidebarAppearance", null),
+    ).resolves.toEqual({ rowHeight: 40, textScale: 1 });
+    await expect(
+      host.harness.behavior.callRpc("saveSidebarAppearance", {
+        textScale: 0.9,
+      }),
+    ).resolves.toEqual({ rowHeight: 40, textScale: 0.9 });
+    await expect(
+      host.harness.behavior.callRpc("saveSidebarAppearance", {
+        textScale: 1.11,
+      }),
+    ).rejects.toThrow("rpc input validation failed");
+    await expect(
       host.harness.behavior.callRpc("moveSidebarThread", {
         threadId: "thr_source",
         parentThreadId: null,
