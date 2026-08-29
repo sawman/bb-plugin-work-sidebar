@@ -3347,3 +3347,69 @@ button.ws-provider-health:focus-visible {
     var(--ws-text-font-family-code);
 }
 /* R37 typography token block: end */
+.ws-task-workflow {
+  display: grid;
+  gap: 0.55rem;
+}
+.ws-task-workflow-section {
+  display: grid;
+  gap: 0.25rem;
+}
+.ws-task-workflow-section > h3,
+.ws-task-workflow-disclosure {
+  margin: 0;
+  color: var(--muted-foreground);
+  font: var(--ws-text-label);
+  line-height: inherit;
+}
+.ws-task-workflow-section[data-tone="attention"] > h3 {
+  color: var(--foreground);
+}
+.ws-task-workflow-disclosure {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+.ws-task-workflow-list {
+  display: grid;
+  gap: 0.2rem;
+}
+.ws-task-workflow-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem;
+  border-radius: 0.3rem;
+}
+.ws-task-workflow-row[data-state="canceled"] {
+  text-decoration: line-through;
+}
+.ws-task-workflow-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+.ws-task-workflow-title { font: var(--ws-text-primary); line-height: inherit; }
+.ws-task-workflow-meta { color: var(--muted-foreground); font: var(--ws-text-metadata); line-height: inherit; }
+.ws-task-workflow-owner {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.2rem;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: var(--ws-text-metadata);
+  line-height: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ws-task-workflow-owner[data-state="unavailable"] { cursor: default; }

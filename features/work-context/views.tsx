@@ -6,6 +6,8 @@ import { CopyBadge } from "../../components/ui/copy-badge";
 import { Input } from "../../components/ui/input";
 import { SearchCombobox } from "../../components/ui/combobox";
 import { AssigneePicker } from "../tasks/assignee-picker";
+import { TaskWorkflowCard } from "../tasks/workflow-card";
+import { projectTaskWorkflow, type TaskWorkflowOwner } from "../tasks/workflow-model";
 import type { rpcContract } from "../../contracts";
 import {
   goalProgressPercent,
@@ -19,7 +21,6 @@ import { useTasksRead } from "../tasks/queries";
 import {
   nextOutcomeStatus,
   previousOutcomeStatus,
-  projectWorkTaskBindingOwnership,
 } from "./model";
 import {
   useLatestActivity,
@@ -689,20 +690,40 @@ function TasksCard({
   mutations: TasksMutations;
 }) {
   const outcome = useWorkOutcome(threadId);
+  const status = useWorkStatus(threadId);
   const [selection, setSelection] = useState("");
   const [attachmentPickerOpen, setAttachmentPickerOpen] = useState(false);
-  const { bindingOwnedTaskIds, currentThreadBindingTaskIds } =
-    projectWorkTaskBindingOwnership(threadId, outcome.data?.bindings ?? []);
-  const attached = (tasks.data?.tasks ?? []).filter((task) =>
-    task.linkedThreadIds.includes(threadId) && !bindingOwnedTaskIds.has(task.id),
-  );
+  const genericTasks = (tasks.data?.tasks ?? []).filter((task) => task.linkedThreadIds.includes(threadId));
+  const executionTaskIds = new Set(outcome.data?.executionTasks.map((task) => task.id) ?? []);
   const available = (tasks.data?.tasks ?? []).filter(
-    (task) =>
-      !task.linkedThreadIds.includes(threadId) &&
-      !bindingOwnedTaskIds.has(task.id),
+    (task) => !task.linkedThreadIds.includes(threadId) && !executionTaskIds.has(task.id) && task.id !== outcome.data?.outcome?.id,
   );
-  const boundTaskCount = currentThreadBindingTaskIds.size;
-  const taskCount = attached.length + boundTaskCount;
+  const threadById = new Map([
+    ...(status.data?.children ?? []),
+    ...(status.data ? [{ id: threadId, ...status.data.currentThread, isArchived: false }] : []),
+  ].map((candidate) => [candidate.id, candidate]));
+  const owners: TaskWorkflowOwner[] = (outcome.data?.bindings ?? [])
+    .filter((binding) => binding.executionTaskId !== null)
+    .map((binding) => {
+      const thread = binding.ownerThreadId ? threadById.get(binding.ownerThreadId) : null;
+      const liveStatus = thread?.status === "active" ? "working" : thread?.status === "starting" ? "starting" : thread?.status === "completed" ? "completed" : thread?.status === "failed" ? "failed" : "idle";
+      return {
+        taskId: binding.executionTaskId!,
+        threadId: binding.ownerThreadId,
+        threadTitle: thread?.title ?? binding.ownerThreadId,
+        providerId: thread?.providerId ?? null,
+        liveStatus,
+        isArchived: thread?.isArchived ?? binding.ownerThreadId !== null,
+        unavailable: !thread,
+      };
+    });
+  const workflow = projectTaskWorkflow({
+    outcomeTaskId: outcome.data?.outcome?.id ?? null,
+    tasks: genericTasks,
+    executionTasks: outcome.data?.executionTasks ?? [],
+    owners,
+  });
+  const detachableTaskIds = new Set(genericTasks.filter((task) => !executionTaskIds.has(task.id)).map((task) => task.id));
   const busy = mutations.attachment.isPending || mutations.assignment.isPending;
   const report = (operation: Promise<unknown>, fallback: string) =>
     void operation.catch((error) =>
@@ -711,73 +732,18 @@ function TasksCard({
   return (
     <CardState
       title="Tasks"
-      trailing={
-        tasks.data ? (
-          <span title={`${taskCount} task${taskCount === 1 ? "" : "s"}`}>
-            <span aria-hidden>{taskCount}</span>
-            <span className="ws-sr-only">
-              {taskCount} task{taskCount === 1 ? "" : "s"}
-            </span>
-          </span>
-        ) : undefined
-      }
       pending={tasks.isPending}
       error={tasks.error}
       onRetry={() => void tasks.refetch()}
     >
       <div className="ws-thread-task-card">
-        {boundTaskCount ? (
-          <p className="ws-card-note" role="status">
-            {boundTaskCount} work task{boundTaskCount === 1 ? "" : "s"}{" "}
-            {boundTaskCount === 1 ? "is" : "are"} bound to this thread.
-          </p>
-        ) : null}
-        {attached.length ? (
-          <div className="ws-work-card-list">
-            {attached.map((task) => (
-              <div key={task.id} className="ws-work-card-row">
-                <span className="ws-work-card-key">{task.key}</span>
-                <span className="ws-work-card-copy">{task.title}</span>
-                <AssigneePicker
-                  value={task.assignee}
-                  disabled={busy}
-                  onChange={(assignee) =>
-                    report(
-                      mutations.assignment.mutateAsync({
-                        taskId: task.id,
-                        assignee,
-                      }),
-                      "Could not update task assignee",
-                    )
-                  }
-                />
-                <button
-                  type="button"
-                  disabled={busy}
-                  aria-label={`Detach ${task.key} from this thread`}
-                  onClick={() =>
-                    report(
-                      mutations.attachment.mutateAsync({
-                        taskId: task.id,
-                        threadId,
-                        attached: false,
-                      }),
-                      "Could not detach task",
-                    )
-                  }
-                >
-                  <Icon name="X" aria-hidden />
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="ws-card-note">
-            {boundTaskCount
-              ? "No additional tasks are attached to this thread."
-              : "No tasks are attached to this thread."}
-          </p>
-        )}
+        <TaskWorkflowCard
+          sections={workflow}
+          busy={busy}
+          detachableTaskIds={detachableTaskIds}
+          onAssigneeChange={(taskId, assignee) => report(mutations.assignment.mutateAsync({ taskId, assignee }), "Could not update task assignee")}
+          onDetach={(taskId) => report(mutations.attachment.mutateAsync({ taskId, threadId, attached: false }), "Could not detach task")}
+        />
         <div className="ws-work-card-control">
           <SearchCombobox
             ariaLabel="Add task to this thread"
@@ -808,49 +774,6 @@ function TasksCard({
             {mutations.attachment.isPending ? "…" : "Add"}
           </button>
         </div>
-        {outcome.data?.executionTasks.length ? (
-          <div
-            className="ws-work-card-list ws-work-card-list-separated"
-            role="group"
-            aria-label="Execution tasks"
-          >
-            {outcome.data.executionTasks.map((task) => {
-              const sidebarTask = tasks.data?.tasks.find(
-                (candidate) => candidate.id === task.id,
-              );
-              return <div key={task.id} className="ws-work-card-row">
-                <span
-                  className={`ws-status-dot ws-status-dot-${task.status}`}
-                  aria-hidden
-                >
-                  {task.status === "done" ? "✓" : "•"}
-                </span>
-                <span className="ws-work-card-copy">
-                  <strong>{task.title}</strong>
-                  <small>
-                    {task.key} · {readableStatus(task.status)}
-                  </small>
-                </span>
-                {sidebarTask ? (
-                  <AssigneePicker
-                    value={sidebarTask.assignee}
-                    taskKey={task.key}
-                    disabled={mutations.assignment.isPending}
-                    onChange={(assignee) =>
-                      report(
-                        mutations.assignment.mutateAsync({
-                          taskId: task.id,
-                          assignee,
-                        }),
-                        "Could not update task assignee",
-                      )
-                    }
-                  />
-                ) : null}
-              </div>;
-            })}
-          </div>
-        ) : null}
       </div>
     </CardState>
   );

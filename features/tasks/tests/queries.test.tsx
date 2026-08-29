@@ -270,7 +270,7 @@ describe("Tasks read slots", () => {
     );
     expect(
       populated.container.querySelector(
-        ".ws-thread-task-card > .ws-work-card-list > .ws-work-card-row",
+        ".ws-thread-task-card .ws-task-workflow-row",
       ),
     ).toBeTruthy();
     populated.lifecycle.unmount();
@@ -294,6 +294,8 @@ describe("Tasks read slots", () => {
       { timeout: 2_000 },
     );
     expect(retry.getByText("Status")).toBeTruthy();
+    expect(retry.getByText("Work item")).toBeTruthy();
+    expect(retry.getByText("Goal")).toBeTruthy();
     expect(retry.getByLabelText(/Codex provider status: Ready/)).toBeTruthy();
     expect(
       retry.queryByText("No tasks are attached to this thread."),
