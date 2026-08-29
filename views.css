@@ -3282,6 +3282,31 @@ button.ws-provider-health:focus-visible {
   width: 0.62rem;
   height: 0.62rem;
 }
+.ws-task-thread-unavailable {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.16rem;
+  padding-inline: 0.22rem;
+  color: var(--muted-foreground);
+  font: var(--ws-text-label);
+  line-height: inherit;
+  white-space: nowrap;
+}
+.ws-task-thread-unavailable svg,
+.ws-task-assignee-readonly svg {
+  width: 0.65rem;
+  height: 0.65rem;
+}
+.ws-task-thread-unavailable > span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ws-task-assignee-readonly {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted-foreground);
+}
 .ws-task-thread-trigger {
   display: inline-flex;
   align-items: center;
@@ -3304,11 +3329,6 @@ button.ws-provider-health:focus-visible {
 .ws-task-thread-trigger > svg {
   width: 0.65rem;
   height: 0.65rem;
-}
-.ws-task-thread-count {
-  color: var(--muted-foreground);
-  font: var(--ws-text-metadata);
-  line-height: 1;
 }
 /* R37 typography token block: start */
 :root {
