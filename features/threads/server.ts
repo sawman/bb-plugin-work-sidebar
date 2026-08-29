@@ -7,6 +7,8 @@ import {
 import {
   normalizeSidebarRowHeight,
   validateSidebarRowHeight,
+  normalizeTextScale,
+  validateTextScale,
 } from "./sidebar-appearance.js";
 
 export const THREAD_PREFERENCE_CHANNEL = "sidebar-order:changed";
@@ -15,6 +17,7 @@ export const THREAD_PREFERENCE_KEYS = {
   later: "sidebar-later-threads:v1",
   groups: "sidebar-thread-groups:v1",
   appearance: "sidebar-appearance:v1",
+  textScale: "sidebar-text-scale:v1",
 } as const;
 
 export function sanitizeThreadOrder(value: unknown): string[] {
@@ -136,6 +139,17 @@ export function createArchivedThreadService(adapter: ArchivedThreadAdapter) {
 export function createThreadPreferencesService(
   adapter: ThreadPreferenceAdapter,
 ) {
+  async function appearance() {
+    return {
+      rowHeight: normalizeSidebarRowHeight(
+        await adapter.get(THREAD_PREFERENCE_KEYS.appearance),
+      ),
+      textScale: normalizeTextScale(
+        await adapter.get(THREAD_PREFERENCE_KEYS.textScale),
+      ),
+    };
+  }
+
   return {
     async order() {
       return sanitizeThreadOrder(
@@ -187,13 +201,7 @@ export function createThreadPreferencesService(
       adapter.publish(THREAD_PREFERENCE_CHANNEL, preferences);
       return preferences;
     },
-    async appearance() {
-      return {
-        rowHeight: normalizeSidebarRowHeight(
-          await adapter.get(THREAD_PREFERENCE_KEYS.appearance),
-        ),
-      };
-    },
+    appearance,
     async saveAppearance(rowHeight: number) {
       const validation = validateSidebarRowHeight(String(rowHeight));
       if (validation.value === null) throw new Error(validation.error);
@@ -202,7 +210,17 @@ export function createThreadPreferencesService(
       adapter.publish(THREAD_PREFERENCE_CHANNEL, {
         appearance: { rowHeight: value },
       });
-      return { rowHeight: value };
+      return appearance();
+    },
+    async saveTextScale(textScale: number) {
+      const validation = validateTextScale(String(textScale));
+      if (validation.value === null) throw new Error(validation.error);
+      const value = validation.value;
+      await adapter.set(THREAD_PREFERENCE_KEYS.textScale, value);
+      adapter.publish(THREAD_PREFERENCE_CHANNEL, {
+        appearance: { textScale: value },
+      });
+      return appearance();
     },
   };
 }

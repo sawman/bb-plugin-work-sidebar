@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
-import { waitFor } from "@testing-library/react";
+import { fireEvent, waitFor } from "@testing-library/react";
 import {
   getPluginQueryClient,
   queryKeys,
@@ -85,17 +85,28 @@ describe("R2 app registration and Query lifecycle", () => {
       onNavigate: () => undefined,
       searchQuery: "",
       Original: () => null,
+    }, {
+      rpc: {
+        getSidebarAppearance: () => ({ rowHeight: 40, textScale: 0.9 }),
+      } as never,
     });
     const right = renderSlot(app.threadPanelActions[0]!, {
       threadId: "thr_test",
       params: null,
+    }, {
+      rpc: {
+        getSidebarAppearance: () => ({ rowHeight: 40, textScale: 0.9 }),
+      } as never,
     });
     expect(
       ["Threads", "Tasks", "PRs"].map((name) =>
         Boolean(left.getByRole("button", { name }).closest(".ws-list")),
       ),
     ).toEqual([true, true, true]);
-    const leftRoot = left.container.querySelector(".ws-list");
+    const leftRoot = left.container.querySelector<HTMLElement>(".ws-list");
+    await waitFor(() =>
+      expect(leftRoot?.style.getPropertyValue("--ws-text-scale")).toBe("0.9"),
+    );
     expect(leftRoot?.querySelector(":scope > .ws-tabs-sticky")).toBeTruthy();
     expect(leftRoot?.querySelector(":scope > .ws-list-toolbar")).toBeTruthy();
     expect(leftRoot?.querySelector(":scope > .ws-view-content")).toBeTruthy();
@@ -115,6 +126,13 @@ describe("R2 app registration and Query lifecycle", () => {
       "ws-work-thr_test-panel-agents",
     ]);
     expect(right.container.querySelectorAll(".ws-panel-body")).toHaveLength(3);
+    await waitFor(() =>
+      expect(
+        right.container
+          .querySelector<HTMLElement>(".ws-panel")
+          ?.style.getPropertyValue("--ws-text-scale"),
+      ).toBe("0.9"),
+    );
     expect(mount).toHaveBeenCalledTimes(2);
     // Changes owns no cache entries until its tab mounts the panel; once
     // selected, the file query remains hook-stable and disabled until opened.
@@ -138,7 +156,33 @@ describe("R2 app registration and Query lifecycle", () => {
           queryKey: ["work-sidebar", "sidebar", "threads", "appearance"],
         })
         ?.getObserversCount(),
-    ).toBe(1);
+    ).toBe(2);
+    const saveAppearance = vi.fn(() => ({ rowHeight: 40, textScale: 1.1 }));
+    const settings = renderSlot(
+      app.settingsSections[0]!,
+      {},
+      {
+        rpc: {
+          getSidebarAppearance: () => ({ rowHeight: 40, textScale: 0.9 }),
+          saveSidebarAppearance: saveAppearance,
+        } as never,
+      },
+    );
+    fireEvent.change(settings.getByRole("spinbutton", { name: "Text scale" }), {
+      target: { value: "1.1" },
+    });
+    await waitFor(() =>
+      expect(saveAppearance).toHaveBeenCalledWith({ textScale: 1.1 }),
+    );
+    await waitFor(() => {
+      expect(leftRoot?.style.getPropertyValue("--ws-text-scale")).toBe("1.1");
+      expect(
+        right.container
+          .querySelector<HTMLElement>(".ws-panel")
+          ?.style.getPropertyValue("--ws-text-scale"),
+      ).toBe("1.1");
+    });
+    settings.unmount();
     expect(
       client
         .getQueryCache()
@@ -176,7 +220,7 @@ describe("R2 app registration and Query lifecycle", () => {
     ).toHaveLength(0);
     left.unmount();
     right.unmount();
-    expect(unmount).toHaveBeenCalledTimes(2);
+    expect(unmount).toHaveBeenCalledTimes(3);
     await waitFor(() =>
       expect(
         client
@@ -229,6 +273,149 @@ describe("R2 app registration and Query lifecycle", () => {
 
     expect(mount.mock.calls).toHaveLength(priorMounts + 4);
     expect(unmount.mock.calls).toHaveLength(priorUnmounts + 4);
+  });
+
+  it("keeps appearance realtime ownership in the left slot while panels share live cache updates", async () => {
+    const app = await loadPluginApp(() => import("../../app"));
+    const client = getPluginQueryClient();
+    client.clear();
+    let textScale = 0.9;
+    const getAppearance = vi.fn(() => ({ rowHeight: 40, textScale }));
+    const rpc = {
+      getSidebarAppearance: getAppearance,
+    } as never;
+    const left = renderSlot(
+      app.threadLists[0]!,
+      {
+        activeThreadId: null,
+        activeProjectId: null,
+        isCompactViewport: false,
+        onNavigate: () => undefined,
+        searchQuery: "",
+        Original: () => null,
+      },
+      { rpc },
+    );
+    const rightOne = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_panel_one", params: null },
+      { rpc },
+    );
+    const rightTwo = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_panel_two", params: null },
+      { rpc },
+    );
+    const appearanceKey = [
+      "work-sidebar",
+      "sidebar",
+      "threads",
+      "appearance",
+    ] as const;
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const appearanceInvalidations = () =>
+      invalidate.mock.calls.filter(
+        (call) => call[0]?.queryKey?.join("/") === appearanceKey.join("/"),
+      );
+
+    await waitFor(() => {
+      expect(
+        left.container
+          .querySelector<HTMLElement>(".ws-list")
+          ?.style.getPropertyValue("--ws-text-scale"),
+      ).toBe("0.9");
+      expect(
+        rightOne.container
+          .querySelector<HTMLElement>(".ws-panel")
+          ?.style.getPropertyValue("--ws-text-scale"),
+      ).toBe("0.9");
+      expect(
+        rightTwo.container
+          .querySelector<HTMLElement>(".ws-panel")
+          ?.style.getPropertyValue("--ws-text-scale"),
+      ).toBe("0.9");
+    });
+    expect(
+      client
+        .getQueryCache()
+        .find({ queryKey: appearanceKey })
+        ?.getObserversCount(),
+    ).toBe(3);
+
+    await rightOne.behavior.emitRealtime("sidebar-order:changed", {});
+    await rightTwo.behavior.emitRealtime("sidebar-order:changed", {});
+    expect(appearanceInvalidations()).toHaveLength(0);
+
+    textScale = 1.05;
+    await left.behavior.emitRealtime("sidebar-order:changed", {});
+    await waitFor(() => {
+      expect(appearanceInvalidations()).toHaveLength(1);
+      expect(getAppearance).toHaveBeenCalledTimes(2);
+      expect(
+        rightOne.container
+          .querySelector<HTMLElement>(".ws-panel")
+          ?.style.getPropertyValue("--ws-text-scale"),
+      ).toBe("1.05");
+      expect(
+        rightTwo.container
+          .querySelector<HTMLElement>(".ws-panel")
+          ?.style.getPropertyValue("--ws-text-scale"),
+      ).toBe("1.05");
+    });
+
+    const saveAppearance = vi.fn(
+      async ({ textScale: next }: { textScale: number }) => {
+        textScale = next;
+        return { rowHeight: 40, textScale: next };
+      },
+    );
+    const settings = renderSlot(
+      app.settingsSections[0]!,
+      {},
+      {
+        rpc: {
+          getSidebarAppearance: getAppearance,
+          saveSidebarAppearance: saveAppearance,
+        } as never,
+      },
+    );
+    const input = await settings.findByRole("spinbutton", {
+      name: "Text scale",
+    });
+    fireEvent.change(input, { target: { value: "1.1" } });
+    await waitFor(() => {
+      expect(saveAppearance).toHaveBeenCalledWith({ textScale: 1.1 });
+      expect(
+        left.container
+          .querySelector<HTMLElement>(".ws-list")
+          ?.style.getPropertyValue("--ws-text-scale"),
+      ).toBe("1.1");
+      expect(
+        rightOne.container
+          .querySelector<HTMLElement>(".ws-panel")
+          ?.style.getPropertyValue("--ws-text-scale"),
+      ).toBe("1.1");
+      expect(
+        rightTwo.container
+          .querySelector<HTMLElement>(".ws-panel")
+          ?.style.getPropertyValue("--ws-text-scale"),
+      ).toBe("1.1");
+    });
+
+    settings.unmount();
+    left.unmount();
+    rightOne.unmount();
+    rightTwo.unmount();
+    await waitFor(() =>
+      expect(
+        client
+          .getQueryCache()
+          .getAll()
+          .every((query) => query.getObserversCount() === 0),
+      ).toBe(true),
+    );
+    invalidate.mockRestore();
+    client.clear();
   });
 });
 

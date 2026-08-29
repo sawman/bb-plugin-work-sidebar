@@ -35,6 +35,13 @@ export const threadQueryPolicies = {
   appearance: queryPolicies.sidebarOrderPreferences,
 } as const;
 export type ThreadsRpc = PluginRpcClient<typeof rpcContract>;
+export type SidebarAppearance = {
+  rowHeight: number;
+  textScale: number;
+};
+export type SidebarAppearanceUpdate =
+  | { rowHeight: number }
+  | { textScale: number };
 
 export function useThreadHierarchyMutation(rpc: ThreadsRpc) {
   const client = useQueryClient();
@@ -66,13 +73,20 @@ function sidebarAppearanceQuery(rpc: ThreadsRpc) {
   } as const;
 }
 
+export async function saveSidebarAppearance(
+  client: QueryClient,
+  rpc: ThreadsRpc,
+  update: SidebarAppearanceUpdate,
+) {
+  const result = await rpc.call("saveSidebarAppearance", update);
+  client.setQueryData(threadQueryKeys.appearance(), result);
+  return result;
+}
+
 function useSaveSidebarAppearance(rpc: ThreadsRpc, client: QueryClient) {
   return useMutation({
-    mutationFn: (rowHeight: number) =>
-      rpc.call("saveSidebarAppearance", { rowHeight }),
-    onSuccess: (result) => {
-      client.setQueryData(threadQueryKeys.appearance(), result);
-    },
+    mutationFn: (update: SidebarAppearanceUpdate) =>
+      saveSidebarAppearance(client, rpc, update),
   });
 }
 
@@ -127,10 +141,18 @@ export function useThreadPreferences() {
     },
     ...threadQueryPolicies.groups,
   });
-  const appearance = useQuery(sidebarAppearanceQuery(rpc));
-  const saveAppearance = useSaveSidebarAppearance(rpc, client);
+  const appearancePreferences = useSidebarAppearancePreferences();
+  const appearance = appearancePreferences.appearance;
+  const saveAppearance = appearancePreferences.saveAppearance;
   useRealtime("sidebar-order:changed", () => {
-    void client.invalidateQueries({ queryKey: root });
+    for (const key of [
+      threadQueryKeys.order(),
+      threadQueryKeys.groups(),
+      threadQueryKeys.appearance(),
+      threadQueryKeys.archived(),
+    ]) {
+      void client.invalidateQueries({ queryKey: key });
+    }
   });
   const saveGroups = useMutation({
     mutationFn: (next: SidebarThreadGroupPreferences) =>

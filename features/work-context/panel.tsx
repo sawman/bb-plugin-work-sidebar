@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStore } from "zustand";
 import {
@@ -19,6 +19,10 @@ import { invalidateTracker, useTracker } from "../tracker/queries";
 import { invalidateWorkContextCards, useWorkStatus } from "./queries";
 import { parseWorkSidebarRealtimeEvent } from "../../shared/work-realtime";
 import { WorkContextCards } from "./views";
+import {
+  DEFAULT_TEXT_SCALE,
+} from "../threads/sidebar-appearance";
+import { useSidebarAppearancePreferences } from "../threads/queries";
 
 const WORK_TABS: readonly {
   id: WorkTab;
@@ -54,6 +58,7 @@ function queueRootEvent(scope: WorkPanelScope, rootThreadId: string) {
 
 export function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const queryClient = useQueryClient();
+  const appearance = useSidebarAppearancePreferences();
   const status = useWorkStatus(threadId);
   const tracker = useTracker(threadId);
   const workScopeRef = useRef<WorkPanelScope>({
@@ -109,7 +114,16 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
     threadInteractionStore.getState().setWorkTab(threadId, next);
   const tabIdPrefix = `ws-work-${threadId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   return (
-    <div className="ws-panel">
+    <div
+      className="ws-panel"
+      style={
+        {
+          "--ws-text-scale": String(
+            appearance.appearance.data?.textScale ?? DEFAULT_TEXT_SCALE,
+          ),
+        } as CSSProperties
+      }
+    >
       <header className="ws-panel-header">
         <div className="ws-panel-heading">
           <Icon name="ListTodo" className="ws-panel-icon" aria-hidden />

@@ -2,6 +2,8 @@ import { z } from "zod";
 import {
   MAX_SIDEBAR_ROW_HEIGHT,
   MIN_SIDEBAR_ROW_HEIGHT,
+  MAX_TEXT_SCALE,
+  MIN_TEXT_SCALE,
 } from "./sidebar-appearance";
 
 const sidebarThreadGroup = z.object({
@@ -85,25 +87,38 @@ export const threadPreferenceSchemas = {
           .number()
           .min(MIN_SIDEBAR_ROW_HEIGHT)
           .max(MAX_SIDEBAR_ROW_HEIGHT),
+        textScale: z.number().min(MIN_TEXT_SCALE).max(MAX_TEXT_SCALE),
       })
       .strict(),
   },
   saveSidebarAppearance: {
-    input: z
-      .object({
-        rowHeight: z
-          .number()
-          .min(MIN_SIDEBAR_ROW_HEIGHT)
-          .max(MAX_SIDEBAR_ROW_HEIGHT)
-          .multipleOf(0.1),
-      })
-      .strict(),
+    input: z.union([
+      z
+        .object({
+          rowHeight: z
+            .number()
+            .min(MIN_SIDEBAR_ROW_HEIGHT)
+            .max(MAX_SIDEBAR_ROW_HEIGHT)
+            .multipleOf(0.1),
+        })
+        .strict(),
+      z
+        .object({
+          textScale: z
+            .number()
+            .min(MIN_TEXT_SCALE)
+            .max(MAX_TEXT_SCALE)
+            .multipleOf(0.01),
+        })
+        .strict(),
+    ]),
     output: z
       .object({
         rowHeight: z
           .number()
           .min(MIN_SIDEBAR_ROW_HEIGHT)
           .max(MAX_SIDEBAR_ROW_HEIGHT),
+        textScale: z.number().min(MIN_TEXT_SCALE).max(MAX_TEXT_SCALE),
       })
       .strict(),
   },
