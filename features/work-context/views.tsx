@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { Icon, type IconName } from "../../components/ui/icon";
 import { CopyBadge } from "../../components/ui/copy-badge";
 import { Input } from "../../components/ui/input";
-import { Combobox } from "../../components/ui/combobox";
+import { SearchCombobox } from "../../components/ui/combobox";
 import { AssigneePicker } from "../tasks/assignee-picker";
 import type { rpcContract } from "../../contracts";
 import {
@@ -571,6 +571,7 @@ function TasksCard({
 }) {
   const outcome = useWorkOutcome(threadId);
   const [selection, setSelection] = useState("");
+  const [attachmentPickerOpen, setAttachmentPickerOpen] = useState(false);
   const { bindingOwnedTaskIds, currentThreadBindingTaskIds } =
     projectWorkTaskBindingOwnership(threadId, outcome.data?.bindings ?? []);
   const attached = (tasks.data?.tasks ?? []).filter((task) =>
@@ -659,18 +660,19 @@ function TasksCard({
           </p>
         )}
         <div className="ws-work-card-control">
-          <Combobox
-            value={selection}
-            disabled={busy}
-            options={available.map((task) => ({
-              value: task.id,
-              label: task.key,
-              detail: task.title,
-            }))}
-            onChange={setSelection}
-            placeholder="Add an existing task…"
+          <SearchCombobox
             ariaLabel="Add task to this thread"
-            className="ws-task-attachment-picker"
+            disabled={busy}
+            emptyMessage="No matching tasks."
+            emptyOption
+            listboxLabel="Available tasks"
+            onOpenChange={setAttachmentPickerOpen}
+            onSelectionChange={(values) => setSelection(values[0] ?? "")}
+            open={attachmentPickerOpen}
+            options={available.map((task) => ({ value: task.id, label: task.key, detail: task.title }))}
+            placeholder="Add an existing task…"
+            portal
+            selectedValues={selection ? [selection] : []}
           />
           <button
             type="button"

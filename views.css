@@ -818,171 +818,6 @@
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
-.ws-pr-reviewer-picker {
-  position: fixed;
-  z-index: 1100;
-  display: grid;
-  width: min(18rem, calc(100vw - 1rem));
-  max-height: min(26rem, calc(100vh - 1rem));
-  gap: 0.36rem;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 0.45rem;
-  background: var(--popover);
-  box-shadow: 0 0.5rem 1.5rem
-    color-mix(in srgb, var(--foreground) 20%, transparent);
-  color: var(--popover-foreground);
-}
-.ws-pr-reviewer-picker > header {
-  display: flex;
-  min-width: 0;
-  align-items: start;
-  justify-content: space-between;
-  gap: 0.35rem;
-}
-.ws-pr-reviewer-picker > header > span {
-  display: grid;
-  min-width: 0;
-  gap: 0.08rem;
-}
-.ws-pr-reviewer-picker > header strong,
-.ws-pr-reviewer-picker > header small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ws-pr-reviewer-picker > header strong {
-  font-size: 0.72rem;
-  font-weight: 600;
-}
-.ws-pr-reviewer-picker > header small {
-  color: var(--muted-foreground);
-  font-size: 0.6rem;
-}
-.ws-pr-reviewer-picker > header button {
-  display: grid;
-  width: 1.35rem;
-  height: 1.35rem;
-  place-items: center;
-  flex: none;
-  padding: 0;
-  border: 0;
-  border-radius: calc(var(--radius) - 3px);
-  background: transparent;
-  color: var(--muted-foreground);
-  cursor: pointer;
-}
-.ws-pr-reviewer-picker > header button:hover {
-  background: var(--accent);
-  color: var(--foreground);
-}
-.ws-pr-reviewer-picker > header svg {
-  width: 0.72rem;
-  height: 0.72rem;
-}
-.ws-pr-reviewer-picker > input {
-  box-sizing: border-box;
-  width: 100%;
-  height: 1.7rem;
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 3px);
-  padding: 0 0.4rem;
-  background: var(--background);
-  color: var(--foreground);
-  font-size: 0.64rem;
-}
-.ws-pr-reviewer-options {
-  display: grid;
-  min-height: 0;
-  max-height: 14rem;
-  overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 3px);
-  background: var(--background);
-}
-.ws-pr-reviewer-options > button {
-  display: grid;
-  grid-template-columns: 0.8rem minmax(0, auto) minmax(0, 1fr);
-  align-items: center;
-  gap: 0.3rem;
-  width: 100%;
-  padding: 0.34rem 0.4rem;
-  border: 0;
-  border-bottom: 1px solid var(--border);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 0.64rem;
-  text-align: left;
-  cursor: pointer;
-}
-.ws-pr-reviewer-options > button:last-child {
-  border-bottom: 0;
-}
-.ws-pr-reviewer-options > button:hover,
-.ws-pr-reviewer-options > button[aria-selected="true"] {
-  background: var(--accent);
-}
-.ws-pr-reviewer-options > button[data-active="true"] {
-  box-shadow: inset 0 0 0 1px var(--ring);
-}
-.ws-pr-reviewer-options svg {
-  width: 0.68rem;
-  height: 0.68rem;
-  color: var(--muted-foreground);
-}
-.ws-pr-reviewer-options small {
-  overflow: hidden;
-  color: var(--muted-foreground);
-  font-size: 0.58rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ws-pr-reviewer-state,
-.ws-pr-reviewer-error {
-  padding: 0.4rem;
-  color: var(--muted-foreground);
-  font-size: 0.62rem;
-}
-.ws-pr-reviewer-state {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem;
-}
-.ws-pr-reviewer-error {
-  color: var(--destructive);
-}
-.ws-pr-reviewer-picker > footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.3rem;
-}
-.ws-pr-reviewer-picker > footer button,
-.ws-pr-reviewer-state button {
-  min-height: 1.55rem;
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 3px);
-  padding: 0 0.45rem;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 0.61rem;
-  cursor: pointer;
-}
-.ws-pr-reviewer-picker > footer button:last-child {
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
-.ws-pr-reviewer-picker button:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
-.ws-pr-reviewer-picker :is(button, input):focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 1px;
-}
 .ws-pr-stack {
   border-left: 0;
   background: none;
@@ -2696,72 +2531,8 @@ button.ws-provider-health:focus-visible {
 .ws-work-toolbar-actions {
   min-height: 1.6rem;
 }
-.ws-sidebar-search {
-  display: grid;
-  box-sizing: border-box;
-  width: 100%;
-  height: 1.6rem;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.2rem;
-  padding-inline: 0.3rem 0.16rem;
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 3px);
-  background: var(--background);
-  color: var(--muted-foreground);
-}
 .ws-sidebar-search-popover {
-  position: fixed;
-  z-index: 1000;
-  box-sizing: border-box;
   width: min(14rem, calc(100vw - 1rem));
-  padding: 0.35rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--popover);
-  color: var(--popover-foreground);
-}
-.ws-sidebar-search:focus-within {
-  outline: 2px solid var(--ring);
-  outline-offset: 1px;
-}
-.ws-sidebar-search > svg,
-.ws-sidebar-search-close svg {
-  width: 0.72rem;
-  height: 0.72rem;
-}
-.ws-sidebar-search input {
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--foreground);
-  font: inherit;
-}
-.ws-sidebar-search input::placeholder {
-  color: var(--muted-foreground);
-}
-.ws-sidebar-search input::-webkit-search-cancel-button {
-  display: none;
-}
-.ws-sidebar-search-close {
-  display: grid;
-  width: 1.2rem;
-  height: 1.2rem;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 2px;
-  background: transparent;
-  color: var(--muted-foreground);
-}
-.ws-sidebar-search-close:hover {
-  background: var(--accent);
-  color: var(--accent-foreground);
-}
-.ws-sidebar-search-close:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 0;
 }
 .ws-thread-settings {
   z-index: 41;
@@ -2951,35 +2722,64 @@ button.ws-provider-health:focus-visible {
   opacity: 0.55;
   cursor: wait;
 }
-.ws-combobox {
+.ws-search-shell {
   position: relative;
   min-width: 0;
 }
-.ws-combobox input {
+.ws-search-shell-input {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
+  height: 1.55rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 3px);
+  padding: 0 0.34rem;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.61rem;
 }
-.ws-combobox-options {
+.ws-search-shell-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+.ws-search-shell-content {
   position: absolute;
-  z-index: 80;
+  z-index: 1000;
   top: calc(100% + 0.16rem);
-  right: 0;
   left: 0;
   display: grid;
-  max-height: 9rem;
-  overflow: auto;
+  width: min(18rem, calc(100vw - 1rem));
+  min-width: min(10rem, calc(100vw - 1rem));
+  max-width: calc(100vw - 1rem);
+  gap: 0.28rem;
+  overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: var(--radius);
+  padding: 0.35rem;
   background: var(--popover);
   box-shadow: 0 0.35rem 1rem
     color-mix(in srgb, var(--foreground) 18%, transparent);
+  color: var(--popover-foreground);
 }
-.ws-combobox-options button {
+.ws-search-shell-content[data-portalled="true"] {
+  position: fixed;
+  top: auto;
+  left: auto;
+}
+.ws-search-shell-options {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  max-height: 14rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 3px);
+  background: var(--background);
+}
+.ws-search-shell-options button {
+  display: grid;
+  grid-template-columns: auto minmax(0, auto) minmax(0, 1fr) auto;
   gap: 0.28rem;
-  align-items: baseline;
+  align-items: center;
   width: 100%;
   border: 0;
   border-bottom: 1px solid var(--border);
@@ -2990,136 +2790,96 @@ button.ws-provider-health:focus-visible {
   text-align: left;
   cursor: pointer;
 }
-.ws-combobox-options button:last-child {
+.ws-search-shell-options button:last-child {
   border-bottom: 0;
 }
-.ws-combobox-options button:hover,
-.ws-combobox-options button[aria-selected="true"] {
+.ws-search-shell-options button:hover,
+.ws-search-shell-options button[aria-selected="true"],
+.ws-search-shell-options button[data-active="true"] {
   background: var(--accent);
 }
-.ws-combobox-options button[data-active="true"] {
-  background: var(--accent);
+.ws-search-shell-options button[data-active="true"] {
   box-shadow: inset 0 0 0 1px var(--ring);
 }
-.ws-combobox-options small {
+.ws-search-shell-options button:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+.ws-search-shell-option-label,
+.ws-search-shell-options small {
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-search-shell-options small {
   color: var(--muted-foreground);
   font-size: 0.55rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
-.ws-combobox-options > small {
-  padding: 0.35rem;
-}
-.ws-task-attachment-picker .ws-combobox-options {
-  right: 0;
-  left: auto;
-  width: min(15rem, calc(100vw - 1.5rem));
-  min-width: 100%;
-  border-radius: calc(var(--radius) - 3px);
-  background: var(--card);
-}
-.ws-task-attachment-picker .ws-combobox-options button > span {
-  overflow: hidden;
-  color: var(--primary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ws-task-attachment-picker .ws-combobox-options button > small {
-  color: var(--muted-foreground);
-  font-size: 0.59rem;
-}
-
-.ws-hierarchy-dialog-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1200;
+.ws-search-shell-leading,
+.ws-search-shell-trailing {
   display: grid;
   place-items: center;
-  padding: 1rem;
-  background: color-mix(in srgb, var(--background) 38%, transparent);
 }
-
-.ws-hierarchy-dialog {
-  width: min(22rem, calc(100vw - 2rem));
-  display: grid;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--popover);
-  color: var(--popover-foreground);
-  box-shadow: var(--shadow-lg);
+.ws-search-shell-leading :is(svg, .ws-thread-provider),
+.ws-search-shell-trailing svg {
+  width: 0.68rem;
+  height: 0.68rem;
 }
-
-.ws-hierarchy-dialog > header {
+.ws-search-shell-state {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.ws-hierarchy-dialog > header > div {
-  min-width: 0;
-  display: grid;
-  gap: 0.15rem;
-}
-
-.ws-hierarchy-dialog > header span {
-  overflow: hidden;
+  gap: 0.4rem;
+  padding: 0.4rem;
   color: var(--muted-foreground);
-  font-size: 0.78rem;
+  font-size: 0.62rem;
+}
+.ws-search-shell-state[role="alert"],
+.ws-search-shell-error {
+  color: var(--destructive);
+}
+.ws-search-shell-header {
+  min-width: 0;
+}
+.ws-search-shell-header > span {
+  display: grid;
+  min-width: 0;
+  gap: 0.08rem;
+}
+.ws-search-shell-header :is(strong, small) {
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.ws-hierarchy-dialog > header button {
-  display: grid;
-  width: 1.75rem;
-  height: 1.75rem;
-  place-items: center;
-  border: 0;
-  border-radius: calc(var(--radius) * 0.6);
+.ws-search-shell-header strong {
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.ws-search-shell-header small {
+  color: var(--muted-foreground);
+  font-size: 0.6rem;
+}
+.ws-search-shell-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.3rem;
+}
+.ws-search-shell-footer > button,
+.ws-search-shell-state button {
+  min-height: 1.55rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 3px);
+  padding: 0 0.45rem;
   background: transparent;
   color: inherit;
-}
-
-.ws-hierarchy-dialog > header button:hover,
-.ws-hierarchy-dialog > header button:focus-visible {
-  background: var(--accent);
-  color: var(--accent-foreground);
-}
-
-.ws-hierarchy-combobox .ws-combobox-options {
-  position: static;
-  margin-top: 0.25rem;
-}
-
-.ws-hierarchy-dialog > [role="alert"] {
-  margin: 0;
-  color: var(--destructive);
-  font-size: 0.78rem;
-}
-.ws-linear-search-row {
-  border-bottom: 1px solid var(--border);
-  padding: 0.28rem;
-}
-.ws-linear-search-row input {
-  box-sizing: border-box;
-  width: 100%;
-  height: 1.55rem;
-  border: 0;
-  border-radius: 3px;
-  padding: 0 0.3rem;
-  background: transparent;
-  color: var(--foreground);
+  font: inherit;
   font-size: 0.61rem;
+  cursor: pointer;
 }
-.ws-linear-search-row input:focus {
-  outline: 1px solid var(--ring);
-  outline-offset: 0;
+.ws-search-shell-footer > button:last-child {
+  background: var(--primary);
+  color: var(--primary-foreground);
 }
 .ws-task-meta .ws-task-key-badge,
 .ws-task-meta .ws-task-badge {
@@ -3222,7 +2982,7 @@ button.ws-provider-health:focus-visible {
   gap: 0.3rem;
   align-items: center;
 }
-.ws-work-card-control .ws-combobox input,
+.ws-work-card-control .ws-search-shell-input,
 .ws-work-card-control > button {
   box-sizing: border-box;
   height: 1.5rem;
@@ -3509,88 +3269,4 @@ button.ws-provider-health:focus-visible {
   color: var(--muted-foreground);
   font-size: 0.5rem;
   line-height: 1;
-}
-.ws-task-thread-popover {
-  position: absolute;
-  z-index: 90;
-  top: calc(100% + 0.16rem);
-  left: 0;
-  display: grid;
-  width: min(15rem, calc(100vw - 1rem));
-  min-width: min(10rem, calc(100vw - 1rem));
-  max-width: min(16rem, calc(100vw - 1rem));
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  background: var(--popover);
-  box-shadow: 0 0.35rem 1rem
-    color-mix(in srgb, var(--foreground) 18%, transparent);
-}
-.ws-task-thread-search {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 0.22rem;
-  padding: 0.24rem 0.3rem;
-  border-bottom: 1px solid var(--border);
-}
-.ws-task-thread-search svg {
-  width: 0.66rem;
-  height: 0.66rem;
-  color: var(--muted-foreground);
-}
-.ws-task-thread-search input {
-  width: 100%;
-  min-width: 0;
-  border: 0;
-  padding: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--popover-foreground);
-  font: inherit;
-  font-size: 0.61rem;
-}
-.ws-task-thread-options {
-  display: grid;
-  max-height: 11rem;
-  overflow-y: auto;
-  padding: 0.12rem;
-}
-.ws-task-thread-options button,
-.ws-task-thread-options > span {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.28rem;
-  border: 0;
-  border-radius: 2px;
-  padding: 0.28rem 0.34rem;
-  background: transparent;
-  color: var(--popover-foreground);
-  font-size: 0.59rem;
-  text-align: left;
-}
-.ws-task-thread-options button {
-  cursor: pointer;
-}
-.ws-task-thread-options button:hover,
-.ws-task-thread-options button[aria-selected="true"],
-.ws-task-thread-options button[data-active="true"] {
-  background: var(--accent);
-}
-.ws-task-thread-options button[data-active="true"] {
-  box-shadow: inset 0 0 0 1px var(--ring);
-}
-.ws-task-thread-options button:disabled {
-  cursor: default;
-  opacity: 0.58;
-}
-.ws-task-thread-options .ws-thread-provider,
-.ws-task-thread-options svg {
-  width: 0.68rem;
-  height: 0.68rem;
-}
-.ws-task-thread-options button > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
