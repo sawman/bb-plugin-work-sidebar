@@ -105,7 +105,10 @@ export function useThreadRowPointerDrag({
       const targetElement = document.querySelector<HTMLElement>(
         `[data-ws-thread-id="${CSS.escape(targetId)}"]`,
       );
-      if (!targetElement) return;
+      if (!targetElement) {
+        onDropTargetChange(null);
+        return;
+      }
       const bounds = targetElement.getBoundingClientRect();
       onDropTargetChange({
         kind: "reorder",

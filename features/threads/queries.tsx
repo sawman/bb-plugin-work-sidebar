@@ -52,10 +52,12 @@ export function useThreadHierarchyMutation(rpc: ThreadsRpc) {
     }) => rpc.call("moveSidebarThread", input),
     onSuccess: async (result) => {
       await client.invalidateQueries({ queryKey: threadQueryKeys.root });
-      for (const threadId of result.affectedThreadIds) {
-        await invalidateWorkContextCards(client, threadId);
-        await invalidateTracker(client, threadId);
-      }
+      await Promise.all(
+        result.affectedThreadIds.flatMap((threadId) => [
+          invalidateWorkContextCards(client, threadId),
+          invalidateTracker(client, threadId),
+        ]),
+      );
       await invalidateTaskQueries(client, ["list", "links"]);
     },
   });

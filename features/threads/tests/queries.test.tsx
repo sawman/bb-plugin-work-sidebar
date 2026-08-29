@@ -23,6 +23,14 @@ function queryWrapper(client: QueryClient) {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+  return { promise, resolve };
+}
+
 describe("R9 Threads query ownership", () => {
   it("round-trips text scale through the shared typed appearance query", async () => {
     const client = new QueryClient();
@@ -229,5 +237,52 @@ describe("R9 Threads query ownership", () => {
       [{ queryKey: queryKeys.sidebar.tasks.list() }],
       [{ queryKey: queryKeys.sidebar.tasks.links() }],
     ]);
+  });
+
+  it("starts all affected thread invalidations as one batch", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const rpc = {
+      call: vi.fn(async () => ({
+        threadId: "thr_child",
+        parentThreadId: null,
+        oldRootThreadId: "thr_root",
+        newRootThreadId: "thr_child",
+        affectedThreadIds: ["thr_child", "thr_nested"],
+      })),
+    };
+    const rootInvalidation = deferred<void>();
+    const cardInvalidation = deferred<void>();
+    const invalidate = vi
+      .spyOn(client, "invalidateQueries")
+      .mockImplementation((filters) =>
+        JSON.stringify(filters?.queryKey) === JSON.stringify(threadQueryKeys.root)
+          ? rootInvalidation.promise
+          : cardInvalidation.promise,
+      );
+    const view = renderHook(
+      () => useThreadHierarchyMutation(rpc as unknown as ThreadsRpc),
+      { wrapper: queryWrapper(client) },
+    );
+
+    let mutation!: Promise<unknown>;
+    await act(async () => {
+      mutation = view.result.current.mutateAsync({
+        threadId: "thr_child",
+        parentThreadId: null,
+      });
+      rootInvalidation.resolve();
+      await Promise.resolve();
+    });
+
+    expect(invalidate).toHaveBeenCalledTimes(1 + 2 * (7 + 1));
+    cardInvalidation.resolve();
+    await act(async () => {
+      await mutation;
+    });
+    expect(invalidate).toHaveBeenCalledTimes(1 + 2 * (7 + 1) + 2);
+    view.unmount();
+    client.clear();
   });
 });

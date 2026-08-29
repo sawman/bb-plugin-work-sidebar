@@ -1583,16 +1583,18 @@ describe("R18 registered left sidebar parity", () => {
     const source = reparent.container.querySelector<HTMLElement>(
       '[data-ws-thread-id="thr_one"]',
     )!;
-    const target = reparent.container.querySelector<HTMLElement>(
-      '[data-ws-thread-reparent-target="thr_two"]',
-    )!;
-    const elementAt = mockElementAt(target);
+    const elementAt = mockElementAt(null);
     fireEvent.pointerDown(source, {
       button: 0,
       pointerId: 31,
       clientX: 0,
       clientY: 0,
     });
+    fireEvent.pointerMove(window, { pointerId: 31, clientX: 10, clientY: 20 });
+    const target = reparent.container.querySelector<HTMLElement>(
+      '[data-ws-thread-reparent-target="thr_two"]',
+    )!;
+    elementAt.mockReturnValue(target);
     fireEvent.pointerMove(window, { pointerId: 31, clientX: 10, clientY: 20 });
     const targetRow = reparent.container.querySelector<HTMLElement>(
       '[data-ws-thread-id="thr_two"]',
@@ -1692,16 +1694,18 @@ describe("R18 registered left sidebar parity", () => {
     const rejectedSource = rejected.container.querySelector<HTMLElement>(
       '[data-ws-thread-id="thr_parent"]',
     )!;
-    const descendantTarget = rejected.container.querySelector<HTMLElement>(
-      '[data-ws-thread-reparent-target="thr_child"]',
-    )!;
-    elementAt.mockReturnValue(descendantTarget);
+    const rejectedElementAt = mockElementAt(null);
     fireEvent.pointerDown(rejectedSource, {
       button: 0,
       pointerId: 33,
       clientX: 0,
       clientY: 0,
     });
+    fireEvent.pointerMove(window, { pointerId: 33, clientX: 10, clientY: 20 });
+    const descendantTarget = rejected.container.querySelector<HTMLElement>(
+      '[data-ws-thread-reparent-target="thr_child"]',
+    )!;
+    rejectedElementAt.mockReturnValue(descendantTarget);
     fireEvent.pointerMove(window, { pointerId: 33, clientX: 10, clientY: 20 });
     fireEvent.pointerUp(window, { pointerId: 33, clientX: 10, clientY: 20 });
     await waitFor(() => expect(rejectedMove).not.toHaveBeenCalled());
@@ -1722,10 +1726,7 @@ describe("R18 registered left sidebar parity", () => {
     const unchangedSource = unchanged.container.querySelector<HTMLElement>(
       '[data-ws-thread-id="thr_child"]',
     )!;
-    const currentParentTarget = unchanged.container.querySelector<HTMLElement>(
-      '[data-ws-thread-reparent-target="thr_parent"]',
-    )!;
-    elementAt.mockReturnValue(currentParentTarget);
+    const unchangedElementAt = mockElementAt(null);
     fireEvent.pointerDown(unchangedSource, {
       button: 0,
       pointerId: 34,
@@ -1733,9 +1734,48 @@ describe("R18 registered left sidebar parity", () => {
       clientY: 0,
     });
     fireEvent.pointerMove(window, { pointerId: 34, clientX: 10, clientY: 20 });
+    const currentParentTarget = unchanged.container.querySelector<HTMLElement>(
+      '[data-ws-thread-reparent-target="thr_parent"]',
+    )!;
+    unchangedElementAt.mockReturnValue(currentParentTarget);
+    fireEvent.pointerMove(window, { pointerId: 34, clientX: 10, clientY: 20 });
     fireEvent.pointerUp(window, { pointerId: 34, clientX: 10, clientY: 20 });
     await waitFor(() => expect(unchangedMove).not.toHaveBeenCalled());
     unchanged.unmount();
+  });
+
+  it("renders one To Top drop target for the whole thread tree", async () => {
+    const slot = await leftSlot({
+      threads: [
+        thread("thr_active", "Active"),
+        thread("thr_later", "Later"),
+        thread("thr_archive", "Archive"),
+      ],
+      groups: [
+        { id: "group_later", name: "Later", threadIds: ["thr_later"] },
+        { id: "group_archive", name: "Archive", threadIds: ["thr_archive"] },
+      ],
+    });
+    await waitFor(() =>
+      expect(
+        slot.container.querySelector('[data-ws-thread-id="thr_active"]'),
+      ).toBeTruthy(),
+    );
+    const source = slot.container.querySelector<HTMLElement>(
+      '[data-ws-thread-id="thr_active"]',
+    )!;
+    mockElementAt(null);
+    fireEvent.pointerDown(source, {
+      button: 0,
+      pointerId: 36,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { pointerId: 36, clientX: 10, clientY: 20 });
+
+    expect(slot.getAllByRole("note", { name: "To Top" })).toHaveLength(1);
+    fireEvent.pointerCancel(window, { pointerId: 36 });
+    slot.unmount();
   });
 
   it("refreshes exactly the advertised thread, archive, subtext, and authored-PR domains", async () => {
