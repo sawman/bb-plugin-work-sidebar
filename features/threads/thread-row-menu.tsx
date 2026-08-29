@@ -64,14 +64,12 @@ export function ThreadRowMenu({
           {parentThreadId ? (
             <>
               <ContextMenuItem
-                aria-describedby={hierarchy.toTopDescriptionId}
                 disabled={hierarchy.disabled}
                 title={hierarchy.toTopDescription}
                 onSelect={() => void hierarchy.promote()}
               >
                 To Top
               </ContextMenuItem>
-              <span id={hierarchy.toTopDescriptionId} className="ws-sr-only" role="tooltip">{hierarchy.toTopDescription}</span>
             </>
           ) : null}
           <ContextMenuItem

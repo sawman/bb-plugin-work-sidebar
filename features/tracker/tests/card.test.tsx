@@ -233,6 +233,7 @@ describe("registered tracker card", () => {
       { threadId: "thr_populated_tracker", params: null },
       { rpc: fixture() },
     );
+    fireEvent.focus(await slot.findByLabelText("Search Linear issues"));
     const option = await slot.findByRole("option");
     expect(option.textContent).toContain("LIN-1");
     expect(option.getAttribute("aria-selected")).toBe("false");
@@ -247,6 +248,7 @@ describe("registered tracker card", () => {
       { threadId: "thr_empty_tracker", params: null },
       { rpc: fixture({ getWorkTracker: () => ({ ...unlinked, suggestions: [] }) }) },
     );
+    fireEvent.focus(await slot.findByLabelText("Search Linear issues"));
     await waitFor(() => expect(slot.getByText("No related issues found.")).toBeTruthy());
     await expectNoAriaViolations(slot.container);
     expect(slot.queryByRole("listbox", { name: "Suggested Linear issues" })).toBeNull();
@@ -353,6 +355,7 @@ describe("registered tracker card", () => {
       { threadId: "thr_mutate", params: null },
       { rpc: fixture({ getWorkTracker, linkLinearIssue }) },
     );
+    fireEvent.focus(await slot.findByLabelText("Search Linear issues"));
     await waitFor(() => expect(slot.getByText("Suggested")).toBeTruthy());
     fireEvent.click(slot.getByText("Suggested"));
     await waitFor(() =>

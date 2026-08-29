@@ -1,4 +1,3 @@
-import { useId } from "react";
 import { toast } from "sonner";
 import { useThreadHierarchy } from "./thread-hierarchy-context";
 
@@ -15,7 +14,6 @@ export function useThreadHierarchyMenu({
   onFocusReturn(): void;
 }) {
   const hierarchy = useThreadHierarchy();
-  const descriptionId = useId();
   const promote = async () => {
     try {
       await hierarchy.move(threadId, null);
@@ -40,6 +38,5 @@ export function useThreadHierarchyMenu({
     },
     promote,
     toTopDescription: THREAD_TO_TOP_DESCRIPTION,
-    toTopDescriptionId: descriptionId,
   };
 }

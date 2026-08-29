@@ -219,10 +219,11 @@ describe("R9 production ThreadRow host behavior", () => {
     expect(toTop.getAttribute("title")).toBe(
       "Move this thread out of its parent and make it a top-level thread",
     );
-    expect(toTop.getAttribute("aria-describedby")).toBeTruthy();
-    expect(slot.getByRole("tooltip").textContent).toBe(
-      "Move this thread out of its parent and make it a top-level thread",
-    );
+    expect(toTop.getAttribute("aria-describedby")).toBeNull();
+    expect(slot.queryByRole("tooltip")).toBeNull();
+    expect(
+      Array.from(slot.getByRole("menu").children).map((child) => child.getAttribute("role")),
+    ).not.toContain("tooltip");
     fireEvent.click(toTop);
     await waitFor(() =>
       expect(moveThread).toHaveBeenCalledWith({

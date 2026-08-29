@@ -160,7 +160,7 @@ describe("pull-request reviewer picker", () => {
     await screen.findByRole("option", { name: "alice" });
     fireEvent.change(search, { target: { value: "missing" } });
     expect(screen.queryByRole("listbox")).toBeNull();
-    expect(screen.getByRole("searchbox", { name: "Search reviewers" })).toBe(search);
+    expect(screen.getByRole("combobox", { name: "Search reviewers" })).toBe(search);
     expect(search.hasAttribute("aria-controls")).toBe(false);
     expect(screen.getByText("No matching reviewers.")).toBeTruthy();
     await expectNoAriaViolations();
