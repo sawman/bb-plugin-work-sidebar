@@ -225,8 +225,11 @@ describe("R2 server registration and disposal", () => {
       "getWorkStatus",
       "getWorkOutcome",
       "getWorkGoal",
-      "getWorkPlan",
-      "getWorkBackgroundJobs",
+    "getWorkPlan",
+    "getWorkItemQueue",
+    "saveWorkItemQueue",
+    "moveWorkItemToExecution",
+    "getWorkBackgroundJobs",
       "getGitHubPollingPolicy",
       "getWorkTracker",
       "linkLinearIssue",
@@ -256,12 +259,29 @@ describe("R2 server registration and disposal", () => {
     );
     await expect(
       host.harness.behavior.callRpc("getSidebarAppearance", null),
-    ).resolves.toEqual({ rowHeight: 40, textScale: 1 });
+    ).resolves.toEqual({
+      rowHeight: 40,
+      textScale: 1,
+      workingProviderAnimation: "slow-spin",
+    });
     await expect(
       host.harness.behavior.callRpc("saveSidebarAppearance", {
         textScale: 0.9,
       }),
-    ).resolves.toEqual({ rowHeight: 40, textScale: 0.9 });
+    ).resolves.toEqual({
+      rowHeight: 40,
+      textScale: 0.9,
+      workingProviderAnimation: "slow-spin",
+    });
+    await expect(
+      host.harness.behavior.callRpc("saveSidebarAppearance", {
+        workingProviderAnimation: "sheen",
+      }),
+    ).resolves.toEqual({
+      rowHeight: 40,
+      textScale: 0.9,
+      workingProviderAnimation: "sheen",
+    });
     await expect(
       host.harness.behavior.callRpc("saveSidebarAppearance", {
         textScale: 1.11,

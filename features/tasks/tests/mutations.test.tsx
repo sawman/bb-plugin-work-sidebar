@@ -35,7 +35,7 @@ describe("Tasks mutations", () => {
     const a = hook.result.current.assignment.mutateAsync({ taskId: task.id, assignee: "agent" }); const r = hook.result.current.reorder.mutateAsync({ taskId: task.id, beforeTaskId: "task_2", afterTaskId: null });
     await waitFor(() => expect(rpc.call).toHaveBeenCalledTimes(2)); expect(client.isMutating({ mutationKey: taskOptimisticMutationKey })).toBe(2); await invalidateTaskQueries(client, ["list", "links"]); expect(invalidations).toEqual([]);
     expect(isMutating).toHaveBeenCalledWith({ mutationKey: taskOptimisticMutationKey }); assign.resolve({}); await a; expect(client.isMutating({ mutationKey: taskOptimisticMutationKey })).toBe(1); expect(invalidations).toEqual([]);
-    reorder.resolve({}); await r; expect(client.isMutating({ mutationKey: taskOptimisticMutationKey })).toBe(0); expect(invalidations.sort()).toEqual(["links", "list"]);
+    reorder.resolve({}); await r; expect(client.isMutating({ mutationKey: taskOptimisticMutationKey })).toBe(0); expect(invalidations.sort()).toEqual(["links", "list", "outcome"]);
   });
 
   it("rolls back only the failed projection while a different optimistic mutation remains", async () => {
@@ -75,7 +75,7 @@ describe("Tasks mutations", () => {
     const oneRun = one.hook.result.current.assignment.mutateAsync({ taskId: task.id, assignee: "agent" }); const twoRun = two.hook.result.current.assignment.mutateAsync({ taskId: task.id, assignee: "agent" });
     await waitFor(() => expect(one.client.isMutating({ mutationKey: taskOptimisticMutationKey })).toBe(1)); await waitFor(() => expect(two.client.isMutating({ mutationKey: taskOptimisticMutationKey })).toBe(1));
     await invalidateTaskQueries(one.client, ["links"]); await invalidateTaskQueries(two.client, ["list"]); expect(oneInvalidations).toEqual([]); expect(twoInvalidations).toEqual([]);
-    first.resolve({}); await oneRun; expect(oneInvalidations.sort()).toEqual(["links", "list"]); expect(twoInvalidations).toEqual([]);
-    second.resolve({}); await twoRun; expect(twoInvalidations).toEqual(["list"]);
+    first.resolve({}); await oneRun; expect(oneInvalidations.sort()).toEqual(["links", "list", "outcome"]); expect(twoInvalidations).toEqual([]);
+    second.resolve({}); await twoRun; expect(twoInvalidations.sort()).toEqual(["list", "outcome"]);
   });
 });

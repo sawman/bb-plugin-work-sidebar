@@ -4,6 +4,8 @@ import type { WorkContextCompositionDependencies } from "../../shared/server-com
 import { createWorkContextReadService } from "./server-reads.js";
 import { createBackgroundJobsReadService } from "./background-jobs-server.js";
 import { projectWorkBindingOwner } from "./server-owner-projection.js";
+import { createWorkItemQueueService, normalizeWorkItemQueue, WORK_ITEM_QUEUE_KEY } from "./work-item-queue-server.js";
+import { projectLatestActivity } from "./latest-activity.js";
 
 type WorkContextHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
@@ -12,6 +14,9 @@ type WorkContextHandlers = Pick<
   | "getWorkOutcome"
   | "getWorkGoal"
   | "getWorkPlan"
+  | "getWorkItemQueue"
+  | "saveWorkItemQueue"
+  | "moveWorkItemToExecution"
   | "getWorkProviderStatus"
   | "getLatestActivity"
   | "getWorkBackgroundJobs"
@@ -23,67 +28,29 @@ const PROVIDER_STATUS_URLS: Readonly<Record<string, string>> = {
   "acp-cursor": "https://status.cursor.com/",
 };
 
+
 const emptyLegacyContext = () => ({
   state: "none" as const,
   taskIds: [],
   message: null,
 });
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function latestActivity(rows: readonly unknown[], latestAssistant: string | null, hasCurrentTurn: boolean) {
-  const flattened: unknown[] = [];
-  const visit = (items: readonly unknown[]) => items.forEach((item) => {
-    flattened.push(item);
-    if (isRecord(item) && Array.isArray(item.children)) visit(item.children);
-  });
-  visit(rows);
-  type ActivityKind = "assistant" | "user" | "command" | "activity";
-  type Activity = { text: string; kind: ActivityKind };
-  const activity: Activity[] = [];
-  for (const row of flattened) {
-    if (!isRecord(row)) continue;
-    if (row.kind === "conversation" && typeof row.text === "string" && row.text.trim()) {
-      activity.push({ text: row.text.trim(), kind: row.role === "assistant" ? "assistant" : "user" });
-    } else if (row.kind === "work" && row.workKind === "command" && typeof row.command === "string" && row.command.trim()) {
-      activity.push({ text: row.command.trim(), kind: "command" });
-    } else if (typeof row.text === "string" && row.text.trim()) {
-      activity.push({ text: row.text.trim(), kind: "activity" });
-    }
-  }
-  let lastUser: Activity | undefined;
-  let lastAssistant: Activity | undefined;
-  for (let index = activity.length - 1; index >= 0; index -= 1) {
-    if (activity[index]?.kind === "user") {
-      lastUser = activity[index];
-      break;
-    }
-  }
-  for (let index = activity.length - 1; index >= 0; index -= 1) {
-    if (activity[index]?.kind === "assistant") {
-      lastAssistant = activity[index];
-      break;
-    }
-  }
-  const latest = latestAssistant?.trim()
-    ? { text: latestAssistant.trim().slice(0, 360), kind: "assistant" as const }
-    : lastAssistant ? { text: lastAssistant.text.slice(0, 360), kind: "assistant" as const } : null;
-  return {
-    latest,
-    lastUser: lastUser ? { text: lastUser.text.slice(0, 360), kind: "user" as const } : null,
-    current: hasCurrentTurn && lastUser
-      ? { text: lastUser.text.slice(0, 360), kind: "user" as const }
-      : null,
-  };
-}
 
 /** Work card and activity RPC handlers belong to the Work Context slice. */
 export function createWorkContextRegistration(
   dependencies: WorkContextCompositionDependencies,
 ): WorkContextHandlers {
   const { bb, tasks } = dependencies;
+  const queueService = createWorkItemQueueService({
+    get: () => bb.storage.kv.get<unknown>(WORK_ITEM_QUEUE_KEY),
+    set: (value) => bb.storage.kv.set(WORK_ITEM_QUEUE_KEY, value),
+    publish: (rootThreadId) => {
+      bb.realtime.publish("work-sidebar:changed", { family: "work", rootThreadId });
+      bb.realtime.publish("work-sidebar:changed", { family: "tasks", threadId: rootThreadId });
+    },
+    ensureOutcome: tasks.ensureOutcomeContext,
+    createExecution: tasks.createExecutionTask,
+  });
   const backgroundJobs = createBackgroundJobsReadService({
     timeline: (input) => bb.sdk.threads.timeline(input),
   });
@@ -241,6 +208,22 @@ export function createWorkContextRegistration(
     };
   };
   return {
+    async getWorkItemQueue({ threadId }) {
+      const root = await tasks.rootThread(threadId);
+      return { rootThreadId: root.id, ...(await queueService.read(root.id)) };
+    },
+    async saveWorkItemQueue({ threadId, queue }) {
+      const root = await tasks.rootThread(threadId);
+      return {
+        rootThreadId: root.id,
+        ...(await queueService.write(root.id, normalizeWorkItemQueue(queue))),
+      };
+    },
+    async moveWorkItemToExecution({ threadId, reference, title, description }) {
+      if (!(await tasks.available())) throw new Error("BB Tasks are unavailable.");
+      const root = await tasks.rootThread(threadId);
+      return queueService.moveToExecution(root.id, normalizeWorkItemQueue({ current: reference, backlog: [] }).current!, title, description);
+    },
     async getWorkContext({ threadId }) { return getContext(threadId); },
     async getWorkStatus({ threadId }) { return cards.status(threadId); },
     async getWorkOutcome({ threadId }) { return cards.outcome(threadId); },
@@ -292,7 +275,7 @@ export function createWorkContextRegistration(
       ]);
       return {
         currentThread: { status: thread.status, runtimeStatus: thread.runtime.displayStatus },
-        ...latestActivity(timeline.rows, output.output, thread.status === "active" || thread.status === "starting"),
+        ...projectLatestActivity(timeline.rows, output.output, thread.status === "active" || thread.status === "starting"),
       };
     },
   };

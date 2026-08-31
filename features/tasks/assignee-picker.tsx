@@ -13,78 +13,108 @@ export function AssigneePicker({
   disabled?: boolean;
   taskKey?: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLSpanElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const label = `${value === "agent" ? "Agent" : "Human"} assigned${taskKey ? ` to ${taskKey}` : ""}`;
-  const listLabel = `Task assignee${taskKey ? ` for ${taskKey}` : ""}`;
+  const [pending, setPending] = useState<SidebarTask["assignee"] | null>(null);
+  const pointerStart = useRef<number | null>(null);
+  const pendingRef = useRef<SidebarTask["assignee"] | null>(null);
+  const commitTimer = useRef<number | null>(null);
+  const current = pending ?? value;
+  const label = `${current === "agent" ? "Agent" : "Human"} assigned${taskKey ? ` to ${taskKey}` : ""}`;
 
+  const clearPending = () => {
+    if (commitTimer.current !== null) window.clearTimeout(commitTimer.current);
+    commitTimer.current = null;
+    pendingRef.current = null;
+    setPending(null);
+  };
+  const queue = (next: SidebarTask["assignee"]) => {
+    if (disabled || next === value) {
+      clearPending();
+      return;
+    }
+    if (pendingRef.current === next) {
+      clearPending();
+      return;
+    }
+    if (commitTimer.current !== null) window.clearTimeout(commitTimer.current);
+    pendingRef.current = next;
+    setPending(next);
+    commitTimer.current = window.setTimeout(() => {
+      commitTimer.current = null;
+      pendingRef.current = null;
+      setPending(null);
+      onChange(next);
+    }, 2_000);
+  };
+
+  useEffect(
+    () => () => {
+      if (commitTimer.current !== null)
+        window.clearTimeout(commitTimer.current);
+    },
+    [],
+  );
   useEffect(() => {
-    if (!open) return;
-    const dismissOutside = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const dismissWithEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setOpen(false);
-      triggerRef.current?.focus();
-    };
-    document.addEventListener("pointerdown", dismissOutside, true);
-    document.addEventListener("keydown", dismissWithEscape);
-    return () => {
-      document.removeEventListener("pointerdown", dismissOutside, true);
-      document.removeEventListener("keydown", dismissWithEscape);
-    };
-  }, [open]);
+    if (pending && pending === value) clearPending();
+  }, [pending, value]);
 
   return (
-    <span className="ws-assignee-picker" ref={rootRef}>
-      <button
-        ref={triggerRef}
-        type="button"
-        disabled={disabled}
-        className="ws-assignee-trigger"
-        aria-label={label}
-        title={label}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <Icon name={value === "agent" ? "Bot" : "User"} aria-hidden />
-        <span>⌄</span>
-      </button>
-      {open && (
-        <span
-          className="ws-assignee-options"
-          role="listbox"
-          aria-label={listLabel}
-        >
-          <button
-            type="button"
-            role="option"
-            aria-selected={value === "human"}
-            onClick={() => {
-              onChange("human");
-              setOpen(false);
-            }}
-          >
+    <button
+      type="button"
+      className="ws-assignee-toggle"
+      data-assignee={current}
+      data-pending={pending ?? undefined}
+      disabled={disabled}
+      role="switch"
+      aria-checked={current === "agent"}
+      aria-label={
+        pending
+          ? `${pending === "agent" ? "Agent" : "Human"} assignment pending for ${taskKey ?? "task"}; activate again or press Escape to cancel`
+          : label
+      }
+      title={
+        pending
+          ? `Switching to ${pending === "agent" ? "Agent" : "Human"} in 2 seconds. Click again or press Escape to cancel.`
+          : "Swipe left for Human, right for Agent"
+      }
+      onPointerDown={(event) => {
+        pointerStart.current = event.clientX;
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+      }}
+      onPointerUp={(event) => {
+        const start = pointerStart.current;
+        pointerStart.current = null;
+        if (start === null) return;
+        const delta = event.clientX - start;
+        if (Math.abs(delta) >= 12) queue(delta > 0 ? "agent" : "human");
+        else queue(current === "agent" ? "human" : "agent");
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && pending) {
+          event.preventDefault();
+          clearPending();
+        }
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          queue("human");
+        }
+        if (event.key === "ArrowRight") {
+          event.preventDefault();
+          queue("agent");
+        }
+      }}
+    >
+      <span className="ws-assignee-toggle-viewport" aria-hidden>
+        <span className="ws-assignee-toggle-track">
+          <span className="ws-assignee-toggle-state">
             <Icon name="User" aria-hidden />
-            Human
-          </button>
-          <button
-            type="button"
-            role="option"
-            aria-selected={value === "agent"}
-            onClick={() => {
-              onChange("agent");
-              setOpen(false);
-            }}
-          >
+            <span>Human</span>
+          </span>
+          <span className="ws-assignee-toggle-state">
             <Icon name="Bot" aria-hidden />
-            Agent
-          </button>
+            <span>Agent</span>
+          </span>
         </span>
-      )}
-    </span>
+      </span>
+    </button>
   );
 }

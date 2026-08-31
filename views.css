@@ -94,43 +94,128 @@
   filter: drop-shadow(0 0 0.12rem var(--primary-foreground));
   opacity: 0.96;
   transform: translate(-50%, -50%);
-  -webkit-clip-path: polygon(
-    -55% 0,
-    -25% 0,
-    -5% 100%,
-    -35% 100%
-  );
-  clip-path: polygon(
-    -55% 0,
-    -25% 0,
-    -5% 100%,
-    -35% 100%
-  );
+  -webkit-clip-path: polygon(-55% 0, -25% 0, -5% 100%, -35% 100%);
+  clip-path: polygon(-55% 0, -25% 0, -5% 100%, -35% 100%);
 }
-.ws-thread-provider[data-runtime-state="working"]
+.ws-list[data-working-provider-animation="sheen"]
+  .ws-thread-provider[data-runtime-state="working"]
   .ws-thread-provider-fallback-shine,
-.ws-thread-provider[data-runtime-state="working"]
+.ws-panel[data-working-provider-animation="sheen"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-fallback-shine,
+.ws-list[data-working-provider-animation="sheen"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-mark::after,
+.ws-panel[data-working-provider-animation="sheen"]
+  .ws-thread-provider[data-runtime-state="working"]
   .ws-thread-provider-mark::after {
   animation: ws-thread-provider-shine 3.6s linear infinite;
 }
+.ws-list[data-working-provider-animation="slow-spin"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-glyph,
+.ws-panel[data-working-provider-animation="slow-spin"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-glyph {
+  animation: ws-thread-provider-spin 3.2s linear infinite;
+}
+.ws-list[data-working-provider-animation="fast-spin"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-glyph,
+.ws-panel[data-working-provider-animation="fast-spin"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-glyph {
+  animation: ws-thread-provider-spin 1s linear infinite;
+}
+.ws-list[data-working-provider-animation="medium-spin"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-glyph,
+.ws-panel[data-working-provider-animation="medium-spin"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-glyph {
+  animation: ws-thread-provider-spin 2s linear infinite;
+}
+.ws-list[data-working-provider-animation="slow-bounce"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-glyph,
+.ws-panel[data-working-provider-animation="slow-bounce"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-glyph {
+  animation: ws-thread-provider-bounce 1.8s ease-in-out infinite;
+}
+.ws-list[data-working-provider-animation="medium-bounce"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-glyph,
+.ws-panel[data-working-provider-animation="medium-bounce"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-glyph {
+  animation: ws-thread-provider-bounce 1.1s ease-in-out infinite;
+}
+.ws-list[data-working-provider-animation="fast-bounce"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-glyph,
+.ws-panel[data-working-provider-animation="fast-bounce"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-glyph {
+  animation: ws-thread-provider-bounce 0.7s ease-in-out infinite;
+}
+.ws-list[data-working-provider-animation="pulse"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-glyph,
+.ws-panel[data-working-provider-animation="pulse"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-glyph {
+  animation: ws-thread-provider-pulse 1.6s ease-in-out infinite;
+}
+.ws-list[data-working-provider-animation$="-sheen"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-fallback-shine,
+.ws-panel[data-working-provider-animation$="-sheen"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-fallback-shine,
+.ws-list[data-working-provider-animation$="-sheen"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-mark::after,
+.ws-panel[data-working-provider-animation$="-sheen"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-mark::after {
+  animation: ws-thread-provider-shine var(--ws-provider-animation-duration) linear infinite;
+}
+.ws-list[data-working-provider-animation$="-pulse"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-glyph,
+.ws-panel[data-working-provider-animation$="-pulse"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-glyph {
+  animation: ws-thread-provider-pulse var(--ws-provider-animation-duration) ease-in-out infinite;
+}
+.ws-list[data-working-provider-animation^="slow-"],
+.ws-panel[data-working-provider-animation^="slow-"] { --ws-provider-animation-duration: 3.2s; }
+.ws-list[data-working-provider-animation^="medium-"],
+.ws-panel[data-working-provider-animation^="medium-"] { --ws-provider-animation-duration: 1.8s; }
+.ws-list[data-working-provider-animation^="fast-"],
+.ws-panel[data-working-provider-animation^="fast-"] { --ws-provider-animation-duration: 1s; }
+@keyframes ws-thread-provider-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+@keyframes ws-thread-provider-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+@keyframes ws-thread-provider-bounce {
+  50% { transform: translateY(-0.14rem); }
+}
 @keyframes ws-thread-provider-shine {
   0% {
-    -webkit-clip-path: polygon(
-      -55% 0,
-      -25% 0,
-      -5% 100%,
-      -35% 100%
-    );
+    -webkit-clip-path: polygon(-55% 0, -25% 0, -5% 100%, -35% 100%);
     clip-path: polygon(-55% 0, -25% 0, -5% 100%, -35% 100%);
   }
   70%,
   100% {
-    -webkit-clip-path: polygon(
-      105% 0,
-      135% 0,
-      155% 100%,
-      125% 100%
-    );
+    -webkit-clip-path: polygon(105% 0, 135% 0, 155% 100%, 125% 100%);
     clip-path: polygon(105% 0, 135% 0, 155% 100%, 125% 100%);
   }
 }
@@ -138,7 +223,9 @@
   .ws-thread-provider[data-runtime-state="working"]
     .ws-thread-provider-fallback-shine,
   .ws-thread-provider[data-runtime-state="working"]
-    .ws-thread-provider-mark::after {
+    .ws-thread-provider-mark::after,
+  .ws-thread-provider[data-runtime-state="working"]
+    .ws-thread-provider-glyph {
     animation: none;
   }
 }
@@ -167,24 +254,18 @@
   filter: drop-shadow(0 0 0.12rem var(--primary-foreground));
   inset: 0;
   opacity: 0.96;
-  -webkit-clip-path: polygon(
-    -55% 0,
-    -25% 0,
-    -5% 100%,
-    -35% 100%
-  );
-  clip-path: polygon(
-    -55% 0,
-    -25% 0,
-    -5% 100%,
-    -35% 100%
-  );
+  -webkit-clip-path: polygon(-55% 0, -25% 0, -5% 100%, -35% 100%);
+  clip-path: polygon(-55% 0, -25% 0, -5% 100%, -35% 100%);
 }
 .ws-thread-provider-mark + .ws-thread-provider-fallback,
 .ws-thread-provider-mark ~ .ws-thread-provider-fallback-shine {
   visibility: hidden;
 }
-.ws-thread-provider[data-runtime-state="working"]
+.ws-list[data-working-provider-animation="sheen"]
+  .ws-thread-provider[data-runtime-state="working"]
+  .ws-thread-provider-fallback-shine,
+.ws-panel[data-working-provider-animation="sheen"]
+  .ws-thread-provider[data-runtime-state="working"]
   .ws-thread-provider-fallback-shine {
   display: block;
 }
@@ -1941,6 +2022,17 @@ button.ws-change-file-row:hover {
   font: var(--ws-text-title);
   line-height: 1.35;
 }
+.ws-card-content {
+  margin: 0;
+  font: var(--ws-text-primary);
+  line-height: 1.35;
+}
+.ws-card-section-label {
+  margin: 0;
+  color: var(--muted-foreground);
+  font: var(--ws-text-label);
+  line-height: 1.2;
+}
 .ws-card-note {
   margin: 0;
   color: var(--muted-foreground);
@@ -2191,12 +2283,13 @@ button.ws-change-file-row:hover {
 }
 .ws-provider-health {
   flex: none;
-  width: 0.4rem;
-  height: 0.4rem;
+  display: inline-grid;
+  width: 0.84rem;
+  height: 0.84rem;
+  place-items: center;
   border: 0;
-  border-radius: 999px;
   padding: 0;
-  background: var(--muted-foreground);
+  color: var(--muted-foreground);
 }
 button.ws-provider-health {
   cursor: pointer;
@@ -2209,13 +2302,26 @@ button.ws-provider-health:focus-visible {
   outline-offset: 2px;
 }
 .ws-provider-health-green {
-  background: var(--success);
+  color: var(--success);
 }
 .ws-provider-health-amber {
-  background: var(--warning);
+  color: var(--warning);
 }
 .ws-provider-health-red {
-  background: var(--destructive);
+  color: var(--destructive);
+}
+.ws-provider-health-icon,
+.ws-provider-health-icon .ws-thread-provider {
+  display: inline-grid;
+  width: 0.78rem;
+  height: 0.78rem;
+  place-items: center;
+}
+.ws-provider-health .ws-thread-provider {
+  color: inherit;
+}
+.ws-provider-health .ws-thread-provider-fallback {
+  opacity: 1;
 }
 .ws-status-heading-meta,
 .ws-status-heading-meta > span {
@@ -3132,6 +3238,20 @@ button.ws-provider-health:focus-visible {
   display: grid;
   gap: 0.24rem;
 }
+.ws-sidebar-appearance-field {
+  min-inline-size: 0;
+  padding: 0.4rem;
+  border: 1px solid var(--border);
+}
+.ws-working-animation-controls {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.3rem 0.45rem;
+}
+.ws-working-animation-controls select {
+  min-width: 0;
+}
 .ws-sidebar-text-scale-editor small,
 .ws-sidebar-appearance-field small {
   color: var(--muted-foreground);
@@ -3163,7 +3283,9 @@ button.ws-provider-health:focus-visible {
   grid-template-columns: 2.8rem auto;
   gap: 0.2rem;
 }
-.ws-thread-appearance-settings .ws-sidebar-text-scale-editor .ws-settings-input-row {
+.ws-thread-appearance-settings
+  .ws-sidebar-text-scale-editor
+  .ws-settings-input-row {
   grid-template-columns: 2.8rem auto;
   gap: 0.2rem;
 }
@@ -3416,16 +3538,16 @@ button.ws-provider-health:focus-visible {
   --ws-text-label-weight: var(--font-weight-semibold, 600);
   --ws-text-code-size: calc(0.7rem * var(--ws-text-scale));
   --ws-text-code-weight: var(--font-weight-normal, 400);
-  --ws-text-primary: var(--ws-text-primary-weight) var(--ws-text-primary-size) / normal
-    var(--ws-text-font-family);
-  --ws-text-title: var(--ws-text-title-weight) var(--ws-text-title-size) / normal
-    var(--ws-text-font-family);
-  --ws-text-subtext: var(--ws-text-subtext-weight) var(--ws-text-subtext-size) / normal
-    var(--ws-text-font-family);
-  --ws-text-metadata: var(--ws-text-metadata-weight) var(--ws-text-metadata-size) / normal
-    var(--ws-text-font-family);
-  --ws-text-label: var(--ws-text-label-weight) var(--ws-text-label-size) / normal
-    var(--ws-text-font-family);
+  --ws-text-primary: var(--ws-text-primary-weight) var(--ws-text-primary-size) /
+    normal var(--ws-text-font-family);
+  --ws-text-title: var(--ws-text-title-weight) var(--ws-text-title-size) /
+    normal var(--ws-text-font-family);
+  --ws-text-subtext: var(--ws-text-subtext-weight) var(--ws-text-subtext-size) /
+    normal var(--ws-text-font-family);
+  --ws-text-metadata: var(--ws-text-metadata-weight)
+    var(--ws-text-metadata-size) / normal var(--ws-text-font-family);
+  --ws-text-label: var(--ws-text-label-weight) var(--ws-text-label-size) /
+    normal var(--ws-text-font-family);
   --ws-text-code: var(--ws-text-code-weight) var(--ws-text-code-size) / normal
     var(--ws-text-font-family-code);
 }
@@ -3459,6 +3581,18 @@ button.ws-provider-health:focus-visible {
   cursor: pointer;
   text-align: left;
 }
+.ws-task-workflow-disclosure-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+}
+.ws-task-workflow-count {
+  min-width: 1.15rem;
+  color: var(--muted-foreground);
+  font: var(--ws-text-metadata);
+  line-height: inherit;
+  text-align: right;
+}
 .ws-task-workflow-list {
   display: grid;
   gap: 0.2rem;
@@ -3469,7 +3603,6 @@ button.ws-provider-health:focus-visible {
   align-items: center;
   gap: 0.35rem;
   padding: 0.3rem;
-  border-radius: 0.3rem;
 }
 .ws-task-workflow-icon {
   width: 0.7rem;
@@ -3483,9 +3616,25 @@ button.ws-provider-health:focus-visible {
   display: grid;
   min-width: 0;
   flex: 1;
+  gap: 0.12rem;
 }
-.ws-task-workflow-title { font: var(--ws-text-primary); line-height: inherit; }
-.ws-task-workflow-meta { color: var(--muted-foreground); font: var(--ws-text-metadata); line-height: inherit; }
+.ws-task-workflow-title {
+  overflow: hidden;
+  font: var(--ws-text-primary);
+  line-height: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-task-workflow-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.18rem;
+  color: var(--muted-foreground);
+  font: var(--ws-text-metadata);
+  line-height: inherit;
+  white-space: nowrap;
+}
 .ws-task-workflow-owner {
   display: inline-flex;
   width: fit-content;
@@ -3500,4 +3649,186 @@ button.ws-provider-health:focus-visible {
   text-align: left;
   cursor: pointer;
 }
-.ws-task-workflow-owner[data-state="unavailable"] { cursor: default; }
+.ws-task-workflow-owner[data-state="unavailable"] {
+  cursor: default;
+}
+.ws-task-workflow-history {
+  margin: 0;
+  color: var(--muted-foreground);
+  font: var(--ws-text-metadata);
+  line-height: 1.35;
+}
+.ws-task-workflow-status {
+  position: relative;
+  display: inline-grid;
+  flex: 0 0 auto;
+}
+.ws-task-workflow-status > button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  padding: 0.18rem;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.ws-task-workflow-status > button:hover:not(:disabled),
+.ws-task-workflow-status > button:focus-visible {
+  color: var(--foreground);
+}
+.ws-task-workflow-status-options {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.2rem);
+  left: 0;
+  display: grid;
+  min-width: max-content;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--popover);
+  box-shadow: var(--shadow-lg);
+}
+.ws-task-workflow-status-options > button {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 0;
+  padding: 0.3rem 0.45rem;
+  background: transparent;
+  color: var(--popover-foreground);
+  font: var(--ws-text-metadata);
+  line-height: inherit;
+  text-align: left;
+}
+.ws-task-workflow-status-options > button:hover,
+.ws-task-workflow-status-options > button[aria-selected="true"] {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+.ws-task-workflow-status-options svg {
+  width: 0.68rem;
+  height: 0.68rem;
+}
+.ws-assignee-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 3.75rem;
+  height: 1.2rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.05rem;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  cursor: ew-resize;
+  touch-action: pan-y;
+}
+.ws-assignee-toggle:focus-visible {
+  outline: 1px solid var(--ring);
+  outline-offset: 1px;
+}
+.ws-assignee-toggle-viewport {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+}
+.ws-assignee-toggle-track {
+  display: flex;
+  width: 200%;
+  transition: transform 180ms ease;
+}
+.ws-assignee-toggle[data-assignee="agent"] .ws-assignee-toggle-track {
+  transform: translateX(-50%);
+}
+.ws-assignee-toggle-state {
+  display: inline-flex;
+  width: 50%;
+  flex: 0 0 50%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.22rem;
+  color: var(--foreground);
+  font: var(--ws-text-label);
+  line-height: 1;
+}
+.ws-assignee-toggle-state svg {
+  width: 0.62rem;
+  height: 0.62rem;
+}
+.ws-assignee-toggle[data-pending] .ws-assignee-toggle-track {
+  opacity: 0.58;
+}
+.ws-work-item-queue {
+  display: grid;
+  gap: 0.3rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--border);
+}
+.ws-work-item-queue-heading,
+.ws-work-item-backlog-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+.ws-work-item-queue-current,
+.ws-work-item-reference {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font: var(--ws-text-primary);
+  line-height: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-work-item-reference-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-work-item-reference-meta,
+.ws-work-item-sources,
+.ws-work-item-queue-add {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.ws-work-item-reference-meta {
+  flex: 0 0 auto;
+}
+.ws-work-item-sources {
+  justify-content: flex-end;
+  color: var(--muted-foreground);
+  font: var(--ws-text-metadata);
+  line-height: inherit;
+}
+.ws-work-item-sources > span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.1rem;
+  padding: 0 0.28rem;
+  border: 1px solid var(--border);
+}
+.ws-work-item-queue-add {
+  align-items: flex-start;
+}
+.ws-work-item-linear-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  padding-top: 0.25rem;
+  color: var(--muted-foreground);
+  font: var(--ws-text-subtext);
+  line-height: inherit;
+}
+.ws-work-item-backlog {
+  display: grid;
+  gap: 0.24rem;
+}

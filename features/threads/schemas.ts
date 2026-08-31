@@ -4,6 +4,7 @@ import {
   MIN_SIDEBAR_ROW_HEIGHT,
   MAX_TEXT_SCALE,
   MIN_TEXT_SCALE,
+  WORKING_PROVIDER_ANIMATIONS,
 } from "./sidebar-appearance";
 
 const sidebarThreadGroup = z.object({
@@ -88,6 +89,7 @@ export const threadPreferenceSchemas = {
           .min(MIN_SIDEBAR_ROW_HEIGHT)
           .max(MAX_SIDEBAR_ROW_HEIGHT),
         textScale: z.number().min(MIN_TEXT_SCALE).max(MAX_TEXT_SCALE),
+        workingProviderAnimation: z.enum(WORKING_PROVIDER_ANIMATIONS).optional(),
       })
       .strict(),
   },
@@ -100,6 +102,11 @@ export const threadPreferenceSchemas = {
             .min(MIN_SIDEBAR_ROW_HEIGHT)
             .max(MAX_SIDEBAR_ROW_HEIGHT)
             .multipleOf(0.1),
+        })
+        .strict(),
+      z
+        .object({
+          workingProviderAnimation: z.enum(WORKING_PROVIDER_ANIMATIONS),
         })
         .strict(),
       z
@@ -119,6 +126,7 @@ export const threadPreferenceSchemas = {
           .min(MIN_SIDEBAR_ROW_HEIGHT)
           .max(MAX_SIDEBAR_ROW_HEIGHT),
         textScale: z.number().min(MIN_TEXT_SCALE).max(MAX_TEXT_SCALE),
+        workingProviderAnimation: z.enum(WORKING_PROVIDER_ANIMATIONS).optional(),
       })
       .strict(),
   },

@@ -187,6 +187,49 @@ rebound first. A future binding-migration wizard is a separate product decision.
 
 ## Unified Work item card
 
+### Current-goal and backlog revision (2026-08-31)
+
+The earlier primary-Linear presentation is replaced by a user-visible **work
+queue**. A work-item reference is a small, plugin-owned classification record
+which points at exactly one source record; it never copies the source title,
+status, assignee, or description.
+
+- A root has zero or one **Current goal**. It can reference either a BB Task
+  or a Linear issue.
+- It may have an ordered **Backlog** of additional BB Task and Linear
+  references.
+- Everything else belongs to **Execution tasks**. Those retain the existing
+  BB outcome/execution binding rules; a Linear record cannot silently become
+  a BB execution task.
+- Promoting a backlog entry makes it Current and atomically demotes the old
+  Current entry to the front of Backlog. Demoting Current clears that lane and
+  places it at the front of Backlog. Reordering is scoped to Backlog only.
+- A source-native status control updates precisely its referenced source:
+  BB Task through BB Tasks; Linear through Taskboard. There is no automatic
+  cross-system status synchronization.
+
+"Move to tasks" therefore has honest source-specific meaning: a BB Task is
+reclassified out of the goal queue and remains/gets linked as a normal task;
+a Linear goal offers **Create BB execution task from Linear**. That explicit
+copy records its Linear origin and leaves the Linear issue as the source of
+the goal's status. "Move to goals" promotes an existing linked BB Task or a
+linked Linear issue into Current/Backlog. The durable BB outcome is a system
+execution container, not an implicit second Current goal; migrations seed it
+as Current only when no explicit work-queue data exists.
+
+Storage is root-scoped and versioned. Migration reads the existing outcome
+and `work-linear-links:v2`: outcome becomes Current when present; otherwise
+the old primary Linear issue becomes Current and remaining links become
+Backlog. Invalid/missing references are omitted on projection and retained in
+storage only until the next successful queue mutation, which compacts them.
+Every queue mutation publishes the existing ordered Work then Tasks realtime
+signals for the root and all affected owner threads.
+
+The card renders Current goal first, then Backlog, then its add/search actions.
+The Tasks card renders execution and ordinary linked tasks only; it never
+duplicates a Current goal. This keeps one workflow without concealing that
+BB Tasks and Linear have different lifecycle APIs and permissions.
+
 ### Information architecture
 
 The separate Outcome and Linear cards become one **Work item** card:
@@ -409,6 +452,35 @@ breaks the primitive contract or can push text below an accessible minimum.
 - Replacing BB Tasks or creating a repository task queue.
 - Copying remote or host records into Zustand.
 - Rewriting all three areas in one change.
+
+## Recycle Bin and destructive archive
+
+The enhanced sidebar distinguishes reversible filing from BB's destructive host
+archive lifecycle:
+
+- **Recycle Bin** is a plugin-managed group. Moving a live thread there does
+  not call the SDK archive action, does not close its pane, and retains its
+  environment. A durable bin record stores the thread id, its previous group
+  (or Active), and the time it entered the bin.
+- **Restore** removes that record and returns the thread to its recorded group;
+  if the group no longer exists, it returns to Active. Binned threads are
+  excluded from Active/custom groups and from every thread assignment, parent,
+  reviewer-link, and owner picker.
+- Bin is reachable from the row context menu and a drag target. A binned row
+  can be restored by context menu or drag to Active/a custom group.
+- **Archive** remains BB's host-owned recursive operation, sits in the
+  destructive Delete section, and uses destructive styling. It is never used
+  as an implementation detail of binning.
+- A genuinely archived thread is read-only for grouping: it cannot move to a
+  custom group. Its only recovery affordance is **Resume in new worktree**.
+  The SDK cannot revive the old archived environment or history, so this opens
+  BB's new-thread flow preselected to the original project; it must never claim
+  to restore the original thread.
+- Retention is opt-in. The preference stores a retention duration but does not
+  silently archive anything. A separately configured BB automation may invoke
+  the plugin's expiry endpoint; it archives only eligible bin records, removes
+  each record after the host action is accepted, and emits one Threads-family
+  invalidation.
 
 ## Acceptance criteria
 

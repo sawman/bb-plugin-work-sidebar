@@ -7,15 +7,11 @@ import type { useTrackerSearch } from "./queries";
 export function LinkedTrackerRow({
   linked,
   busy,
-  primary = false,
-  onSetPrimary,
   onStatus,
   onUnlink,
 }: {
   linked: TrackerContext["items"][number];
   busy: boolean;
-  primary?: boolean;
-  onSetPrimary?(): void;
   onStatus(statusId: string): void;
   onUnlink(): void;
 }) {
@@ -24,7 +20,7 @@ export function LinkedTrackerRow({
   const currentStatus =
     statusOptions.find((option) => option.current)?.id ?? "";
   return (
-    <div className="ws-linear-linked-item" role="listitem">
+    <div className="ws-linear-linked-item">
       <button
         type="button"
         className="ws-linear-issue"
@@ -35,18 +31,6 @@ export function LinkedTrackerRow({
         <span>{item.title}</span>
       </button>
       <div className="ws-linear-controls">
-        {onSetPrimary ? (
-          <button
-            type="button"
-            className="ws-text-button"
-            aria-label={primary ? `${item.key} is the primary Linear issue` : `Make ${item.key} the primary Linear issue`}
-            aria-pressed={primary}
-            disabled={busy || primary}
-            onClick={onSetPrimary}
-          >
-            {primary ? "Primary" : "Make primary"}
-          </button>
-        ) : null}
         <select
           aria-label={`${item.key} status`}
           value={currentStatus}

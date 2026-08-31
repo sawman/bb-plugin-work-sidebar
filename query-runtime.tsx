@@ -14,6 +14,11 @@ export type QueryPolicy = Readonly<{
 }>;
 
 const queryRoot = ["work-sidebar"] as const;
+export const workOutcomeQueryRoot = (): QueryKey => [
+  ...queryRoot,
+  "work",
+  "outcome",
+];
 
 export const queryKeys = {
   assets: {
@@ -40,6 +45,12 @@ export const queryKeys = {
     },
   },
   work: {
+    itemQueue: (threadId: string): QueryKey => [
+      ...queryRoot,
+      "work",
+      "item-queue",
+      threadId,
+    ],
     status: (threadId: string): QueryKey => [
       ...queryRoot,
       "work",
@@ -59,9 +70,7 @@ export const queryKeys = {
       threadId,
     ],
     outcome: (threadId: string): QueryKey => [
-      ...queryRoot,
-      "work",
-      "outcome",
+      ...workOutcomeQueryRoot(),
       threadId,
     ],
     goal: (threadId: string): QueryKey => [

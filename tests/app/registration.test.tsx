@@ -87,7 +87,11 @@ describe("R2 app registration and Query lifecycle", () => {
       Original: () => null,
     }, {
       rpc: {
-        getSidebarAppearance: () => ({ rowHeight: 40, textScale: 0.9 }),
+        getSidebarAppearance: () => ({
+          rowHeight: 40,
+          textScale: 0.9,
+          workingProviderAnimation: "fast-spin",
+        }),
       } as never,
     });
     const right = renderSlot(app.threadPanelActions[0]!, {
@@ -95,7 +99,11 @@ describe("R2 app registration and Query lifecycle", () => {
       params: null,
     }, {
       rpc: {
-        getSidebarAppearance: () => ({ rowHeight: 40, textScale: 0.9 }),
+        getSidebarAppearance: () => ({
+          rowHeight: 40,
+          textScale: 0.9,
+          workingProviderAnimation: "fast-spin",
+        }),
       } as never,
     });
     expect(
@@ -106,6 +114,9 @@ describe("R2 app registration and Query lifecycle", () => {
     const leftRoot = left.container.querySelector<HTMLElement>(".ws-list");
     await waitFor(() =>
       expect(leftRoot?.style.getPropertyValue("--ws-text-scale")).toBe("0.9"),
+    );
+    expect(leftRoot?.getAttribute("data-working-provider-animation")).toBe(
+      "fast-spin",
     );
     expect(leftRoot?.querySelector(":scope > .ws-tabs-sticky")).toBeTruthy();
     expect(leftRoot?.querySelector(":scope > .ws-list-toolbar")).toBeTruthy();
@@ -133,10 +144,17 @@ describe("R2 app registration and Query lifecycle", () => {
           ?.style.getPropertyValue("--ws-text-scale"),
       ).toBe("0.9"),
     );
+    expect(
+      right.container
+        .querySelector(".ws-panel")
+        ?.getAttribute("data-working-provider-animation"),
+    ).toBe("fast-spin");
     expect(mount).toHaveBeenCalledTimes(2);
     // Changes owns no cache entries until its tab mounts the panel; once
     // selected, the file query remains hook-stable and disabled until opened.
-    expect(client.getQueryCache().getAll()).toHaveLength(18);
+    // Work-item queue is independently cacheable from the outcome and task
+    // projections, so mounted Work now owns one additional query entry.
+    expect(client.getQueryCache().getAll()).toHaveLength(19);
     expect(
       client
         .getQueryCache()

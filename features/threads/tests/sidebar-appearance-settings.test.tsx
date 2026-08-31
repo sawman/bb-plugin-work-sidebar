@@ -184,4 +184,43 @@ describe("sidebar appearance settings", () => {
     expect(results.violations).toEqual([]);
     expect(results.incomplete).toEqual([]);
   });
+
+  it("offers and persists every working-provider animation", async () => {
+    const save = vi.fn(async () => ({
+      rowHeight: 40,
+      textScale: 1,
+      workingProviderAnimation: "fast-spin" as const,
+    }));
+    const app = await loadPluginApp(() => import("../../../app"));
+    const section = app.settingsSections.find(
+      ({ id }) => id === "sidebar-appearance",
+    )!;
+    const slot = renderSlot(
+      section,
+      {},
+      {
+        rpc: {
+          getSidebarAppearance: () => ({ rowHeight: 40, textScale: 1 }),
+          saveSidebarAppearance: save,
+        } as never,
+      },
+    );
+    const style = await slot.findByRole("combobox", { name: "Style" });
+    const speed = slot.getByRole("combobox", { name: "Speed" });
+    expect((style as HTMLSelectElement).value).toBe("spin");
+    expect((speed as HTMLSelectElement).value).toBe("slow");
+    expect([...style.querySelectorAll("option")].map((option) => option.value)).toEqual([
+      "none",
+      "spin",
+      "bounce",
+      "sheen",
+      "pulse",
+    ]);
+    fireEvent.change(style, { target: { value: "bounce" } });
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith({
+        workingProviderAnimation: "slow-bounce",
+      }),
+    );
+  });
 });

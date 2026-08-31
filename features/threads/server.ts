@@ -8,6 +8,7 @@ import {
   normalizeSidebarRowHeight,
   validateSidebarRowHeight,
   normalizeTextScale,
+  normalizeWorkingProviderAnimation,
   validateTextScale,
 } from "./sidebar-appearance.js";
 
@@ -18,6 +19,7 @@ export const THREAD_PREFERENCE_KEYS = {
   groups: "sidebar-thread-groups:v1",
   appearance: "sidebar-appearance:v1",
   textScale: "sidebar-text-scale:v1",
+  workingProviderAnimation: "sidebar-working-provider-animation:v1",
 } as const;
 
 export function sanitizeThreadOrder(value: unknown): string[] {
@@ -147,6 +149,9 @@ export function createThreadPreferencesService(
       textScale: normalizeTextScale(
         await adapter.get(THREAD_PREFERENCE_KEYS.textScale),
       ),
+      workingProviderAnimation: normalizeWorkingProviderAnimation(
+        await adapter.get(THREAD_PREFERENCE_KEYS.workingProviderAnimation),
+      ),
     };
   }
 
@@ -219,6 +224,16 @@ export function createThreadPreferencesService(
       await adapter.set(THREAD_PREFERENCE_KEYS.textScale, value);
       adapter.publish(THREAD_PREFERENCE_CHANNEL, {
         appearance: { textScale: value },
+      });
+      return appearance();
+    },
+    async saveWorkingProviderAnimation(workingProviderAnimation: unknown) {
+      const value = normalizeWorkingProviderAnimation(workingProviderAnimation);
+      if (value !== workingProviderAnimation)
+        throw new Error("Choose a supported working-provider animation.");
+      await adapter.set(THREAD_PREFERENCE_KEYS.workingProviderAnimation, value);
+      adapter.publish(THREAD_PREFERENCE_CHANNEL, {
+        appearance: { workingProviderAnimation: value },
       });
       return appearance();
     },

@@ -10,7 +10,9 @@ import { getPluginQueryClient } from "../../../query-runtime";
 
 type Rpc = NonNullable<RenderSlotOptions<typeof rpcContract>["rpc"]>;
 const taskResult = { available: true, tasks: [], projects: [], error: null };
-const axe = configureAxe({ runOnly: { type: "tag", values: ["cat.aria", "cat.name-role-value"] } });
+const axe = configureAxe({
+  runOnly: { type: "tag", values: ["cat.aria", "cat.name-role-value"] },
+});
 const aggregate = {
   rootThreadId: "thr_one",
   tasksAvailable: true,
@@ -161,9 +163,11 @@ describe("registered Work context cards", () => {
       },
     );
 
-    await waitFor(() => expect(slot.getByText("Linked Linear work")).toBeTruthy());
+    await waitFor(() => expect(slot.getByText("Ship cards")).toBeTruthy());
     expect(slot.queryByText("Outcome")).toBeNull();
     expect(slot.container.querySelectorAll(".ws-linear-card")).toHaveLength(0);
+    expect(slot.getByRole("button", { name: "Add Linear issue" })).toBeTruthy();
+    expect(slot.queryByText("Linked Linear work")).toBeNull();
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();
   });
@@ -311,22 +315,49 @@ describe("registered Work context cards", () => {
     const root = renderSlot(
       app.threadPanelActions[0]!,
       { threadId: "thr_root", params: null },
-      { rpc: fixture({ getWorkStatus: () => rootStatus, getWorkOutcome: rootOutcome }) },
+      {
+        rpc: fixture({
+          getWorkStatus: () => rootStatus,
+          getWorkOutcome: rootOutcome,
+        }),
+      },
     );
     const child = renderSlot(
       app.threadPanelActions[0]!,
       { threadId: "thr_child", params: null },
-      { rpc: fixture({ getWorkStatus: () => childStatus, getWorkOutcome: childOutcome }) },
+      {
+        rpc: fixture({
+          getWorkStatus: () => childStatus,
+          getWorkOutcome: childOutcome,
+        }),
+      },
     );
     const sibling = renderSlot(
       app.threadPanelActions[0]!,
       { threadId: "thr_sibling", params: null },
-      { rpc: fixture({ getWorkStatus: () => siblingStatus, getWorkOutcome: siblingOutcome }) },
+      {
+        rpc: fixture({
+          getWorkStatus: () => siblingStatus,
+          getWorkOutcome: siblingOutcome,
+        }),
+      },
     );
     try {
-      await waitFor(() => expect(rootOutcome).toHaveBeenCalledExactlyOnceWith({ threadId: "thr_root" }));
-      await waitFor(() => expect(childOutcome).toHaveBeenCalledExactlyOnceWith({ threadId: "thr_child" }));
-      await waitFor(() => expect(siblingOutcome).toHaveBeenCalledExactlyOnceWith({ threadId: "thr_sibling" }));
+      await waitFor(() =>
+        expect(rootOutcome).toHaveBeenCalledExactlyOnceWith({
+          threadId: "thr_root",
+        }),
+      );
+      await waitFor(() =>
+        expect(childOutcome).toHaveBeenCalledExactlyOnceWith({
+          threadId: "thr_child",
+        }),
+      );
+      await waitFor(() =>
+        expect(siblingOutcome).toHaveBeenCalledExactlyOnceWith({
+          threadId: "thr_sibling",
+        }),
+      );
 
       const rootEvent = {
         family: "work",
@@ -340,7 +371,9 @@ describe("registered Work context cards", () => {
       await waitFor(() => expect(siblingOutcome).toHaveBeenCalledTimes(2));
       expect(rootOutcome).toHaveBeenLastCalledWith({ threadId: "thr_root" });
       expect(childOutcome).toHaveBeenLastCalledWith({ threadId: "thr_child" });
-      expect(siblingOutcome).toHaveBeenLastCalledWith({ threadId: "thr_sibling" });
+      expect(siblingOutcome).toHaveBeenLastCalledWith({
+        threadId: "thr_sibling",
+      });
 
       await root.behavior.emitRealtime("work-sidebar:changed", {
         family: "tasks",
@@ -488,7 +521,9 @@ describe("registered Work context cards", () => {
     );
     const priority = slot.getByRole("img", { name: "High priority" });
     expect(priority.getAttribute("data-priority")).toBe("high");
-    expect(priority.querySelectorAll('[data-priority-bar="active"]')).toHaveLength(3);
+    expect(
+      priority.querySelectorAll('[data-priority-bar="active"]'),
+    ).toHaveLength(3);
     const controls = slot.getByRole("group", {
       name: "Outcome status: To do",
     });
@@ -599,31 +634,32 @@ describe("registered Work context cards", () => {
       },
     );
     try {
-      await waitFor(() => expect(slot.getByText("Unrelated linked task")).toBeTruthy());
+      await waitFor(() =>
+        expect(slot.getByText("Unrelated linked task")).toBeTruthy(),
+      );
       expect(slot.queryByText(/work tasks are bound/i)).toBeNull();
-      for (const title of ["Ship cards", "Run validation", "Unrelated linked task"])
+      for (const title of [
+        "Ship cards",
+        "Run validation",
+        "Unrelated linked task",
+      ])
         expect(slot.getAllByText(title)).toHaveLength(1);
-      expect(slot.queryByRole("button", { name: "Detach WORK-1 from this thread" })).toBeNull();
-      expect(slot.queryByRole("button", { name: "Detach WORK-2 from this thread" })).toBeNull();
-      expect(slot.getByRole("button", { name: "Detach WORK-3 from this thread" })).toBeTruthy();
-      const outcomeAssignee = slot.getByRole("button", {
+      expect(
+        slot.queryByRole("button", { name: "Detach WORK-1 from this thread" }),
+      ).toBeNull();
+      expect(
+        slot.queryByRole("button", { name: "Detach WORK-2 from this thread" }),
+      ).toBeNull();
+      expect(
+        slot.getByRole("button", { name: "Detach WORK-3 from this thread" }),
+      ).toBeTruthy();
+      const outcomeAssignee = slot.getByRole("switch", {
         name: "Human assigned to WORK-1",
       });
       expect(
-        slot.getByRole("button", { name: "Agent assigned to WORK-2" }),
+        slot.getByRole("switch", { name: "Agent assigned to WORK-2" }),
       ).toBeTruthy();
-      fireEvent.click(outcomeAssignee);
-      fireEvent.click(
-        within(
-          slot.getByRole("listbox", { name: "Task assignee for WORK-1" }),
-        ).getByRole("option", { name: "Agent" }),
-      );
-      await waitFor(() =>
-        expect(updateTaskAssignee).toHaveBeenCalledWith({
-          taskId: "task_1",
-          assignee: "agent",
-        }),
-      );
+      expect(outcomeAssignee.getAttribute("aria-checked")).toBe("false");
     } finally {
       slot.lifecycle.unmount();
       getPluginQueryClient().clear();
@@ -731,9 +767,21 @@ describe("registered Work context cards", () => {
     const sidebarTasks = () => ({
       ...taskResult,
       tasks: [
-        { ...populatedOutcome.outcome!, linkedThreadIds: ["thr_root"], assignee: "human" as const },
-        { ...directExecution, linkedThreadIds: ["thr_root"], assignee: "agent" as const },
-        { ...delegatedExecution, linkedThreadIds: ["thr_child"], assignee: "agent" as const },
+        {
+          ...populatedOutcome.outcome!,
+          linkedThreadIds: ["thr_root"],
+          assignee: "human" as const,
+        },
+        {
+          ...directExecution,
+          linkedThreadIds: ["thr_root"],
+          assignee: "agent" as const,
+        },
+        {
+          ...delegatedExecution,
+          linkedThreadIds: ["thr_child"],
+          assignee: "agent" as const,
+        },
         genericRoot,
         genericChild,
       ],
@@ -741,10 +789,17 @@ describe("registered Work context cards", () => {
     const root = renderSlot(
       app.threadPanelActions[0]!,
       { threadId: "thr_root", params: null },
-      { rpc: fixture({ sidebarTasks, getWorkOutcome: () => ownerScopedOutcome }) },
+      {
+        rpc: fixture({
+          sidebarTasks,
+          getWorkOutcome: () => ownerScopedOutcome,
+        }),
+      },
     );
     try {
-      await waitFor(() => expect(root.getByText("Unbound root task")).toBeTruthy());
+      await waitFor(() =>
+        expect(root.getByText("Unbound root task")).toBeTruthy(),
+      );
       expect(root.queryByText(/work tasks are bound/i)).toBeNull();
     } finally {
       root.lifecycle.unmount();
@@ -754,17 +809,32 @@ describe("registered Work context cards", () => {
     const child = renderSlot(
       app.threadPanelActions[0]!,
       { threadId: "thr_child", params: null },
-      { rpc: fixture({ sidebarTasks, getWorkOutcome: () => ownerScopedOutcome }) },
+      {
+        rpc: fixture({
+          sidebarTasks,
+          getWorkOutcome: () => ownerScopedOutcome,
+        }),
+      },
     );
     try {
-      await waitFor(() => expect(child.getByText("Unbound child task")).toBeTruthy());
+      await waitFor(() =>
+        expect(child.getByText("Unbound child task")).toBeTruthy(),
+      );
       expect(child.queryByText(/work tasks are bound/i)).toBeNull();
-      expect(child.getByRole("button", { name: "Open Sibling worker" })).toBeTruthy();
-      const picker = child.getByRole("combobox", { name: "Add task to this thread" });
+      expect(
+        child.getByRole("button", { name: "Open Sibling worker" }),
+      ).toBeTruthy();
+      const picker = child.getByRole("combobox", {
+        name: "Add task to this thread",
+      });
       fireEvent.focus(picker);
-      await waitFor(() => expect(child.getByRole("option", { name: /WORK-4/ })).toBeTruthy());
+      await waitFor(() =>
+        expect(child.getByRole("option", { name: /WORK-4/ })).toBeTruthy(),
+      );
       for (const key of ["WORK-1", "WORK-2", "WORK-3"])
-        expect(child.queryByRole("option", { name: new RegExp(key) })).toBeNull();
+        expect(
+          child.queryByRole("option", { name: new RegExp(key) }),
+        ).toBeNull();
     } finally {
       child.lifecycle.unmount();
       getPluginQueryClient().clear();
@@ -785,8 +855,14 @@ describe("registered Work context cards", () => {
       dispatchState: "ready" as const,
       recoveryMessage: null,
     };
-    let resolveAdoption!: (value: { task: NonNullable<typeof populatedOutcome.outcome>; binding: typeof adoptedBinding }) => void;
-    const pendingAdoption = new Promise<{ task: NonNullable<typeof populatedOutcome.outcome>; binding: typeof adoptedBinding }>((resolve) => {
+    let resolveAdoption!: (value: {
+      task: NonNullable<typeof populatedOutcome.outcome>;
+      binding: typeof adoptedBinding;
+    }) => void;
+    const pendingAdoption = new Promise<{
+      task: NonNullable<typeof populatedOutcome.outcome>;
+      binding: typeof adoptedBinding;
+    }>((resolve) => {
       resolveAdoption = resolve;
     });
     const getWorkOutcome = vi
@@ -799,21 +875,45 @@ describe("registered Work context cards", () => {
           message: "One legacy top-level attachment can be explicitly adopted.",
         },
       })
-      .mockReturnValue({ ...populatedOutcome, legacy: { state: "none" as const, taskIds: [], message: null } });
+      .mockReturnValue({
+        ...populatedOutcome,
+        legacy: { state: "none" as const, taskIds: [], message: null },
+      });
     const adoptLegacyOutcome = vi.fn(() => pendingAdoption);
     const slot = renderSlot(
       app.threadPanelActions[0]!,
       { threadId: "thr_one", params: null },
       { rpc: fixture({ getWorkOutcome, adoptLegacyOutcome }) },
     );
-    await waitFor(() => expect(slot.getByText("One legacy top-level attachment can be explicitly adopted.")).toBeTruthy());
-    const adopt = slot.getByRole("button", { name: "Adopt legacy outcome" }) as HTMLButtonElement;
+    await waitFor(() =>
+      expect(
+        slot.getByText(
+          "One legacy top-level attachment can be explicitly adopted.",
+        ),
+      ).toBeTruthy(),
+    );
+    const adopt = slot.getByRole("button", {
+      name: "Adopt legacy outcome",
+    }) as HTMLButtonElement;
     fireEvent.click(adopt);
-    await waitFor(() => expect(adoptLegacyOutcome).toHaveBeenCalledWith({ rootThreadId: "thr_one", taskId: "task_legacy" }));
+    await waitFor(() =>
+      expect(adoptLegacyOutcome).toHaveBeenCalledWith({
+        rootThreadId: "thr_one",
+        taskId: "task_legacy",
+      }),
+    );
     expect(adopt.disabled).toBe(true);
-    resolveAdoption({ task: populatedOutcome.outcome!, binding: adoptedBinding });
-    await waitFor(() => expect(slot.getByText("Legacy outcome adopted.")).toBeTruthy());
-    await slot.behavior.emitRealtime("work-sidebar:changed", { family: "work", rootThreadId: "thr_one" });
+    resolveAdoption({
+      task: populatedOutcome.outcome!,
+      binding: adoptedBinding,
+    });
+    await waitFor(() =>
+      expect(slot.getByText("Legacy outcome adopted.")).toBeTruthy(),
+    );
+    await slot.behavior.emitRealtime("work-sidebar:changed", {
+      family: "work",
+      rootThreadId: "thr_one",
+    });
     await waitFor(() => expect(getWorkOutcome).toHaveBeenCalledTimes(3));
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();
@@ -828,17 +928,35 @@ describe("registered Work context cards", () => {
             legacy: {
               state: "adoptable",
               taskIds: ["task_legacy"],
-              message: "One legacy top-level attachment can be explicitly adopted.",
+              message:
+                "One legacy top-level attachment can be explicitly adopted.",
             },
           }),
-          adoptLegacyOutcome: () => Promise.reject(new Error("Adoption failed")),
+          adoptLegacyOutcome: () =>
+            Promise.reject(new Error("Adoption failed")),
         }),
       },
     );
-    await waitFor(() => expect(rejected.getByRole("button", { name: "Adopt legacy outcome" })).toBeTruthy());
-    fireEvent.click(rejected.getByRole("button", { name: "Adopt legacy outcome" }));
-    await waitFor(() => expect(rejected.getByRole("alert").textContent).toContain("Adoption failed"));
-    expect((rejected.getByRole("button", { name: "Adopt legacy outcome" }) as HTMLButtonElement).disabled).toBe(false);
+    await waitFor(() =>
+      expect(
+        rejected.getByRole("button", { name: "Adopt legacy outcome" }),
+      ).toBeTruthy(),
+    );
+    fireEvent.click(
+      rejected.getByRole("button", { name: "Adopt legacy outcome" }),
+    );
+    await waitFor(() =>
+      expect(rejected.getByRole("alert").textContent).toContain(
+        "Adoption failed",
+      ),
+    );
+    expect(
+      (
+        rejected.getByRole("button", {
+          name: "Adopt legacy outcome",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
     rejected.lifecycle.unmount();
     getPluginQueryClient().clear();
 
@@ -852,14 +970,23 @@ describe("registered Work context cards", () => {
             legacy: {
               state: "ambiguous",
               taskIds: ["task_a", "task_b"],
-              message: "Several legacy top-level tasks are attached; select one explicitly to adopt.",
+              message:
+                "Several legacy top-level tasks are attached; select one explicitly to adopt.",
             },
           }),
         }),
       },
     );
-    await waitFor(() => expect(unsafe.getByText("Several legacy top-level tasks are attached; select one explicitly to adopt.")).toBeTruthy());
-    expect(unsafe.queryByRole("button", { name: "Adopt legacy outcome" })).toBeNull();
+    await waitFor(() =>
+      expect(
+        unsafe.getByText(
+          "Several legacy top-level tasks are attached; select one explicitly to adopt.",
+        ),
+      ).toBeTruthy(),
+    );
+    expect(
+      unsafe.queryByRole("button", { name: "Adopt legacy outcome" }),
+    ).toBeNull();
     unsafe.lifecycle.unmount();
     getPluginQueryClient().clear();
 
@@ -873,14 +1000,23 @@ describe("registered Work context cards", () => {
             legacy: {
               state: "project_mismatch",
               taskIds: ["task_elsewhere"],
-              message: "Legacy attachment is linked to a different BB project and cannot be adopted.",
+              message:
+                "Legacy attachment is linked to a different BB project and cannot be adopted.",
             },
           }),
         }),
       },
     );
-    await waitFor(() => expect(mismatch.getByText("Legacy attachment is linked to a different BB project and cannot be adopted.")).toBeTruthy());
-    expect(mismatch.queryByRole("button", { name: "Adopt legacy outcome" })).toBeNull();
+    await waitFor(() =>
+      expect(
+        mismatch.getByText(
+          "Legacy attachment is linked to a different BB project and cannot be adopted.",
+        ),
+      ).toBeTruthy(),
+    );
+    expect(
+      mismatch.queryByRole("button", { name: "Adopt legacy outcome" }),
+    ).toBeNull();
     mismatch.lifecycle.unmount();
     getPluginQueryClient().clear();
   });
@@ -991,7 +1127,7 @@ describe("registered Work context cards", () => {
       ).toBe(false);
       expect(previous.querySelector("svg")).toBeTruthy();
       expect(next.querySelector("svg")).toBeTruthy();
-      expect(current.querySelector('svg[data-icon="CircleHalf"]')).toBeTruthy();
+      expect(current.querySelector('svg[data-icon="Hammer"]')).toBeTruthy();
       fireEvent.click(previous);
       await waitFor(() =>
         expect(updateWorkTask).toHaveBeenCalledWith({
@@ -1117,67 +1253,379 @@ describe("registered Work context cards", () => {
     const workflowOutcome = {
       ...outcome,
       outcome: { ...populatedOutcome.outcome!, id: "task_outcome" },
-      executionTasks: [execution, { ...execution, id: "task_archived", key: "WORK-20", title: "Archived owner follow-up", status: "todo" as const, assignee: "human" as const }],
-      bindings: [{
-        rootThreadId: "thr_one",
-        outcomeTaskId: "task_outcome",
-        taskProjectId: "project_1",
-        executionTaskId: "task_execution",
-        ownerThreadId: "thr_owner",
-        mode: "delegated" as const,
-        idempotencyKey: "workflow",
-        dispatchState: "ready" as const,
-        recoveryMessage: null,
-      }, {
-        rootThreadId: "thr_one", outcomeTaskId: "task_outcome", taskProjectId: "project_1", executionTaskId: "task_archived", ownerThreadId: "thr_archived", mode: "delegated" as const, idempotencyKey: "archived", dispatchState: "ready" as const, recoveryMessage: null,
-      }],
+      executionTasks: [
+        execution,
+        {
+          ...execution,
+          id: "task_archived",
+          key: "WORK-20",
+          title: "Archived owner follow-up",
+          status: "todo" as const,
+          assignee: "human" as const,
+        },
+      ],
+      bindings: [
+        {
+          rootThreadId: "thr_one",
+          outcomeTaskId: "task_outcome",
+          taskProjectId: "project_1",
+          executionTaskId: "task_execution",
+          ownerThreadId: "thr_owner",
+          mode: "delegated" as const,
+          idempotencyKey: "workflow",
+          dispatchState: "ready" as const,
+          recoveryMessage: null,
+        },
+        {
+          rootThreadId: "thr_one",
+          outcomeTaskId: "task_outcome",
+          taskProjectId: "project_1",
+          executionTaskId: "task_archived",
+          ownerThreadId: "thr_archived",
+          mode: "delegated" as const,
+          idempotencyKey: "archived",
+          dispatchState: "ready" as const,
+          recoveryMessage: null,
+        },
+      ],
     };
-    const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_one", params: null }, {
-      rpc: fixture({
-        sidebarTasks: () => ({
-          available: true,
-          projects: [{ id: "project_1", name: "Work" }],
-          error: null,
-          tasks: [
-            { ...execution, title: "Stale duplicate", linkedThreadIds: ["thr_one"], assignee: "agent" as const },
-            { ...execution, id: "task_human", key: "WORK-3", title: "Approve the release", status: "in_review" as const, parentTaskId: null, linkedThreadIds: ["thr_one"], assignee: "human" as const },
-            { ...execution, id: "task_next", key: "WORK-4", title: "Prepare the follow-up", status: "backlog" as const, parentTaskId: null, linkedThreadIds: ["thr_one"], assignee: "agent" as const },
-            { ...execution, id: "task_done", key: "WORK-5", title: "Completed evidence", status: "done" as const, parentTaskId: null, linkedThreadIds: ["thr_one"], assignee: "agent" as const, updatedAt: "2026-08-29T00:00:10.000Z" },
-            ...Array.from({ length: 6 }, (_, index) => ({ ...execution, id: `task_done_${index}`, key: `WORK-${index + 6}`, title: `Completed ${index}`, status: index === 5 ? "canceled" as const : "done" as const, parentTaskId: null, linkedThreadIds: ["thr_one"], assignee: "agent" as const, updatedAt: `2026-08-29T00:00:${20 + index}.000Z` })),
-          ],
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      {
+        rpc: fixture({
+          sidebarTasks: () => ({
+            available: true,
+            projects: [{ id: "project_1", name: "Work" }],
+            error: null,
+            tasks: [
+              {
+                ...execution,
+                title: "Stale duplicate",
+                linkedThreadIds: ["thr_one"],
+                assignee: "agent" as const,
+              },
+              {
+                ...execution,
+                id: "task_human",
+                key: "WORK-3",
+                title: "Approve the release",
+                status: "in_review" as const,
+                parentTaskId: null,
+                linkedThreadIds: ["thr_one"],
+                assignee: "human" as const,
+              },
+              {
+                ...execution,
+                id: "task_next",
+                key: "WORK-4",
+                title: "Prepare the follow-up",
+                status: "backlog" as const,
+                parentTaskId: null,
+                linkedThreadIds: ["thr_one"],
+                assignee: "agent" as const,
+              },
+              {
+                ...execution,
+                id: "task_done",
+                key: "WORK-5",
+                title: "Completed evidence",
+                status: "done" as const,
+                parentTaskId: null,
+                linkedThreadIds: ["thr_one"],
+                assignee: "agent" as const,
+                updatedAt: "2026-08-29T00:00:10.000Z",
+              },
+              ...Array.from({ length: 6 }, (_, index) => ({
+                ...execution,
+                id: `task_done_${index}`,
+                key: `WORK-${index + 6}`,
+                title: `Completed ${index}`,
+                status: index === 5 ? ("canceled" as const) : ("done" as const),
+                parentTaskId: null,
+                linkedThreadIds: ["thr_one"],
+                assignee: "agent" as const,
+                updatedAt: `2026-08-29T00:00:${20 + index}.000Z`,
+              })),
+            ],
+          }),
+          getWorkOutcome: () => workflowOutcome,
+          getWorkStatus: () => ({
+            ...status,
+            children: [
+              {
+                id: "thr_owner",
+                title: "Validation worker",
+                depth: 1,
+                status: "active" as const,
+                runtimeStatus: "working",
+                providerId: "codex",
+                isArchived: false,
+                task: null,
+              },
+              {
+                id: "thr_archived",
+                title: "Archived worker",
+                depth: 1,
+                status: "idle" as const,
+                runtimeStatus: "idle",
+                providerId: "codex",
+                isArchived: true,
+                task: null,
+              },
+            ],
+          }),
         }),
-        getWorkOutcome: () => workflowOutcome,
-        getWorkStatus: () => ({
-          ...status,
-          children: [{ id: "thr_owner", title: "Validation worker", depth: 1, status: "active" as const, runtimeStatus: "working", providerId: "codex", isArchived: false, task: null }, { id: "thr_archived", title: "Archived worker", depth: 1, status: "idle" as const, runtimeStatus: "idle", providerId: "codex", isArchived: true, task: null }],
-        }),
-      }),
-    });
-    await waitFor(() => expect(slot.getByRole("heading", { name: "Needs you" })).toBeTruthy());
-    expect([...slot.container.querySelectorAll(".ws-task-workflow h3")].map((heading) => heading.textContent)).toEqual([
-      "Needs you", "In progress", "Next", "Completed (7)",
-    ]);
+      },
+    );
+    await waitFor(() =>
+      expect(slot.getByRole("heading", { name: "Needs you" })).toBeTruthy(),
+    );
+    expect(
+      [...slot.container.querySelectorAll(".ws-task-workflow h3")].map(
+        (heading) => heading.textContent,
+      ),
+    ).toEqual(["Needs you2", "In progress1", "Next1", "Completed7"]);
     expect(slot.getByText("Approve the release")).toBeTruthy();
-    expect(slot.getByText("Archived owner follow-up").closest(".ws-task-workflow-section")?.querySelector("h3")?.textContent).toBe("Needs you");
+    const needsYou = slot.getByRole("button", { name: "Needs you: 2 tasks" });
+    expect(needsYou.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(needsYou);
+    expect(needsYou.getAttribute("aria-expanded")).toBe("false");
+    expect(slot.queryByText("Approve the release")).toBeNull();
+    fireEvent.click(needsYou);
+    expect(slot.getByText("Approve the release")).toBeTruthy();
+    expect(
+      slot
+        .getByText("Archived owner follow-up")
+        .closest(".ws-task-workflow-section")
+        ?.querySelector("h3")?.textContent,
+    ).toBe("Needs you2");
     expect(slot.getByText("Run the agent work")).toBeTruthy();
     expect(slot.queryByText("Stale duplicate")).toBeNull();
-    const openOwner = slot.getByRole("button", { name: "Open Validation worker" });
+    const openOwner = slot.getByRole("button", {
+      name: "Open Validation worker",
+    });
     fireEvent.click(openOwner);
-    expect(slot.inspection.navigateCalls).toContainEqual({ method: "toThread", threadId: "thr_owner" });
+    expect(slot.inspection.navigateCalls).toContainEqual({
+      method: "toThread",
+      threadId: "thr_owner",
+    });
     expect(slot.getByRole("img", { name: /codex provider/ })).toBeTruthy();
     expect(slot.getByText("Prepare the follow-up")).toBeTruthy();
     expect(slot.getByText("Archived owner follow-up")).toBeTruthy();
-    expect(slot.getAllByText("Owner unavailable")).toHaveLength(2);
-    expect(slot.queryByRole("button", { name: "Open Archived worker" })).toBeNull();
-    expect(slot.getByRole("button", { name: /Completed \(7\)/ }).getAttribute("aria-expanded")).toBe("false");
+    expect(slot.getAllByText("You")).toHaveLength(2);
+    expect(
+      slot.queryByRole("button", { name: "Open Archived worker" }),
+    ).toBeNull();
+    expect(
+      slot
+        .getByRole("button", { name: "Completed: 7 tasks" })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
     expect(slot.queryByText("Completed 5")).toBeNull();
-    fireEvent.click(slot.getByRole("button", { name: /Completed \(7\)/ }));
+    fireEvent.click(slot.getByRole("button", { name: "Completed: 7 tasks" }));
     expect(slot.getByText("Completed 5")).toBeTruthy();
     expect(slot.getByRole("article", { name: /Canceled/ })).toBeTruthy();
-    expect(slot.container.querySelectorAll(".ws-task-workflow-section:last-of-type .ws-task-workflow-row")).toHaveLength(5);
-    expect(slot.getByText("Older completed tasks are available in BB Tasks.")).toBeTruthy();
+    expect(
+      slot.container.querySelectorAll(
+        ".ws-task-workflow-section:last-of-type .ws-task-workflow-row",
+      ),
+    ).toHaveLength(5);
+    expect(
+      slot.queryByText("Older completed tasks are available in BB Tasks."),
+    ).toBeNull();
     expect(slot.queryByText(/bound to this thread/i)).toBeNull();
     expect(slot.queryByRole("group", { name: "Execution tasks" })).toBeNull();
+    slot.lifecycle.unmount();
+    getPluginQueryClient().clear();
+  });
+
+  it("keeps execution-task ownership visible while assignment is pending and lets Human work be completed", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    let assignee: "human" | "agent" = "human";
+    let statusValue: import("../../../work-model").SidebarTask["status"] =
+      "todo";
+    let resolveAssignment!: () => void;
+    const assignment = new Promise<void>((resolve) => {
+      resolveAssignment = resolve;
+    });
+    const updateTaskAssignee = vi.fn(async () => {
+      await assignment;
+      assignee = "agent";
+      return { taskId: "task_execution", assignee };
+    });
+    const updateTaskStatus = vi.fn(
+      async (input: {
+        taskId: string;
+        status: import("../../../work-model").SidebarTask["status"];
+      }) => {
+        statusValue = input.status;
+        const { assignee: _assignee, ...task } = taskRecord();
+        return {
+          task: {
+            ...task,
+            id: "task_human",
+            key: "WORK-3",
+            title: "Confirm the release",
+            status: statusValue,
+          },
+        };
+      },
+    );
+    const taskRecord = () => ({
+      id: "task_execution",
+      projectId: "project_1",
+      projectName: "Work",
+      key: "WORK-2",
+      title: "Make the human decision",
+      status: statusValue,
+      priority: "high" as const,
+      dueDate: null,
+      parentTaskId: "task_outcome",
+      updatedAt: "2026-08-29T01:00:00.000Z",
+      assignee,
+    });
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      {
+        rpc: fixture({
+          sidebarTasks: () => ({
+            available: true,
+            projects: [{ id: "project_1", name: "Work" }],
+            error: null,
+            tasks: [
+              { ...taskRecord(), linkedThreadIds: ["thr_one"] },
+              {
+                ...taskRecord(),
+                id: "task_human",
+                key: "WORK-3",
+                title: "Confirm the release",
+                status: statusValue,
+                linkedThreadIds: ["thr_one"],
+              },
+            ],
+          }),
+          getWorkOutcome: () => ({
+            ...outcome,
+            executionTasks: [taskRecord()],
+          }),
+          updateTaskAssignee,
+          updateTaskStatus,
+        }),
+      },
+    );
+
+    await waitFor(() =>
+      expect(slot.getByLabelText("Human assigned to WORK-2")).toBeTruthy(),
+    );
+    const assignmentSwitch = slot.getByRole("switch", {
+      name: "Human assigned to WORK-2",
+    });
+    fireEvent.pointerDown(assignmentSwitch, { clientX: 2, pointerId: 1 });
+    fireEvent.pointerUp(assignmentSwitch, { clientX: 28, pointerId: 1 });
+    expect(updateTaskAssignee).not.toHaveBeenCalled();
+    await new Promise((resolve) => window.setTimeout(resolve, 2_020));
+    await waitFor(() =>
+      expect(updateTaskAssignee).toHaveBeenCalledWith({
+        taskId: "task_execution",
+        assignee: "agent",
+      }),
+    );
+    expect(
+      slot.getByRole("switch", { name: "Agent assigned to WORK-2" }),
+    ).toBeTruthy();
+    resolveAssignment();
+    await updateTaskAssignee.mock.results[0]!.value;
+    slot.lifecycle.unmount();
+    getPluginQueryClient().clear();
+
+    const completionSlot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      {
+        rpc: fixture({
+          sidebarTasks: () => ({
+            available: true,
+            projects: [{ id: "project_1", name: "Work" }],
+            error: null,
+            tasks: [
+              {
+                ...taskRecord(),
+                id: "task_human",
+                key: "WORK-3",
+                title: "Confirm the release",
+                status: statusValue,
+                linkedThreadIds: ["thr_one"],
+                assignee: "human" as const,
+              },
+            ],
+          }),
+          updateTaskStatus,
+        }),
+      },
+    );
+    const statusControl = await completionSlot.findByRole("button", {
+      name: "Change status for WORK-3: To do",
+    });
+    fireEvent.click(statusControl);
+    fireEvent.click(completionSlot.getByRole("option", { name: "In Review" }));
+    await waitFor(() =>
+      expect(updateTaskStatus).toHaveBeenCalledWith({
+        taskId: "task_human",
+        status: "in_review",
+      }),
+    );
+    await waitFor(() =>
+      expect(completionSlot.getByText("Confirm the release")).toBeTruthy(),
+    );
+    completionSlot.lifecycle.unmount();
+    getPluginQueryClient().clear();
+  });
+
+  it("puts task attachment before workflow sections and uses shared card typography", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      {
+        rpc: fixture({
+          getWorkGoal: () => ({
+            objective: "Keep card content calm",
+            status: "active",
+            tokensUsed: 1,
+            tokenBudget: 10,
+            timeUsedSeconds: 1,
+          }),
+          getWorkTracker: () => ({
+            ...aggregate.tracker,
+            visible: true,
+            available: true,
+            primaryKey: null,
+          }),
+        }),
+      },
+    );
+    await waitFor(() =>
+      expect(slot.container.querySelector('[data-card="tasks"]')).toBeTruthy(),
+    );
+    const taskCard = slot.container.querySelector('[data-card="tasks"]')!;
+    await waitFor(() =>
+      expect(taskCard.querySelector(".ws-work-card-control")).toBeTruthy(),
+    );
+    const control = taskCard.querySelector(".ws-work-card-control")!;
+    const workflow = taskCard.querySelector(".ws-task-workflow")!;
+    expect(control.compareDocumentPosition(workflow)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(slot.getByRole("button", { name: "Add Linear issue" })).toBeTruthy();
+    expect(
+      slot
+        .getByText("Keep card content calm")
+        .classList.contains("ws-card-content"),
+    ).toBe(true);
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();
   });
@@ -1185,12 +1633,26 @@ describe("registered Work context cards", () => {
   it("keeps workflow IDs unique and ARIA-valid across two mounted Work panels", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));
-    const first = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_one", params: null }, { rpc: fixture() });
-    const second = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_two", params: null }, { rpc: fixture() });
-    await waitFor(() => expect(second.getByRole("heading", { name: "Needs you" })).toBeTruthy());
-    const ids = [...document.querySelectorAll(".ws-task-workflow [id]")].map((element) => element.id);
+    const first = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      { rpc: fixture() },
+    );
+    const second = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_two", params: null },
+      { rpc: fixture() },
+    );
+    await waitFor(() =>
+      expect(second.getByRole("heading", { name: "Needs you" })).toBeTruthy(),
+    );
+    const ids = [...document.querySelectorAll(".ws-task-workflow [id]")].map(
+      (element) => element.id,
+    );
     expect(new Set(ids).size).toBe(ids.length);
     expect((await axe(document.body)).violations).toEqual([]);
-    first.lifecycle.unmount(); second.lifecycle.unmount(); getPluginQueryClient().clear();
+    first.lifecycle.unmount();
+    second.lifecycle.unmount();
+    getPluginQueryClient().clear();
   });
 });

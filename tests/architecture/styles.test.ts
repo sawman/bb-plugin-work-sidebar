@@ -104,7 +104,7 @@ describe("stylesheet policy", () => {
     expect(violations).toEqual([]);
   });
 
-  test("moves a contrasting working-provider sheen from left to right", () => {
+  test("keeps working-provider animation modes visible and motion-safe", () => {
     const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
     const sheenStart = source.indexOf(".ws-thread-provider-fallback-shine");
     const animationStart = source.indexOf(
@@ -121,12 +121,22 @@ describe("stylesheet policy", () => {
     expect(animationStart).toBeGreaterThanOrEqual(0);
     expect(animationEnd).toBeGreaterThan(animationStart);
     expect(sheen).toContain("var(--primary-foreground)");
-    expect(sheen).toMatch(
+    expect(source).toContain('data-working-provider-animation="slow-spin"');
+    expect(source).toContain('data-working-provider-animation="fast-spin"');
+    expect(source).toContain('data-working-provider-animation="sheen"');
+    expect(source).toContain('data-working-provider-animation="pulse"');
+    expect(source).toMatch(
       /animation:\s*ws-thread-provider-shine\s+[\d.]+s\s+linear\s+infinite/,
     );
-    expect(sheen).not.toContain(" alternate");
+    expect(source).toMatch(
+      /animation:\s*ws-thread-provider-spin\s+3\.2s\s+linear\s+infinite/,
+    );
+    expect(source).toMatch(
+      /animation:\s*ws-thread-provider-spin\s+1s\s+linear\s+infinite/,
+    );
     expect(animation).toContain("clip-path:");
     expect(animation).not.toContain("mask-position:");
     expect(animation).not.toMatch(/\b(?:filter|opacity)\s*:/);
+    expect(source).toContain("@media (prefers-reduced-motion: reduce)");
   });
 });

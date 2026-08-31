@@ -48,13 +48,35 @@ export const taskboardStatusOptionSchema = z
     current: z.boolean(),
   })
   .strict();
+export const taskboardSourceStatusSchema = z
+  .object({
+    source: z.enum(["linear", "github", "jira"]),
+    configured: z.boolean(),
+    available: z.boolean(),
+    message: z.string().nullable(),
+    lastSyncedAt: z.string().nullable(),
+    itemCount: z.number().int().nonnegative(),
+  })
+  .strict();
+export const taskboardRefreshSchema = z
+  .object({
+    sources: z.array(taskboardSourceStatusSchema),
+    itemCount: z.number().int().nonnegative(),
+  })
+  .strict();
 export const trackerItemSchema = z
   .object({
     key: z.string(),
     title: z.string(),
     url: z.string().url(),
     status: z.string(),
-    stateCategory: z.enum(["backlog", "todo", "in_progress", "done", "canceled"]),
+    stateCategory: z.enum([
+      "backlog",
+      "todo",
+      "in_progress",
+      "done",
+      "canceled",
+    ]),
     priority: z.string().nullable(),
     assignee: z.string().nullable(),
     project: z.string().nullable(),
@@ -103,11 +125,15 @@ export const trackerRpcSchemas = {
     output: z.object({ items: z.array(trackerSuggestionSchema) }).strict(),
   },
   unlinkLinearIssue: {
-    input: threadInput.extend({ key: z.string().trim().min(2).max(64) }).strict(),
+    input: threadInput
+      .extend({ key: z.string().trim().min(2).max(64) })
+      .strict(),
     output: z.object({ ok: z.literal(true) }).strict(),
   },
   setPrimaryLinearIssue: {
-    input: threadInput.extend({ key: z.string().trim().min(2).max(64) }).strict(),
+    input: threadInput
+      .extend({ key: z.string().trim().min(2).max(64) })
+      .strict(),
     output: z.object({ key: z.string() }).strict(),
   },
   updateLinearIssueStatus: {

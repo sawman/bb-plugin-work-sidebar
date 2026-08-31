@@ -69,6 +69,15 @@ export function useLatestActivity(
 }
 export const useWorkOutcome = (threadId: string) =>
   useWorkContextCard<WorkOutcome>(threadId, "outcome", "getWorkOutcome");
+export function useWorkItemQueue(threadId: string) {
+  const rpc = useRpc<typeof rpcContract>();
+  return useQuery({
+    queryKey: queryKeys.work.itemQueue(threadId),
+    queryFn: () => rpc.call("getWorkItemQueue", { threadId }),
+    ...queryPolicies.workContext,
+    refetchOnMount: "always",
+  });
+}
 export const useWorkGoal = (threadId: string) =>
   useWorkContextCard<WorkGoal>(threadId, "goal", "getWorkGoal");
 export const useWorkPlan = (threadId: string) =>
@@ -110,6 +119,7 @@ export function invalidateWorkContextCards(
     queryKeys.work.outcome,
     queryKeys.work.goal,
     queryKeys.work.plan,
+    queryKeys.work.itemQueue,
     queryKeys.work.providerHealth,
   ];
   return Promise.all(
@@ -160,4 +170,36 @@ export function useWorkOutcomeMutation(threadId: string) {
       onSuccess: invalidate,
     }),
   };
+}
+
+export function useWorkItemQueueMutation(threadId: string) {
+  const rpc = useRpc<typeof rpcContract>();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...queryKeys.work.itemQueue(threadId), "save"],
+    mutationFn: (queue: { current: { source: "bb_task" | "linear"; id: string } | null; backlog: readonly { source: "bb_task" | "linear"; id: string }[] }) =>
+      rpc.call("saveWorkItemQueue", {
+        threadId,
+        queue: { ...queue, backlog: [...queue.backlog] },
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.work.itemQueue(threadId) }),
+  });
+}
+
+export function useMoveWorkItemToExecution(threadId: string) {
+  const rpc = useRpc<typeof rpcContract>();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: [...queryKeys.work.itemQueue(threadId), "move-to-execution"],
+    mutationFn: (input: {
+      reference: { source: "bb_task" | "linear"; id: string };
+      title: string;
+      description?: string;
+    }) => rpc.call("moveWorkItemToExecution", { threadId, ...input }),
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.work.itemQueue(threadId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.work.outcome(threadId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.sidebar.tasks.list() }),
+    ]),
+  });
 }

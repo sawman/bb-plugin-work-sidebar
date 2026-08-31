@@ -3,6 +3,7 @@ import type { PluginRpcInput } from "../../shared/server-plugin-rpc.js";
 import {
   taskboardDetailSchema,
   taskboardItemSchema,
+  taskboardRefreshSchema,
   taskboardStatusOptionSchema,
   trackerContextSchema,
   type TrackerContext,
@@ -50,8 +51,12 @@ function linksFrom(value: unknown, version: "v1" | "v2"): Links {
       if (!threadId.startsWith("thr_")) return [];
       const v2State = version === "v2" && isRecord(stored) ? stored : null;
       const candidates = v2State
-        ? (Array.isArray(v2State.keys) ? v2State.keys : [])
-        : (Array.isArray(stored) ? stored : [stored]);
+        ? Array.isArray(v2State.keys)
+          ? v2State.keys
+          : []
+        : Array.isArray(stored)
+          ? stored
+          : [stored];
       const links = candidates
         .map(linkFrom)
         .filter((link): link is Link => link !== null)
@@ -70,7 +75,9 @@ function linksFrom(value: unknown, version: "v1" | "v2"): Links {
               (link) => link.key.toUpperCase() === storedPrimary.toUpperCase(),
             )
           : undefined;
-      return [[threadId, { keys: links, primaryKey: (primary ?? links[0])!.key }]];
+      return [
+        [threadId, { keys: links, primaryKey: (primary ?? links[0])!.key }],
+      ];
     }),
   );
 }
@@ -90,6 +97,49 @@ function unavailable(error: unknown): TrackerContext {
 
 /** Server-only Taskboard adapter; all plugin responses are schema-validated. */
 export function createTrackerService(dependencies: TrackerServiceDependencies) {
+  const refreshes = new Map<string, Promise<void>>();
+  const refresh = (projectId: string, source: "linear") => {
+    const refreshKey = `${projectId}:${source}`;
+    const pending = refreshes.get(refreshKey);
+    if (pending) return pending;
+    const started = dependencies
+      .call("refresh", { projectId, source }, taskboardRefreshSchema)
+      .then(() => undefined)
+      .finally(() => {
+        if (refreshes.get(refreshKey) === started) refreshes.delete(refreshKey);
+      });
+    refreshes.set(refreshKey, started);
+    return started;
+  };
+  const callWithCacheRecovery = async <T>(
+    method: string,
+    input: PluginRpcInput & { projectId: string; source: "linear" },
+    outputSchema: z.ZodType<T>,
+  ) => {
+    try {
+      return await dependencies.call(method, input, outputSchema);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        !/Linear item is not cached for this BB project; refresh the project tracker first/i.test(
+          message,
+        )
+      )
+        throw error;
+      await refresh(input.projectId, input.source);
+      try {
+        return await dependencies.call(method, input, outputSchema);
+      } catch (retryError) {
+        const retryMessage =
+          retryError instanceof Error ? retryError.message : String(retryError);
+        if (/item is not cached for this BB project/i.test(retryMessage))
+          throw new Error(
+            "Linear could not find this item after refreshing the BB project tracker.",
+          );
+        throw retryError;
+      }
+    }
+  };
   const links = async () => {
     const current = await dependencies.getStorage(TRACKER_LINKS_KEY);
     if (current !== undefined && current !== null)
@@ -125,7 +175,7 @@ export function createTrackerService(dependencies: TrackerServiceDependencies) {
           Promise.all(
             rootLinks.keys.map(async (link) => {
               const [{ item }, { options }] = await Promise.all([
-                dependencies.call(
+                callWithCacheRecovery(
                   "getItem",
                   {
                     projectId: link.projectId,
@@ -134,7 +184,7 @@ export function createTrackerService(dependencies: TrackerServiceDependencies) {
                   },
                   z.object({ item: taskboardDetailSchema }).strict(),
                 ),
-                dependencies.call(
+                callWithCacheRecovery(
                   "statusOptions",
                   {
                     projectId: link.projectId,
@@ -249,7 +299,7 @@ export function createTrackerService(dependencies: TrackerServiceDependencies) {
           primaryKey:
             rootLinks.primaryKey?.toUpperCase() === normalized
               ? nextLinks[0]!.key
-              : rootLinks.primaryKey ?? nextLinks[0]!.key,
+              : (rootLinks.primaryKey ?? nextLinks[0]!.key),
         };
       else delete stored[root.id];
       await dependencies.setStorage(stored);
@@ -282,7 +332,7 @@ export function createTrackerService(dependencies: TrackerServiceDependencies) {
       );
       if (!link)
         throw new Error(`${normalized} is not linked to this work thread.`);
-      const { item } = await dependencies.call(
+      const { item } = await callWithCacheRecovery(
         "updateItemStatus",
         {
           projectId: link.projectId,

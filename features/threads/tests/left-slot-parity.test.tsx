@@ -236,6 +236,26 @@ describe("R18 registered left sidebar parity", () => {
     }
   });
 
+  it("applies the persisted provider-working animation to the left sidebar", async () => {
+    const slot = await leftSlot({
+      rpc: {
+        getSidebarAppearance: () => ({
+          rowHeight: 40,
+          textScale: 1,
+          workingProviderAnimation: "fast-spin",
+        }),
+      },
+    });
+    await waitFor(() =>
+      expect(
+        slot.container
+          .querySelector(".ws-list")
+          ?.getAttribute("data-working-provider-animation"),
+      ).toBe("fast-spin"),
+    );
+    slot.unmount();
+  });
+
   it("keeps creation before refresh and refresh rightmost on every left tab", async () => {
     const slot = await leftSlot({ activeProjectId: project.id });
     const actionLabels = () =>

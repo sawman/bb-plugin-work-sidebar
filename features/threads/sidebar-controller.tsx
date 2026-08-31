@@ -25,6 +25,7 @@ import { invalidateSidebarPullRequestStacks } from "@/features/pull-requests/que
 import type { PullRequestThreadReference } from "@/features/pull-requests/thread-link";
 import { DEFAULT_SIDEBAR_ROW_HEIGHT } from "./sidebar-appearance";
 import { DEFAULT_TEXT_SCALE } from "./sidebar-appearance";
+import { DEFAULT_WORKING_PROVIDER_ANIMATION } from "./sidebar-appearance";
 import "../../app.css";
 import "../../scrollbar.css";
 import "../../views.css";
@@ -212,6 +213,9 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   const taskLinks = taskLinksData?.links ?? {};
   const textScale =
     threadPreferences.appearance.data?.textScale ?? DEFAULT_TEXT_SCALE;
+  const workingProviderAnimation =
+    threadPreferences.appearance.data?.workingProviderAnimation ??
+    DEFAULT_WORKING_PROVIDER_ANIMATION;
   const settings = (
     <ThreadListSettings
       rowHeight={threadPreferences.appearance.data?.rowHeight}
@@ -260,6 +264,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     <TextScaleProvider scale={textScale}>
       <div
         className="ws-list"
+        data-working-provider-animation={workingProviderAnimation}
         style={
           {
             "--ws-sidebar-row-height": `${threadPreferences.appearance.data?.rowHeight ?? DEFAULT_SIDEBAR_ROW_HEIGHT}px`,

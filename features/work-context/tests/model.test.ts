@@ -10,6 +10,7 @@ import {
 describe("work-context card model", () => {
   it("gives every Work card an independently cacheable key", () => {
     expect(Object.keys(queryKeys.work)).toEqual([
+      "itemQueue",
       "status",
       "activity",
       "backgroundJobs",

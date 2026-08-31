@@ -11,6 +11,33 @@ export const MAX_TEXT_SCALE = 1.1;
 export const TEXT_SCALE_STEP = 0.01;
 export const MINIMUM_TEXT_ROLE_SIZE_REM = 0.7;
 export const MIN_ACCESSIBLE_TEXT_SIZE_PX = 10;
+export const WORKING_PROVIDER_ANIMATION_STYLES = ["none", "spin", "bounce", "sheen", "pulse"] as const;
+export const WORKING_PROVIDER_ANIMATION_SPEEDS = ["slow", "medium", "fast"] as const;
+export type WorkingProviderAnimationStyle = (typeof WORKING_PROVIDER_ANIMATION_STYLES)[number];
+export type WorkingProviderAnimationSpeed = (typeof WORKING_PROVIDER_ANIMATION_SPEEDS)[number];
+export const WORKING_PROVIDER_ANIMATIONS = [
+  "none",
+  // Kept for persisted settings from the earlier single-select UI.
+  "sheen",
+  "pulse",
+  ...WORKING_PROVIDER_ANIMATION_STYLES.filter((style) => style !== "none").flatMap((style) =>
+    WORKING_PROVIDER_ANIMATION_SPEEDS.map((speed) => `${speed}-${style}`),
+  ),
+] as const;
+export type WorkingProviderAnimation =
+  (typeof WORKING_PROVIDER_ANIMATIONS)[number];
+export const DEFAULT_WORKING_PROVIDER_ANIMATION: WorkingProviderAnimation =
+  "slow-spin";
+
+export function splitWorkingProviderAnimation(value: WorkingProviderAnimation): {
+  style: WorkingProviderAnimationStyle;
+  speed: WorkingProviderAnimationSpeed;
+} {
+  if (value === "none") return { style: "none", speed: "slow" };
+  if (value === "sheen" || value === "pulse") return { style: value, speed: "slow" };
+  const [speed, style] = value.split("-") as [WorkingProviderAnimationSpeed, WorkingProviderAnimationStyle];
+  return { style, speed };
+}
 
 const TENTH_PIXEL = /^\d+(?:\.\d)?$/;
 const HUNDREDTH_MULTIPLIER = /^\d+(?:\.\d{1,2})?$/;
@@ -75,4 +102,13 @@ export function normalizeTextScale(value: unknown): number {
         : "";
   const result = validateTextScale(candidate);
   return result.value ?? DEFAULT_TEXT_SCALE;
+}
+
+export function normalizeWorkingProviderAnimation(
+  value: unknown,
+): WorkingProviderAnimation {
+  return typeof value === "string" &&
+    (WORKING_PROVIDER_ANIMATIONS as readonly string[]).includes(value)
+    ? (value as WorkingProviderAnimation)
+    : DEFAULT_WORKING_PROVIDER_ANIMATION;
 }

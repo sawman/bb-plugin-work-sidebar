@@ -56,17 +56,31 @@ describe("R9 Threads server preferences", () => {
     await expect(service.appearance()).resolves.toEqual({
       rowHeight: 47.5,
       textScale: 0.9,
+      workingProviderAnimation: "slow-spin",
     });
     await expect(service.saveAppearance(52.5)).resolves.toEqual({
       rowHeight: 52.5,
       textScale: 0.9,
+      workingProviderAnimation: "slow-spin",
     });
     expect(saved.get(THREAD_PREFERENCE_KEYS.appearance)).toBe(52.5);
     await expect(service.saveTextScale(1.1)).resolves.toEqual({
       rowHeight: 52.5,
       textScale: 1.1,
+      workingProviderAnimation: "slow-spin",
     });
     expect(saved.get(THREAD_PREFERENCE_KEYS.textScale)).toBe(1.1);
+    await expect(service.saveWorkingProviderAnimation("fast-spin")).resolves.toEqual({
+      rowHeight: 52.5,
+      textScale: 1.1,
+      workingProviderAnimation: "fast-spin",
+    });
+    expect(saved.get(THREAD_PREFERENCE_KEYS.workingProviderAnimation)).toBe(
+      "fast-spin",
+    );
+    await expect(service.saveWorkingProviderAnimation("invalid")).rejects.toThrow(
+      "Choose a supported working-provider animation.",
+    );
     await expect(service.saveTextScale(1.11)).rejects.toThrow(
       "Enter a value from 0.9 to 1.1.",
     );
@@ -97,7 +111,11 @@ describe("R9 Threads server preferences", () => {
       channel: "sidebar-order:changed",
       payload: { appearance: { textScale: 1.1 } },
     });
-    expect(published).toHaveLength(4);
+    expect(published[4]).toEqual({
+      channel: "sidebar-order:changed",
+      payload: { appearance: { workingProviderAnimation: "fast-spin" } },
+    });
+    expect(published).toHaveLength(5);
     expect(service).not.toHaveProperty("archivedThreads");
   });
 });

@@ -131,6 +131,39 @@ what is already there.
 
 ## R32 — canonical Work item model (`BBPLUG-160`)
 
+### R32.4 Current goal + ordered backlog (`BBPLUG-198`)
+
+- **Red:** add pure projection cases for explicit BB Current, explicit Linear
+  Current, promotion/demotion, stable Backlog order, legacy outcome/primary
+  migration, missing-source compaction, and source-native status dispatch.
+  Add fake-host RPC tests proving one ordered Work/Tasks signal pair and no
+  cross-source status write.
+- **Green:** add a root-scoped, versioned reference store and typed contracts
+  for read, add, promote, demote, reorder, remove, and source-native status.
+  Reuse BB Tasks and Taskboard adapters; create a BB execution task from a
+  Linear goal only through an explicit operation carrying provenance.
+- **Refactor:** keep references/projection in Work-context, Taskboard wire
+  operations in Tracker, and durable binding enforcement in Tasks. Remove the
+  old "primary means current" inference after migration is covered.
+- **Validation:** focused model/server/schema/Query tests twice; serial full
+  suite; typecheck; SDK check; build; reload; diff check.
+
+### R32.5 Work-queue card (`BBPLUG-199`)
+
+- **Red:** mounted Work-slot tests prove exactly one Current goal, ordered
+  Backlog, source-specific status calls, promotion/demotion/reorder/remove,
+  Linear-to-execution explicit copy, loading/error/busy recovery, and no
+  duplicate Current item in Tasks.
+- **Green:** replace the mixed Outcome/Linear presentation with Current goal
+  and Backlog sections plus a single add affordance that selects BB Task or
+  Linear. Retain execution controls in Tasks.
+- **Refactor:** delete primary-only UI and duplicated card branches in the
+  same loop; extract shared source presentation only where BB and Linear need
+  the same semantic control.
+- **Validation:** focused UI/axe tests twice; serial full suite twice;
+  typecheck; SDK check; build; verified-source reload; light/dark narrow/wide
+  visual states including an empty queue and a mixed backlog.
+
 ### R32.1 Work item projection (landed model foundation)
 
 - **Red:** add pure projection tests for outcome-only, Linear-only,
@@ -333,6 +366,26 @@ what is already there.
   accessibility threshold is not maintained.
 
 ## R34 — automation, lifecycle, and integrated acceptance
+
+## R40 — plugin-managed Recycle Bin
+
+- **Red:** server/model tests prove a binned thread retains its exact original
+  destination, restore falls back to Active only when that group is gone, and
+  malformed/stale records are dropped. Registered left-slot tests prove Bin
+  hides live rows, restore and drag restore correctly, native Archive is not
+  called while binning, and every thread picker omits binned and archived
+  threads.
+- **Green:** add a typed persisted bin preference plus Query/mutation boundary;
+  compose Bin into the Threads slice, route row and toolbar actions through it,
+  and move the host archive operation into the destructive menu section.
+- **Refactor:** remove archive-as-group transport and duplicated archived-row
+  grouping controls. Keep the native archive read surface separate from Bin.
+- **Validation:** focused server, query, picker, drag, and registered-sidebar
+  tests twice; full serial suite twice; typecheck; SDK check; build; reload;
+  light/dark narrow/wide keyboard and drag checks.
+- **Expiry:** add only the typed opt-in eligibility/expiry operation here. A
+  BB Automation is configured separately after the user selects a retention
+  period; no release silently creates or enables it.
 
 ### R34.1 Tool and realtime contract
 

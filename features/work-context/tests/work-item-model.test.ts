@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { TaskSummary } from "../../../work-model";
 import {
+  demoteCurrentWorkItem,
+  moveWorkItemToTasks,
+  promoteWorkItem,
   projectWorkItem,
+  resolveWorkItemQueue,
   type WorkItemTrackerRecord,
 } from "../work-item-model";
 
@@ -33,6 +37,55 @@ const linear = (
 });
 
 describe("unified work item projection", () => {
+  it("migrates existing outcome and Linear links into one explicit current goal and backlog", () => {
+    expect(resolveWorkItemQueue({ outcome, linked: [linear("LIN-1"), linear("LIN-2")], primaryLinearKey: "LIN-2", queue: null })).toEqual({
+      current: { source: "bb_task", id: outcome.id },
+      backlog: [{ source: "linear", id: "LIN-1" }, { source: "linear", id: "LIN-2" }],
+    });
+    expect(resolveWorkItemQueue({ outcome: null, linked: [linear("LIN-1"), linear("LIN-2")], primaryLinearKey: "LIN-2", queue: null })).toEqual({
+      current: { source: "linear", id: "LIN-2" },
+      backlog: [{ source: "linear", id: "LIN-1" }],
+    });
+  });
+
+  it("promotes and demotes without duplicating a work-item reference", () => {
+    const initial = { current: { source: "linear" as const, id: "LIN-1" }, backlog: [{ source: "bb_task" as const, id: "task-2" }, { source: "linear" as const, id: "LIN-3" }] };
+    expect(promoteWorkItem(initial, { source: "bb_task", id: "task-2" })).toEqual({
+      current: { source: "bb_task", id: "task-2" },
+      backlog: [{ source: "linear", id: "LIN-1" }, { source: "linear", id: "LIN-3" }],
+    });
+    expect(demoteCurrentWorkItem(initial)).toEqual({
+      current: null,
+      backlog: [{ source: "linear", id: "LIN-1" }, { source: "bb_task", id: "task-2" }, { source: "linear", id: "LIN-3" }],
+    });
+  });
+
+  it("honors an explicitly persisted empty queue instead of reviving legacy work", () => {
+    expect(resolveWorkItemQueue({
+      outcome,
+      linked: [linear("LIN-1")],
+      primaryLinearKey: "LIN-1",
+      queue: { current: null, backlog: [] },
+    })).toEqual({ current: null, backlog: [] });
+  });
+
+  it("moves a goal into execution by promoting only the first remaining backlog item", () => {
+    const queue = {
+      current: { source: "linear" as const, id: "LIN-1" },
+      backlog: [
+        { source: "bb_task" as const, id: "task-2" },
+        { source: "linear" as const, id: "LIN-3" },
+      ],
+    };
+    expect(moveWorkItemToTasks(queue, queue.current)).toEqual({
+      current: { source: "bb_task", id: "task-2" },
+      backlog: [{ source: "linear", id: "LIN-3" }],
+    });
+    expect(moveWorkItemToTasks(queue, queue.backlog[1]!)).toEqual({
+      current: queue.current,
+      backlog: [{ source: "bb_task", id: "task-2" }],
+    });
+  });
   it("keeps the BB outcome canonical while ordering one primary Linear record first", () => {
     expect(
       projectWorkItem({
@@ -47,6 +100,13 @@ describe("unified work item projection", () => {
       linked: [linear("LIN-1"), linear("LIN-2")],
       primaryLinearKey: "LIN-1",
       createFromLinear: null,
+      queue: {
+        current: { source: "bb_task", id: outcome.id },
+        backlog: [
+          { source: "linear", id: "LIN-2" },
+          { source: "linear", id: "LIN-1" },
+        ],
+      },
     });
   });
 
@@ -68,6 +128,7 @@ describe("unified work item projection", () => {
         title: "LIN-8 external outcome",
         priority: "high",
       },
+      queue: { current: { source: "linear", id: "LIN-8" }, backlog: [] },
     });
   });
 

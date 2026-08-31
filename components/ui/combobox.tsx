@@ -426,7 +426,7 @@ export function SearchCombobox({
   return (
     <div ref={rootRef} className="ws-search-shell" onBlur={dismissOnBlur}>
       {!inputInContent && input}
-      {content}
+      {open ? content : null}
     </div>
   );
 }

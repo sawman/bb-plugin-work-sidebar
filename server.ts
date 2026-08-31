@@ -64,6 +64,9 @@ export default function plugin(
     getWorkOutcome: workContext.getWorkOutcome,
     getWorkGoal: workContext.getWorkGoal,
     getWorkPlan: workContext.getWorkPlan,
+    getWorkItemQueue: workContext.getWorkItemQueue,
+    saveWorkItemQueue: workContext.saveWorkItemQueue,
+    moveWorkItemToExecution: workContext.moveWorkItemToExecution,
     getWorkBackgroundJobs: workContext.getWorkBackgroundJobs,
     getGitHubPollingPolicy: pullRequests.getGitHubPollingPolicy,
     getWorkTracker: tracker.getWorkTracker,
@@ -101,10 +104,7 @@ export default function plugin(
       "create_execution_task",
       "bind_execution_owner",
     ],
-    skills: [],
-    instructions: WORK_AGENT_INSTRUCTIONS,
+    skills: [], instructions: WORK_AGENT_INSTRUCTIONS,
   }));
 }
-
-export { fetchGitHubStack, createServerLifecycle };
-export { rpcContract };
+export { fetchGitHubStack, createServerLifecycle, rpcContract };

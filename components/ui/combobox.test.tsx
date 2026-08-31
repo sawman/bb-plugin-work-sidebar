@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { createRef, useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { createRef, useEffect, useState } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { configureAxe } from "vitest-axe";
 import { TextScaleProvider } from "../../shared/text-scale";
 import { SearchCombobox } from "./combobox";
@@ -37,6 +37,30 @@ function MultiSelectFixture() {
       />
       <output>{selectedValues.join(",")}</output>
     </>
+  );
+}
+
+function PopupLifecycleProbe({ onUnmount }: { onUnmount(): void }) {
+  useEffect(() => onUnmount, [onUnmount]);
+  return <span>Popup lifecycle</span>;
+}
+
+function TaskPickerFixture({ onPopupUnmount }: { onPopupUnmount(): void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <SearchCombobox
+      ariaLabel="Add task to this thread"
+      emptyMessage="No matching tasks"
+      footer={<PopupLifecycleProbe onUnmount={onPopupUnmount} />}
+      listboxLabel="Available tasks"
+      onOpenChange={setOpen}
+      onSelectionChange={() => undefined}
+      open={open}
+      options={[{ value: "task", label: "TASK-1" }]}
+      placeholder="Add an existing task…"
+      portal
+      selectedValues={[]}
+    />
   );
 }
 
@@ -141,5 +165,24 @@ describe("SearchCombobox", () => {
     expect(content()?.style.getPropertyValue("--ws-text-scale")).toBe("0.9");
     rerender(renderScaled(1.1));
     expect(content()?.style.getPropertyValue("--ws-text-scale")).toBe("1.1");
+  });
+
+  it("unmounts the task dropdown subtree when the popup closes", async () => {
+    const onPopupUnmount = vi.fn();
+    render(<TaskPickerFixture onPopupUnmount={onPopupUnmount} />);
+
+    const input = screen.getByRole("combobox", {
+      name: "Add task to this thread",
+    });
+    fireEvent.focus(input);
+    expect(screen.getByText("Popup lifecycle")).toBeTruthy();
+
+    fireEvent.pointerDown(document.body);
+    await waitFor(() => {
+      expect(screen.queryByText("Popup lifecycle")).toBeNull();
+      expect(document.querySelector(".ws-search-shell-content")).toBeNull();
+    });
+    expect(onPopupUnmount).toHaveBeenCalledTimes(1);
+    expect(input.isConnected).toBe(true);
   });
 });

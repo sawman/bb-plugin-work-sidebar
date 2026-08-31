@@ -17,6 +17,7 @@ import {
   type SidebarThreadGroup,
   type SidebarThreadGroupPreferences,
 } from "./model";
+import type { WorkingProviderAnimation } from "./sidebar-appearance";
 import { invalidateTaskQueries } from "../tasks/mutations";
 import { invalidateTracker } from "../tracker/queries";
 import { invalidateWorkContextCards } from "../work-context/queries";
@@ -38,10 +39,12 @@ export type ThreadsRpc = PluginRpcClient<typeof rpcContract>;
 export type SidebarAppearance = {
   rowHeight: number;
   textScale: number;
+  workingProviderAnimation?: WorkingProviderAnimation;
 };
 export type SidebarAppearanceUpdate =
   | { rowHeight: number }
-  | { textScale: number };
+  | { textScale: number }
+  | { workingProviderAnimation: WorkingProviderAnimation };
 
 export function useThreadHierarchyMutation(rpc: ThreadsRpc) {
   const client = useQueryClient();
@@ -88,14 +91,18 @@ export async function saveSidebarAppearance(
 function useSaveSidebarAppearance(
   rpc: ThreadsRpc,
   client: QueryClient,
-  field: "rowHeight" | "textScale",
+  field: "rowHeight" | "textScale" | "workingProviderAnimation",
 ) {
   return useMutation({
-    mutationFn: (value: number) =>
+    mutationFn: (value: number | WorkingProviderAnimation) =>
       saveSidebarAppearance(
         client,
         rpc,
-        field === "rowHeight" ? { rowHeight: value } : { textScale: value },
+        field === "rowHeight"
+          ? { rowHeight: value as number }
+          : field === "textScale"
+            ? { textScale: value as number }
+            : { workingProviderAnimation: value as WorkingProviderAnimation },
       ),
   });
 }
@@ -106,7 +113,12 @@ export function useSidebarAppearancePreferences() {
   const appearance = useQuery(sidebarAppearanceQuery(rpc));
   const saveRowHeight = useSaveSidebarAppearance(rpc, client, "rowHeight");
   const saveTextScale = useSaveSidebarAppearance(rpc, client, "textScale");
-  return { appearance, saveRowHeight, saveTextScale };
+  const saveWorkingProviderAnimation = useSaveSidebarAppearance(
+    rpc,
+    client,
+    "workingProviderAnimation",
+  );
+  return { appearance, saveRowHeight, saveTextScale, saveWorkingProviderAnimation };
 }
 
 export async function saveThreadGroups(
@@ -156,6 +168,8 @@ export function useThreadPreferences() {
   const appearance = appearancePreferences.appearance;
   const saveRowHeight = appearancePreferences.saveRowHeight;
   const saveTextScale = appearancePreferences.saveTextScale;
+  const saveWorkingProviderAnimation =
+    appearancePreferences.saveWorkingProviderAnimation;
   useRealtime("sidebar-order:changed", () => {
     for (const key of [
       threadQueryKeys.order(),
@@ -183,6 +197,7 @@ export function useThreadPreferences() {
     appearance,
     saveRowHeight,
     saveTextScale,
+    saveWorkingProviderAnimation,
     saveGroups,
     saveOrder,
   };

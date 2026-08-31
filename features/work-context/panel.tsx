@@ -21,6 +21,7 @@ import { parseWorkSidebarRealtimeEvent } from "../../shared/work-realtime";
 import { WorkContextCards } from "./views";
 import {
   DEFAULT_TEXT_SCALE,
+  DEFAULT_WORKING_PROVIDER_ANIMATION,
 } from "../threads/sidebar-appearance";
 import { useSidebarAppearancePreferences } from "../threads/queries";
 import { TextScaleProvider, textScaleStyle } from "../../shared/text-scale";
@@ -115,9 +116,16 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
     threadInteractionStore.getState().setWorkTab(threadId, next);
   const tabIdPrefix = `ws-work-${threadId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   const textScale = appearance.appearance.data?.textScale ?? DEFAULT_TEXT_SCALE;
+  const workingProviderAnimation =
+    appearance.appearance.data?.workingProviderAnimation ??
+    DEFAULT_WORKING_PROVIDER_ANIMATION;
   return (
     <TextScaleProvider scale={textScale}>
-      <div className="ws-panel" style={textScaleStyle(textScale)}>
+      <div
+        className="ws-panel"
+        data-working-provider-animation={workingProviderAnimation}
+        style={textScaleStyle(textScale)}
+      >
         <header className="ws-panel-header">
           <div className="ws-panel-heading">
             <Icon name="ListTodo" className="ws-panel-icon" aria-hidden />
