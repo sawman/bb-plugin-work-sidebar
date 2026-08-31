@@ -3856,8 +3856,10 @@ button.ws-provider-health:focus-visible {
 }
 .ws-work-item-sources > span {
   display: inline-flex;
+  box-sizing: border-box;
   align-items: center;
-  min-height: 1.1rem;
+  /* Card headings share Status's compact 0.8rem metadata rhythm. */
+  min-height: 0.8rem;
   padding: 0 0.28rem;
   border: 1px solid var(--border);
 }

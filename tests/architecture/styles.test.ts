@@ -108,9 +108,14 @@ describe("stylesheet policy", () => {
     const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
     const heading = source.match(/\.ws-card-heading\s*\{([\s\S]*?)\}/)?.[1];
     const info = source.match(/\.ws-card-heading-info\s*\{([\s\S]*?)\}/)?.[1];
+    const workItemSource = source.match(
+      /\.ws-work-item-sources > span\s*\{([\s\S]*?)\}/,
+    )?.[1];
 
     expect(heading).toContain("min-height: 0.8rem");
     expect(info).toContain("min-height: 0.8rem");
+    expect(workItemSource).toContain("min-height: 0.8rem");
+    expect(workItemSource).toContain("box-sizing: border-box");
   });
 
   test("keeps working-provider animation modes visible and motion-safe", () => {
