@@ -55,8 +55,7 @@ describe("task workflow projection", () => {
     });
 
     expect(result.needsYou.map(({ task }) => task.id)).toEqual(["human"]);
-    expect(result.inProgress.map(({ task }) => task.id)).toEqual(["agent"]);
-    expect(result.next.map(({ task }) => task.id)).toEqual(["next"]);
+    expect(result.queue.map(({ task }) => task.id)).toEqual(["agent", "next"]);
     expect(result.completed.map(({ task }) => task.id)).toEqual([
       "done",
       "canceled",
@@ -64,8 +63,7 @@ describe("task workflow projection", () => {
     expect(
       [
         ...result.needsYou,
-        ...result.inProgress,
-        ...result.next,
+        ...result.queue,
         ...result.completed,
       ].map(({ task }) => task.id),
     ).toEqual(["human", "agent", "next", "done", "canceled"]);
@@ -82,7 +80,7 @@ describe("task workflow projection", () => {
     });
 
     expect(result.needsYou[0]?.task.id).toBe("decision");
-    expect(result.inProgress[0]).toMatchObject({
+    expect(result.queue[0]).toMatchObject({
       task: { id: "starting" },
       owner: { threadId: "thr_starting" },
     });
@@ -96,8 +94,8 @@ describe("task workflow projection", () => {
       owners: [owner("shared", "idle"), owner("shared", "working")],
     });
 
-    expect(result.inProgress).toHaveLength(1);
-    expect(result.inProgress[0]).toMatchObject({
+    expect(result.queue).toHaveLength(1);
+    expect(result.queue[0]).toMatchObject({
       task: { title: "Refreshed task" },
       owner: { liveStatus: "working" },
     });
@@ -116,8 +114,8 @@ describe("task workflow projection", () => {
       owners: [],
     });
 
-    expect(result.inProgress).toHaveLength(1);
-    expect(result.inProgress[0]?.task).toMatchObject({
+    expect(result.queue).toHaveLength(1);
+    expect(result.queue[0]?.task).toMatchObject({
       id: "shared",
       title: "Execution record",
       priority: "urgent",
@@ -150,12 +148,10 @@ describe("task workflow projection", () => {
       "human-todo",
       "human-high",
     ]);
-    expect(result.inProgress.map(({ task: item }) => item.id)).toEqual([
+    expect(result.queue.map(({ task: item }) => item.id)).toEqual([
       "agent-working",
       "agent-starting",
       "agent-missing",
-    ]);
-    expect(result.next.map(({ task: item }) => item.id)).toEqual([
       "next-a",
       "next-z",
     ]);
@@ -171,15 +167,15 @@ describe("task workflow projection", () => {
       owners: [owner("archived-owner", "working", { isArchived: true })],
     });
 
-    expect(result.next.map(({ task: item }) => item.id)).toEqual([
+    expect(result.queue.map(({ task: item }) => item.id)).toEqual([
       "archived-owner",
       "missing-owner",
     ]);
-    expect(result.next[0]).toMatchObject({
+    expect(result.queue[0]).toMatchObject({
       owner: { isArchived: true },
       ownerUnavailable: true,
     });
-    expect(result.next[1]).toMatchObject({
+    expect(result.queue[1]).toMatchObject({
       owner: null,
       ownerUnavailable: true,
     });

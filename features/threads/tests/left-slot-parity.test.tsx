@@ -972,7 +972,8 @@ describe("R18 registered left sidebar parity", () => {
       expect(
         labels.findIndex((label) => label.startsWith("Gamma")),
       ).toBeLessThan(labels.findIndex((label) => label.startsWith("Active")));
-      expect(labels.at(-1)?.startsWith("Recycle Bin")).toBe(true);
+      expect(labels.at(-2)?.startsWith("Recycle Bin")).toBe(true);
+      expect(labels.at(-1)?.startsWith("Archive")).toBe(true);
     });
     slot.lifecycle.unmount();
   });

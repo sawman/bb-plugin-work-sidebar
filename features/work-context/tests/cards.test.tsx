@@ -1385,7 +1385,7 @@ describe("registered Work context cards", () => {
       [...slot.container.querySelectorAll(".ws-task-workflow h3")].map(
         (heading) => heading.textContent,
       ),
-    ).toEqual(["Needs you2", "In progress1", "Next1", "Completed7"]);
+    ).toEqual(["Needs you2", "Queue2", "Completed7"]);
     expect(slot.getByText("Approve the release")).toBeTruthy();
     const needsYou = slot.getByRole("button", { name: "Needs you: 2 tasks" });
     expect(needsYou.getAttribute("aria-expanded")).toBe("true");

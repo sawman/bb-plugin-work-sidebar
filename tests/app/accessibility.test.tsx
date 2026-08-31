@@ -410,7 +410,7 @@ describe("R19D registered slot accessibility", () => {
     await waitFor(() =>
       expect(slot.getByText("Accessible execution task")).toBeTruthy(),
     );
-    expect(slot.getByRole("heading", { name: "Next" })).toBeTruthy();
+    expect(slot.getByRole("heading", { name: "Queue" })).toBeTruthy();
     await expectNoAriaViolations(slot.container);
     fireEvent.click(slot.getByRole("tab", { name: "Changes" }));
     await waitFor(() =>

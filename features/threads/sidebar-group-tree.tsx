@@ -210,19 +210,19 @@ export function SidebarThreadGroups({
             </details>
           );
         })}
-        <ArchivedThreads
-          threads={organization.threads}
-          projectsById={organization.projectsById}
-          providersById={providersById}
-          onNavigate={onNavigate}
-          searchQuery={searchQuery}
-        />
         <RecycleBinView
           entries={recycleBinEntries}
           threads={allThreads}
           projectsById={organization.projectsById}
           providersById={providersById}
           onRestore={(threadId) => organization.restoreFromRecycleBin(threadId)}
+          searchQuery={searchQuery}
+        />
+        <ArchivedThreads
+          threads={organization.threads}
+          projectsById={organization.projectsById}
+          providersById={providersById}
+          onNavigate={onNavigate}
           searchQuery={searchQuery}
         />
       </section>

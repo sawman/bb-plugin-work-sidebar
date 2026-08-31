@@ -5,6 +5,7 @@ import { createChangesRegistration } from "./features/changes/server-registratio
 import { createPullRequestRegistration, fetchGitHubStack } from "./features/pull-requests/server-registration.js";
 import { createTasksRegistration, WORK_AGENT_INSTRUCTIONS } from "./features/tasks/server-registration.js";
 import { createThreadRegistration } from "./features/threads/server-registration.js";
+import { registerRecycleBinExpiryRoute } from "./features/threads/recycle-bin-http.js";
 import { createTrackerRegistration } from "./features/tracker/server-registration.js";
 import { createWorkContextRegistration } from "./features/work-context/server-registration.js";
 import { createServerLifecycle, type ServerLifecycle } from "./server-lifecycle.js";
@@ -22,6 +23,7 @@ export default function plugin(
   const dependencies: ServerCompositionDependencies = { bb, lifecycle, pullRequests, tasks };
   const changes = createChangesRegistration(dependencies);
   const threads = createThreadRegistration(bb, tasks);
+  registerRecycleBinExpiryRoute(bb, threads.expireRecycleBinThreads);
   const workContext = createWorkContextRegistration(dependencies);
   const tracker = createTrackerRegistration(dependencies);
   bb.rpc.register(rpcContract, {

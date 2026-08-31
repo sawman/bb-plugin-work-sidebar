@@ -45,20 +45,10 @@ export function TaskWorkflowCard({
         onDetach={onDetach}
       />
       <WorkflowSection
-        id={`${idPrefix}-in-progress`}
-        title="In progress"
-        items={sections.inProgress}
-        defaultOpen
-        busy={busy}
-        onAssigneeChange={onAssigneeChange}
-        onStatusChange={onStatusChange}
-        detachableTaskIds={detachableTaskIds}
-        onDetach={onDetach}
-      />
-      <WorkflowSection
-        id={`${idPrefix}-next`}
-        title="Next"
-        items={sections.next}
+        id={`${idPrefix}-queue`}
+        title="Queue"
+        items={sections.queue}
+        icon="Hammer"
         defaultOpen
         busy={busy}
         onAssigneeChange={onAssigneeChange}
@@ -79,8 +69,7 @@ export function TaskWorkflowCard({
         onDetach={onDetach}
       />
       {!sections.needsYou.length &&
-      !sections.inProgress.length &&
-      !sections.next.length &&
+      !sections.queue.length &&
       !sections.completed.length ? (
         <p className="ws-card-note">No tasks are attached to this thread.</p>
       ) : null}
@@ -92,6 +81,7 @@ function WorkflowSection({
   id,
   title,
   tone,
+  icon,
   items,
   total,
   itemLimit,
@@ -103,8 +93,9 @@ function WorkflowSection({
   onDetach,
 }: {
   id: string;
-  title: "Needs you" | "In progress" | "Next" | "Completed";
+  title: "Needs you" | "Queue" | "Completed";
   tone?: "attention";
+  icon?: "Hammer";
   items: readonly TaskWorkflowItem[];
   total?: number;
   itemLimit?: number;
@@ -137,6 +128,7 @@ function WorkflowSection({
           <span>{title}</span>
           <span className="ws-task-workflow-disclosure-meta" aria-hidden>
             <span className="ws-task-workflow-count">{count}</span>
+            {icon ? <Icon className="ws-task-workflow-icon" name={icon} /> : null}
             <Icon
               className="ws-task-workflow-icon"
               name={open ? "ChevronUp" : "ChevronDown"}

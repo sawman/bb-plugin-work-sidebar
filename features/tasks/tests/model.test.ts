@@ -6,7 +6,7 @@ describe("Tasks status presentation", () => {
     expect(["backlog", "todo", "in_progress", "in_review", "done", "canceled"].map((status) => taskStatusPresentation(status as TaskStatus))).toEqual([
       { label: "Backlog", tone: "backlog", icon: "ListTodo" },
       { label: "To do", tone: "todo", icon: "Circle" },
-      { label: "In Progress", tone: "progress", icon: "LoaderCircle" },
+      { label: "In Progress", tone: "progress", icon: "Hammer" },
       { label: "In Review", tone: "review", icon: "Eye" },
       { label: "Done", tone: "complete", icon: "Check" },
       { label: "Canceled", tone: "canceled", icon: "X" },

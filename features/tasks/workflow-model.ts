@@ -148,8 +148,7 @@ export function projectTaskWorkflow({
 
   const ownerByTask = ownersByTask(owners);
   const needsYou: TaskWorkflowItem[] = [];
-  const inProgress: TaskWorkflowItem[] = [];
-  const next: TaskWorkflowItem[] = [];
+  const queue: TaskWorkflowItem[] = [];
   const completed: TaskWorkflowItem[] = [];
 
   for (const task of uniqueTasks.values()) {
@@ -178,15 +177,14 @@ export function projectTaskWorkflow({
     ) {
       // Agent review remains active work; there is no separate reviewer field
       // in the Tasks record.
-      inProgress.push(item);
+      queue.push(item);
     } else {
-      next.push(item);
+      queue.push(item);
     }
   }
 
   needsYou.sort((left, right) => compareItems(left, right, false));
-  inProgress.sort((left, right) => compareItems(left, right, true));
-  next.sort((left, right) => compareItems(left, right, false));
+  queue.sort((left, right) => compareItems(left, right, true));
   completed.sort(
     (left, right) =>
       completedAt(right) - completedAt(left) || compareItems(left, right, false),
@@ -194,8 +192,7 @@ export function projectTaskWorkflow({
 
   return {
     needsYou,
-    inProgress,
-    next,
+    queue,
     // The section is intentionally bounded; the Tasks app remains the
     // full-history destination for older completions.
     completed: completed.slice(0, MAX_COMPLETED_TASK_PREVIEW),
