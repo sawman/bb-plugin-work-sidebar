@@ -43,7 +43,11 @@ export function TaskWorkflowCard({
             onClick={() => setCompletedOpen((open) => !open)}
           >
             <span>Completed ({sections.completedTotal})</span>
-            <Icon name={completedOpen ? "ChevronUp" : "ChevronDown"} aria-hidden />
+            <Icon
+              className="ws-task-workflow-icon"
+              name={completedOpen ? "ChevronUp" : "ChevronDown"}
+              aria-hidden
+            />
           </button>
         </h3>
         {completedOpen ? (
@@ -114,7 +118,7 @@ function WorkflowRow({
   return (
     <article className="ws-task-workflow-row" data-state={task.status} data-owner-unavailable={ownerUnavailable || undefined} aria-label={`${task.key}: ${task.title}. ${accessibleStatus}.`}>
       <TaskPriorityIcon priority={task.priority ?? "none"} />
-      <Icon name={status.icon} aria-hidden />
+      <Icon className="ws-task-workflow-icon" name={status.icon} aria-hidden />
       <span className="ws-task-workflow-copy">
         <span className="ws-task-workflow-title">{task.title}</span>
         <span className="ws-task-workflow-meta">{task.key} · {status.label}</span>
@@ -128,7 +132,16 @@ function WorkflowRow({
         ) : null}
       </span>
       <AssigneePicker value={task.assignee} taskKey={task.key} disabled={busy} onChange={(assignee) => onAssigneeChange(task.id, assignee)} />
-      {detachable ? <button type="button" disabled={busy} aria-label={`Detach ${task.key} from this thread`} onClick={() => onDetach(task.id)}><Icon name="X" aria-hidden /></button> : null}
+      {detachable ? (
+        <button
+          type="button"
+          disabled={busy}
+          aria-label={`Detach ${task.key} from this thread`}
+          onClick={() => onDetach(task.id)}
+        >
+          <Icon className="ws-task-workflow-icon" name="X" aria-hidden />
+        </button>
+      ) : null}
     </article>
   );
 }

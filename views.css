@@ -3471,6 +3471,11 @@ button.ws-provider-health:focus-visible {
   padding: 0.3rem;
   border-radius: 0.3rem;
 }
+.ws-task-workflow-icon {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: 0 0 auto;
+}
 .ws-task-workflow-row[data-state="canceled"] {
   text-decoration: line-through;
 }
