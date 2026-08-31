@@ -52,6 +52,7 @@ export default function plugin(
     getRecycleBin: threads.getRecycleBin,
     binSidebarThread: threads.binSidebarThread,
     restoreBinnedSidebarThread: threads.restoreBinnedSidebarThread,
+    expireRecycleBinThreads: threads.expireRecycleBinThreads,
     sidebarArchivedThreads: threads.sidebarArchivedThreads,
     unarchiveSidebarThread: threads.unarchiveSidebarThread,
     getWorkContext: workContext.getWorkContext,

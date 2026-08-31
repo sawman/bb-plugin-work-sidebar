@@ -222,6 +222,7 @@ describe("R2 server registration and disposal", () => {
       "getRecycleBin",
       "binSidebarThread",
       "restoreBinnedSidebarThread",
+      "expireRecycleBinThreads",
       "sidebarArchivedThreads",
       "unarchiveSidebarThread",
       "getWorkContext",

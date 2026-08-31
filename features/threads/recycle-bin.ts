@@ -65,3 +65,16 @@ export function filterBinnedThreadIds(
   const binned = new Set(entries.map((entry) => entry.threadId));
   return threadIds.filter((threadId) => !binned.has(threadId));
 }
+
+/**
+ * Select records an explicitly configured automation may archive. This is
+ * intentionally pure: the plugin never starts a retention timer by itself.
+ */
+export function expiredRecycleBinEntries(
+  entries: readonly RecycleBinEntry[],
+  retentionDays: number,
+  now = Date.now(),
+) {
+  const cutoff = now - retentionDays * 24 * 60 * 60 * 1_000;
+  return entries.filter((entry) => entry.binnedAt <= cutoff);
+}

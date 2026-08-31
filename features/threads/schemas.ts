@@ -171,6 +171,17 @@ export const threadArchiveSchemas = {
       })
       .strict(),
   },
+  expireRecycleBinThreads: {
+    input: z
+      .object({ retentionDays: z.number().int().min(1).max(3_650) })
+      .strict(),
+    output: z
+      .object({
+        archivedThreadIds: z.array(z.string().startsWith("thr_")),
+        entries: z.array(recycleBinEntry),
+      })
+      .strict(),
+  },
   sidebarArchivedThreads: {
     input: z.object({ force: z.boolean().optional() }).strict(),
     output: z

@@ -1,12 +1,17 @@
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { rpcContract } from "../../contracts.js";
-import { createArchivedThreadService, createThreadPreferencesService } from "./server.js";
+import {
+  createArchivedThreadService,
+  createThreadPreferencesService,
+} from "./server.js";
+import { createRecycleBinExpiryHandler } from "./recycle-bin-expiry.js";
 import { createSdkThreadHierarchyService, type WorkBindingReader } from "./hierarchy-server.js";
+import { registerThreadSettings } from "./settings-registration.js";
 
 type ThreadHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
   "getSidebarOrder" | "saveSiblingOrder" | "getLaterThreads" | "saveLaterThreads" | "getThreadGroups" | "saveThreadGroups" | "getSidebarAppearance" | "saveSidebarAppearance" | "moveSidebarThread" |
-    "getRecycleBin" | "binSidebarThread" | "restoreBinnedSidebarThread" | "sidebarArchivedThreads" | "unarchiveSidebarThread"
+    "getRecycleBin" | "binSidebarThread" | "restoreBinnedSidebarThread" | "expireRecycleBinThreads" | "sidebarArchivedThreads" | "unarchiveSidebarThread"
 >;
 
 /** Thread preference and archive RPC handlers stay with the Threads slice. */
@@ -14,16 +19,7 @@ export function createThreadRegistration(
   bb: BbPluginApi,
   work: WorkBindingReader,
 ): ThreadHandlers {
-  bb.settings.define({
-    stuckThreadMinutes: {
-      type: "select",
-      label: "Stuck thread timeout",
-      description:
-        "Show a clock when an active runtime, goal, plan, or background job has produced no update for this long.",
-      options: ["15", "30", "45", "60", "120"],
-      default: "30",
-    },
-  });
+  registerThreadSettings(bb);
   const archived = createArchivedThreadService(bb.sdk.threads);
   const preferences = createThreadPreferencesService({
     get: (key) => bb.storage.kv.get<unknown>(key),
@@ -70,6 +66,10 @@ export function createThreadRegistration(
     async restoreBinnedSidebarThread({ threadId, groupIds }) {
       return preferences.restoreBinnedThread(threadId, groupIds);
     },
+    expireRecycleBinThreads: createRecycleBinExpiryHandler(
+      preferences,
+      (threadId) => bb.sdk.threads.archive({ threadId }),
+    ),
     async sidebarArchivedThreads() {
       try {
         return { available: true, threads: await archived.list(), error: null };

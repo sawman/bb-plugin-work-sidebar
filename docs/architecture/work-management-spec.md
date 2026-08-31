@@ -477,11 +477,11 @@ archive lifecycle:
   The SDK cannot revive the old archived environment or history, so this opens
   BB's new-thread flow preselected to the original project; it must never claim
   to restore the original thread.
-- Retention is opt-in. The preference stores a retention duration but does not
-  silently archive anything. A separately configured BB automation may invoke
-  the plugin's expiry endpoint; it archives only eligible bin records, removes
-  each record after the host action is accepted, and emits one Threads-family
-  invalidation.
+- Retention is opt-in. The plugin never starts a timer. A separately configured
+  BB automation invokes `expireRecycleBinThreads({ retentionDays })`; it archives
+  only eligible bin records, removes each record immediately after the host
+  action is accepted, and emits a Threads-family invalidation. An automation
+  chooses its schedule and retention duration explicitly.
 
 ## Acceptance criteria
 

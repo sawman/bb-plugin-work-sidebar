@@ -237,6 +237,14 @@ export function createThreadPreferencesService(
       });
       return result;
     },
+    async removeBinnedThread(threadId: string) {
+      const value = (await recycleBin()).filter(
+        (entry) => entry.threadId !== threadId,
+      );
+      await adapter.set(THREAD_PREFERENCE_KEYS.recycleBin, value);
+      adapter.publish(THREAD_PREFERENCE_CHANNEL, { recycleBin: value });
+      return value;
+    },
     async saveAppearance(rowHeight: number) {
       const validation = validateSidebarRowHeight(String(rowHeight));
       if (validation.value === null) throw new Error(validation.error);
