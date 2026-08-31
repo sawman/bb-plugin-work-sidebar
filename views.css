@@ -3803,21 +3803,22 @@ button.ws-provider-health:focus-visible {
 }
 .ws-work-item-queue {
   display: grid;
-  gap: 0.3rem;
+  gap: 0.42rem;
   padding-bottom: 0.45rem;
   border-bottom: 1px solid var(--border);
 }
 .ws-work-item-queue-heading,
+.ws-work-item-queue-current,
 .ws-work-item-backlog-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.45rem;
 }
-.ws-work-item-queue-current,
 .ws-work-item-reference {
   display: inline-flex;
   min-width: 0;
+  flex: 1;
   align-items: center;
   gap: 0.35rem;
   margin: 0;
@@ -3834,14 +3835,17 @@ button.ws-provider-health:focus-visible {
   white-space: nowrap;
 }
 .ws-work-item-reference-meta,
-.ws-work-item-sources,
-.ws-work-item-queue-add {
+.ws-work-item-reference-controls,
+.ws-work-item-sources {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 0.3rem;
 }
 .ws-work-item-reference-meta {
+  flex: 0 0 auto;
+}
+.ws-work-item-reference-controls {
   flex: 0 0 auto;
 }
 .ws-work-item-sources {
@@ -3858,7 +3862,42 @@ button.ws-provider-health:focus-visible {
   border: 1px solid var(--border);
 }
 .ws-work-item-queue-add {
+  display: inline-flex;
   align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.18rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.42rem;
+}
+.ws-work-item-queue-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.18rem;
+}
+.ws-work-item-queue-action {
+  display: grid;
+  width: 1.45rem;
+  height: 1.45rem;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.ws-work-item-queue-action:hover:not(:disabled),
+.ws-work-item-queue-action:focus-visible {
+  color: var(--foreground);
+}
+.ws-work-item-queue-action:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+.ws-work-item-queue-action svg {
+  width: 0.78rem;
+  height: 0.78rem;
 }
 .ws-work-item-linear-status {
   display: flex;

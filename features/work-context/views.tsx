@@ -666,24 +666,25 @@ function WorkQueue({
     <section className="ws-work-item-queue" aria-label="Work queue">
       <div className="ws-work-item-queue-heading">
         <h3 className="ws-card-section-label">Current goal</h3>
-        {queue.current ? (
-          <span>
-            <button type="button" className="ws-text-button" disabled={pending} onClick={onDemote}>Defer</button>
-            <button type="button" className="ws-text-button" disabled={pending} onClick={() => onMoveToExecution(queue.current!)}>Start task</button>
-          </span>
-        ) : null}
       </div>
       {queue.current ? (
-        <QueueReference
-          reference={queue.current}
-          label={labelForReference(queue.current)}
-          task={taskById.get(queue.current.id)}
-          showStatus={queue.current.source === "bb_task" && queue.current.id !== outcomeTaskId}
-          disabled={pending}
-          onStatus={onTaskStatus}
-          updatingAssignee={updatingAssignee}
-          onUpdateAssignee={onUpdateAssignee}
-        />
+        <div className="ws-work-item-queue-current">
+          <QueueReference
+            reference={queue.current}
+            label={labelForReference(queue.current)}
+            task={taskById.get(queue.current.id)}
+            showStatus={queue.current.source === "bb_task" && queue.current.id !== outcomeTaskId}
+            disabled={pending}
+            onStatus={onTaskStatus}
+            updatingAssignee={updatingAssignee}
+            onUpdateAssignee={onUpdateAssignee}
+          />
+          <WorkItemQueueActions
+            disabled={pending}
+            onDefer={onDemote}
+            onStart={() => onMoveToExecution(queue.current!)}
+          />
+        </div>
       ) : (
         <p className="ws-card-note">Choose a BB task or linked Linear issue as the current goal.</p>
       )}
@@ -703,12 +704,11 @@ function WorkQueue({
                 updatingAssignee={updatingAssignee}
                 onUpdateAssignee={onUpdateAssignee}
               />
-              <button type="button" className="ws-text-button" disabled={pending} onClick={() => onPromote(reference)}>
-                Make current
-              </button>
-              <button type="button" className="ws-text-button" disabled={pending} onClick={() => onMoveToExecution(reference)}>
-                Start task
-              </button>
+              <WorkItemQueueActions
+                disabled={pending}
+                onMakeCurrent={() => onPromote(reference)}
+                onStart={() => onMoveToExecution(reference)}
+              />
             </div>
           ))}
           </div>
@@ -830,11 +830,17 @@ function QueueReference({
 }) {
   return (
     <span className="ws-work-item-reference">
-      <span className="ws-work-item-reference-title">{task?.title ?? label}</span>
       {task ? (
         <span className="ws-work-item-reference-meta">
-          <CopyBadge value={task.key} label="task ID" className="ws-work-header-badge">{task.key}</CopyBadge>
           <TaskPriorityIcon priority={task.priority} />
+          <CopyBadge value={task.key} label="task ID" className="ws-work-header-badge">{task.key}</CopyBadge>
+        </span>
+      ) : (
+        <CopyBadge value={reference.id} label="Linear issue" className="ws-work-header-badge">{reference.id}</CopyBadge>
+      )}
+      <span className="ws-work-item-reference-title">{task?.title ?? label}</span>
+      {task ? (
+        <span className="ws-work-item-reference-controls">
           {task.assignee ? (
             <AssigneePicker
               value={task.assignee}
@@ -843,22 +849,71 @@ function QueueReference({
               onChange={(assignee) => onUpdateAssignee(reference.id, assignee)}
             />
           ) : null}
+          {showStatus ? (
+            <select
+              aria-label={`${task.key} status`}
+              disabled={disabled}
+              value={task.status}
+              onChange={(event) => onStatus(reference.id, event.target.value as TaskStatus)}
+            >
+              {(["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const).map((status) => (
+                <option key={status} value={status}>{taskStatusPresentation(status).label}</option>
+              ))}
+            </select>
+          ) : null}
         </span>
-      ) : (
-        <CopyBadge value={reference.id} label="Linear issue" className="ws-work-header-badge">{reference.id}</CopyBadge>
-      )}
-      {showStatus && task ? (
-        <select
-          aria-label={`${task.key} status`}
-          disabled={disabled}
-          value={task.status}
-          onChange={(event) => onStatus(reference.id, event.target.value as TaskStatus)}
-        >
-          {(["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const).map((status) => (
-            <option key={status} value={status}>{taskStatusPresentation(status).label}</option>
-          ))}
-        </select>
       ) : null}
+    </span>
+  );
+}
+
+function WorkItemQueueActions({
+  disabled,
+  onDefer,
+  onMakeCurrent,
+  onStart,
+}: {
+  disabled: boolean;
+  onDefer?: () => void;
+  onMakeCurrent?: () => void;
+  onStart: () => void;
+}) {
+  return (
+    <span className="ws-work-item-queue-actions" role="group" aria-label="Work item actions">
+      {onDefer ? (
+        <button
+          type="button"
+          className="ws-work-item-queue-action"
+          disabled={disabled}
+          aria-label="Defer"
+          title="Defer current goal"
+          onClick={onDefer}
+        >
+          <Icon name="Clock" aria-hidden />
+        </button>
+      ) : null}
+      {onMakeCurrent ? (
+        <button
+          type="button"
+          className="ws-work-item-queue-action"
+          disabled={disabled}
+          aria-label="Make current"
+          title="Make current goal"
+          onClick={onMakeCurrent}
+        >
+          <Icon name="ArrowRight" aria-hidden />
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className="ws-work-item-queue-action"
+        disabled={disabled}
+        aria-label="Start task"
+        title="Start as task"
+        onClick={onStart}
+      >
+        <Icon name="CircleHalf" aria-hidden />
+      </button>
     </span>
   );
 }
