@@ -1,5 +1,6 @@
 import {
   createContext,
+  createElement,
   useContext,
   type CSSProperties,
   type PropsWithChildren,
@@ -14,11 +15,7 @@ export function TextScaleProvider({
   scale,
   children,
 }: PropsWithChildren<{ scale: number }>): ReactElement {
-  return (
-    <TextScaleContext.Provider value={scale}>
-      {children}
-    </TextScaleContext.Provider>
-  );
+  return createElement(TextScaleContext.Provider, { value: scale }, children);
 }
 
 export function useTextScale(): number {
