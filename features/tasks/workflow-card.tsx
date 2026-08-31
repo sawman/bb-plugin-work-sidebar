@@ -191,11 +191,12 @@ function WorkflowRow({
         onChange={(next) => onStatusChange(task.id, next)}
       />
       <span className="ws-task-workflow-copy">
-        <span className="ws-task-workflow-title">{task.title}</span>
-        <span className="ws-task-workflow-meta">
+        <span className="ws-task-workflow-title-line">
           <TaskPriorityIcon priority={task.priority ?? "none"} />
-          <span>{task.key}</span>
-          <span aria-hidden>·</span>
+          <span className="ws-task-workflow-key">{task.key}</span>
+          <span className="ws-task-workflow-title">{task.title}</span>
+        </span>
+        <span className="ws-task-workflow-meta">
           {owner?.threadId && !ownerUnavailable && task.assignee === "agent" ? (
             <button
               type="button"
@@ -219,22 +220,30 @@ function WorkflowRow({
           )}
         </span>
       </span>
-      <AssigneePicker
-        value={task.assignee}
-        taskKey={task.key}
-        disabled={busy}
-        onChange={(assignee) => onAssigneeChange(task.id, assignee)}
-      />
-      {detachable ? (
-        <button
-          type="button"
+      <span
+        className="ws-task-workflow-actions"
+        role="group"
+        aria-label={`Actions for ${task.key}`}
+      >
+        <AssigneePicker
+          value={task.assignee}
+          taskKey={task.key}
           disabled={busy}
-          aria-label={`Detach ${task.key} from this thread`}
-          onClick={() => onDetach(task.id)}
-        >
-          <Icon className="ws-task-workflow-icon" name="X" aria-hidden />
-        </button>
-      ) : null}
+          onChange={(assignee) => onAssigneeChange(task.id, assignee)}
+        />
+        {detachable ? (
+          <button
+            type="button"
+            className="ws-task-workflow-action"
+            disabled={busy}
+            aria-label={`Detach ${task.key} from this thread`}
+            title="Detach from this thread"
+            onClick={() => onDetach(task.id)}
+          >
+            <Icon className="ws-task-workflow-icon" name="X" aria-hidden />
+          </button>
+        ) : null}
+      </span>
     </article>
   );
 }

@@ -2813,7 +2813,7 @@ button.ws-provider-health:focus-visible {
 }
 .ws-thread-task-card {
   display: grid;
-  gap: 0.38rem;
+  gap: 0.58rem;
   padding: 0.58rem;
 }
 .ws-github-api-indicator {
@@ -3618,7 +3618,20 @@ button.ws-provider-health:focus-visible {
   flex: 1;
   gap: 0.12rem;
 }
+.ws-task-workflow-title-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.26rem;
+}
+.ws-task-workflow-key {
+  flex: 0 0 auto;
+  color: var(--muted-foreground);
+  font: var(--ws-text-metadata);
+  line-height: inherit;
+}
 .ws-task-workflow-title {
+  min-width: 0;
   overflow: hidden;
   font: var(--ws-text-primary);
   line-height: inherit;
@@ -3651,6 +3664,29 @@ button.ws-provider-health:focus-visible {
 }
 .ws-task-workflow-owner[data-state="unavailable"] {
   cursor: default;
+}
+.ws-task-workflow-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.3rem;
+  padding-left: 0.32rem;
+  border-left: 1px solid var(--border);
+}
+.ws-task-workflow-action {
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  place-items: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.ws-task-workflow-action:hover:not(:disabled),
+.ws-task-workflow-action:focus-visible {
+  color: var(--foreground);
 }
 .ws-task-workflow-history {
   margin: 0;
