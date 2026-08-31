@@ -7,6 +7,22 @@ import { getPluginQueryClient } from "../../../query-runtime";
 
 const project = { id: "project", name: "Project", isPersonal: false };
 
+function dispatchHrefClickWithoutJsdomNavigation(
+  link: HTMLElement,
+  event: MouseEvent,
+) {
+  let componentPrevented = false;
+  const stopJsdomNavigation = (dispatched: MouseEvent) => {
+    componentPrevented = dispatched.defaultPrevented;
+    dispatched.preventDefault();
+  };
+  // Preserve the native modifier-click assertion while stopping only jsdom's
+  // unsupported document navigation after the component handler has run.
+  document.addEventListener("click", stopJsdomNavigation, { once: true });
+  link.dispatchEvent(event);
+  return componentPrevented;
+}
+
 function thread(
   id: string,
   title: string,
@@ -1408,8 +1424,9 @@ describe("R18 registered left sidebar parity", () => {
         cancelable: true,
         ...modifier,
       });
-      expect(baseLink.dispatchEvent(modifiedClick)).toBe(true);
-      expect(modifiedClick.defaultPrevented).toBe(false);
+      expect(
+        dispatchHrefClickWithoutJsdomNavigation(baseLink, modifiedClick),
+      ).toBe(false);
     }
     expect(slot.inspection.navigateCalls).not.toContainEqual({
       method: "openUrl",

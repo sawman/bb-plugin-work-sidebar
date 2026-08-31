@@ -14,6 +14,17 @@ import { ChangesError, ChangesStackBranchRow } from "../views";
 
 afterEach(cleanup);
 
+function dispatchHrefClickWithoutJsdomNavigation(link: HTMLElement) {
+  const stopJsdomNavigation = (event: MouseEvent) => event.preventDefault();
+  // The PR action is intentionally a native link. Stop only jsdom's unsupported
+  // navigation after its normal click handling so this isolation test can keep
+  // asserting that the surrounding row does not receive the activation.
+  document.addEventListener("click", stopJsdomNavigation, { once: true });
+  link.dispatchEvent(
+    new MouseEvent("click", { bubbles: true, cancelable: true }),
+  );
+}
+
 function stackBranch(
   overrides: Partial<GitHubStackBranch> = {},
 ): GitHubStackBranch {
@@ -372,7 +383,7 @@ describe("R13 Changes error presentation", () => {
     );
     expect(actions).toBeTruthy();
     if (!actions) throw new Error("missing trailing actions");
-    fireEvent.click(
+    dispatchHrefClickWithoutJsdomNavigation(
       within(actions).getByRole("link", { name: /Open pull request/ }),
     );
     expect(onToggle).not.toHaveBeenCalled();

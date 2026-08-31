@@ -468,6 +468,35 @@ describe("registered tracker card", () => {
     slot.lifecycle.unmount();
   });
 
+  it("releases the tracker observer when Work is inactive and remounts it on return", async () => {
+    const app = await loadPluginApp(() => import("../../../app"));
+    const client = getPluginQueryClient();
+    const getWorkTracker = vi.fn(() => linked);
+    const threadId = "thr_inactive_tracker";
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId, params: null },
+      { rpc: fixture({ getWorkTracker }) },
+    );
+    const key = ["work-sidebar", "tracker", "context", threadId];
+
+    await waitFor(() => expect(getWorkTracker).toHaveBeenCalledTimes(1));
+    expect(client.getQueryCache().find({ queryKey: key })?.getObserversCount()).toBe(1);
+
+    fireEvent.click(slot.getByRole("tab", { name: "Agents" }));
+    await waitFor(() =>
+      expect(client.getQueryCache().find({ queryKey: key })?.getObserversCount()).toBe(0),
+    );
+
+    fireEvent.click(slot.getByRole("tab", { name: "Work" }));
+    await waitFor(() =>
+      expect(client.getQueryCache().find({ queryKey: key })?.getObserversCount()).toBe(1),
+    );
+    // The existing Work-tab policy deliberately refreshes on every mount.
+    expect(getWorkTracker).toHaveBeenCalledTimes(2);
+    slot.lifecycle.unmount();
+  });
+
   it("uses BB navigation for the global Linear header badge", async () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(

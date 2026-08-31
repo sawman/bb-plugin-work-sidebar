@@ -40,6 +40,23 @@ const stack = {
 
 const clipboardWrite = vi.fn(() => Promise.resolve());
 
+function dispatchHrefClickWithoutJsdomNavigation(
+  link: HTMLElement,
+  event: MouseEvent,
+) {
+  let componentPrevented = false;
+  const stopJsdomNavigation = (dispatched: MouseEvent) => {
+    componentPrevented = dispatched.defaultPrevented;
+    dispatched.preventDefault();
+  };
+  // BB deliberately preserves modifier-click navigation. This final bubble
+  // listener runs after the component handler, records that contract, then
+  // prevents jsdom from attempting an unsupported document navigation.
+  document.addEventListener("click", stopJsdomNavigation, { once: true });
+  link.dispatchEvent(event);
+  return componentPrevented;
+}
+
 beforeEach(() => {
   clipboardWrite.mockClear();
   Object.defineProperty(navigator, "clipboard", {
@@ -479,8 +496,9 @@ describe("pull-request stack number presentation", () => {
         button: 0,
         ...modifier,
       });
-      expect(title.dispatchEvent(modifiedClick)).toBe(true);
-      expect(modifiedClick.defaultPrevented).toBe(false);
+      expect(dispatchHrefClickWithoutJsdomNavigation(title, modifiedClick)).toBe(
+        false,
+      );
     }
     expect(openPullRequest).not.toHaveBeenCalled();
     fireEvent.contextMenu(title, { clientX: 12, clientY: 18 });

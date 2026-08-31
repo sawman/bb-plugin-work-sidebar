@@ -62,7 +62,6 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const queryClient = useQueryClient();
   const appearance = useSidebarAppearancePreferences();
   const status = useWorkStatus(threadId);
-  const tracker = useTracker(threadId);
   const workScopeRef = useRef<WorkPanelScope>({
     threadId,
     rootThreadId: null,
@@ -163,19 +162,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
           hidden={tab !== "work"}
           tabIndex={0}
         >
-          {tab === "work" && (
-            <div className="ws-section-stack">
-              <header>
-                <div>
-                  <h2>Work</h2>
-                </div>
-                <span className="ws-work-header-badges">
-                  <TrackerHeaderBadge items={tracker.data} />
-                </span>
-              </header>
-              <WorkContextCards threadId={threadId} tracker={tracker} />
-            </div>
-          )}
+          {tab === "work" && <WorkTabContent threadId={threadId} />}
         </div>
         <div
           className="ws-panel-body"
@@ -199,5 +186,25 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
         </div>
       </div>
     </TextScaleProvider>
+  );
+}
+
+function WorkTabContent({ threadId }: { threadId: string }) {
+  // Tracker data is displayed only by the Work tab. Mounting its observer here
+  // lets inactive Changes and Agents tabs retain the warm cache without a live
+  // query subscription.
+  const tracker = useTracker(threadId);
+  return (
+    <div className="ws-section-stack">
+      <header>
+        <div>
+          <h2>Work</h2>
+        </div>
+        <span className="ws-work-header-badges">
+          <TrackerHeaderBadge items={tracker.data} />
+        </span>
+      </header>
+      <WorkContextCards threadId={threadId} tracker={tracker} />
+    </div>
   );
 }
