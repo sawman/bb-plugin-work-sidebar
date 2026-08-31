@@ -35,7 +35,6 @@ type NumericAppearanceEditorProps = {
   validate(value: string): { value: number | null; error: string | null };
   onSave(value: number): Promise<number>;
   successMessage(value: number): string;
-  hint?: string;
   initialValue: number;
   className: string;
 };
@@ -51,7 +50,6 @@ function NumericAppearanceEditor({
   validate,
   onSave,
   successMessage,
-  hint,
   initialValue,
   className,
 }: NumericAppearanceEditorProps) {
@@ -93,7 +91,8 @@ function NumericAppearanceEditor({
     if (lastAttemptedDraft.current === attemptedDraft) return;
     const timer = window.setTimeout(() => {
       lastAttemptedDraft.current = attemptedDraft;
-      void onSaveRef.current(requested)
+      void onSaveRef
+        .current(requested)
         .then((savedValue) => {
           if (latestDraft.current !== attemptedDraft) return;
           const next = String(savedValue);
@@ -111,14 +110,7 @@ function NumericAppearanceEditor({
         });
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [
-    changeVersion,
-    dirty,
-    draft,
-    pending,
-    saved,
-    validation.value,
-  ]);
+  }, [changeVersion, dirty, draft, pending, saved, validation.value]);
 
   return (
     <div className={className}>
@@ -144,7 +136,6 @@ function NumericAppearanceEditor({
         />
         <span aria-hidden>{suffix}</span>
       </div>
-      {hint ? <small>{hint}</small> : null}
       {validation.error ? (
         <small id={errorId} className="ws-settings-error" role="alert">
           {validation.error}
@@ -160,8 +151,27 @@ export function SidebarRowHeightEditor({
   compact = false,
   onSave,
 }: SidebarRowHeightEditorProps) {
-  return (
-    compact ? (
+  return compact ? (
+    <NumericAppearanceEditor
+      saved={saved}
+      pending={pending}
+      label="Row height"
+      min={MIN_SIDEBAR_ROW_HEIGHT}
+      max={MAX_SIDEBAR_ROW_HEIGHT}
+      step="0.1"
+      suffix="px"
+      validate={validateSidebarRowHeight}
+      onSave={async (value) => (await onSave(value)).rowHeight}
+      successMessage={(value) => `Sidebar rows set to ${value}px`}
+      initialValue={DEFAULT_SIDEBAR_ROW_HEIGHT}
+      className="ws-thread-appearance-entry ws-sidebar-row-height-editor"
+    />
+  ) : (
+    <div
+      data-layout="narrow"
+      className="ws-settings-card ws-sidebar-appearance-settings"
+    >
+      <strong>Sidebar appearance</strong>
       <NumericAppearanceEditor
         saved={saved}
         pending={pending}
@@ -174,30 +184,9 @@ export function SidebarRowHeightEditor({
         onSave={async (value) => (await onSave(value)).rowHeight}
         successMessage={(value) => `Sidebar rows set to ${value}px`}
         initialValue={DEFAULT_SIDEBAR_ROW_HEIGHT}
-        className="ws-sidebar-row-height-editor"
+        className="ws-sidebar-appearance-field"
       />
-    ) : (
-      <div
-        data-layout="narrow"
-        className="ws-settings-card ws-sidebar-appearance-settings"
-      >
-        <strong>Sidebar appearance</strong>
-        <NumericAppearanceEditor
-          saved={saved}
-          pending={pending}
-          label="Row height"
-          min={MIN_SIDEBAR_ROW_HEIGHT}
-          max={MAX_SIDEBAR_ROW_HEIGHT}
-          step="0.1"
-          suffix="px"
-          validate={validateSidebarRowHeight}
-          onSave={async (value) => (await onSave(value)).rowHeight}
-          successMessage={(value) => `Sidebar rows set to ${value}px`}
-          initialValue={DEFAULT_SIDEBAR_ROW_HEIGHT}
-          className="ws-sidebar-appearance-field"
-        />
-      </div>
-    )
+    </div>
   );
 }
 
@@ -214,8 +203,26 @@ export function SidebarTextScaleEditor({
   compact = false,
   onSave,
 }: SidebarTextScaleEditorProps) {
-  return (
-    compact ? (
+  return compact ? (
+    <NumericAppearanceEditor
+      saved={saved}
+      pending={pending}
+      label="Text scale"
+      min={MIN_TEXT_SCALE}
+      max={MAX_TEXT_SCALE}
+      step="0.01"
+      suffix="×"
+      validate={validateTextScale}
+      onSave={async (value) => (await onSave(value)).textScale}
+      successMessage={(value) => `Text scale set to ${value}`}
+      initialValue={DEFAULT_TEXT_SCALE}
+      className="ws-thread-appearance-entry ws-sidebar-text-scale-editor"
+    />
+  ) : (
+    <div
+      data-layout="narrow"
+      className="ws-settings-card ws-sidebar-text-scale-editor"
+    >
       <NumericAppearanceEditor
         saved={saved}
         pending={pending}
@@ -227,54 +234,31 @@ export function SidebarTextScaleEditor({
         validate={validateTextScale}
         onSave={async (value) => (await onSave(value)).textScale}
         successMessage={(value) => `Text scale set to ${value}`}
-        hint="Compact 0.90 · Default 1.00 · Comfortable 1.10"
         initialValue={DEFAULT_TEXT_SCALE}
-        className="ws-sidebar-text-scale-editor"
+        className="ws-sidebar-appearance-field"
       />
-    ) : (
-      <div
-        data-layout="narrow"
-        className="ws-settings-card ws-sidebar-text-scale-editor"
-      >
-        <NumericAppearanceEditor
-          saved={saved}
-          pending={pending}
-          label="Text scale"
-          min={MIN_TEXT_SCALE}
-          max={MAX_TEXT_SCALE}
-          step="0.01"
-          suffix="×"
-          validate={validateTextScale}
-          onSave={async (value) => (await onSave(value)).textScale}
-          successMessage={(value) => `Text scale set to ${value}`}
-          hint="Compact 0.90 · Default 1.00 · Comfortable 1.10"
-          initialValue={DEFAULT_TEXT_SCALE}
-          className="ws-sidebar-appearance-field"
-        />
-      </div>
-    )
+    </div>
   );
 }
 
 export function SidebarAppearanceSettings() {
   const preferences = useSidebarAppearancePreferences();
   return (
-    <div className="ws-settings-card ws-sidebar-appearance-settings" data-layout="narrow">
+    <div
+      className="ws-settings-card ws-sidebar-appearance-settings"
+      data-layout="narrow"
+    >
       <strong>Sidebar appearance</strong>
       <SidebarRowHeightEditor
         saved={preferences.appearance.data?.rowHeight}
         pending={preferences.saveRowHeight.isPending}
-        onSave={(rowHeight) =>
-          preferences.saveRowHeight.mutateAsync(rowHeight)
-        }
+        onSave={(rowHeight) => preferences.saveRowHeight.mutateAsync(rowHeight)}
         compact
       />
       <SidebarTextScaleEditor
         saved={preferences.appearance.data?.textScale}
         pending={preferences.saveTextScale.isPending}
-        onSave={(textScale) =>
-          preferences.saveTextScale.mutateAsync(textScale)
-        }
+        onSave={(textScale) => preferences.saveTextScale.mutateAsync(textScale)}
         compact
       />
       <WorkingProviderAnimationEditor
@@ -290,17 +274,20 @@ export function SidebarAppearanceSettings() {
   );
 }
 
-const workingProviderAnimationLabels: Record<WorkingProviderAnimation, string> = {
-  none: "No motion",
-  ...Object.fromEntries(
-    WORKING_PROVIDER_ANIMATION_STYLES.filter((style) => style !== "none").flatMap((style) =>
-      WORKING_PROVIDER_ANIMATION_SPEEDS.map((speed) => [
-        `${speed}-${style}`,
-        `${speed[0]!.toUpperCase()}${speed.slice(1)} ${style}`,
-      ]),
+const workingProviderAnimationLabels: Record<WorkingProviderAnimation, string> =
+  {
+    none: "No motion",
+    ...Object.fromEntries(
+      WORKING_PROVIDER_ANIMATION_STYLES.filter(
+        (style) => style !== "none",
+      ).flatMap((style) =>
+        WORKING_PROVIDER_ANIMATION_SPEEDS.map((speed) => [
+          `${speed}-${style}`,
+          `${speed[0]!.toUpperCase()}${speed.slice(1)} ${style}`,
+        ]),
+      ),
     ),
-  ),
-} as Record<WorkingProviderAnimation, string>;
+  } as Record<WorkingProviderAnimation, string>;
 
 function WorkingProviderAnimationEditor({
   saved,
@@ -315,22 +302,59 @@ function WorkingProviderAnimationEditor({
   const value = saved ?? DEFAULT_WORKING_PROVIDER_ANIMATION;
   const { style, speed } = splitWorkingProviderAnimation(value);
   const save = (nextStyle: typeof style, nextSpeed: typeof speed) => {
-    const next = nextStyle === "none" ? "none" : `${nextSpeed}-${nextStyle}` as WorkingProviderAnimation;
+    const next =
+      nextStyle === "none"
+        ? "none"
+        : (`${nextSpeed}-${nextStyle}` as WorkingProviderAnimation);
     void onSave(next)
-      .then(() => toast.success(`Working animation set to ${workingProviderAnimationLabels[next]}`))
-      .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not save working provider animation"));
+      .then(() =>
+        toast.success(
+          `Working animation set to ${workingProviderAnimationLabels[next]}`,
+        ),
+      )
+      .catch((error: unknown) =>
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not save working provider animation",
+        ),
+      );
   };
   return (
     <fieldset className="ws-sidebar-appearance-field ws-working-animation-field">
       <legend>Working provider animation</legend>
       <div className="ws-working-animation-controls">
         <label htmlFor={`${id}-style`}>Style</label>
-        <select id={`${id}-style`} value={style} disabled={pending} onChange={(event) => save(event.currentTarget.value as typeof style, speed)}>
-          {WORKING_PROVIDER_ANIMATION_STYLES.map((item) => <option key={item} value={item}>{item === "none" ? "None" : item[0]!.toUpperCase() + item.slice(1)}</option>)}
+        <select
+          id={`${id}-style`}
+          value={style}
+          disabled={pending}
+          onChange={(event) =>
+            save(event.currentTarget.value as typeof style, speed)
+          }
+        >
+          {WORKING_PROVIDER_ANIMATION_STYLES.map((item) => (
+            <option key={item} value={item}>
+              {item === "none"
+                ? "None"
+                : item[0]!.toUpperCase() + item.slice(1)}
+            </option>
+          ))}
         </select>
         <label htmlFor={`${id}-speed`}>Speed</label>
-        <select id={`${id}-speed`} value={speed} disabled={pending || style === "none"} onChange={(event) => save(style, event.currentTarget.value as typeof speed)}>
-          {WORKING_PROVIDER_ANIMATION_SPEEDS.map((item) => <option key={item} value={item}>{item[0]!.toUpperCase() + item.slice(1)}</option>)}
+        <select
+          id={`${id}-speed`}
+          value={speed}
+          disabled={pending || style === "none"}
+          onChange={(event) =>
+            save(style, event.currentTarget.value as typeof speed)
+          }
+        >
+          {WORKING_PROVIDER_ANIMATION_SPEEDS.map((item) => (
+            <option key={item} value={item}>
+              {item[0]!.toUpperCase() + item.slice(1)}
+            </option>
+          ))}
         </select>
       </div>
     </fieldset>

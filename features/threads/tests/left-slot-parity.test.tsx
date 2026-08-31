@@ -587,7 +587,9 @@ describe("R18 registered left sidebar parity", () => {
       }),
     );
     await waitFor(() =>
-      expect(slot.queryByRole("combobox", { name: "Search reviewers" })).toBeNull(),
+      expect(
+        slot.queryByRole("combobox", { name: "Search reviewers" }),
+      ).toBeNull(),
     );
 
     fireEvent.click(
@@ -984,7 +986,10 @@ describe("R18 registered left sidebar parity", () => {
       { id: "group_later", name: "Later", threadIds: ["thr_one"] },
     ];
     const saveGroups = vi.fn(
-      ({ groups: next, disclosures: nextDisclosures }: {
+      ({
+        groups: next,
+        disclosures: nextDisclosures,
+      }: {
         groups: typeof groups;
         disclosures?: Record<string, boolean>;
       }) => {
@@ -1013,8 +1018,7 @@ describe("R18 registered left sidebar parity", () => {
     });
     await waitFor(() =>
       expect(
-        restored
-          .container
+        restored.container
           .querySelector("details.ws-thread-group:not(.ws-active-threads)")
           ?.getAttribute("open"),
       ).toBeNull(),
@@ -1119,8 +1123,20 @@ describe("R18 registered left sidebar parity", () => {
     const pluginSettings = slot.getByRole("link", {
       name: "Open Work Sidebar settings",
     });
+    const textScale = slot.getByRole("spinbutton", { name: "Text scale" });
     expect(appearance?.contains(rowHeight)).toBe(true);
     expect(appearance?.contains(pluginSettings)).toBe(true);
+    expect(
+      appearance?.querySelectorAll(".ws-thread-appearance-entry"),
+    ).toHaveLength(3);
+    expect(rowHeight.closest(".ws-thread-appearance-entry")).toBeTruthy();
+    expect(textScale.closest(".ws-thread-appearance-entry")).toBeTruthy();
+    expect(
+      pluginSettings.classList.contains("ws-thread-appearance-entry"),
+    ).toBe(true);
+    expect(
+      slot.queryByText("Compact 0.90 · Default 1.00 · Comfortable 1.10"),
+    ).toBeNull();
     expect(pluginSettings.getAttribute("href")).toBe(
       "/settings/plugins/work-sidebar",
     );
@@ -1593,15 +1609,14 @@ describe("R18 registered left sidebar parity", () => {
   });
 
   it("reparents through the existing hierarchy mutation, promotes through To Top, and leaves rejected hierarchy drops unchanged", async () => {
-    const moveThread = vi.fn((input: {
-      threadId: string;
-      parentThreadId: string | null;
-    }) => ({
-      ...input,
-      oldRootThreadId: "thr_one",
-      newRootThreadId: input.parentThreadId ?? input.threadId,
-      affectedThreadIds: [input.threadId],
-    }));
+    const moveThread = vi.fn(
+      (input: { threadId: string; parentThreadId: string | null }) => ({
+        ...input,
+        oldRootThreadId: "thr_one",
+        newRootThreadId: input.parentThreadId ?? input.threadId,
+        affectedThreadIds: [input.threadId],
+      }),
+    );
     const saveOrder = vi.fn(({ threadIds }: { threadIds: string[] }) => ({
       threadIds,
     }));
@@ -1643,7 +1658,9 @@ describe("R18 registered left sidebar parity", () => {
     reparent.unmount();
 
     const splitMove = vi.fn();
-    const splitYield = await leftSlot({ rpc: { moveSidebarThread: splitMove } });
+    const splitYield = await leftSlot({
+      rpc: { moveSidebarThread: splitMove },
+    });
     const splitSource = splitYield.container.querySelector<HTMLElement>(
       '[data-ws-thread-id="thr_one"]',
     )!;
@@ -1659,15 +1676,14 @@ describe("R18 registered left sidebar parity", () => {
     expect(splitMove).not.toHaveBeenCalled();
     splitYield.unmount();
 
-    const promoteThread = vi.fn((input: {
-      threadId: string;
-      parentThreadId: string | null;
-    }) => ({
-      ...input,
-      oldRootThreadId: "thr_parent",
-      newRootThreadId: input.parentThreadId ?? input.threadId,
-      affectedThreadIds: [input.threadId],
-    }));
+    const promoteThread = vi.fn(
+      (input: { threadId: string; parentThreadId: string | null }) => ({
+        ...input,
+        oldRootThreadId: "thr_parent",
+        newRootThreadId: input.parentThreadId ?? input.threadId,
+        affectedThreadIds: [input.threadId],
+      }),
+    );
     const promote = await leftSlot({
       threads: [
         thread("thr_parent", "Parent"),
@@ -1698,9 +1714,7 @@ describe("R18 registered left sidebar parity", () => {
     elementAt.mockReturnValue(toTop);
     fireEvent.pointerMove(window, { pointerId: 32, clientX: 10, clientY: 20 });
     expect(toTop.getAttribute("data-drop-target")).toBe("true");
-    expect(
-      promote.container.querySelector('[data-drop-placement]'),
-    ).toBeNull();
+    expect(promote.container.querySelector("[data-drop-placement]")).toBeNull();
     fireEvent.pointerUp(window, { pointerId: 32, clientX: 10, clientY: 20 });
     await waitFor(() =>
       expect(promoteThread).toHaveBeenCalledWith({
@@ -1719,9 +1733,7 @@ describe("R18 registered left sidebar parity", () => {
       rpc: { moveSidebarThread: rejectedMove },
     });
     if (!rejected.container.querySelector('[data-ws-thread-id="thr_child"]'))
-      fireEvent.click(
-        rejected.getByRole("button", { name: /1 child agent/ }),
-      );
+      fireEvent.click(rejected.getByRole("button", { name: /1 child agent/ }));
     const rejectedSource = rejected.container.querySelector<HTMLElement>(
       '[data-ws-thread-id="thr_parent"]',
     )!;
@@ -1751,9 +1763,7 @@ describe("R18 registered left sidebar parity", () => {
       rpc: { moveSidebarThread: unchangedMove },
     });
     if (!unchanged.container.querySelector('[data-ws-thread-id="thr_child"]'))
-      fireEvent.click(
-        unchanged.getByRole("button", { name: /1 child agent/ }),
-      );
+      fireEvent.click(unchanged.getByRole("button", { name: /1 child agent/ }));
     const unchangedSource = unchanged.container.querySelector<HTMLElement>(
       '[data-ws-thread-id="thr_child"]',
     )!;
@@ -1843,9 +1853,8 @@ describe("R18 registered left sidebar parity", () => {
     await waitFor(() =>
       expect(slot.getByRole("link", { name: /One/ })).toBeTruthy(),
     );
-    const archive = slot.container.querySelector<HTMLDetailsElement>(
-      ".ws-archived",
-    )!;
+    const archive =
+      slot.container.querySelector<HTMLDetailsElement>(".ws-archived")!;
     fireEvent.click(archive.querySelector("summary")!);
     await waitFor(() => expect(getArchive).toHaveBeenCalledTimes(1));
     const beforeRefresh = slot.getByRole("link", { name: /One/ });

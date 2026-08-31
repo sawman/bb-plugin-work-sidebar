@@ -1,8 +1,4 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { SidebarListIconButton } from "@/components/ui/sidebar-list-actions";
 import { BbUrlLink } from "@/components/ui/url-link";
@@ -99,7 +95,7 @@ export function ThreadListSettings({
               compact
             />
             <BbUrlLink
-              className="ws-thread-settings-link"
+              className="ws-thread-appearance-entry ws-thread-settings-link"
               href="/settings/plugins/work-sidebar"
               aria-label="Open Work Sidebar settings"
               onClick={() => closeSettings({ restoreFocus: false })}

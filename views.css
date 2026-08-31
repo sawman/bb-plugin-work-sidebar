@@ -179,7 +179,8 @@
 .ws-panel[data-working-provider-animation$="-sheen"]
   .ws-thread-provider[data-runtime-state="working"]
   .ws-thread-provider-mark::after {
-  animation: ws-thread-provider-shine var(--ws-provider-animation-duration) linear infinite;
+  animation: ws-thread-provider-shine var(--ws-provider-animation-duration)
+    linear infinite;
 }
 .ws-list[data-working-provider-animation$="-pulse"]
   .ws-thread-provider[data-runtime-state="working"]
@@ -187,14 +188,21 @@
 .ws-panel[data-working-provider-animation$="-pulse"]
   .ws-thread-provider[data-runtime-state="working"]
   .ws-thread-provider-glyph {
-  animation: ws-thread-provider-pulse var(--ws-provider-animation-duration) ease-in-out infinite;
+  animation: ws-thread-provider-pulse var(--ws-provider-animation-duration)
+    ease-in-out infinite;
 }
 .ws-list[data-working-provider-animation^="slow-"],
-.ws-panel[data-working-provider-animation^="slow-"] { --ws-provider-animation-duration: 3.2s; }
+.ws-panel[data-working-provider-animation^="slow-"] {
+  --ws-provider-animation-duration: 3.2s;
+}
 .ws-list[data-working-provider-animation^="medium-"],
-.ws-panel[data-working-provider-animation^="medium-"] { --ws-provider-animation-duration: 1.8s; }
+.ws-panel[data-working-provider-animation^="medium-"] {
+  --ws-provider-animation-duration: 1.8s;
+}
 .ws-list[data-working-provider-animation^="fast-"],
-.ws-panel[data-working-provider-animation^="fast-"] { --ws-provider-animation-duration: 1s; }
+.ws-panel[data-working-provider-animation^="fast-"] {
+  --ws-provider-animation-duration: 1s;
+}
 @keyframes ws-thread-provider-spin {
   to {
     transform: rotate(1turn);
@@ -206,7 +214,9 @@
   }
 }
 @keyframes ws-thread-provider-bounce {
-  50% { transform: translateY(-0.14rem); }
+  50% {
+    transform: translateY(-0.14rem);
+  }
 }
 @keyframes ws-thread-provider-shine {
   0% {
@@ -224,8 +234,7 @@
     .ws-thread-provider-fallback-shine,
   .ws-thread-provider[data-runtime-state="working"]
     .ws-thread-provider-mark::after,
-  .ws-thread-provider[data-runtime-state="working"]
-    .ws-thread-provider-glyph {
+  .ws-thread-provider[data-runtime-state="working"] .ws-thread-provider-glyph {
     animation: none;
   }
 }
@@ -1843,9 +1852,8 @@ button.ws-change-file-row:hover {
   cursor: not-allowed;
 }
 .ws-thread-settings-link {
-  padding: 0.26rem 0;
-  color: var(--muted-foreground);
-  font: var(--ws-text-subtext);
+  color: var(--foreground);
+  font: var(--ws-text-label);
   line-height: inherit;
   text-decoration: none;
 }
@@ -3266,20 +3274,21 @@ button.ws-provider-health:focus-visible {
 }
 .ws-thread-appearance-settings {
   display: grid;
-  gap: 0.1rem;
-  padding: 0.35rem 0.45rem 0.42rem;
+  padding: 0.25rem 0.45rem;
 }
-.ws-thread-appearance-settings .ws-sidebar-row-height-editor {
+.ws-thread-appearance-settings .ws-thread-appearance-entry {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.35rem;
-  padding: 0;
+  min-height: 2rem;
+  padding: 0.32rem 0;
+  border-top: 1px solid var(--border);
+}
+.ws-thread-appearance-settings .ws-thread-appearance-entry:first-child {
+  border-top: 0;
 }
 .ws-thread-appearance-settings .ws-sidebar-text-scale-editor {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.35rem;
 }
 .ws-thread-appearance-settings .ws-settings-input-row {
   grid-template-columns: 2.8rem auto;
@@ -3290,10 +3299,6 @@ button.ws-provider-health:focus-visible {
   .ws-settings-input-row {
   grid-template-columns: 2.8rem auto;
   gap: 0.2rem;
-}
-.ws-thread-appearance-settings .ws-sidebar-text-scale-editor input {
-  width: 2.8rem;
-  padding-inline: 0.28rem;
 }
 .ws-thread-appearance-settings .ws-settings-input-row input {
   width: 2.8rem;
