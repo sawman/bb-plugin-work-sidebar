@@ -1,7 +1,4 @@
-import {
-  experimental_useSidebarThreadActions,
-  experimental_useSidebarThreadSplit,
-} from "@get-bb/plugin-sdk/app";
+import { experimental_useSidebarThreadActions } from "@get-bb/plugin-sdk/app";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -13,7 +10,6 @@ import {
 import type { ThreadProvider } from "./thread-provider-logo";
 import { ThreadRowContent } from "./thread-row-content";
 import { ThreadWorkspaceBadge } from "./thread-workspace-badge";
-import { useArchivedThreadPointerDrag } from "./use-archived-thread-pointer-drag";
 
 export type ArchivedThread = {
   id: string;
@@ -38,58 +34,33 @@ export function ArchivedThreadRow({
   duration,
   project,
   provider,
-  groups,
-  onUnarchive,
   onNavigate,
-  dragging,
-  onDragThreadChange,
-  onDropTargetChange,
 }: {
   thread: ArchivedThread;
   duration: string | null;
   project?: { name: string; isPersonal: boolean };
   provider?: ThreadProvider;
-  groups: readonly { id: string; name: string }[];
-  onUnarchive(threadId: string, destination: string | null): void;
   onNavigate(): void;
-  dragging: boolean;
-  onDragThreadChange(threadId: string | null): void;
-  onDropTargetChange(
-    target:
-      | { kind: "reorder"; threadId: string; placement: "before" | "after" }
-      | { kind: "reparent"; parentThreadId: string | null }
-      | null,
-  ): void;
 }) {
   const actions = experimental_useSidebarThreadActions();
-  const { splitProps, isAvailable } = experimental_useSidebarThreadSplit(
-    thread.id,
-  );
   const title = thread.title || thread.titleFallback || "Untitled thread";
   const projectLabel = project?.isPersonal
     ? "Personal"
     : (project?.name ?? "Project");
-  const startPointerDrag = useArchivedThreadPointerDrag({
-    threadId: thread.id,
-    onDragThreadChange,
-    onDropTargetChange,
-    onRestore: (destination) => onUnarchive(thread.id, destination),
-  });
+  const resume = () => {
+    actions.openNewThread({ projectId: thread.projectId, focusPrompt: true });
+    onNavigate();
+  };
   return (
-    <article
-      className={`ws-thread ws-archived-thread ${dragging ? "ws-thread-dragging" : ""}`}
-      onPointerDownCapture={startPointerDrag}
-    >
+    <article className="ws-thread ws-archived-thread">
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <a
             href="#"
-            {...splitProps}
             className="ws-thread-anchor ws-sidebar-row"
             onClick={(event) => {
               event.preventDefault();
-              actions.open(thread.id);
-              onNavigate();
+              resume();
             }}
             onKeyDown={(event) => {
               if (
@@ -144,40 +115,9 @@ export function ArchivedThreadRow({
         </ContextMenuTrigger>
         <ContextMenuContent aria-label={`Actions for ${title}`}>
           <ContextMenuLabel>{title}</ContextMenuLabel>
-          <ContextMenuItem
-            onSelect={() => {
-              actions.open(thread.id);
-              onNavigate();
-            }}
-          >
-            Open
+          <ContextMenuItem onSelect={resume}>
+            Resume in new worktree
           </ContextMenuItem>
-          {isAvailable && (
-            <ContextMenuItem
-              onSelect={() => {
-                actions.open(thread.id, { split: true });
-                onNavigate();
-              }}
-            >
-              Open in split
-            </ContextMenuItem>
-          )}
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            className="ws-thread-menu-destination"
-            onSelect={() => onUnarchive(thread.id, null)}
-          >
-            Active
-          </ContextMenuItem>
-          {groups.map((group) => (
-            <ContextMenuItem
-              key={group.id}
-              className="ws-thread-menu-destination"
-              onSelect={() => onUnarchive(thread.id, group.id)}
-            >
-              {group.name}
-            </ContextMenuItem>
-          ))}
           <ContextMenuSeparator />
           <ContextMenuItem
             data-tone="destructive"

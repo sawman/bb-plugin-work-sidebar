@@ -154,7 +154,8 @@ describe("R2 app registration and Query lifecycle", () => {
     // selected, the file query remains hook-stable and disabled until opened.
     // Work-item queue is independently cacheable from the outcome and task
     // projections, so mounted Work now owns one additional query entry.
-    expect(client.getQueryCache().getAll()).toHaveLength(19);
+    // The plugin-managed Recycle Bin is a durable sidebar preference query.
+    expect(client.getQueryCache().getAll()).toHaveLength(20);
     expect(
       client
         .getQueryCache()

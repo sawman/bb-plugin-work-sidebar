@@ -25,7 +25,6 @@ describe("Threads organization lifecycle", () => {
       searchQuery: "",
       saveGroups: vi.fn(),
       saveOrder: vi.fn(),
-      unarchive: vi.fn(async () => undefined),
       archive: vi.fn(async () => undefined),
     };
     const view = renderHook(

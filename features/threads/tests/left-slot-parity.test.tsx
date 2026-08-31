@@ -116,6 +116,9 @@ async function leftSlot({
     getSidebarOrder: () => ({ threadIds: threads.map(({ id }) => id) }),
     getThreadGroups: () => ({ groups }),
     getSidebarAppearance: () => ({ rowHeight: 40 }),
+    getRecycleBin: () => ({ entries: [] }),
+    binSidebarThread: () => ({ entries: [] }),
+    restoreBinnedSidebarThread: () => ({ destination: null, entries: [] }),
     saveThreadGroups: ({ groups: next }: { groups: unknown[] }) => ({
       groups: next,
     }),
@@ -969,7 +972,7 @@ describe("R18 registered left sidebar parity", () => {
       expect(
         labels.findIndex((label) => label.startsWith("Gamma")),
       ).toBeLessThan(labels.findIndex((label) => label.startsWith("Active")));
-      expect(labels.at(-1)?.startsWith("Archive")).toBe(true);
+      expect(labels.at(-1)?.startsWith("Recycle Bin")).toBe(true);
     });
     slot.lifecycle.unmount();
   });
@@ -1234,50 +1237,10 @@ describe("R18 registered left sidebar parity", () => {
     );
     expect(archivedLink.querySelector(".ws-thread-drag-handle")).toBeNull();
     fireEvent.keyDown(archivedLink, { key: "F10", shiftKey: true });
-    expect(slot.getByRole("menuitem", { name: "Active" })).toBeTruthy();
-    expect(slot.getByRole("menuitem", { name: "Later" })).toBeTruthy();
+    expect(
+      slot.getByRole("menuitem", { name: "Resume in new worktree" }),
+    ).toBeTruthy();
     fireEvent.keyDown(window, { key: "Escape" });
-    const archivedRow = archivedLink.closest<HTMLElement>(".ws-thread")!;
-    const activeRow = slot.container.querySelector<HTMLElement>(
-      '[data-ws-thread-group="active"][data-ws-thread-id="thr_active"]',
-    )!;
-    elementAt.mockReturnValue(archivedRow);
-    fireEvent.pointerDown(activeRow, {
-      button: 0,
-      pointerId: 23,
-      clientX: 0,
-      clientY: 0,
-    });
-    fireEvent.pointerMove(window, { pointerId: 23, clientX: 10, clientY: 20 });
-    fireEvent.pointerUp(window, { pointerId: 23, clientX: 10, clientY: 20 });
-    expect(slot.inspection.sidebarActionCalls).toContainEqual({
-      method: "archive",
-      threadId: "thr_active",
-    });
-    const groupZone = slot.container.querySelector<HTMLElement>(
-      '[data-ws-thread-drop-zone="group_later"]',
-    )!;
-    elementAt.mockReturnValue(groupZone);
-    fireEvent.pointerDown(archivedRow, {
-      button: 0,
-      pointerId: 22,
-      clientX: 0,
-      clientY: 0,
-    });
-    fireEvent.pointerMove(window, { pointerId: 22, clientX: 10, clientY: 20 });
-    fireEvent.pointerUp(window, { pointerId: 22, clientX: 10, clientY: 20 });
-    await waitFor(() =>
-      expect(unarchive).toHaveBeenCalledWith({ threadId: "thr_archived" }),
-    );
-    await waitFor(() =>
-      expect(saveGroups).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          groups: [
-            { id: "group_later", name: "Later", threadIds: ["thr_archived"] },
-          ],
-        }),
-      ),
-    );
     slot.lifecycle.unmount();
   });
 
@@ -1526,9 +1489,10 @@ describe("R18 registered left sidebar parity", () => {
     const saveGroups = vi.fn(({ groups: next }: { groups: unknown[] }) => ({
       groups: next,
     }));
+    const binSidebarThread = vi.fn(() => ({ entries: [] }));
     const crossGroup = await leftSlot({
       groups: [{ id: "group_later", name: "Later", threadIds: ["thr_two"] }],
-      rpc: { saveThreadGroups: saveGroups },
+      rpc: { saveThreadGroups: saveGroups, binSidebarThread },
     });
     await waitFor(() => expect(crossGroup.getByText("Later")).toBeTruthy());
     const crossSource = crossGroup.container.querySelector<HTMLElement>(
@@ -1563,7 +1527,7 @@ describe("R18 registered left sidebar parity", () => {
       '[data-ws-thread-id="thr_one"]',
     )!;
     const archive = crossGroup.container.querySelector<HTMLElement>(
-      '[data-ws-thread-drop-zone="archive"]',
+      '[data-ws-thread-drop-zone="recycle-bin"]',
     )!;
     elementAt.mockReturnValue(archive);
     fireEvent.pointerDown(archiveSource, {
@@ -1574,10 +1538,12 @@ describe("R18 registered left sidebar parity", () => {
     });
     fireEvent.pointerMove(window, { pointerId: 10, clientX: 10, clientY: 20 });
     fireEvent.pointerUp(window, { pointerId: 10, clientX: 10, clientY: 20 });
-    expect(crossGroup.inspection.sidebarActionCalls).toContainEqual({
-      method: "archive",
-      threadId: "thr_one",
-    });
+    await waitFor(() =>
+      expect(binSidebarThread).toHaveBeenCalledWith({
+        threadId: "thr_one",
+        originGroupId: "group_later",
+      }),
+    );
     crossGroup.lifecycle.unmount();
   });
 
@@ -1833,7 +1799,7 @@ describe("R18 registered left sidebar parity", () => {
       expect(slot.getByRole("link", { name: /One/ })).toBeTruthy(),
     );
     const archive = slot.container.querySelector<HTMLDetailsElement>(
-      '[data-ws-thread-drop-zone="archive"]',
+      ".ws-archived",
     )!;
     fireEvent.click(archive.querySelector("summary")!);
     await waitFor(() => expect(getArchive).toHaveBeenCalledTimes(1));

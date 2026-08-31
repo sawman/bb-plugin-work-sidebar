@@ -37,7 +37,7 @@ import {
 import {
   threadQueryKeys,
   useThreadPreferences,
-  useUnarchiveSidebarThread,
+  useRecycleBin,
 } from "./queries";
 import { useSidebarThreadOrganization } from "./sidebar-organization";
 import { threadInteractionStore } from "./store";
@@ -70,10 +70,21 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   const actions = experimental_useSidebarThreadActions();
   const queryClient = useQueryClient();
   const threadPreferences = useThreadPreferences();
+  const recycleBin = useRecycleBin();
+  const binnedIds = useMemo(
+    () => new Set((recycleBin.bin.data ?? []).map((entry) => entry.threadId)),
+    [recycleBin.bin.data],
+  );
+  const liveThreads = useMemo(
+    () =>
+      threads.filter(
+        (thread) => !thread.isArchived && !binnedIds.has(thread.id),
+      ),
+    [binnedIds, threads],
+  );
   // Sole task-links observer, including native mode: Agents and WorkThreadTree share one
   // cache and polling owner rather than creating per-consumer intervals.
   const { data: taskLinksData, refetch: refetchTaskLinks } = useTaskLinksRead();
-  const unarchiveMutation = useUnarchiveSidebarThread();
   const [view, setView] = useState<SidebarView>("work");
   const [threadSearchQuery, setThreadSearchQuery] = useState("");
   const [subtextRefreshKey, setSubtextRefreshKey] = useState(0);
@@ -88,7 +99,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     () =>
       view === "queue"
         ? new Map(
-            threads.map((thread) => [
+            liveThreads.map((thread) => [
               thread.id,
               {
                 title: threadTitle(thread),
@@ -98,12 +109,12 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
             ]),
           )
         : EMPTY_TASK_OWNER_THREADS,
-    [providersById, threads, view],
+    [liveThreads, providersById, view],
   );
   const pullRequestThreads = useMemo(
     () =>
       view === "prs"
-        ? threads.map((thread) => ({
+        ? liveThreads.map((thread) => ({
             id: thread.id,
             title: threadTitle(thread),
             branchName: thread.environment?.branchName ?? null,
@@ -112,15 +123,15 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
             provider: providersById.get(thread.providerId),
           }))
         : EMPTY_PULL_REQUEST_THREADS,
-    [providersById, threads, view],
+    [liveThreads, providersById, view],
   );
   const groupPreferences = threadPreferences.groups.data ?? {
     groups: [],
     activeGroupPosition: 0,
   };
   const threadCount = useMemo(
-    () => threadCountPresentation(threads),
-    [threads],
+    () => threadCountPresentation(liveThreads),
+    [liveThreads],
   );
   const saveGroups = useCallback(
     (
@@ -158,7 +169,8 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   const effectiveThreadSearchQuery = threadSearchQuery || props.searchQuery;
   const organization = useSidebarThreadOrganization({
     active: view === "work",
-    threads,
+    threads: liveThreads,
+    hierarchyThreads: threads.filter((thread) => !thread.isArchived),
     projects,
     order: threadPreferences.order.data ?? [],
     groups: groupPreferences.groups,
@@ -166,8 +178,10 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     searchQuery: effectiveThreadSearchQuery,
     saveGroups,
     saveOrder,
-    unarchive: unarchiveMutation.mutateAsync,
-    archive: async (threadId) => actions.archive(threadId),
+    bin: async (threadId, originGroupId) =>
+      recycleBin.binThread.mutateAsync({ threadId, originGroupId }),
+    restore: async (threadId, groupIds) =>
+      recycleBin.restore.mutateAsync({ threadId, groupIds }),
   });
 
   useEffect(() => {
@@ -184,6 +198,9 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
       invalidateSidebarPullRequestStacks(queryClient),
       queryClient.invalidateQueries({
         queryKey: threadQueryKeys.archived(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: threadQueryKeys.recycleBin(),
       }),
     ]);
   }, [
@@ -251,7 +268,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
       reorderDisabled={organization.reorderDisabled}
       settings={settings}
       activeProjectId={props.activeProjectId}
-      onArchiveSelected={() => void organization.archiveSelected()}
+      onBinSelected={() => void organization.binSelected()}
       onRefresh={refreshThreadDetails}
       searchQuery={threadSearchQuery}
       onSearchQueryChange={setThreadSearchQuery}
@@ -298,7 +315,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
         />
         {view === "work" && (
           <ThreadHierarchyProvider
-            threads={threads}
+            threads={liveThreads}
             taskLinks={taskLinks}
             ready={taskLinksData !== undefined}
           >
@@ -318,6 +335,8 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
                   ? `No threads match “${effectiveThreadSearchQuery}”.`
                   : "No active threads."
               }
+              recycleBinEntries={recycleBin.bin.data ?? []}
+              allThreads={threads.filter((thread) => !thread.isArchived)}
             />
             <ThreadHierarchyPickerHost />
           </ThreadHierarchyProvider>

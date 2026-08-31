@@ -37,6 +37,7 @@ type ThreadPartitions = {
 type SidebarOrganizationInput = {
   active: boolean;
   threads: readonly PluginSidebarThread[];
+  hierarchyThreads?: readonly PluginSidebarThread[];
   projects: readonly ThreadProject[];
   order: readonly string[];
   groups: readonly SidebarThreadGroup[];
@@ -44,8 +45,11 @@ type SidebarOrganizationInput = {
   searchQuery: string;
   saveGroups(groups: SidebarThreadGroup[], activeGroupPosition?: number): void;
   saveOrder(order: string[]): void;
-  unarchive(threadId: string): Promise<unknown>;
-  archive(threadId: string): Promise<unknown>;
+  bin?(threadId: string, originGroupId: string | null): Promise<unknown>;
+  restore?(
+    threadId: string,
+    groupIds: string[],
+  ): Promise<{ destination: string | null }>;
 };
 
 export type SidebarThreadOrganization = {
@@ -70,14 +74,14 @@ export type SidebarThreadOrganization = {
   setDragThreadId(threadId: string | null): void;
   setDropTarget(target: ThreadDropTarget): void;
   moveToGroup(threadId: string, destination: string | null): void;
-  unarchiveToGroup(threadId: string, destination: string | null): void;
+  moveToRecycleBin(threadId: string): Promise<void>;
+  restoreFromRecycleBin(threadId: string): void;
   reorder(
     sourceId: string,
     targetId: string,
     placement: "before" | "after",
   ): void;
-  archiveSelected(): Promise<void>;
-  archiveThread(threadId: string): void;
+  binSelected(): Promise<void>;
   saveGroups(groups: SidebarThreadGroup[]): void;
   addGroup(name: string): boolean;
   moveGroup(groupId: string, direction: -1 | 1): void;
@@ -109,6 +113,7 @@ const EMPTY_THREAD_PARTITIONS: ThreadPartitions = {
 export function useSidebarThreadOrganization({
   active,
   threads,
+  hierarchyThreads = threads,
   projects,
   order,
   groups,
@@ -116,20 +121,17 @@ export function useSidebarThreadOrganization({
   searchQuery,
   saveGroups,
   saveOrder,
-  unarchive,
-  archive,
+  bin,
+  restore,
 }: SidebarOrganizationInput): SidebarThreadOrganization {
-  const dragThreadId = useStore(
-    threadInteractionStore,
-    (state) => (active ? state.dragThreadId : null),
+  const dragThreadId = useStore(threadInteractionStore, (state) =>
+    active ? state.dragThreadId : null,
   );
-  const dropTarget = useStore(
-    threadInteractionStore,
-    (state) => (active ? state.dropTarget : null),
+  const dropTarget = useStore(threadInteractionStore, (state) =>
+    active ? state.dropTarget : null,
   );
-  const selectedThreadIds = useStore(
-    threadInteractionStore,
-    (state) => (active ? state.selectedThreadIds : EMPTY_SELECTION),
+  const selectedThreadIds = useStore(threadInteractionStore, (state) =>
+    active ? state.selectedThreadIds : EMPTY_SELECTION,
   );
   const effectiveOrder = useMemo(
     () => (active ? reconcileThreadOrder(order, threads) : EMPTY_ORDER),
@@ -137,8 +139,10 @@ export function useSidebarThreadOrganization({
   );
   const allChildren = useMemo(
     () =>
-      active ? childrenByParent(threads, effectiveOrder) : EMPTY_THREAD_TREE,
-    [active, effectiveOrder, threads],
+      active
+        ? childrenByParent(hierarchyThreads, effectiveOrder)
+        : EMPTY_THREAD_TREE,
+    [active, effectiveOrder, hierarchyThreads],
   );
   const projectsById = useMemo(
     () =>
@@ -198,15 +202,12 @@ export function useSidebarThreadOrganization({
     [active, projectNames, searchQuery, threadPartitions.active],
   );
   const activeRoots = useMemo(
-    () =>
-      active ? rootThreads(filtered, effectiveOrder) : EMPTY_THREADS,
+    () => (active ? rootThreads(filtered, effectiveOrder) : EMPTY_THREADS),
     [active, effectiveOrder, filtered],
   );
   const activeChildren = useMemo(
     () =>
-      active
-        ? childrenByParent(filtered, effectiveOrder)
-        : EMPTY_THREAD_TREE,
+      active ? childrenByParent(filtered, effectiveOrder) : EMPTY_THREAD_TREE,
     [active, effectiveOrder, filtered],
   );
   const groupedTrees = useMemo(
@@ -248,9 +249,7 @@ export function useSidebarThreadOrganization({
   );
   const visibleThreadIds = useMemo(
     () =>
-      active
-        ? visibleThreadTreeIds(activeRoots, activeChildren)
-        : EMPTY_ORDER,
+      active ? visibleThreadTreeIds(activeRoots, activeChildren) : EMPTY_ORDER,
     [active, activeChildren, activeRoots],
   );
   const reorderDisabled = !active || searchQuery.trim().length > 0;
@@ -287,31 +286,50 @@ export function useSidebarThreadOrganization({
     },
     [allChildren, groups, saveGroups, threads],
   );
-  const unarchiveToGroup = useCallback(
-    (threadId: string, destination: string | null) => {
-      void unarchive(threadId)
-        .then(() => {
-          if (!destination) return;
-          saveGroups(
-            groups.map((group) =>
-              group.id === destination
-                ? {
-                    ...group,
-                    threadIds: [...new Set([...group.threadIds, threadId])],
-                  }
-                : group,
-            ),
-          );
-        })
-        .catch((error: unknown) =>
-          toast.error(
-            error instanceof Error
-              ? error.message
-              : "Could not unarchive thread",
-          ),
+  const moveToRecycleBin = useCallback(
+    async (threadId: string) => {
+      const thread = threads.find((candidate) => candidate.id === threadId);
+      if (!thread) return;
+      const subtree = visibleThreadTreeIds([thread], allChildren);
+      try {
+        for (const id of subtree)
+          await (bin?.(id, groupIds.get(id) ?? null) ?? Promise.resolve());
+        toast.success("Moved to Recycle Bin");
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not move thread to Recycle Bin",
         );
+      }
     },
-    [groups, saveGroups, unarchive],
+    [allChildren, bin, groupIds, threads],
+  );
+  const restoreFromRecycleBin = useCallback(
+    (threadId: string) => {
+      const thread = hierarchyThreads.find((candidate) => candidate.id === threadId);
+      const descendants = thread
+        ? visibleThreadTreeIds([thread], allChildren)
+        : [threadId];
+      void (async () => {
+        if (!restore) throw new Error("Recycle Bin is unavailable");
+        let destination: string | null = null;
+        for (const id of descendants) {
+          const result = await restore(id, groups.map((group) => group.id));
+          if (id === threadId) destination = result.destination;
+        }
+        toast.success(
+          destination
+            ? `Restored to ${groups.find((group) => group.id === destination)?.name ?? "previous group"}`
+            : "Restored to Active",
+        );
+      })().catch((error: unknown) =>
+        toast.error(
+          error instanceof Error ? error.message : "Could not restore thread",
+        ),
+      );
+    },
+    [allChildren, groups, hierarchyThreads, restore],
   );
   const selectThread = useCallback(
     (
@@ -349,7 +367,7 @@ export function useSidebarThreadOrganization({
     },
     [effectiveOrder, reorderDisabled, saveOrder, threads],
   );
-  const archiveSelected = useCallback(async () => {
+  const binSelected = useCallback(async () => {
     const byId = new Map(threads.map((thread) => [thread.id, thread]));
     const roots = [...selectedThreadIds].filter((id) => {
       for (
@@ -360,16 +378,9 @@ export function useSidebarThreadOrganization({
         if (selectedThreadIds.has(parent)) return false;
       return byId.has(id);
     });
-    await Promise.all(roots.map(archive));
+    for (const id of roots) await moveToRecycleBin(id);
     threadInteractionStore.getState().setSelected(null, []);
-  }, [archive, selectedThreadIds, threads]);
-  const archiveThread = useCallback(
-    (threadId: string) => {
-      if (groupIds.has(threadId)) moveToGroup(threadId, null);
-      void archive(threadId);
-    },
-    [archive, groupIds, moveToGroup],
-  );
+  }, [moveToRecycleBin, selectedThreadIds, threads]);
   const addGroup = useCallback(
     (input: string) => {
       if (groups.length >= 12) {
@@ -477,10 +488,10 @@ export function useSidebarThreadOrganization({
     setDragThreadId,
     setDropTarget,
     moveToGroup,
-    unarchiveToGroup,
+    moveToRecycleBin,
+    restoreFromRecycleBin,
     reorder,
-    archiveSelected,
-    archiveThread,
+    binSelected,
     saveGroups,
     addGroup,
     moveGroup,

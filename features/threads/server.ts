@@ -11,6 +11,12 @@ import {
   normalizeWorkingProviderAnimation,
   validateTextScale,
 } from "./sidebar-appearance.js";
+import {
+  binThread,
+  normalizeRecycleBin,
+  restoreThread,
+  type RecycleBinEntry,
+} from "./recycle-bin.js";
 
 export const THREAD_PREFERENCE_CHANNEL = "sidebar-order:changed";
 export const THREAD_PREFERENCE_KEYS = {
@@ -20,6 +26,7 @@ export const THREAD_PREFERENCE_KEYS = {
   appearance: "sidebar-appearance:v1",
   textScale: "sidebar-text-scale:v1",
   workingProviderAnimation: "sidebar-working-provider-animation:v1",
+  recycleBin: "sidebar-recycle-bin:v1",
 } as const;
 
 export function sanitizeThreadOrder(value: unknown): string[] {
@@ -52,9 +59,7 @@ type ArchivedThreadRow = {
   environmentBranchName: string | null;
   environmentName: string | null;
   environmentWorkspaceDisplayKind:
-    | "managed-worktree"
-    | "unmanaged-worktree"
-    | "other";
+    "managed-worktree" | "unmanaged-worktree" | "other";
   pinnedAt: number | null;
   createdAt: number;
   updatedAt: number;
@@ -85,9 +90,7 @@ export type ArchivedThreadProjection = {
   environmentBranchName: string | null;
   environmentName: string | null;
   environmentWorkspaceDisplayKind:
-    | "managed-worktree"
-    | "unmanaged-worktree"
-    | "other";
+    "managed-worktree" | "unmanaged-worktree" | "other";
   isPinned: boolean;
   isUnread: false;
   createdAt: number;
@@ -154,6 +157,11 @@ export function createThreadPreferencesService(
       ),
     };
   }
+  async function recycleBin(): Promise<RecycleBinEntry[]> {
+    return normalizeRecycleBin(
+      await adapter.get(THREAD_PREFERENCE_KEYS.recycleBin),
+    );
+  }
 
   return {
     async order() {
@@ -207,6 +215,28 @@ export function createThreadPreferencesService(
       return preferences;
     },
     appearance,
+    recycleBin,
+    async binThread(threadId: string, originGroupId: string | null) {
+      const value = binThread(await recycleBin(), threadId, originGroupId);
+      await adapter.set(THREAD_PREFERENCE_KEYS.recycleBin, value);
+      adapter.publish(THREAD_PREFERENCE_CHANNEL, { recycleBin: value });
+      return value;
+    },
+    async restoreBinnedThread(
+      threadId: string,
+      existingGroupIds: readonly string[],
+    ) {
+      const result = restoreThread(
+        await recycleBin(),
+        threadId,
+        new Set(existingGroupIds),
+      );
+      await adapter.set(THREAD_PREFERENCE_KEYS.recycleBin, result.entries);
+      adapter.publish(THREAD_PREFERENCE_CHANNEL, {
+        recycleBin: result.entries,
+      });
+      return result;
+    },
     async saveAppearance(rowHeight: number) {
       const validation = validateSidebarRowHeight(String(rowHeight));
       if (validation.value === null) throw new Error(validation.error);

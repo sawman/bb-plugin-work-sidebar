@@ -4,9 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const host = vi.hoisted(() => ({
   open: vi.fn(),
-  splitPointerDown: vi.fn((event: { stopPropagation(): void }) =>
-    event.stopPropagation(),
-  ),
+  openNewThread: vi.fn(),
 }));
 
 vi.mock("@get-bb/plugin-sdk/app", async () => {
@@ -16,13 +14,8 @@ vi.mock("@get-bb/plugin-sdk/app", async () => {
   return {
     ...actual,
     experimental_useSidebarThreadActions: () => ({
-      open: host.open,
+      openNewThread: host.openNewThread,
       requestDelete: vi.fn(),
-    }),
-    experimental_useSidebarThreadSplit: () => ({
-      splitProps: { onPointerDown: host.splitPointerDown },
-      isAvailable: true,
-      layout: null,
     }),
   };
 });
@@ -35,15 +28,8 @@ afterEach(() => {
   Reflect.deleteProperty(document, "elementFromPoint");
 });
 
-describe("ArchivedThreadRow pointer interaction", () => {
-  it("hands the pointer to BB and still drags the whole row into a custom group", () => {
-    const groupZone = document.createElement("section");
-    groupZone.dataset.wsThreadDropZone = "group_later";
-    Object.defineProperty(document, "elementFromPoint", {
-      configurable: true,
-      value: vi.fn(() => groupZone),
-    });
-    const onUnarchive = vi.fn();
+describe("ArchivedThreadRow", () => {
+  it("starts a replacement thread instead of reopening an unusable archived environment", () => {
     const view = render(
       <ArchivedThreadRow
         thread={{
@@ -63,37 +49,14 @@ describe("ArchivedThreadRow pointer interaction", () => {
           archivedAt: 1,
         }}
         duration="3h"
-        groups={[{ id: "group_later", name: "Later" }]}
-        onUnarchive={onUnarchive}
         onNavigate={vi.fn()}
-        dragging={false}
-        onDragThreadChange={vi.fn()}
-        onDropTargetChange={vi.fn()}
       />,
     );
 
-    const link = view.getByRole("link", { name: /Archived thread/ });
-    fireEvent.pointerDown(link, {
-      button: 0,
-      pointerId: 7,
-      clientX: 0,
-      clientY: 0,
+    fireEvent.click(view.getByRole("link", { name: /Archived thread/ }));
+    expect(host.openNewThread).toHaveBeenCalledWith({
+      projectId: "project",
+      focusPrompt: true,
     });
-    fireEvent.pointerMove(window, {
-      pointerId: 7,
-      clientX: 10,
-      clientY: 20,
-    });
-    fireEvent.pointerUp(window, {
-      pointerId: 7,
-      clientX: 10,
-      clientY: 20,
-    });
-
-    expect(host.splitPointerDown).toHaveBeenCalledTimes(1);
-    expect(onUnarchive).toHaveBeenCalledWith(
-      "thr_archived",
-      "group_later",
-    );
   });
 });

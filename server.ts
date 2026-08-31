@@ -2,21 +2,12 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { rpcContract } from "./contracts.js";
 import { createAgentRegistration } from "./features/agents/server-registration.js";
 import { createChangesRegistration } from "./features/changes/server-registration.js";
-import {
-  createPullRequestRegistration,
-  fetchGitHubStack,
-} from "./features/pull-requests/server-registration.js";
-import {
-  createTasksRegistration,
-  WORK_AGENT_INSTRUCTIONS,
-} from "./features/tasks/server-registration.js";
+import { createPullRequestRegistration, fetchGitHubStack } from "./features/pull-requests/server-registration.js";
+import { createTasksRegistration, WORK_AGENT_INSTRUCTIONS } from "./features/tasks/server-registration.js";
 import { createThreadRegistration } from "./features/threads/server-registration.js";
 import { createTrackerRegistration } from "./features/tracker/server-registration.js";
 import { createWorkContextRegistration } from "./features/work-context/server-registration.js";
-import {
-  createServerLifecycle,
-  type ServerLifecycle,
-} from "./server-lifecycle.js";
+import { createServerLifecycle, type ServerLifecycle } from "./server-lifecycle.js";
 import type { ServerCompositionDependencies } from "./shared/server-composition-dependencies.js";
 
 /** Server entrypoint: lifecycle ownership plus feature registration only. */
@@ -53,10 +44,14 @@ export default function plugin(
     sidebarPullRequestStacks: pullRequests.sidebarPullRequestStacks,
     sidebarThreadPullRequests: pullRequests.sidebarThreadPullRequests,
     sidebarAuthoredPullRequests: pullRequests.sidebarAuthoredPullRequests,
-    sidebarAuthoredPullRequestStacks: pullRequests.sidebarAuthoredPullRequestStacks,
+    sidebarAuthoredPullRequestStacks:
+      pullRequests.sidebarAuthoredPullRequestStacks,
     setAuthoredPullRequestDraft: pullRequests.setAuthoredPullRequestDraft,
     getPullRequestReviewers: pullRequests.getPullRequestReviewers,
     updatePullRequestReviewers: pullRequests.updatePullRequestReviewers,
+    getRecycleBin: threads.getRecycleBin,
+    binSidebarThread: threads.binSidebarThread,
+    restoreBinnedSidebarThread: threads.restoreBinnedSidebarThread,
     sidebarArchivedThreads: threads.sidebarArchivedThreads,
     unarchiveSidebarThread: threads.unarchiveSidebarThread,
     getWorkContext: workContext.getWorkContext,
@@ -94,17 +89,10 @@ export default function plugin(
   });
   tasks.registerTools();
   bb.agents.configure(() => ({
-    tools: [
-      "get_sidebar_tasks",
-      "get_task",
-      "update_task",
-      "comment_task",
-      "get_work_context",
-      "create_work_task",
-      "create_execution_task",
-      "bind_execution_owner",
-    ],
-    skills: [], instructions: WORK_AGENT_INSTRUCTIONS,
+    tools: ["get_sidebar_tasks", "get_task", "update_task", "comment_task", "get_work_context", "create_work_task", "create_execution_task",
+      "bind_execution_owner"],
+    skills: [],
+    instructions: WORK_AGENT_INSTRUCTIONS,
   }));
 }
 export { fetchGitHubStack, createServerLifecycle, rpcContract };

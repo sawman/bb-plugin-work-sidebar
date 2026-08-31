@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import type { SidebarThreadOrganization } from "./sidebar-organization";
 import { SidebarThreadGroups } from "./sidebar-group-tree";
 import type { ThreadProviderDirectory } from "@/components/threads/thread-provider-logo";
+import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
+import type { RecycleBinEntry } from "./recycle-bin";
 
 type SidebarWorkViewProps = {
   toolbar: ReactNode;
@@ -13,6 +15,8 @@ type SidebarWorkViewProps = {
   staleWorkingMinutes: number;
   searchQuery: string;
   emptyMessage: string;
+  recycleBinEntries: readonly RecycleBinEntry[];
+  allThreads: readonly PluginSidebarThread[];
 };
 
 export function SidebarWorkView({
@@ -25,6 +29,8 @@ export function SidebarWorkView({
   staleWorkingMinutes,
   searchQuery,
   emptyMessage,
+  recycleBinEntries,
+  allThreads,
 }: SidebarWorkViewProps) {
   return (
     <>
@@ -39,6 +45,8 @@ export function SidebarWorkView({
           staleWorkingMinutes={staleWorkingMinutes}
           searchQuery={searchQuery}
           emptyMessage={emptyMessage}
+          recycleBinEntries={recycleBinEntries}
+          allThreads={allThreads}
         />
       </div>
     </>

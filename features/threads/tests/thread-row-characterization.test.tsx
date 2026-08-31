@@ -338,7 +338,9 @@ describe("R21D ThreadRow characterization", () => {
 
     const afterRename = renderRow();
     openMenu(afterRename);
-    fireEvent.click(afterRename.getByRole("menuitem", { name: "Archive" }));
+    fireEvent.click(
+      afterRename.getByRole("menuitem", { name: "Archive permanently" }),
+    );
     expect(host.actions.archive).toHaveBeenCalledWith(thread.id);
     openMenu(afterRename);
     fireEvent.click(afterRename.getByRole("menuitem", { name: "Delete" }));
@@ -365,9 +367,7 @@ describe("R21D ThreadRow characterization", () => {
     const active = view.getByRole("menuitem", { name: "Active" });
     const later = view.getByRole("menuitem", { name: "Later" });
     expect(active.className).toBe(later.className);
-    expect(menu.querySelector('[data-tone="destructive"]')?.textContent).toBe(
-      "Delete",
-    );
+    expect(menu.querySelectorAll('[data-tone="destructive"]')).toHaveLength(2);
 
     fireEvent.click(active);
     expect(view.onMoveToGroup).toHaveBeenCalledWith(thread.id, null);

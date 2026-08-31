@@ -5,17 +5,8 @@ import { createSdkThreadHierarchyService, type WorkBindingReader } from "./hiera
 
 type ThreadHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
-  | "getSidebarOrder"
-  | "saveSiblingOrder"
-  | "getLaterThreads"
-  | "saveLaterThreads"
-  | "getThreadGroups"
-  | "saveThreadGroups"
-  | "getSidebarAppearance"
-  | "saveSidebarAppearance"
-  | "moveSidebarThread"
-  | "sidebarArchivedThreads"
-  | "unarchiveSidebarThread"
+  "getSidebarOrder" | "saveSiblingOrder" | "getLaterThreads" | "saveLaterThreads" | "getThreadGroups" | "saveThreadGroups" | "getSidebarAppearance" | "saveSidebarAppearance" | "moveSidebarThread" |
+    "getRecycleBin" | "binSidebarThread" | "restoreBinnedSidebarThread" | "sidebarArchivedThreads" | "unarchiveSidebarThread"
 >;
 
 /** Thread preference and archive RPC handlers stay with the Threads slice. */
@@ -69,6 +60,15 @@ export function createThreadRegistration(
     },
     async moveSidebarThread(input) {
       return hierarchy.move(input);
+    },
+    async getRecycleBin() {
+      return { entries: await preferences.recycleBin() };
+    },
+    async binSidebarThread({ threadId, originGroupId }) {
+      return { entries: await preferences.binThread(threadId, originGroupId) };
+    },
+    async restoreBinnedSidebarThread({ threadId, groupIds }) {
+      return preferences.restoreBinnedThread(threadId, groupIds);
     },
     async sidebarArchivedThreads() {
       try {

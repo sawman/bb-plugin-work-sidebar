@@ -5,46 +5,25 @@ import {
   ArchivedThreadRow,
   type ArchivedThread,
 } from "@/components/threads/archived-thread-row";
-import type { SidebarThreadGroup } from "./model";
 import { archiveDurationLabel } from "./model";
 import { useArchivedThreads } from "./queries";
 import { SidebarTable } from "@/components/ui/sidebar-table";
 import type { ThreadProviderDirectory } from "@/components/threads/thread-provider-logo";
 
 type Project = { id: string; name: string; isPersonal: boolean };
-type DropTarget =
-  | { kind: "reorder"; threadId: string; placement: "before" | "after" }
-  | { kind: "reparent"; parentThreadId: string | null }
-  | null;
 const EMPTY_ARCHIVED_THREADS: ArchivedThread[] = [];
 
 export function ArchivedThreads({
   threads,
   projectsById,
   providersById,
-  groups,
-  onSaveGroups,
   onNavigate,
-  dragThreadId,
-  onDragThreadChange,
-  dropTarget,
-  onDropTargetChange,
-  onArchive,
-  onRoster,
   searchQuery,
 }: {
   threads: readonly PluginSidebarThread[];
   projectsById: ReadonlyMap<string, Project>;
   providersById: ThreadProviderDirectory;
-  groups: readonly SidebarThreadGroup[];
-  onSaveGroups(next: SidebarThreadGroup[]): void;
   onNavigate(): void;
-  dragThreadId: string | null;
-  onDragThreadChange(id: string | null): void;
-  dropTarget: DropTarget;
-  onDropTargetChange(target: DropTarget): void;
-  onArchive(id: string): void;
-  onRoster(ids: ReadonlySet<string>): void;
   searchQuery: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -81,11 +60,6 @@ export function ArchivedThreads({
   );
   const searching = needle.length > 0;
   const effectivelyOpen = searching || open;
-  const ids = useMemo(
-    () => new Set(archived.map((thread) => thread.id)),
-    [archived],
-  );
-  useEffect(() => onRoster(ids), [ids, onRoster]);
   useEffect(() => {
     if (!effectivelyOpen || visibleArchived.length === 0) return undefined;
     setNow(Date.now());
@@ -99,61 +73,12 @@ export function ArchivedThreads({
       : query.archive.isSuccess
         ? "ready"
         : "idle";
-  const unarchive = (id: string, destination: string | null) =>
-    void query.unarchive
-      .mutateAsync(id)
-      .then(() => {
-        if (destination)
-          onSaveGroups(
-            groups.map((group) =>
-              group.id === destination
-                ? {
-                    ...group,
-                    threadIds: [...new Set([...group.threadIds, id])],
-                  }
-                : group,
-            ),
-          );
-        toast.success(
-          `Moved to ${destination ? (groups.find((group) => group.id === destination)?.name ?? "group") : "Active"}`,
-        );
-      })
-      .catch((error: unknown) =>
-        toast.error(
-          error instanceof Error ? error.message : "Could not unarchive thread",
-        ),
-      );
   return (
     <details
       className="ws-thread-group ws-archived"
-      data-ws-thread-drop-zone="archive"
-      data-drop-target={
-        (dropTarget?.kind === "reorder" &&
-          dropTarget.threadId === "archive") ||
-        undefined
-      }
       open={effectivelyOpen}
       onToggle={(event) => {
         if (!searching) setOpen(event.currentTarget.open);
-      }}
-      onDragOver={(event) => {
-        const id = dragThreadId ?? event.dataTransfer.getData("text/plain");
-        if (!id || ids.has(id)) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
-        onDropTargetChange({
-          kind: "reorder",
-          threadId: "archive",
-          placement: "after",
-        });
-      }}
-      onDrop={(event) => {
-        const id = dragThreadId ?? event.dataTransfer.getData("text/plain");
-        if (!id || ids.has(id)) return;
-        event.preventDefault();
-        onArchive(id);
-        onDragThreadChange(null);
-        onDropTargetChange(null);
       }}
     >
       <summary>
@@ -178,12 +103,7 @@ export function ArchivedThreads({
                 duration={archiveDurationLabel(thread.archivedAt, now)}
                 project={projectsById.get(thread.projectId)}
                 provider={providersById.get(thread.providerId)}
-                groups={groups}
-                onUnarchive={unarchive}
                 onNavigate={onNavigate}
-                dragging={dragThreadId === thread.id}
-                onDragThreadChange={onDragThreadChange}
-                onDropTargetChange={onDropTargetChange}
               />
             ))}
           </SidebarTable>

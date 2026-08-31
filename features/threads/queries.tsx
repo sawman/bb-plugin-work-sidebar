@@ -21,6 +21,7 @@ import type { WorkingProviderAnimation } from "./sidebar-appearance";
 import { invalidateTaskQueries } from "../tasks/mutations";
 import { invalidateTracker } from "../tracker/queries";
 import { invalidateWorkContextCards } from "../work-context/queries";
+import type { RecycleBinEntry } from "./recycle-bin";
 
 const root = ["work-sidebar", "sidebar", "threads"] as const;
 export const threadQueryKeys = {
@@ -29,6 +30,7 @@ export const threadQueryKeys = {
   groups: () => [...root, "groups"] as const,
   appearance: () => [...root, "appearance"] as const,
   archived: () => [...root, "archived"] as const,
+  recycleBin: () => [...root, "recycle-bin"] as const,
 } as const;
 export const threadQueryPolicies = {
   order: queryPolicies.sidebarOrderPreferences,
@@ -49,10 +51,8 @@ export type SidebarAppearanceUpdate =
 export function useThreadHierarchyMutation(rpc: ThreadsRpc) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: {
-      threadId: string;
-      parentThreadId: string | null;
-    }) => rpc.call("moveSidebarThread", input),
+    mutationFn: (input: { threadId: string; parentThreadId: string | null }) =>
+      rpc.call("moveSidebarThread", input),
     onSuccess: async (result) => {
       await client.invalidateQueries({ queryKey: threadQueryKeys.root });
       await Promise.all(
@@ -118,7 +118,12 @@ export function useSidebarAppearancePreferences() {
     client,
     "workingProviderAnimation",
   );
-  return { appearance, saveRowHeight, saveTextScale, saveWorkingProviderAnimation };
+  return {
+    appearance,
+    saveRowHeight,
+    saveTextScale,
+    saveWorkingProviderAnimation,
+  };
 }
 
 export async function saveThreadGroups(
@@ -176,6 +181,7 @@ export function useThreadPreferences() {
       threadQueryKeys.groups(),
       threadQueryKeys.appearance(),
       threadQueryKeys.archived(),
+      threadQueryKeys.recycleBin(),
     ]) {
       void client.invalidateQueries({ queryKey: key });
     }
@@ -244,6 +250,31 @@ export function useArchivedThreadsQuery(
 export function useArchivedThreads(rosterFingerprint: string) {
   const rpc = useRpc<typeof rpcContract>();
   return useArchivedThreadsQuery(rpc, rosterFingerprint);
+}
+
+/** Reversible plugin-owned filing. This deliberately never invokes host archive. */
+export function useRecycleBin() {
+  const rpc = useRpc<typeof rpcContract>();
+  const client = useQueryClient();
+  const bin = useQuery({
+    queryKey: threadQueryKeys.recycleBin(),
+    queryFn: async () =>
+      (await rpc.call("getRecycleBin", null)).entries as RecycleBinEntry[],
+    ...threadQueryPolicies.groups,
+  });
+  const binThread = useMutation({
+    mutationFn: (input: { threadId: string; originGroupId: string | null }) =>
+      rpc.call("binSidebarThread", input),
+    onSuccess: (result) =>
+      client.setQueryData(threadQueryKeys.recycleBin(), result.entries),
+  });
+  const restore = useMutation({
+    mutationFn: (input: { threadId: string; groupIds: string[] }) =>
+      rpc.call("restoreBinnedSidebarThread", input),
+    onSuccess: (result) =>
+      client.setQueryData(threadQueryKeys.recycleBin(), result.entries),
+  });
+  return { bin, binThread, restore };
 }
 
 /** Shared archive action for thread-group drop targets and archive rows. */

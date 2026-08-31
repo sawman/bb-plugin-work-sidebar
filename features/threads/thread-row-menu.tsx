@@ -22,6 +22,7 @@ export function ThreadRowMenu({
   groupId,
   groups,
   onMoveToGroup,
+  onMoveToRecycleBin,
   onFocusReturn,
   actions,
 }: {
@@ -35,14 +36,15 @@ export function ThreadRowMenu({
   groupId: string | null;
   groups: readonly SidebarThreadGroup[];
   onMoveToGroup(threadId: string, groupId: string | null): void;
+  onMoveToRecycleBin?(threadId: string): void;
   onFocusReturn(): void;
   actions: ThreadRowActions;
 }) {
   const hierarchy = useThreadHierarchyMenu({ threadId, title, onFocusReturn });
   return (
     <ContextMenu>
-        <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-        <ContextMenuContent aria-label={`Actions for ${title}`}>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuContent aria-label={`Actions for ${title}`}>
         <ContextMenuLabel>{title}</ContextMenuLabel>
         <ContextMenuItem onSelect={() => actions.setPinned(!isPinned)}>
           {isPinned ? "Unpin" : "Pin"}
@@ -59,25 +61,25 @@ export function ThreadRowMenu({
         <ContextMenuItem onSelect={() => actions.setRead(isUnread)}>
           {isUnread ? "Mark read" : "Mark unread"}
         </ContextMenuItem>
-          <ContextMenuItem onSelect={actions.startRename}>Rename</ContextMenuItem>
-          <ContextMenuSeparator />
-          {parentThreadId ? (
-            <>
-              <ContextMenuItem
-                disabled={hierarchy.disabled}
-                title={hierarchy.toTopDescription}
-                onSelect={() => void hierarchy.promote()}
-              >
-                To Top
-              </ContextMenuItem>
-            </>
-          ) : null}
-          <ContextMenuItem
-            disabled={hierarchy.disabled}
-            onSelect={(event) => hierarchy.open(event.currentTarget)}
-          >
-            Move under…
-          </ContextMenuItem>
+        <ContextMenuItem onSelect={actions.startRename}>Rename</ContextMenuItem>
+        <ContextMenuSeparator />
+        {parentThreadId ? (
+          <>
+            <ContextMenuItem
+              disabled={hierarchy.disabled}
+              title={hierarchy.toTopDescription}
+              onSelect={() => void hierarchy.promote()}
+            >
+              To Top
+            </ContextMenuItem>
+          </>
+        ) : null}
+        <ContextMenuItem
+          disabled={hierarchy.disabled}
+          onSelect={(event) => hierarchy.open(event.currentTarget)}
+        >
+          Move under…
+        </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
           className="ws-thread-menu-destination"
@@ -96,17 +98,22 @@ export function ThreadRowMenu({
             {group.name}
           </ContextMenuItem>
         ))}
-        <ContextMenuItem onSelect={actions.archiveTree}>
-          Archive
+        <ContextMenuItem
+          onSelect={() => (onMoveToRecycleBin ?? actions.archiveTree)(threadId)}
+        >
+          Move to Recycle Bin
         </ContextMenuItem>
         <ContextMenuSeparator />
+        <ContextMenuItem data-tone="destructive" onSelect={actions.archiveTree}>
+          Archive permanently
+        </ContextMenuItem>
         <ContextMenuItem
           data-tone="destructive"
           onSelect={actions.requestDeleteTree}
         >
           Delete
         </ContextMenuItem>
-        </ContextMenuContent>
+      </ContextMenuContent>
     </ContextMenu>
   );
 }

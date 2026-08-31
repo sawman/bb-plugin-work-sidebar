@@ -466,8 +466,9 @@ archive lifecycle:
   if the group no longer exists, it returns to Active. Binned threads are
   excluded from Active/custom groups and from every thread assignment, parent,
   reviewer-link, and owner picker.
-- Bin is reachable from the row context menu and a drag target. A binned row
-  can be restored by context menu or drag to Active/a custom group.
+- Bin is reachable from the row context menu and a drag target. Restore is a
+  context-menu/row action, so binned rows cannot accidentally re-enter a
+  custom group through a drag gesture.
 - **Archive** remains BB's host-owned recursive operation, sits in the
   destructive Delete section, and uses destructive styling. It is never used
   as an implementation detail of binning.

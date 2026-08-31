@@ -133,7 +133,7 @@ export function useThreadRowPointerDrag({
         if (toTop) onReparentThread(thread.id, null);
         else if (parentId && parentId !== thread.id)
           onReparentThread(thread.id, parentId);
-        else if (!targetId && zone === "archive") onArchive();
+        else if (!targetId && zone === "recycle-bin") onArchive();
         else if (!targetId && zone && zone !== groupId)
           onMoveToGroup(thread.id, zone === "active" ? null : zone);
         else if (targetGroup && targetGroup !== (groupId ?? "active"))

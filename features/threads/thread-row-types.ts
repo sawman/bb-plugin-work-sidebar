@@ -39,6 +39,7 @@ export type ThreadRowProps = {
     event: ReactMouseEvent<HTMLAnchorElement>,
   ): boolean;
   onMoveToGroup(threadId: string, groupId: string | null): void;
+  onMoveToRecycleBin?(threadId: string): void;
   project?: ThreadProject;
   provider?: ThreadProvider;
   onNavigate(): void;

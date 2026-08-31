@@ -372,7 +372,7 @@ what is already there.
 - **Red:** server/model tests prove a binned thread retains its exact original
   destination, restore falls back to Active only when that group is gone, and
   malformed/stale records are dropped. Registered left-slot tests prove Bin
-  hides live rows, restore and drag restore correctly, native Archive is not
+  hides live rows, restore correctly, native Archive is not
   called while binning, and every thread picker omits binned and archived
   threads.
 - **Green:** add a typed persisted bin preference plus Query/mutation boundary;

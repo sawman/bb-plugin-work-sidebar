@@ -94,6 +94,12 @@ describe("R9 Threads server preferences", () => {
       ],
       activeGroupPosition: 1,
     });
+    await expect(service.binThread("thr_a", "group_later")).resolves.toEqual([
+      { threadId: "thr_a", originGroupId: "group_later", binnedAt: expect.any(Number) },
+    ]);
+    await expect(
+      service.restoreBinnedThread("thr_a", ["group_later"]),
+    ).resolves.toEqual({ destination: "group_later", entries: [] });
     expect(published[1]).toEqual({
       channel: "sidebar-order:changed",
       payload: {
@@ -115,7 +121,11 @@ describe("R9 Threads server preferences", () => {
       channel: "sidebar-order:changed",
       payload: { appearance: { workingProviderAnimation: "fast-spin" } },
     });
-    expect(published).toHaveLength(5);
+    expect(published).toHaveLength(7);
+    expect(published.slice(-2)).toEqual([
+      expect.objectContaining({ channel: "sidebar-order:changed", payload: expect.objectContaining({ recycleBin: expect.any(Array) }) }),
+      expect.objectContaining({ channel: "sidebar-order:changed", payload: expect.objectContaining({ recycleBin: [] }) }),
+    ]);
     expect(service).not.toHaveProperty("archivedThreads");
   });
 });

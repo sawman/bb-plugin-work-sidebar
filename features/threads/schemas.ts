@@ -33,6 +33,13 @@ const archivedThread = z.object({
   updatedAt: z.number(),
   archivedAt: z.number(),
 });
+const recycleBinEntry = z
+  .object({
+    threadId: z.string().startsWith("thr_"),
+    originGroupId: z.string().startsWith("group_").nullable(),
+    binnedAt: z.number().positive(),
+  })
+  .strict();
 
 export const threadPreferenceSchemas = {
   getSidebarOrder: {
@@ -89,7 +96,9 @@ export const threadPreferenceSchemas = {
           .min(MIN_SIDEBAR_ROW_HEIGHT)
           .max(MAX_SIDEBAR_ROW_HEIGHT),
         textScale: z.number().min(MIN_TEXT_SCALE).max(MAX_TEXT_SCALE),
-        workingProviderAnimation: z.enum(WORKING_PROVIDER_ANIMATIONS).optional(),
+        workingProviderAnimation: z
+          .enum(WORKING_PROVIDER_ANIMATIONS)
+          .optional(),
       })
       .strict(),
   },
@@ -126,13 +135,42 @@ export const threadPreferenceSchemas = {
           .min(MIN_SIDEBAR_ROW_HEIGHT)
           .max(MAX_SIDEBAR_ROW_HEIGHT),
         textScale: z.number().min(MIN_TEXT_SCALE).max(MAX_TEXT_SCALE),
-        workingProviderAnimation: z.enum(WORKING_PROVIDER_ANIMATIONS).optional(),
+        workingProviderAnimation: z
+          .enum(WORKING_PROVIDER_ANIMATIONS)
+          .optional(),
       })
       .strict(),
   },
 } as const;
 
 export const threadArchiveSchemas = {
+  getRecycleBin: {
+    input: z.null(),
+    output: z.object({ entries: z.array(recycleBinEntry) }).strict(),
+  },
+  binSidebarThread: {
+    input: z
+      .object({
+        threadId: z.string().startsWith("thr_"),
+        originGroupId: z.string().startsWith("group_").nullable(),
+      })
+      .strict(),
+    output: z.object({ entries: z.array(recycleBinEntry) }).strict(),
+  },
+  restoreBinnedSidebarThread: {
+    input: z
+      .object({
+        threadId: z.string().startsWith("thr_"),
+        groupIds: z.array(z.string().startsWith("group_")).max(12),
+      })
+      .strict(),
+    output: z
+      .object({
+        destination: z.string().startsWith("group_").nullable(),
+        entries: z.array(recycleBinEntry),
+      })
+      .strict(),
+  },
   sidebarArchivedThreads: {
     input: z.object({ force: z.boolean().optional() }).strict(),
     output: z

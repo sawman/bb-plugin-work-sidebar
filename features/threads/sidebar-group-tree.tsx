@@ -6,6 +6,8 @@ import type { ThreadProviderDirectory } from "@/components/threads/thread-provid
 import { SidebarTable } from "@/components/ui/sidebar-table";
 import { WorkThreadTree } from "./thread-tree";
 import { ThreadToTopDropZone } from "./thread-to-top-drop-zone";
+import { RecycleBinView } from "./recycle-bin-view";
+import type { RecycleBinEntry } from "./recycle-bin";
 type SidebarGroupTreeProps = {
   organization: SidebarThreadOrganization;
   activeThreadId: string | null;
@@ -15,16 +17,11 @@ type SidebarGroupTreeProps = {
   staleWorkingMinutes: number;
   searchQuery: string;
   emptyMessage: string;
+  recycleBinEntries: readonly RecycleBinEntry[];
+  allThreads: readonly PluginSidebarThread[];
 };
 
-type ThreadTreeProps = Pick<
-  SidebarGroupTreeProps,
-  | "activeThreadId"
-  | "providersById"
-  | "onNavigate"
-  | "subtextRefreshKey"
-  | "staleWorkingMinutes"
-> & {
+type ThreadTreeProps = Pick<SidebarGroupTreeProps, "activeThreadId" | "providersById" | "onNavigate" | "subtextRefreshKey" | "staleWorkingMinutes"> & {
   organization: SidebarThreadOrganization;
   roots: readonly PluginSidebarThread[];
   childrenByThread: ReadonlyMap<string, PluginSidebarThread[]>;
@@ -59,6 +56,7 @@ function ThreadTree({
             onNavigate={onNavigate}
             onSelect={organization.selectThread}
             onMoveToGroup={organization.moveToGroup}
+            onMoveToRecycleBin={organization.moveToRecycleBin}
             orderedSiblings={roots}
             reorderDisabled={organization.reorderDisabled}
             dragThreadId={organization.dragThreadId}
@@ -88,9 +86,10 @@ export function SidebarThreadGroups({
   staleWorkingMinutes,
   searchQuery,
   emptyMessage,
+  recycleBinEntries,
+  allThreads,
 }: SidebarGroupTreeProps) {
   const [activeOpen, setActiveOpen] = useState(true);
-  const [archivedThreadIds, setArchivedThreadIds] = useState<ReadonlySet<string>>(new Set());
   const dropTargetId =
     organization.dropTarget?.kind === "reorder"
       ? organization.dropTarget.threadId
@@ -112,8 +111,7 @@ export function SidebarThreadGroups({
     });
   const allowActiveDrop = (event: DragEvent<HTMLElement>) => {
     const id = sourceId(event, organization.dragThreadId);
-    if (!id || (!organization.groupIds.has(id) && !archivedThreadIds.has(id)))
-      return null;
+    if (!id || !organization.groupIds.has(id)) return null;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
     return id;
@@ -148,9 +146,7 @@ export function SidebarThreadGroups({
                 onDrop={(event) => {
                   const id = allowActiveDrop(event);
                   if (!id) return;
-                  if (archivedThreadIds.has(id))
-                    organization.unarchiveToGroup(id, null);
-                  else organization.moveToGroup(id, null);
+                  organization.moveToGroup(id, null);
                   clearDrop();
                 }}
               >
@@ -185,9 +181,7 @@ export function SidebarThreadGroups({
               onDrop={(event) => {
                 const id = allowGroupDrop(event, group.id);
                 if (!id) return;
-                if (archivedThreadIds.has(id))
-                  organization.unarchiveToGroup(id, group.id);
-                else organization.moveToGroup(id, group.id);
+                organization.moveToGroup(id, group.id);
                 clearDrop();
               }}
             >
@@ -220,15 +214,15 @@ export function SidebarThreadGroups({
           threads={organization.threads}
           projectsById={organization.projectsById}
           providersById={providersById}
-          groups={organization.groups}
-          onSaveGroups={organization.saveGroups}
           onNavigate={onNavigate}
-          dragThreadId={organization.dragThreadId}
-          onDragThreadChange={organization.setDragThreadId}
-          dropTarget={organization.dropTarget}
-          onDropTargetChange={organization.setDropTarget}
-          onArchive={organization.archiveThread}
-          onRoster={setArchivedThreadIds}
+          searchQuery={searchQuery}
+        />
+        <RecycleBinView
+          entries={recycleBinEntries}
+          threads={allThreads}
+          projectsById={organization.projectsById}
+          providersById={providersById}
+          onRestore={(threadId) => organization.restoreFromRecycleBin(threadId)}
           searchQuery={searchQuery}
         />
       </section>

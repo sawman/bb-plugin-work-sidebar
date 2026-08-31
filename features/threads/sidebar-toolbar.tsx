@@ -12,7 +12,7 @@ type SidebarToolbarProps = {
   reorderDisabled: boolean;
   settings: ReactNode;
   activeProjectId: string | null;
-  onArchiveSelected(): void;
+  onBinSelected(): void;
   onRefresh(): void | Promise<unknown>;
   onNewThread(projectId: string): void;
   searchQuery: string;
@@ -25,7 +25,7 @@ export function SidebarThreadToolbar({
   reorderDisabled,
   settings,
   activeProjectId,
-  onArchiveSelected,
+  onBinSelected,
   onRefresh,
   onNewThread,
   searchQuery,
@@ -44,9 +44,9 @@ export function SidebarThreadToolbar({
                 </span>
                 <button
                   className="ws-selection-archive"
-                  onClick={onArchiveSelected}
+                  onClick={onBinSelected}
                 >
-                  Archive selected
+                  Move to Recycle Bin
                 </button>
               </>
             )}

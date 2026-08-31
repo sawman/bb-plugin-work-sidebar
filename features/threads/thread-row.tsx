@@ -16,9 +16,7 @@ import type { ThreadRowProps } from "./thread-row-types";
 import { useThreadRowActions } from "./use-thread-row-actions";
 import { useThreadRowPointerDrag } from "./use-thread-row-pointer-drag";
 import { useThreadHierarchy } from "./thread-hierarchy-context";
-import {
-  THREAD_TO_TOP_DESCRIPTION,
-} from "./use-thread-hierarchy-menu";
+import { THREAD_TO_TOP_DESCRIPTION } from "./use-thread-hierarchy-menu";
 import { toast } from "sonner";
 
 export function ThreadRow({
@@ -34,6 +32,7 @@ export function ThreadRow({
   onToggleChildren,
   onSelect,
   onMoveToGroup,
+  onMoveToRecycleBin,
   project,
   provider,
   onNavigate,
@@ -66,7 +65,7 @@ export function ThreadRow({
     onDropTargetChange,
     onMoveToGroup,
     onDropThread,
-    onArchive: rowActions.archiveTree,
+    onArchive: () => (onMoveToRecycleBin ?? rowActions.archiveTree)(thread.id),
     onReparentThread: (sourceId, parentThreadId) => {
       void hierarchy
         .move(sourceId, parentThreadId)
@@ -145,6 +144,7 @@ export function ThreadRow({
           groupId={groupId}
           groups={groups}
           onMoveToGroup={onMoveToGroup}
+          onMoveToRecycleBin={onMoveToRecycleBin}
           onFocusReturn={() => anchorRef.current?.focus()}
           actions={rowActions}
         >
