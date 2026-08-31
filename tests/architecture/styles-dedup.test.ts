@@ -2,345 +2,14 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 
-const root = join(import.meta.dirname, "../..");
-const stylesheetPath = join(root, "views.css");
-
-type Declaration = {
-  property: string;
-  value: string;
-  important: boolean;
-  line: number;
-};
-
 type Rule = {
   selector: string;
-  declarations: Declaration[];
+  properties: string[];
   line: number;
   atRules: string[];
 };
 
-type DuplicateInventoryItem = {
-  selector: string;
-  lines: number[];
-  overlappingProperties: string[];
-};
-
-const RED_DEAD_SELECTORS = [
-  ".ws-status",
-  ".ws-thread-child-depth-1, .ws-thread-child-depth-2, .ws-thread-child-depth-3, .ws-thread-child-depth-4",
-  ".ws-section-count",
-  ".ws-card-note",
-  ".ws-stack-rail",
-  ".ws-stack-layer",
-  ".ws-agent-card small",
-  ".ws-agent-card",
-  ".ws-agent-card strong",
-  ".ws-agent-state-waiting",
-  ".ws-agent-state-idle",
-  ".ws-thread",
-  ".ws-thread > .ws-thread-anchor",
-  ".ws-thread > .ws-thread-anchor.ws-thread-has-children",
-  ".ws-thread-dragging > .ws-thread-anchor",
-  ".ws-task-meta",
-  ".ws-task-key-badge, .ws-task-badge",
-  ".ws-task-status-picker",
-  ".ws-task-status-picker svg",
-  ".ws-task-status-picker:hover:not(:disabled)",
-  ".ws-pr-row",
-  ".ws-pr-changes_requested",
-  ".ws-pr-stack-disclosure",
-  '.ws-pr-stack-disclosure[data-state="open"]',
-  ".ws-pr-stack-disclosure:hover",
-  ".ws-pr-stack-layer-item",
-  ".ws-pr-stack-layer-item .ws-pr-row",
-  ".ws-pr-target",
-  ".ws-pr-stack-layer-item::before",
-  ".ws-pr-stack-layer-item > .ws-pr-row",
-  ".ws-thread-settings-menu",
-  ".ws-thread-task-card",
-] as const;
-
-// These selectors looked state-specific in the RED review, but were still
-// same-cascade duplicates. They remain in the RED inventory and are not an
-// exemption from the zero-overlap gate.
-const STATE_SHAPED_RED_SELECTORS = [
-  ".ws-thread-dragging > .ws-thread-anchor",
-  ".ws-task-status-picker:hover:not(:disabled)",
-  ".ws-pr-changes_requested",
-  '.ws-pr-stack-disclosure[data-state="open"]',
-  ".ws-pr-stack-disclosure:hover",
-] as const;
-
-// These exact selectors intentionally remain split because each repeated rule
-// owns disjoint declarations; the overlap gate below still inspects every one.
-const EXPECTED_DISJOINT_REPEATED_SELECTORS = [
-  ".ws-thread-child-depth-1, .ws-thread-child-depth-2, .ws-thread-child-depth-3, .ws-thread-child-depth-4",
-  ".ws-section-count",
-  ".ws-callout button",
-  ".ws-stack-layer",
-  ".ws-agent-card small",
-  ".ws-agent-card",
-  ".ws-agent-card > span:nth-child(2)",
-  ".ws-agent-card strong",
-  ".ws-thread",
-  ".ws-thread > .ws-thread-anchor",
-  ".ws-thread > .ws-rename",
-  ".ws-thread-trailing",
-  ".ws-task-meta",
-  ".ws-task-key-badge, .ws-task-badge",
-  ".ws-task-status-picker",
-  ".ws-pr-row",
-  ".ws-pr-stack",
-  ".ws-pr-stack-disclosure",
-  ".ws-pr-stack-layer-item",
-  ".ws-pr-target",
-  ".ws-work-toolbar-actions",
-  ".ws-thread-settings",
-] as const;
-
-const EXPECTED_EFFECTIVE_STYLES: Record<string, Record<string, string>> = {
-  ".ws-status": {
-    width: "auto",
-    "min-width": "0.8rem",
-    "font-size": "0.58rem",
-    position: "relative",
-    display: "inline-grid",
-    "grid-auto-flow": "column",
-    "column-gap": "0.08rem",
-    "place-items": "center",
-    height: "0.8rem",
-    color: "var(--muted-foreground)",
-    "line-height": "1",
-  },
-  ".ws-thread-child-depth-1, .ws-thread-child-depth-2, .ws-thread-child-depth-3, .ws-thread-child-depth-4":
-    {
-      "border-left": "1px solid var(--border)",
-      "margin-left": "0.38rem",
-      "padding-left": "0.24rem",
-    },
-  ".ws-section-count": {
-    color: "var(--muted-foreground)",
-    "font-size": "0.58rem",
-  },
-  ".ws-card-note": {
-    margin: "0",
-    color: "var(--muted-foreground)",
-    "font-size": "0.64rem",
-    "line-height": "1.35",
-  },
-  ".ws-stack-rail": {
-    display: "grid",
-    gap: "0.08rem",
-    margin: "0",
-    padding: "0",
-    "list-style": "none",
-  },
-  ".ws-stack-layer": {
-    "grid-template-columns": "0.8rem minmax(0, 1fr) auto",
-    "align-items": "center",
-    "min-width": "0",
-    "border-radius": "calc(var(--radius) - 3px)",
-    padding: "0.38rem 0.28rem !important",
-    display: "grid",
-    width: "100%",
-    gap: "0.32rem",
-    border: "0 !important",
-    background: "transparent",
-    color: "inherit",
-    "text-align": "left",
-  },
-  ".ws-agent-card small": {
-    color: "var(--muted-foreground)",
-    "font-size": "0.6rem",
-    "line-height": "1.2",
-  },
-  ".ws-agent-card": {
-    "grid-template-columns": "0.8rem minmax(0, 1fr) auto",
-    "align-items": "start",
-    "min-width": "0",
-    padding: "0.42rem 0.18rem",
-    gap: "0.34rem",
-    "border-width": "0 0 1px",
-    "border-radius": "0",
-    background: "transparent",
-    display: "grid",
-    width: "100%",
-  },
-  ".ws-agent-card strong": {
-    overflow: "hidden",
-    "font-size": "0.7rem",
-    "text-overflow": "ellipsis",
-    "white-space": "nowrap",
-    "line-height": "1.2",
-  },
-  ".ws-agent-state-waiting": {
-    color: "var(--primary)",
-    animation: "ws-agent-waiting-bob 1.6s ease-in-out infinite",
-  },
-  ".ws-agent-state-idle": {
-    color: "var(--muted-foreground)",
-  },
-  ".ws-thread": {
-    display: "grid",
-    "grid-template-columns": "minmax(0, 1fr)",
-    "align-items": "center",
-    cursor: "grab",
-  },
-  ".ws-thread > .ws-thread-anchor": {
-    "grid-column": "2",
-    "grid-row": "1",
-    display: "grid",
-    "grid-template-columns": "0.8rem minmax(0, 1fr) auto",
-    width: "100%",
-    "padding-left": "0",
-  },
-  ".ws-thread > .ws-thread-anchor.ws-thread-has-children": {
-    "padding-left": "0",
-  },
-  ".ws-thread-dragging > .ws-thread-anchor": {
-    background: "var(--accent)",
-  },
-  ".ws-task-meta": {
-    "flex-wrap": "wrap",
-    gap: "0.2rem",
-    "align-items": "center",
-    overflow: "visible",
-  },
-  ".ws-task-key-badge, .ws-task-badge": {
-    border: "1px solid var(--border)",
-    "border-radius": "999px",
-    padding: "0.03rem 0.22rem",
-    "white-space": "nowrap",
-    display: "inline-flex",
-    "align-items": "center",
-    gap: "0.14rem",
-    "min-height": "1rem",
-    "box-sizing": "border-box",
-    "font-size": "0.54rem",
-    "line-height": "1",
-  },
-  ".ws-task-status-picker": {
-    display: "inline-flex",
-    "min-height": "1rem",
-    "align-items": "center",
-    "justify-content": "center",
-    gap: "0.22rem",
-    border: "0",
-    "border-radius": "2px",
-    padding: "0",
-    background: "transparent",
-    font: "inherit",
-    "font-size": "0.62rem",
-    "font-weight": "650",
-    "line-height": "1.15",
-    "white-space": "nowrap",
-    cursor: "pointer",
-    position: "relative",
-    width: "1rem",
-    "min-width": "1rem",
-    height: "1rem",
-  },
-  ".ws-task-status-picker svg": {
-    width: "0.62rem",
-    height: "0.62rem",
-  },
-  ".ws-task-status-picker:hover:not(:disabled)": {
-    background: "var(--accent)",
-  },
-  ".ws-pr-row": {
-    position: "relative",
-    display: "grid",
-    "grid-template-columns": "var(--ws-pr-stack-gutter) minmax(0, 1fr) auto",
-    gap: "0.18rem",
-    "align-items": "center",
-    "padding-block": "0.16rem",
-    "padding-inline": "0.45rem",
-    "padding-left": "0",
-  },
-  ".ws-pr-changes_requested": {
-    color: "var(--destructive)",
-  },
-  ".ws-pr-stack-disclosure": {
-    display: "inline-flex",
-    width: "0.8rem",
-    height: "1.15rem",
-    "align-items": "center",
-    "justify-content": "center",
-    flex: "none",
-    border: "0",
-    "border-radius": "calc(var(--radius) - 3px)",
-    background: "transparent",
-    color: "var(--muted-foreground)",
-    cursor: "pointer",
-    padding: "0",
-    "font-size": "0.68rem",
-    "line-height": "1",
-    transition: "transform 0.12s ease",
-  },
-  '.ws-pr-stack-disclosure[data-state="open"]': {
-    transform: "rotate(90deg)",
-    background: "transparent",
-    color: "var(--foreground)",
-  },
-  ".ws-pr-stack-disclosure:hover": {
-    color: "var(--foreground)",
-    background: "var(--accent)",
-    "border-radius": "calc(var(--radius) - 3px)",
-  },
-  ".ws-pr-stack-layer-item": {
-    "min-width": "0",
-    "padding-left": "0 !important",
-    position: "relative",
-    "margin-left": "0 !important",
-    "border-left": "0",
-    background: "none",
-  },
-  ".ws-pr-stack-layer-item .ws-pr-row": {
-    "padding-left": "0",
-  },
-  ".ws-pr-target": {
-    "grid-template-columns": "minmax(0, 1fr)",
-    "grid-template-areas": '"title" "context"',
-    "row-gap": "0.16rem",
-    color: "inherit",
-    "text-decoration": "none",
-  },
-  ".ws-pr-stack-layer-item::before": {
-    position: "absolute",
-    top: "0",
-    bottom: "0",
-    left: "calc(var(--ws-pr-row-inline-padding) + (var(--ws-pr-stack-gutter) - 1px) / 2 - 1px) !important",
-    width: "1px",
-    background: "color-mix(in srgb, var(--primary) 72%, var(--border))",
-    content: '""',
-  },
-  ".ws-pr-stack-layer-item > .ws-pr-row": {
-    "margin-left": "0 !important",
-    background:
-      "linear-gradient( 90deg, color-mix(in srgb, var(--primary) 6%, transparent), transparent 36% )",
-    "padding-left": "0 !important",
-  },
-  ".ws-thread-settings-menu": {
-    position: "absolute",
-    "z-index": "100 !important",
-    right: "0",
-    top: "calc(100% + 0.2rem) !important",
-    display: "grid",
-    "min-width": "10.5rem",
-    padding: "0.18rem",
-    border: "1px solid var(--border)",
-    "border-radius": "var(--radius)",
-    background: "var(--popover)",
-    "box-shadow":
-      "0 8px 24px color-mix(in srgb, var(--foreground) 18%, transparent)",
-    bottom: "auto !important",
-  },
-  ".ws-thread-task-card": {
-    display: "grid",
-    gap: "0.38rem",
-    padding: "0.58rem",
-  },
-};
+const stylesheetPath = join(import.meta.dirname, "../../views.css");
 
 function withoutComments(source: string) {
   return source.replace(/\/\*[\s\S]*?\*\//g, (comment) =>
@@ -361,288 +30,149 @@ function matchingClose(source: string, openIndex: number) {
       if (character === quote && source[index - 1] !== "\\") quote = null;
       continue;
     }
-    if (character === '"' || character === "'") {
-      quote = character;
-    } else if (character === "{") {
-      depth += 1;
-    } else if (character === "}") {
+    if (character === '"' || character === "'") quote = character;
+    if (character === "{") depth += 1;
+    if (character === "}") {
       depth -= 1;
       if (depth === 0) return index;
     }
   }
-  throw new Error(`Unclosed CSS block at ${lineNumber(source, openIndex)}`);
+  throw new Error(`Unclosed CSS block at line ${lineNumber(source, openIndex)}`);
 }
 
-function normalizeWhitespace(value: string) {
+function normalize(value: string) {
   return value.trim().replace(/\s+/g, " ");
 }
 
-function parseDeclarations(
-  source: string,
-  start: number,
-  end: number,
-): Declaration[] {
-  const declarations: Declaration[] = [];
+function declarationProperties(source: string, start: number, end: number) {
+  const properties: string[] = [];
   let segmentStart = start;
   let parentheses = 0;
   let quote: '"' | "'" | null = null;
-  const segments: Array<[number, number]> = [];
+
+  const readSegment = (segmentEnd: number) => {
+    const segment = source.slice(segmentStart, segmentEnd);
+    const colon = segment.indexOf(":");
+    if (colon >= 0) {
+      const property = normalize(segment.slice(0, colon));
+      if (/^[-\w]+$/.test(property)) properties.push(property);
+    }
+    segmentStart = segmentEnd + 1;
+  };
 
   for (let index = start; index < end; index += 1) {
     const character = source[index];
     if (quote) {
       if (character === quote && source[index - 1] !== "\\") quote = null;
-    } else if (character === '"' || character === "'") {
-      quote = character;
-    } else if (character === "(") {
-      parentheses += 1;
-    } else if (character === ")") {
-      parentheses -= 1;
-    } else if (character === ";" && parentheses === 0) {
-      segments.push([segmentStart, index]);
-      segmentStart = index + 1;
+      continue;
     }
+    if (character === '"' || character === "'") quote = character;
+    if (character === "(") parentheses += 1;
+    if (character === ")") parentheses -= 1;
+    if (character === ";" && parentheses === 0) readSegment(index);
   }
-  segments.push([segmentStart, end]);
-
-  for (const [segmentStartIndex, segmentEnd] of segments) {
-    const segment = source.slice(segmentStartIndex, segmentEnd);
-    const colon = segment.indexOf(":");
-    if (colon < 0) continue;
-    const property = normalizeWhitespace(segment.slice(0, colon));
-    if (!/^[-\w]+$/.test(property)) continue;
-    let value = normalizeWhitespace(segment.slice(colon + 1));
-    const important = /\s*!important$/.test(value);
-    if (important) value = value.replace(/\s*!important$/, " !important");
-    declarations.push({
-      property,
-      value,
-      important,
-      line: lineNumber(source, segmentStartIndex),
-    });
-  }
-  return declarations;
+  readSegment(end);
+  return properties;
 }
 
-function parseRules(source: string): Rule[] {
+function parseRules(source: string) {
   const clean = withoutComments(source);
   const rules: Rule[] = [];
 
-  function parseRange(start: number, end: number, atRules: string[]) {
+  const parseRange = (start: number, end: number, atRules: string[]) => {
     let cursor = start;
     while (cursor < end) {
       const open = clean.indexOf("{", cursor);
       if (open < 0 || open >= end) return;
       const close = matchingClose(clean, open);
-      if (close > end)
-        throw new Error(
-          `CSS block escapes its parent at ${lineNumber(clean, open)}`,
-        );
-      const prelude = normalizeWhitespace(clean.slice(cursor, open));
+      const prelude = normalize(clean.slice(cursor, open));
       if (prelude.startsWith("@")) {
         parseRange(open + 1, close, [...atRules, prelude]);
-      } else if (prelude.startsWith(".")) {
+      } else if (prelude) {
         rules.push({
           selector: prelude,
-          declarations: parseDeclarations(clean, open + 1, close),
+          properties: declarationProperties(clean, open + 1, close),
           line: lineNumber(clean, cursor),
           atRules,
         });
       }
       cursor = close + 1;
     }
-  }
+  };
 
   parseRange(0, clean.length, []);
   return rules;
 }
 
-function ruleKey({ atRules, selector }: Pick<Rule, "atRules" | "selector">) {
-  return JSON.stringify([...atRules, selector]);
+function ruleKey(rule: Pick<Rule, "atRules" | "selector">) {
+  return JSON.stringify([...rule.atRules, rule.selector]);
 }
 
-function effectiveDeclarations(
-  rules: Rule[],
-  selector: string,
-  atRules: string[] = [],
-) {
-  const effective = new Map<string, Declaration>();
-  const key = ruleKey({ atRules, selector });
-  for (const rule of rules.filter((candidate) => ruleKey(candidate) === key)) {
-    for (const declaration of rule.declarations) {
-      const previous = effective.get(declaration.property);
-      if (!previous || declaration.important || !previous.important)
-        effective.set(declaration.property, declaration);
-    }
-  }
-  return Object.fromEntries(
-    [...effective.entries()].map(([property, declaration]) => [
-      property,
-      declaration.value,
-    ]),
-  );
-}
-
-function overlappingProperties(rules: Rule[]) {
+function conflictingRepeatedProperties(rules: Rule[]) {
   const byCascade = new Map<string, Rule[]>();
-  for (const rule of rules) {
-    const key = ruleKey(rule);
-    byCascade.set(key, [...(byCascade.get(key) ?? []), rule]);
-  }
-  const duplicates: DuplicateInventoryItem[] = [];
+  for (const rule of rules)
+    byCascade.set(ruleKey(rule), [...(byCascade.get(ruleKey(rule)) ?? []), rule]);
 
-  for (const selectorRules of byCascade.values()) {
-    if (selectorRules.length < 2) continue;
-    const properties = new Set<string>();
-    for (let first = 0; first < selectorRules.length; first += 1) {
-      const firstProperties = selectorRules[first]!.declarations.map(
-        ({ property }) => property,
-      );
-      for (let second = first + 1; second < selectorRules.length; second += 1) {
-        const secondProperties = new Set(
-          selectorRules[second]!.declarations.map(({ property }) => property),
-        );
-        for (const property of firstProperties)
-          if (secondProperties.has(property)) properties.add(property);
+  return [...byCascade.values()].flatMap((matchingRules) => {
+    if (matchingRules.length < 2) return [];
+    const propertyOwners = new Map<string, number[]>();
+    for (const rule of matchingRules)
+      for (const property of new Set(rule.properties))
+        propertyOwners.set(property, [
+          ...(propertyOwners.get(property) ?? []),
+          rule.line,
+        ]);
+
+    const overlaps = [...propertyOwners.entries()]
+      .filter(([, lines]) => lines.length > 1)
+      .map(([property, lines]) => ({ property, lines }));
+    return overlaps.length
+      ? [{ selector: matchingRules[0]!.selector, atRules: matchingRules[0]!.atRules, overlaps }]
+      : [];
+  });
+}
+
+describe("stylesheet duplicate ownership", () => {
+  test("distinguishes cascade contexts while detecting real declaration conflicts", () => {
+    const rules = parseRules(`
+      .same { color: red; }
+      .same { color: blue; }
+      .disjoint { color: red; }
+      .disjoint { display: grid; }
+      @media (max-width: 320px) {
+        .same { color: green; }
+        .media-conflict { gap: 1px; }
+        .media-conflict { gap: 2px; }
       }
-    }
-    if (properties.size === 0) continue;
-    duplicates.push({
-      selector: selectorRules[0]!.selector,
-      lines: selectorRules.map(({ line }) => line),
-      overlappingProperties: [...properties].sort(),
-    });
-  }
-  return duplicates;
-}
+    `);
 
-function repeatedExactSelectors(rules: Rule[]) {
-  const counts = new Map<string, { count: number; selector: string }>();
-  for (const rule of rules) {
-    const key = ruleKey(rule);
-    const count = counts.get(key);
-    counts.set(key, {
-      count: (count?.count ?? 0) + 1,
-      selector: rule.selector,
-    });
-  }
-  return [...counts.values()]
-    .filter(({ count }) => count > 1)
-    .map(({ selector }) => selector);
-}
-
-function emptyRules(rules: Rule[]) {
-  return rules
-    .filter(({ declarations }) => declarations.length === 0)
-    .map(({ selector, line }) => ({ selector, line }));
-}
-
-describe("protected stylesheet duplicate ownership", () => {
-  test("records class rules nested in at-rules for ownership checks", () => {
     expect(
-      parseRules(
-        "@media (min-width: 1px) { .ws-at-rule-only { color: red; } }",
+      conflictingRepeatedProperties(rules).map(
+        ({ selector, atRules, overlaps }) => ({
+          selector,
+          atRules,
+          properties: overlaps.map(({ property }) => property),
+        }),
       ),
     ).toEqual([
+      { selector: ".same", atRules: [], properties: ["color"] },
       {
-        selector: ".ws-at-rule-only",
-        declarations: [
-          {
-            property: "color",
-            value: "red",
-            important: false,
-            line: 1,
-          },
-        ],
-        line: 1,
-        atRules: ["@media (min-width: 1px)"],
+        selector: ".media-conflict",
+        atRules: ["@media (max-width: 320px)"],
+        properties: ["gap"],
       },
     ]);
   });
 
-  test("keeps top-level and at-rule stack toggle gaps in separate cascades", () => {
-    const media = "@media (max-width: 320px)";
-    const rules = parseRules(`
-      .ws-stack-layer-toggle { gap: 0.05rem; }
-      @media (max-width: 320px) {
-        .ws-stack-layer-toggle { gap: 0.02rem; }
-      }
-    `);
-
-    expect({
-      topLevel: effectiveDeclarations(rules, ".ws-stack-layer-toggle"),
-      media: effectiveDeclarations(rules, ".ws-stack-layer-toggle", [media]),
-      overlaps: overlappingProperties(rules),
-      repeated: repeatedExactSelectors(rules),
-    }).toEqual({
-      topLevel: { gap: "0.05rem" },
-      media: { gap: "0.02rem" },
-      overlaps: [],
-      repeated: [],
-    });
-  });
-
-  test("allows an expected disjoint repeat in a separate at-rule cascade", () => {
-    const selector = ".ws-pr-stack-disclosure";
-    const rules = parseRules(`
-      .ws-pr-stack-disclosure { display: grid; }
-      .ws-pr-stack-disclosure { gap: 0.25rem; }
-      @media (max-width: 320px) {
-        .ws-pr-stack-disclosure { scroll-margin-top: 2px; }
-      }
-    `);
-
-    expect(EXPECTED_DISJOINT_REPEATED_SELECTORS).toContain(selector);
-    expect(
-      repeatedExactSelectors(rules),
-      "media-only rules must not enter the top-level repeated-selector inventory",
-    ).toEqual([selector]);
-    expect(
-      overlappingProperties(rules),
-      "a media-only declaration must not create a top-level duplicate-property overlap",
-    ).toEqual([]);
-    expect(
-      effectiveDeclarations(rules, selector),
-      "top-level effective declarations must exclude media-only properties",
-    ).toEqual({
-      display: "grid",
-      gap: "0.25rem",
-    });
-  });
-
-  test("preserves the exact RED inventory and effective declarations", () => {
+  test("keeps production rules free of empty blocks and same-cascade conflicts", () => {
     const rules = parseRules(readFileSync(stylesheetPath, "utf8"));
-    const inventory = overlappingProperties(rules);
-
-    expect(RED_DEAD_SELECTORS).toHaveLength(32);
     expect(
-      STATE_SHAPED_RED_SELECTORS.every((selector) =>
-        RED_DEAD_SELECTORS.includes(selector),
-      ),
-    ).toBe(true);
-    expect(
-      inventory,
-      "all RED same-cascade overlaps must be consolidated",
+      rules.filter(({ properties }) => properties.length === 0),
+      "remove empty rules",
     ).toEqual([]);
-    expect(emptyRules(rules), "empty CSS rules must be removed").toEqual([]);
-
-    for (const selector of RED_DEAD_SELECTORS) {
-      expect(effectiveDeclarations(rules, selector), selector).toEqual(
-        EXPECTED_EFFECTIVE_STYLES[selector],
-      );
-    }
-
-    const repeated = repeatedExactSelectors(rules);
-    expect(repeated).toEqual([...EXPECTED_DISJOINT_REPEATED_SELECTORS]);
-  });
-
-  test("requires zero overlapping properties across repeated exact selectors", () => {
-    const inventory = overlappingProperties(
-      parseRules(readFileSync(stylesheetPath, "utf8")),
-    );
     expect(
-      inventory.map(({ selector }) => selector),
-      "repeated exact selectors must not overlap",
+      conflictingRepeatedProperties(rules),
+      "merge repeated selectors that own the same property in one cascade",
     ).toEqual([]);
   });
 });

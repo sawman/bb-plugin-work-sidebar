@@ -6,10 +6,17 @@ import type {
   ThreadProviderDirectory,
 } from "@/components/threads/thread-provider-logo";
 
-export type ThreadDropTarget = {
-  threadId: string;
-  placement: "before" | "after";
-} | null;
+export type ThreadDropTarget =
+  | {
+      kind: "reorder";
+      threadId: string;
+      placement: "before" | "after";
+    }
+  | {
+      kind: "reparent";
+      parentThreadId: string | null;
+    }
+  | null;
 
 export type ThreadProject = {
   name: string;
@@ -21,6 +28,7 @@ export type ThreadRowProps = {
   active: boolean;
   children: number;
   activeChildren: number;
+  staleWorkingMinutes?: number;
   childrenExpanded: boolean;
   selected: boolean;
   groupId: string | null;
@@ -35,8 +43,6 @@ export type ThreadRowProps = {
   provider?: ThreadProvider;
   onNavigate(): void;
   reorderDisabled: boolean;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
   dragThreadId: string | null;
   onDragThreadChange(threadId: string | null): void;
   dropTarget: ThreadDropTarget;
@@ -47,7 +53,6 @@ export type ThreadRowProps = {
     targetId: string,
     placement: "before" | "after",
   ): void;
-  onMoveThread(threadId: string, direction: -1 | 1): void;
 };
 
 export type WorkThreadTreeProps = Omit<
@@ -55,11 +60,10 @@ export type WorkThreadTreeProps = Omit<
   | "active"
   | "children"
   | "activeChildren"
+  | "staleWorkingMinutes"
   | "childrenExpanded"
   | "selected"
   | "groupId"
-  | "canMoveUp"
-  | "canMoveDown"
   | "canDropThread"
   | "onToggleChildren"
   | "provider"
@@ -72,5 +76,6 @@ export type WorkThreadTreeProps = Omit<
   providersById: ThreadProviderDirectory;
   orderedSiblings: readonly PluginSidebarThread[];
   subtextRefreshKey: number;
+  staleWorkingMinutes: number;
   depth?: number;
 };

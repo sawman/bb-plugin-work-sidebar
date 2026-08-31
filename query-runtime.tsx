@@ -25,11 +25,11 @@ export const queryKeys = {
     ],
   },
   agents: {
-    details: (version: readonly string[]): QueryKey => [
+    details: (threadIds: readonly string[]): QueryKey => [
       ...queryRoot,
       "agents",
       "details",
-      ...version,
+      ...threadIds,
     ],
   },
   sidebar: {
@@ -97,10 +97,14 @@ export const queryPolicies = {
     refetchOnReconnect: false,
   },
   agentDetails: {
-    staleTime: 15_000,
-    gcTime: 10 * 60_000,
+    // A thread's execution model is fixed when the thread is created. Keep
+    // the directory for this frontend generation instead of refetching it on
+    // every host activity update or Agents-tab remount.
+    staleTime: Infinity,
+    gcTime: Infinity,
     retry: 1,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   },
   sidebarOrderPreferences: {
     staleTime: Infinity,

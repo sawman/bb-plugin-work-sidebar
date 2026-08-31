@@ -149,7 +149,7 @@ describe("pull-request stack number presentation", () => {
     for (const badge of [pullRequest, stackNumber, branch]) {
       expect(badge.classList.contains("ws-identifier-badge")).toBe(true);
     }
-    expect(pullRequest.getAttribute("data-tone")).toBe("open");
+    expect(pullRequest.getAttribute("data-tone")).toBe("success");
     expect(branch.getAttribute("data-tone")).toBeNull();
     expect(pullRequest.querySelector("svg")).toBeTruthy();
     expect(branch.querySelector("svg")).toBeNull();
@@ -363,8 +363,8 @@ describe("pull-request stack number presentation", () => {
 
     const badge = screen.getByRole("button", { name: "Copy PR number #94" });
     expect(badge.closest("a")).toBeNull();
-    expect(badge.getAttribute("data-tone")).toBe("open");
-    expect(badge.getAttribute("title")).toContain("Open");
+    expect(badge.getAttribute("data-tone")).toBe("success");
+    expect(badge.getAttribute("title")).toContain("Ready to merge");
     expect(screen.queryByRole("button", { name: "Mark draft" })).toBeNull();
     fireEvent.contextMenu(badge, { clientX: 12, clientY: 18 });
     const action = screen.getByRole("menuitem", { name: "Mark draft" });
@@ -373,6 +373,47 @@ describe("pull-request stack number presentation", () => {
     fireEvent.keyDown(badge, { key: "F10", shiftKey: true });
     expect(screen.getByRole("menuitem", { name: "Mark draft" })).toBeTruthy();
   });
+
+  it.each([
+    ["Draft", "draft", "GitPullRequest", { draft: true, attention: "draft" }],
+    ["Review pending", "open", "Eye", { draft: false, attention: "review_requested" }],
+    ["CI failure", "destructive", "X", { draft: false, attention: "checks_failed" }],
+    ["Changes requested", "destructive", "X", { draft: false, attention: "changes_requested" }],
+    ["Conflicts", "destructive", "X", { draft: false, attention: "conflicts" }],
+    ["Ready to merge", "success", "Check", { draft: false, attention: "ready_to_merge" }],
+  ])(
+    "exposes the %s status label, tone, and icon from the PR badge",
+    (label, tone, icon, state) => {
+      const { unmount } = render(
+        <AuthoredPullRequestRow
+          pullRequest={{
+            number: 96,
+            title: `${label} pull request`,
+            url: "https://github.com/acme/repo/pull/96",
+            repository: "acme/repo",
+            state: state.draft ? "draft" : "open",
+            draft: state.draft,
+            attention: state.attention,
+            head: "feature/status-badge",
+            base: "main",
+            checks: "passing",
+            review: "approved",
+            reviewCommentCount: 0,
+          }}
+          changingDraft={false}
+          onToggleDraft={vi.fn()}
+        />,
+      );
+
+      const badge = screen.getByRole("button", {
+        name: "Copy PR number #96",
+      });
+      expect(badge.getAttribute("data-tone")).toBe(tone);
+      expect(badge.getAttribute("title")).toBe(`PR #96 · ${label}`);
+      expect(badge.querySelector("svg")?.getAttribute("data-icon")).toBe(icon);
+      unmount();
+    },
+  );
 
   it("keeps title navigation while the whole row owns an informative context menu", () => {
     const openPullRequest = vi.fn();
@@ -413,14 +454,43 @@ describe("pull-request stack number presentation", () => {
     expect(title.getAttribute("href")).toBe(
       "https://github.com/acme/repo/pull/95",
     );
-    fireEvent.click(title, { metaKey: true });
+
+    const ordinaryClick = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+    });
+    expect(title.dispatchEvent(ordinaryClick)).toBe(false);
+    expect(ordinaryClick.defaultPrevented).toBe(true);
+    expect(openPullRequest).toHaveBeenCalledWith(
+      "https://github.com/acme/repo/pull/95",
+    );
+    openPullRequest.mockClear();
+
+    for (const modifier of [
+      { metaKey: true },
+      { ctrlKey: true },
+      { shiftKey: true },
+      { altKey: true },
+    ]) {
+      const modifiedClick = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        ...modifier,
+      });
+      expect(title.dispatchEvent(modifiedClick)).toBe(true);
+      expect(modifiedClick.defaultPrevented).toBe(false);
+    }
     expect(openPullRequest).not.toHaveBeenCalled();
     fireEvent.contextMenu(title, { clientX: 12, clientY: 18 });
-    expect(screen.getByRole("menu").getAttribute("data-portalled")).toBe("true");
+    expect(screen.getByRole("menu").getAttribute("data-portalled")).toBe(
+      "true",
+    );
     expect(
-      screen.getByRole("menuitem", { name: "CI: Checks passing" }).getAttribute(
-        "aria-disabled",
-      ),
+      screen
+        .getByRole("menuitem", { name: "CI: Checks passing" })
+        .getAttribute("aria-disabled"),
     ).toBe("true");
     expect(
       screen
@@ -436,13 +506,17 @@ describe("pull-request stack number presentation", () => {
         })
         .getAttribute("aria-disabled"),
     ).toBe("true");
-    fireEvent.click(screen.getByRole("menuitem", { name: "Open pull request" }));
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: "Open pull request" }),
+    );
     expect(openPullRequest).toHaveBeenCalledWith(
       "https://github.com/acme/repo/pull/95",
     );
 
     fireEvent.contextMenu(title, { clientX: 12, clientY: 18 });
-    fireEvent.click(screen.getByRole("menuitem", { name: "Open linked thread" }));
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: "Open linked thread" }),
+    );
     expect(openThread).toHaveBeenCalledWith("thr_context");
 
     const provider = screen.getByRole("button", {
@@ -602,6 +676,6 @@ describe("pull-request stack number presentation", () => {
       screen
         .getByRole("button", { name: "Copy PR number #93" })
         .getAttribute("title"),
-    ).toBe("PR #93 · Open");
+    ).toBe("PR #93 · Ready to merge");
   });
 });

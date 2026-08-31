@@ -38,7 +38,23 @@ describe("R1 app bundle ownership", () => {
     const styles = readFileSync(resolve(repositoryRoot, "dist/app.css"), "utf8");
     expect(styles).not.toMatch(/ws-(review-diff|diff-toolbar|split-diff|working-tree-patch)/);
     expect(styles).toContain(
-      ".ws-combobox-options button[data-active=true]{background:var(--accent);box-shadow:inset 0 0 0 1px var(--ring)}",
+      ".ws-search-shell-options button[data-active=true]{background:var(--accent)}",
     );
+    expect(styles).toContain(
+      ".ws-search-shell-options button[data-active=true]{box-shadow:inset 0 0 0 1px var(--ring)}",
+    );
+  });
+
+  it("retains the typed task automation RPC and tool markers in the server bundle", () => {
+    const bundle = readFileSync(resolve(repositoryRoot, "dist/server.js"), "utf8");
+
+    expect(bundle).toContain("createExecutionTask");
+    expect(bundle).toContain("bindExecutionOwner");
+    expect(bundle).toContain("create_work_task");
+    expect(bundle).toContain("get_task");
+    expect(bundle).toContain("update_task");
+    expect(bundle).toContain("comment_task");
+    expect(bundle).toContain("get_sidebar_tasks");
+    expect(bundle).toContain("Pending/recovery dispatch states require explicit reconciliation");
   });
 });

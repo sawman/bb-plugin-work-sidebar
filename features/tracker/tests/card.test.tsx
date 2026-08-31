@@ -19,6 +19,7 @@ const unlinked = {
   visible: true,
   available: true,
   message: null,
+  primaryKey: null,
   suggestions: [
     { key: "LIN-1", title: "Suggested", url: "https://linear.app/issue/LIN-1" },
   ],
@@ -232,6 +233,7 @@ describe("registered tracker card", () => {
       { threadId: "thr_populated_tracker", params: null },
       { rpc: fixture() },
     );
+    fireEvent.focus(await slot.findByLabelText("Search Linear issues"));
     const option = await slot.findByRole("option");
     expect(option.textContent).toContain("LIN-1");
     expect(option.getAttribute("aria-selected")).toBe("false");
@@ -246,6 +248,7 @@ describe("registered tracker card", () => {
       { threadId: "thr_empty_tracker", params: null },
       { rpc: fixture({ getWorkTracker: () => ({ ...unlinked, suggestions: [] }) }) },
     );
+    fireEvent.focus(await slot.findByLabelText("Search Linear issues"));
     await waitFor(() => expect(slot.getByText("No related issues found.")).toBeTruthy());
     await expectNoAriaViolations(slot.container);
     expect(slot.queryByRole("listbox", { name: "Suggested Linear issues" })).toBeNull();
@@ -302,9 +305,44 @@ describe("registered tracker card", () => {
       );
       await waitFor(() => expect(slot.getByText("Status")).toBeTruthy());
       expect(slot.getByText("Tasks")).toBeTruthy();
-      expect(slot.getByText("Outcome")).toBeTruthy();
+      expect(slot.getByText("Work item")).toBeTruthy();
       slot.lifecycle.unmount();
     }
+  });
+
+  it("scopes a rejected tracker query to Linear and retries while the BB outcome remains visible", async () => {
+    const app = await loadPluginApp(() => import("../../../app"));
+    const retryAttempt = deferred<typeof unlinked>();
+    let recover = false;
+    const getWorkTracker = vi.fn(() => {
+      if (recover) return Promise.resolve(unlinked);
+      if (getWorkTracker.mock.calls.length === 1) {
+        return Promise.reject(new Error("tracker unavailable"));
+      }
+      return retryAttempt.promise;
+    });
+    const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_tracker_error", params: null }, {
+      rpc: fixture({
+        getWorkTracker,
+        getWorkOutcome: () => ({ rootThreadId: "thr_tracker_error", tasksAvailable: true, outcome: { id: "task_1", projectId: "project", projectName: "Work", key: "WORK-1", title: "Keep outcome", status: "todo", priority: "none", dueDate: null, parentTaskId: null, position: 1 }, executionTasks: [], bindings: [], legacy: { state: "none", taskIds: [], message: null } }),
+      }),
+    });
+    await waitFor(() => expect(getWorkTracker).toHaveBeenCalledTimes(2), { timeout: 3_000 });
+    expect(slot.getByText("Keep outcome")).toBeTruthy();
+    expect(slot.queryByRole("alert")).toBeNull();
+    retryAttempt.reject(new Error("tracker unavailable"));
+    await waitFor(
+      () => expect(slot.getByRole("alert").textContent).toContain("tracker unavailable"),
+      { timeout: 3_000 },
+    );
+    const terminalCallCount = getWorkTracker.mock.calls.length;
+    recover = true;
+    fireEvent.click(slot.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(getWorkTracker).toHaveBeenCalledTimes(terminalCallCount + 1));
+    expect(getWorkTracker).toHaveBeenLastCalledWith({ threadId: "thr_tracker_error" });
+    await waitFor(() => expect(slot.queryByRole("alert")).toBeNull());
+    expect(slot.getByText("Keep outcome")).toBeTruthy();
+    slot.lifecycle.unmount();
   });
 
   it("uses the exact link RPC and restores its disabled option after rejection", async () => {
@@ -317,6 +355,7 @@ describe("registered tracker card", () => {
       { threadId: "thr_mutate", params: null },
       { rpc: fixture({ getWorkTracker, linkLinearIssue }) },
     );
+    fireEvent.focus(await slot.findByLabelText("Search Linear issues"));
     await waitFor(() => expect(slot.getByText("Suggested")).toBeTruthy());
     fireEvent.click(slot.getByText("Suggested"));
     await waitFor(() =>
@@ -338,6 +377,41 @@ describe("registered tracker card", () => {
       ),
     );
     expect(toast.error).toHaveBeenCalledWith("link failed");
+    slot.lifecycle.unmount();
+  });
+
+  it("creates the BB outcome from the primary Linear issue with the mapped priority", async () => {
+    const app = await loadPluginApp(() => import("../../../app"));
+    const createWorkTask = vi.fn(() => ({ task: {} } as never));
+    const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_linear_only", params: null }, {
+      rpc: fixture({
+        getWorkTracker: () => ({ ...linked, primaryKey: "LIN-1", items: [{ ...linked.items[0], item: { ...linked.items[0].item, priority: "High" } }] }),
+        createWorkTask,
+      }),
+    });
+    await waitFor(() => expect(slot.getByRole("button", { name: "Create outcome from LIN-1" })).toBeTruthy());
+    fireEvent.click(slot.getByRole("button", { name: "Create outcome from LIN-1" }));
+    await waitFor(() => expect(createWorkTask).toHaveBeenCalledWith({
+      threadId: "thr_linear_only", title: "Suggested", priority: "high",
+      description: "Created from the Work sidebar.", parentTaskId: null,
+    }));
+    slot.lifecycle.unmount();
+  });
+
+  it("sets a primary Linear issue with busy error recovery and keeps outcome visible on tracker rejection", async () => {
+    const app = await loadPluginApp(() => import("../../../app"));
+    const primary = deferred<{ key: string }>();
+    const setPrimaryLinearIssue = vi.fn(() => primary.promise);
+    const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_primary", params: null }, {
+      rpc: fixture({ getWorkTracker: () => ({ ...multiLinked, primaryKey: "LIN-1" }), setPrimaryLinearIssue }),
+    });
+    await waitFor(() => expect(slot.getByRole("button", { name: "Make LIN-2 the primary Linear issue" })).toBeTruthy());
+    fireEvent.click(slot.getByRole("button", { name: "Make LIN-2 the primary Linear issue" }));
+    await waitFor(() => expect(setPrimaryLinearIssue).toHaveBeenCalledWith({ threadId: "thr_primary", key: "LIN-2" }));
+    expect((slot.getByRole("button", { name: "Make LIN-2 the primary Linear issue" }) as HTMLButtonElement).disabled).toBe(true);
+    primary.reject(new Error("primary failed"));
+    await waitFor(() => expect((slot.getByRole("button", { name: "Make LIN-2 the primary Linear issue" }) as HTMLButtonElement).disabled).toBe(false));
+    expect(toast.error).toHaveBeenCalledWith("primary failed");
     slot.lifecycle.unmount();
   });
 

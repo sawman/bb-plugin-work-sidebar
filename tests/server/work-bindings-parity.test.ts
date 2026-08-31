@@ -736,6 +736,7 @@ describe("durable Work/Tasks binding parity", () => {
         title: "Reuse execution task",
         description: "",
         idempotencyKey: "agent-created-execution",
+        assignee: "human",
       },
       { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
     );
@@ -756,6 +757,7 @@ describe("durable Work/Tasks binding parity", () => {
         title: "Create delegated execution",
         description: "",
         idempotencyKey: "delegated-owner",
+        assignee: "agent",
       },
       { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
     );
@@ -817,5 +819,30 @@ describe("durable Work/Tasks binding parity", () => {
       outcome: { id: OUTCOME_TASK_ID },
       legacy: { state: "none", taskIds: [], message: null },
     });
+  });
+
+  it("persists an optional outcome priority exactly once and never remaps a reused outcome", async () => {
+    const { host } = createBindingsFixture();
+    await plugin(host.bb);
+
+    await expect(
+      host.harness.behavior.callRpc("createWorkTask", {
+        threadId: ROOT_THREAD_ID,
+        title: "Create from Linear",
+        description: "",
+        parentTaskId: null,
+        priority: "urgent",
+      }),
+    ).resolves.toMatchObject({ task: { priority: "urgent" } });
+
+    await expect(
+      host.harness.behavior.callRpc("createWorkTask", {
+        threadId: ROOT_THREAD_ID,
+        title: "Later Linear edit",
+        description: "",
+        parentTaskId: null,
+        priority: "low",
+      }),
+    ).resolves.toMatchObject({ task: { priority: "urgent" } });
   });
 });

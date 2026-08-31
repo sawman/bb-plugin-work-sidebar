@@ -8,10 +8,14 @@ import {
 import type { SidebarThreadGroup } from "./model";
 import { archiveDurationLabel } from "./model";
 import { useArchivedThreads } from "./queries";
+import { SidebarTable } from "@/components/ui/sidebar-table";
 import type { ThreadProviderDirectory } from "@/components/threads/thread-provider-logo";
 
 type Project = { id: string; name: string; isPersonal: boolean };
-type DropTarget = { threadId: string; placement: "before" | "after" } | null;
+type DropTarget =
+  | { kind: "reorder"; threadId: string; placement: "before" | "after" }
+  | { kind: "reparent"; parentThreadId: string | null }
+  | null;
 const EMPTY_ARCHIVED_THREADS: ArchivedThread[] = [];
 
 export function ArchivedThreads({
@@ -27,6 +31,7 @@ export function ArchivedThreads({
   onDropTargetChange,
   onArchive,
   onRoster,
+  searchQuery,
 }: {
   threads: readonly PluginSidebarThread[];
   projectsById: ReadonlyMap<string, Project>;
@@ -40,6 +45,7 @@ export function ArchivedThreads({
   onDropTargetChange(target: DropTarget): void;
   onArchive(id: string): void;
   onRoster(ids: ReadonlySet<string>): void;
+  searchQuery: string;
 }) {
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -54,17 +60,38 @@ export function ArchivedThreads({
   const query = useArchivedThreads(fingerprint);
   const archived = (query.archive.data ??
     EMPTY_ARCHIVED_THREADS) as ArchivedThread[];
+  const needle = searchQuery.trim().toLocaleLowerCase();
+  const visibleArchived = useMemo(
+    () =>
+      archived.filter((thread) =>
+        [
+          thread.title,
+          thread.titleFallback,
+          projectsById.get(thread.projectId)?.name,
+          thread.providerId,
+          thread.environmentBranchName,
+          thread.environmentName,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLocaleLowerCase()
+          .includes(needle),
+      ),
+    [archived, needle, projectsById],
+  );
+  const searching = needle.length > 0;
+  const effectivelyOpen = searching || open;
   const ids = useMemo(
     () => new Set(archived.map((thread) => thread.id)),
     [archived],
   );
   useEffect(() => onRoster(ids), [ids, onRoster]);
   useEffect(() => {
-    if (!open || archived.length === 0) return undefined;
+    if (!effectivelyOpen || visibleArchived.length === 0) return undefined;
     setNow(Date.now());
     const interval = window.setInterval(() => setNow(Date.now()), 60_000);
     return () => window.clearInterval(interval);
-  }, [archived.length, open]);
+  }, [effectivelyOpen, visibleArchived.length]);
   const state = query.archive.isPending
     ? "loading"
     : query.archive.isError
@@ -100,15 +127,25 @@ export function ArchivedThreads({
     <details
       className="ws-thread-group ws-archived"
       data-ws-thread-drop-zone="archive"
-      data-drop-target={dropTarget?.threadId === "archive" || undefined}
-      open={open}
-      onToggle={(event) => setOpen(event.currentTarget.open)}
+      data-drop-target={
+        (dropTarget?.kind === "reorder" &&
+          dropTarget.threadId === "archive") ||
+        undefined
+      }
+      open={effectivelyOpen}
+      onToggle={(event) => {
+        if (!searching) setOpen(event.currentTarget.open);
+      }}
       onDragOver={(event) => {
         const id = dragThreadId ?? event.dataTransfer.getData("text/plain");
         if (!id || ids.has(id)) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
-        onDropTargetChange({ threadId: "archive", placement: "after" });
+        onDropTargetChange({
+          kind: "reorder",
+          threadId: "archive",
+          placement: "after",
+        });
       }}
       onDrop={(event) => {
         const id = dragThreadId ?? event.dataTransfer.getData("text/plain");
@@ -120,7 +157,7 @@ export function ArchivedThreads({
       }}
     >
       <summary>
-        Archive <span>{query.archive.data ? archived.length : ""}</span>
+        Archive <span>{query.archive.data ? visibleArchived.length : ""}</span>
       </summary>
       {state === "idle" || state === "loading" ? (
         <div className="ws-thread-group-empty">Loading archive threads…</div>
@@ -131,26 +168,30 @@ export function ArchivedThreads({
             Try again
           </button>
         </div>
-      ) : archived.length > 0 ? (
+      ) : visibleArchived.length > 0 ? (
         <section className="ws-hierarchy" aria-label="Archive threads">
-          {archived.map((thread) => (
-            <ArchivedThreadRow
-              key={thread.id}
-              thread={thread}
-              duration={archiveDurationLabel(thread.archivedAt, now)}
-              project={projectsById.get(thread.projectId)}
-              provider={providersById.get(thread.providerId)}
-              groups={groups}
-              onUnarchive={unarchive}
-              onNavigate={onNavigate}
-              dragging={dragThreadId === thread.id}
-              onDragThreadChange={onDragThreadChange}
-              onDropTargetChange={onDropTargetChange}
-            />
-          ))}
+          <SidebarTable>
+            {visibleArchived.map((thread) => (
+              <ArchivedThreadRow
+                key={thread.id}
+                thread={thread}
+                duration={archiveDurationLabel(thread.archivedAt, now)}
+                project={projectsById.get(thread.projectId)}
+                provider={providersById.get(thread.providerId)}
+                groups={groups}
+                onUnarchive={unarchive}
+                onNavigate={onNavigate}
+                dragging={dragThreadId === thread.id}
+                onDragThreadChange={onDragThreadChange}
+                onDropTargetChange={onDropTargetChange}
+              />
+            ))}
+          </SidebarTable>
         </section>
       ) : (
-        <div className="ws-thread-group-empty">No archive threads.</div>
+        <div className="ws-thread-group-empty">
+          {searching ? "No matches in Archive." : "No archive threads."}
+        </div>
       )}
     </details>
   );

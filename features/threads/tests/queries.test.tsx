@@ -4,12 +4,16 @@ import { QueryClient } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type PropsWithChildren } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { queryKeys } from "../../../query-runtime";
+import { trackerKeys } from "../../tracker/model";
 import { normalizeThreadGroups } from "../model";
 import {
   threadQueryKeys,
   threadQueryPolicies,
   saveThreadGroups,
+  saveSidebarAppearance,
   useArchivedThreadsQuery,
+  useThreadHierarchyMutation,
   type ThreadsRpc,
 } from "../queries";
 
@@ -19,7 +23,38 @@ function queryWrapper(client: QueryClient) {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+  return { promise, resolve };
+}
+
 describe("R9 Threads query ownership", () => {
+  it("round-trips text scale through the shared typed appearance query", async () => {
+    const client = new QueryClient();
+    const rpc = {
+      call: vi.fn(async (method: string, input: unknown) => {
+        expect(method).toBe("saveSidebarAppearance");
+        expect(input).toEqual({ textScale: 1.1 });
+        return { rowHeight: 40, textScale: 1.1 };
+      }),
+    };
+    await expect(
+      saveSidebarAppearance(
+        client,
+        rpc as unknown as ThreadsRpc,
+        { textScale: 1.1 },
+      ),
+    ).resolves.toEqual({ rowHeight: 40, textScale: 1.1 });
+    expect(client.getQueryData(threadQueryKeys.appearance())).toEqual({
+      rowHeight: 40,
+      textScale: 1.1,
+    });
+    client.clear();
+  });
+
   it("keeps preferences/groups/order in typed Query and normalizes groups without importing server.ts", async () => {
     expect(
       normalizeThreadGroups({
@@ -151,6 +186,102 @@ describe("R9 Threads query ownership", () => {
       expect(view.result.current.archive.data).toEqual([{ id: "thr_retried" }]),
     );
     expect(rpc.call).toHaveBeenCalledTimes(4);
+    view.unmount();
+    client.clear();
+  });
+
+  it("reroots every affected Work projection and refreshes the shared task families", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const rpc = {
+      call: vi.fn(async () => ({
+        threadId: "thr_child",
+        parentThreadId: null,
+        oldRootThreadId: "thr_root",
+        newRootThreadId: "thr_child",
+        affectedThreadIds: ["thr_child", "thr_nested"],
+      })),
+    };
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const view = renderHook(
+      () => useThreadHierarchyMutation(rpc as unknown as ThreadsRpc),
+      { wrapper: queryWrapper(client) },
+    );
+
+    await act(async () => {
+      await view.result.current.mutateAsync({
+        threadId: "thr_child",
+        parentThreadId: null,
+      });
+    });
+
+    expect(rpc.call).toHaveBeenCalledWith("moveSidebarThread", {
+      threadId: "thr_child",
+      parentThreadId: null,
+    });
+    const workKeys = (threadId: string) => [
+      queryKeys.work.status(threadId),
+      queryKeys.work.activity(threadId),
+      queryKeys.work.backgroundJobs(threadId),
+      queryKeys.work.outcome(threadId),
+      queryKeys.work.goal(threadId),
+      queryKeys.work.plan(threadId),
+      queryKeys.work.providerHealth(threadId),
+      trackerKeys.context(threadId),
+    ];
+    expect(invalidate.mock.calls).toEqual([
+      [{ queryKey: threadQueryKeys.root }],
+      ...workKeys("thr_child").map((queryKey) => [{ queryKey }]),
+      ...workKeys("thr_nested").map((queryKey) => [{ queryKey }]),
+      [{ queryKey: queryKeys.sidebar.tasks.list() }],
+      [{ queryKey: queryKeys.sidebar.tasks.links() }],
+    ]);
+  });
+
+  it("starts all affected thread invalidations as one batch", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const rpc = {
+      call: vi.fn(async () => ({
+        threadId: "thr_child",
+        parentThreadId: null,
+        oldRootThreadId: "thr_root",
+        newRootThreadId: "thr_child",
+        affectedThreadIds: ["thr_child", "thr_nested"],
+      })),
+    };
+    const rootInvalidation = deferred<void>();
+    const cardInvalidation = deferred<void>();
+    const invalidate = vi
+      .spyOn(client, "invalidateQueries")
+      .mockImplementation((filters) =>
+        JSON.stringify(filters?.queryKey) === JSON.stringify(threadQueryKeys.root)
+          ? rootInvalidation.promise
+          : cardInvalidation.promise,
+      );
+    const view = renderHook(
+      () => useThreadHierarchyMutation(rpc as unknown as ThreadsRpc),
+      { wrapper: queryWrapper(client) },
+    );
+
+    let mutation!: Promise<unknown>;
+    await act(async () => {
+      mutation = view.result.current.mutateAsync({
+        threadId: "thr_child",
+        parentThreadId: null,
+      });
+      rootInvalidation.resolve();
+      await Promise.resolve();
+    });
+
+    expect(invalidate).toHaveBeenCalledTimes(1 + 2 * (7 + 1));
+    cardInvalidation.resolve();
+    await act(async () => {
+      await mutation;
+    });
+    expect(invalidate).toHaveBeenCalledTimes(1 + 2 * (7 + 1) + 2);
     view.unmount();
     client.clear();
   });

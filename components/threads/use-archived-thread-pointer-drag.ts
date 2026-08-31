@@ -4,10 +4,10 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
-type DropTarget = {
-  threadId: string;
-  placement: "before" | "after";
-} | null;
+type DropTarget =
+  | { kind: "reorder"; threadId: string; placement: "before" | "after" }
+  | { kind: "reparent"; parentThreadId: string | null }
+  | null;
 
 export function useArchivedThreadPointerDrag({
   threadId,
@@ -66,7 +66,11 @@ export function useArchivedThreadPointerDrag({
       }
       active = true;
       onDragThreadChange(threadId);
-      onDropTargetChange({ threadId: zone, placement: "after" });
+      onDropTargetChange({
+        kind: "reorder",
+        threadId: zone,
+        placement: "after",
+      });
       moveEvent.preventDefault();
     };
     const finish = (finishEvent: PointerEvent) => {

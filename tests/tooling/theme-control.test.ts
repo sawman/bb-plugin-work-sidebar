@@ -54,6 +54,35 @@ describe("background BB theme control", () => {
     expect(events).toEqual([{ key: "bb.theme", oldValue: "light", newValue: "dark" }]);
   });
 
+  it("keeps off-screen renderers from blocking the theme matrix when animation frames pause", async () => {
+    const { buildRendererThemeScript } = await loadThemeControl();
+    const values = new Map<string, string>([["bb.theme", "light"]]);
+    let fallback: (() => void) | undefined;
+    const context = {
+      document: { documentElement: { classList: { contains: () => false } } },
+      location: { href: "http://127.0.0.1:38886/projects/example" },
+      localStorage: {
+        getItem: (key: string) => values.get(key) ?? null,
+        setItem: (key: string, value: string) => values.set(key, value),
+        removeItem: (key: string) => values.delete(key),
+      },
+      requestAnimationFrame: () => 1,
+      setTimeout: (callback: () => void) => {
+        fallback = callback;
+        return 1;
+      },
+      StorageEvent: class {
+        constructor(_type: string, readonly init: unknown) {}
+      },
+      window: { dispatchEvent: () => undefined },
+    };
+
+    const result = runInNewContext(buildRendererThemeScript("dark"), context);
+    expect(fallback).toBeTypeOf("function");
+    fallback!();
+    await expect(result).resolves.toEqual({ preference: "dark", dark: false });
+  });
+
   it("restores the exact original preference when a matrix command fails", async () => {
     const { withTemporaryThemes } = await loadThemeControl();
     const setPreference = vi.fn(async (_theme: string | null) => undefined);

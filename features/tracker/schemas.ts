@@ -48,34 +48,44 @@ export const taskboardStatusOptionSchema = z
     current: z.boolean(),
   })
   .strict();
-export const trackerItemSchema = z.object({
-  key: z.string(),
-  title: z.string(),
-  url: z.string().url(),
-  status: z.string(),
-  stateCategory: z.enum(["backlog", "todo", "in_progress", "done", "canceled"]),
-  priority: z.string().nullable(),
-  assignee: z.string().nullable(),
-  project: z.string().nullable(),
-});
-export const trackerStatusOptionSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  current: z.boolean(),
-});
-export const trackerLinkedItemSchema = z.object({
-  item: trackerItemSchema,
-  statusOptions: z.array(trackerStatusOptionSchema),
-});
-export const trackerContextSchema = z.object({
-  visible: z.boolean(),
-  available: z.boolean(),
-  message: z.string().nullable(),
-  suggestions: z.array(
-    z.object({ key: z.string(), title: z.string(), url: z.string().url() }),
-  ),
-  items: z.array(trackerLinkedItemSchema),
-});
+export const trackerItemSchema = z
+  .object({
+    key: z.string(),
+    title: z.string(),
+    url: z.string().url(),
+    status: z.string(),
+    stateCategory: z.enum(["backlog", "todo", "in_progress", "done", "canceled"]),
+    priority: z.string().nullable(),
+    assignee: z.string().nullable(),
+    project: z.string().nullable(),
+  })
+  .strict();
+export const trackerStatusOptionSchema = z
+  .object({
+    id: z.string(),
+    name: z.string(),
+    current: z.boolean(),
+  })
+  .strict();
+export const trackerLinkedItemSchema = z
+  .object({
+    item: trackerItemSchema,
+    statusOptions: z.array(trackerStatusOptionSchema),
+  })
+  .strict();
+const trackerSuggestionSchema = z
+  .object({ key: z.string(), title: z.string(), url: z.string().url() })
+  .strict();
+export const trackerContextSchema = z
+  .object({
+    visible: z.boolean(),
+    available: z.boolean(),
+    message: z.string().nullable(),
+    primaryKey: z.string().nullable(),
+    suggestions: z.array(trackerSuggestionSchema),
+    items: z.array(trackerLinkedItemSchema),
+  })
+  .strict();
 
 const threadInput = z
   .object({ threadId: z.string().startsWith("thr_") })
@@ -86,19 +96,19 @@ export const trackerRpcSchemas = {
     input: threadInput
       .extend({ key: z.string().trim().min(2).max(64) })
       .strict(),
-    output: z.object({ key: z.string(), title: z.string() }),
+    output: z.object({ key: z.string(), title: z.string() }).strict(),
   },
   searchLinearIssues: {
     input: threadInput.extend({ query: z.string().trim().max(160) }).strict(),
-    output: z.object({
-      items: z.array(
-        z.object({ key: z.string(), title: z.string(), url: z.string().url() }),
-      ),
-    }),
+    output: z.object({ items: z.array(trackerSuggestionSchema) }).strict(),
   },
   unlinkLinearIssue: {
     input: threadInput.extend({ key: z.string().trim().min(2).max(64) }).strict(),
     output: z.object({ ok: z.literal(true) }).strict(),
+  },
+  setPrimaryLinearIssue: {
+    input: threadInput.extend({ key: z.string().trim().min(2).max(64) }).strict(),
+    output: z.object({ key: z.string() }).strict(),
   },
   updateLinearIssueStatus: {
     input: threadInput
@@ -107,7 +117,7 @@ export const trackerRpcSchemas = {
         statusId: z.string().min(1),
       })
       .strict(),
-    output: z.object({ key: z.string(), status: z.string() }),
+    output: z.object({ key: z.string(), status: z.string() }).strict(),
   },
 };
 

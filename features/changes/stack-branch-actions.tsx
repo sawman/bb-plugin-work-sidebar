@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import type { GitHubStackBranch } from "../../contracts.js";
 import { Icon } from "../../components/ui/icon.js";
+import { BbUrlLink } from "../../components/ui/url-link.js";
 
 type StackBranchActionsProps = {
   pullRequest: GitHubStackBranch["pr"];
@@ -38,16 +39,14 @@ export function StackBranchActions({
     <span className="ws-stack-trailing-actions">
       <span className="ws-stack-action-slot">
         {pullRequest && (
-          <a
+          <BbUrlLink
             className="ws-pr-tooltip"
             data-tooltip="Open on GitHub"
             href={pullRequest.url}
-            target="_blank"
-            rel="noreferrer"
             aria-label={`Open pull request #${pullRequest.number} on GitHub`}
           >
             ↗
-          </a>
+          </BbUrlLink>
         )}
       </span>
       <span className="ws-stack-action-slot">

@@ -459,6 +459,7 @@ export function createWorkBindingsService(
     description: string;
     taskProjectId?: string | null;
     assignee?: "agent" | "human";
+    priority?: Task["priority"];
   }) => {
     if (!(await tasks.available()))
       throw new Error("The official BB Tasks plugin is not available");
@@ -492,7 +493,7 @@ export function createWorkBindingsService(
         title: input.title,
         description: input.description,
         status: "in_progress",
-        priority: "medium",
+        priority: input.priority ?? "medium",
         dueDate: null,
         parentTaskId: null,
         labelIds: [],

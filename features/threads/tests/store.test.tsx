@@ -9,10 +9,18 @@ describe("thread interaction store", () => {
   it("holds presentation state only, including expansion and drag target", () => {
     const store = createThreadInteractionStore();
     store.getState().toggleChildren("thr_a");
-    store.getState().setDrag("thr_a", { threadId: "thr_b", placement: "before" });
+    store.getState().setDrag("thr_a", {
+      kind: "reorder",
+      threadId: "thr_b",
+      placement: "before",
+    });
     expect(store.getState().expandedThreadIds).toEqual(new Set(["thr_a"]));
     expect(store.getState().dragThreadId).toBe("thr_a");
-    expect(store.getState().dropTarget).toEqual({ threadId: "thr_b", placement: "before" });
+    expect(store.getState().dropTarget).toEqual({
+      kind: "reorder",
+      threadId: "thr_b",
+      placement: "before",
+    });
   });
 
   it("keeps Work view state per thread but does not persist across a new store/remount", () => {
@@ -31,7 +39,11 @@ describe("thread interaction store", () => {
     expect(store.getState().workTabFor("thr_1")).toBe("changes");
     store.getState().setSelected("thr_1", ["thr_1", "thr_2"]);
     store.getState().toggleChildren("thr_2");
-    store.getState().setDrag("thr_2", { threadId: "thr_2", placement: "after" });
+    store.getState().setDrag("thr_2", {
+      kind: "reorder",
+      threadId: "thr_2",
+      placement: "after",
+    });
     store.getState().reconcileRoster(["thr_1"]);
     expect(store.getState().selectedThreadIds).toEqual(new Set(["thr_1"]));
     expect(store.getState().selectionAnchorId).toBe("thr_1");
@@ -70,7 +82,7 @@ describe("thread interaction store", () => {
       const dragging = useStore(store, (state) => state.dragThreadId === "thr_a");
       return <>
         <button onClick={() => store.getState().setSelected("thr_a", ["thr_a"])}>{selected ? "selected" : "idle"}</button>
-        <button onClick={() => store.getState().setDrag("thr_a", { threadId: "thr_b", placement: "before" })}>{dragging ? "dragging" : "still"}</button>
+        <button onClick={() => store.getState().setDrag("thr_a", { kind: "reorder", threadId: "thr_b", placement: "before" })}>{dragging ? "dragging" : "still"}</button>
         <ThreadATab />
         <ThreadBTab />
       </>;

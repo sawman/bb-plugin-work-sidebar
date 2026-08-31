@@ -25,6 +25,17 @@ export function registerTasksTools(
     if (!task) throw new Error(`Task not found: ${key}`);
     return task;
   };
+  const publishTaskMutation = async (threadId: string) => {
+    const root = await bindings.rootThread(threadId);
+    bb.realtime.publish("work-sidebar:changed", {
+      family: "work",
+      rootThreadId: root.id,
+    });
+    bb.realtime.publish("work-sidebar:changed", {
+      family: "tasks",
+      threadId,
+    });
+  };
   const taskDetails = async (task: Awaited<ReturnType<typeof findTask>>) => {
     const [projects, assignees] = await Promise.all([
       tasks.projects(),
@@ -46,6 +57,7 @@ export function registerTasksTools(
       description: z.string(),
       taskProjectId: z.string().nullable().optional(),
       assignee: z.enum(["agent", "human"]).optional(),
+      priority: z.enum(["urgent", "high", "medium", "low", "none"]).optional(),
     }).strict(),
     instructions: "Call get_work_context first. Outcomes are top-level only; execution units are direct children created with create_execution_task. Assign agent-owned work to Agent and explicit user follow-up to Human.",
     async execute(params, context) {
@@ -56,6 +68,7 @@ export function registerTasksTools(
         description: params.description,
         taskProjectId: params.taskProjectId,
         assignee: params.assignee,
+        priority: params.priority,
       });
       const task = await namedTask(result.task);
       const assignment = await assignedTo(result.task.id);
@@ -107,10 +120,7 @@ export function registerTasksTools(
         ? await tasks.updateFields(current.id, fields)
         : current;
       if (assignee) await tasks.writeAssignee(current.id, assignee);
-      bb.realtime.publish("work-sidebar:changed", {
-        family: "tasks",
-        threadId: context.threadId,
-      });
+      await publishTaskMutation(context.threadId);
       return JSON.stringify({ task: await taskDetails(updated) });
     },
   });
@@ -122,11 +132,13 @@ export function registerTasksTools(
       body: z.string().trim().min(1),
       notify: z.boolean().default(false),
     }).strict(),
-    async execute({ key, body, notify }) {
+    async execute({ key, body, notify }, context) {
       const task = await findTask(key);
+      const comment = await tasks.comment(task.id, body, notify);
+      await publishTaskMutation(context.threadId);
       return JSON.stringify({
         taskKey: task.key,
-        comment: await tasks.comment(task.id, body, notify),
+        comment,
       });
     },
   });
@@ -150,7 +162,7 @@ export function registerTasksTools(
       title: z.string().trim().min(1),
       description: z.string().default(""),
       idempotencyKey: z.string().trim().min(1).max(200),
-      assignee: z.enum(["agent", "human"]).optional(),
+      assignee: z.enum(["agent", "human"]),
     }).strict(),
     instructions: [
       "Call get_work_context first.",
@@ -174,7 +186,7 @@ export function registerTasksTools(
       prompt: z.string().trim().min(1).optional(),
       title: z.string().trim().min(1).optional(),
       visibility: z.enum(["visible", "hidden"]).optional(),
-    }),
+    }).strict(),
     instructions: "Call get_work_context first. Delegated dispatch persists pending state before spawn; if recovery is required, do not retry automatically.",
     async execute(params, context) {
       const root = await bindings.rootThread(params.rootThreadId ?? context.threadId);

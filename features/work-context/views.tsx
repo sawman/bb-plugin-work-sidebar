@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Icon, type IconName } from "../../components/ui/icon";
 import { CopyBadge } from "../../components/ui/copy-badge";
 import { Input } from "../../components/ui/input";
-import { Combobox } from "../../components/ui/combobox";
+import { SearchCombobox } from "../../components/ui/combobox";
 import { AssigneePicker } from "../tasks/assignee-picker";
+import { TaskWorkflowCard } from "../tasks/workflow-card";
+import { projectTaskWorkflow, type TaskWorkflowOwner } from "../tasks/workflow-model";
 import type { rpcContract } from "../../contracts";
 import {
   goalProgressPercent,
@@ -19,7 +21,6 @@ import { useTasksRead } from "../tasks/queries";
 import {
   nextOutcomeStatus,
   previousOutcomeStatus,
-  projectWorkTaskBindingOwnership,
 } from "./model";
 import {
   useLatestActivity,
@@ -32,6 +33,18 @@ import {
 } from "./queries";
 import { CardState } from "./card-state";
 import { BackgroundJobsCard } from "./background-jobs-view";
+import { useTrackerMutations, useTrackerSearch, type useTracker } from "../tracker/queries";
+import { LinkedTrackerRow, TrackerSearch } from "../tracker/views";
+import { projectWorkItem } from "./work-item-model";
+
+function useDebouncedValue(value: string, delay = 180) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(timer);
+  }, [delay, value]);
+  return debounced;
+}
 
 function StatusCard({ threadId }: { threadId: string }) {
   const query = useWorkStatus(threadId);
@@ -216,18 +229,30 @@ function ProviderHealth({
 type TasksRead = ReturnType<typeof useTasksRead>;
 type TasksMutations = ReturnType<typeof useTasksMutations>;
 
-function OutcomeCard({
+function WorkItemCard({
   threadId,
   tasks,
   taskMutations,
+  tracker,
 }: {
   threadId: string;
   tasks: TasksRead;
   taskMutations: TasksMutations;
+  tracker: ReturnType<typeof useTracker>;
 }) {
   const query = useWorkOutcome(threadId);
   const mutation = useWorkOutcomeMutation(threadId);
+  const rpc = useRpc<typeof rpcContract>();
+  const [trackerQuery, setTrackerQuery] = useState("");
+  const trackerSearch = useTrackerSearch(threadId, useDebouncedValue(trackerQuery));
+  const trackerMutations = useTrackerMutations(rpc, threadId);
   const outcome = query.data?.outcome;
+  const workItem = projectWorkItem({
+    outcome: outcome ?? null,
+    linked: tracker.data?.items.map(({ item, statusOptions }) => ({ ...item, statusOptions })) ?? [],
+    primaryLinearKey: tracker.data?.primaryKey ?? null,
+    legacyState: query.data?.legacy.state ?? "none",
+  });
   const sidebarOutcome = tasks.data?.tasks.find(
     (task) => task.id === outcome?.id,
   );
@@ -251,6 +276,11 @@ function OutcomeCard({
       toast.error(error instanceof Error ? error.message : failure);
     }
   };
+  const trackerBusy =
+    trackerMutations.link.isPending ||
+    trackerMutations.unlink.isPending ||
+    trackerMutations.primary.isPending ||
+    trackerMutations.status.isPending;
   const adoptLegacy = async () => {
     const taskId = legacy?.state === "adoptable" ? legacy.taskIds[0] : null;
     if (!taskId) return;
@@ -267,7 +297,7 @@ function OutcomeCard({
   };
   return (
     <CardState
-      title="Outcome"
+      title="Work item"
       className={outcome ? "ws-outcome-card" : "ws-outcome-empty"}
       trailing={
         outcome ? (
@@ -377,6 +407,26 @@ function OutcomeCard({
               {mutation.create.isPending ? "Creating…" : "Create"}
             </button>
           </div>
+          {workItem.createFromLinear ? (
+            <button
+              type="button"
+              disabled={!query.data?.tasksAvailable || mutation.create.isPending || mutation.adopt.isPending}
+              onClick={() =>
+                void report(
+                  mutation.create.mutateAsync({
+                    title: workItem.createFromLinear!.title,
+                    priority: workItem.createFromLinear!.priority,
+                  }),
+                  "Outcome created from Linear",
+                  "Could not create outcome from Linear",
+                )
+              }
+            >
+              {mutation.create.isPending
+                ? "Creating outcome…"
+                : `Create outcome from ${workItem.createFromLinear.key}`}
+            </button>
+          ) : null}
         </>
       )}
       {adoptionNotice ? (
@@ -387,6 +437,76 @@ function OutcomeCard({
           {adoptionNotice.message}
         </p>
       ) : null}
+      <section className="ws-work-item-tracker" aria-label="Linked Linear records">
+        <h3 className="ws-card-subheading">Linear</h3>
+        {tracker.isPending ? <p className="ws-card-note">Loading linked work…</p> : null}
+        {tracker.isError ? (
+          <div role="alert">
+            <p className="ws-card-note">{tracker.error.message}</p>
+            <button type="button" className="ws-text-button" onClick={() => void tracker.refetch()}>
+              Try again
+            </button>
+          </div>
+        ) : null}
+        {tracker.data && !tracker.isError ? (
+          tracker.data.visible ? (
+            <>
+              {tracker.data.items.length ? (
+                <div className="ws-linear-linked-list" role="list" aria-label="Linked Linear issues">
+                  {tracker.data.items.map((linked) => (
+                    <LinkedTrackerRow
+                      key={linked.item.key}
+                      linked={linked}
+                      busy={trackerBusy}
+                      primary={linked.item.key === tracker.data.primaryKey}
+                      onSetPrimary={() =>
+                        void report(
+                          trackerMutations.primary.mutateAsync(linked.item.key),
+                          "Primary Linear issue updated",
+                          "Could not select primary Linear issue",
+                        )
+                      }
+                      onStatus={(statusId) =>
+                        void report(
+                          trackerMutations.status
+                            .mutateAsync({ key: linked.item.key, statusId })
+                            .then((item) => toast.success(`${item.key} moved to ${item.status}`)),
+                          "Linear issue updated",
+                          "Could not update Linear issue",
+                        )
+                      }
+                      onUnlink={() =>
+                        void report(
+                          trackerMutations.unlink
+                            .mutateAsync(linked.item.key)
+                            .then(() => toast.success(`${linked.item.key} unlinked`)),
+                          "Linear issue unlinked",
+                          "Could not unlink Linear issue",
+                        )
+                      }
+                    />
+                  ))}
+                </div>
+              ) : null}
+              <TrackerSearch
+                data={tracker.data}
+                query={trackerQuery}
+                busy={trackerBusy}
+                search={trackerSearch}
+                onChange={setTrackerQuery}
+                onLink={(key) => {
+                  setTrackerQuery("");
+                  void report(
+                    trackerMutations.link.mutateAsync(key),
+                    "Linear issue linked",
+                    "Could not link Linear issue",
+                  );
+                }}
+              />
+            </>
+          ) : <p className="ws-card-note">Linear is not connected for this project.</p>
+        ) : null}
+      </section>
     </CardState>
   );
 }
@@ -570,19 +690,41 @@ function TasksCard({
   mutations: TasksMutations;
 }) {
   const outcome = useWorkOutcome(threadId);
+  const status = useWorkStatus(threadId);
   const [selection, setSelection] = useState("");
-  const { bindingOwnedTaskIds, currentThreadBindingTaskIds } =
-    projectWorkTaskBindingOwnership(threadId, outcome.data?.bindings ?? []);
-  const attached = (tasks.data?.tasks ?? []).filter((task) =>
-    task.linkedThreadIds.includes(threadId) && !bindingOwnedTaskIds.has(task.id),
-  );
+  const [attachmentPickerOpen, setAttachmentPickerOpen] = useState(false);
+  const genericTasks = (tasks.data?.tasks ?? []).filter((task) => task.linkedThreadIds.includes(threadId));
+  const executionTaskIds = new Set(outcome.data?.executionTasks.map((task) => task.id) ?? []);
   const available = (tasks.data?.tasks ?? []).filter(
-    (task) =>
-      !task.linkedThreadIds.includes(threadId) &&
-      !bindingOwnedTaskIds.has(task.id),
+    (task) => !task.linkedThreadIds.includes(threadId) && !executionTaskIds.has(task.id) && task.id !== outcome.data?.outcome?.id,
   );
-  const boundTaskCount = currentThreadBindingTaskIds.size;
-  const taskCount = attached.length + boundTaskCount;
+  const threadById = new Map([
+    ...(status.data?.children ?? []),
+    ...(status.data ? [{ id: threadId, ...status.data.currentThread, isArchived: false }] : []),
+  ].map((candidate) => [candidate.id, candidate]));
+  const owners: TaskWorkflowOwner[] = (outcome.data?.bindings ?? [])
+    .filter((binding) => binding.executionTaskId !== null)
+    .map((binding) => {
+      const projectedOwner = binding.owner;
+      const thread = binding.ownerThreadId ? threadById.get(binding.ownerThreadId) : null;
+      const liveStatus = projectedOwner?.liveStatus ?? (thread?.status === "active" ? "working" : thread?.status === "starting" ? "starting" : thread?.status === "completed" ? "completed" : thread?.status === "failed" ? "failed" : "idle");
+      return {
+        taskId: binding.executionTaskId!,
+        threadId: binding.ownerThreadId,
+        threadTitle: projectedOwner?.title ?? thread?.title ?? binding.ownerThreadId,
+        providerId: projectedOwner?.providerId ?? thread?.providerId ?? null,
+        liveStatus,
+        isArchived: projectedOwner?.isArchived ?? thread?.isArchived ?? binding.ownerThreadId !== null,
+        unavailable: binding.owner === undefined ? !thread : projectedOwner === null,
+      };
+    });
+  const workflow = projectTaskWorkflow({
+    outcomeTaskId: outcome.data?.outcome?.id ?? null,
+    tasks: genericTasks,
+    executionTasks: outcome.data?.executionTasks ?? [],
+    owners,
+  });
+  const detachableTaskIds = new Set(genericTasks.filter((task) => !executionTaskIds.has(task.id)).map((task) => task.id));
   const busy = mutations.attachment.isPending || mutations.assignment.isPending;
   const report = (operation: Promise<unknown>, fallback: string) =>
     void operation.catch((error) =>
@@ -591,86 +733,32 @@ function TasksCard({
   return (
     <CardState
       title="Tasks"
-      trailing={
-        tasks.data ? (
-          <span title={`${taskCount} task${taskCount === 1 ? "" : "s"}`}>
-            <span aria-hidden>{taskCount}</span>
-            <span className="ws-sr-only">
-              {taskCount} task{taskCount === 1 ? "" : "s"}
-            </span>
-          </span>
-        ) : undefined
-      }
       pending={tasks.isPending}
       error={tasks.error}
       onRetry={() => void tasks.refetch()}
     >
       <div className="ws-thread-task-card">
-        {boundTaskCount ? (
-          <p className="ws-card-note" role="status">
-            {boundTaskCount} work task{boundTaskCount === 1 ? "" : "s"}{" "}
-            {boundTaskCount === 1 ? "is" : "are"} bound to this thread.
-          </p>
-        ) : null}
-        {attached.length ? (
-          <div className="ws-work-card-list">
-            {attached.map((task) => (
-              <div key={task.id} className="ws-work-card-row">
-                <span className="ws-work-card-key">{task.key}</span>
-                <span className="ws-work-card-copy">{task.title}</span>
-                <AssigneePicker
-                  value={task.assignee}
-                  disabled={busy}
-                  onChange={(assignee) =>
-                    report(
-                      mutations.assignment.mutateAsync({
-                        taskId: task.id,
-                        assignee,
-                      }),
-                      "Could not update task assignee",
-                    )
-                  }
-                />
-                <button
-                  type="button"
-                  disabled={busy}
-                  aria-label={`Detach ${task.key} from this thread`}
-                  onClick={() =>
-                    report(
-                      mutations.attachment.mutateAsync({
-                        taskId: task.id,
-                        threadId,
-                        attached: false,
-                      }),
-                      "Could not detach task",
-                    )
-                  }
-                >
-                  <Icon name="X" aria-hidden />
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="ws-card-note">
-            {boundTaskCount
-              ? "No additional tasks are attached to this thread."
-              : "No tasks are attached to this thread."}
-          </p>
-        )}
+        <TaskWorkflowCard
+          sections={workflow}
+          busy={busy}
+          detachableTaskIds={detachableTaskIds}
+          onAssigneeChange={(taskId, assignee) => report(mutations.assignment.mutateAsync({ taskId, assignee }), "Could not update task assignee")}
+          onDetach={(taskId) => report(mutations.attachment.mutateAsync({ taskId, threadId, attached: false }), "Could not detach task")}
+        />
         <div className="ws-work-card-control">
-          <Combobox
-            value={selection}
-            disabled={busy}
-            options={available.map((task) => ({
-              value: task.id,
-              label: task.key,
-              detail: task.title,
-            }))}
-            onChange={setSelection}
-            placeholder="Add an existing task…"
+          <SearchCombobox
             ariaLabel="Add task to this thread"
-            className="ws-task-attachment-picker"
+            disabled={busy}
+            emptyMessage="No matching tasks."
+            emptyOption
+            listboxLabel="Available tasks"
+            onOpenChange={setAttachmentPickerOpen}
+            onSelectionChange={(values) => setSelection(values[0] ?? "")}
+            open={attachmentPickerOpen}
+            options={available.map((task) => ({ value: task.id, label: task.key, detail: task.title }))}
+            placeholder="Add an existing task…"
+            portal
+            selectedValues={selection ? [selection] : []}
           />
           <button
             type="button"
@@ -687,65 +775,29 @@ function TasksCard({
             {mutations.attachment.isPending ? "…" : "Add"}
           </button>
         </div>
-        {outcome.data?.executionTasks.length ? (
-          <div
-            className="ws-work-card-list ws-work-card-list-separated"
-            role="group"
-            aria-label="Execution tasks"
-          >
-            {outcome.data.executionTasks.map((task) => {
-              const sidebarTask = tasks.data?.tasks.find(
-                (candidate) => candidate.id === task.id,
-              );
-              return <div key={task.id} className="ws-work-card-row">
-                <span
-                  className={`ws-status-dot ws-status-dot-${task.status}`}
-                  aria-hidden
-                >
-                  {task.status === "done" ? "✓" : "•"}
-                </span>
-                <span className="ws-work-card-copy">
-                  <strong>{task.title}</strong>
-                  <small>
-                    {task.key} · {readableStatus(task.status)}
-                  </small>
-                </span>
-                {sidebarTask ? (
-                  <AssigneePicker
-                    value={sidebarTask.assignee}
-                    taskKey={task.key}
-                    disabled={mutations.assignment.isPending}
-                    onChange={(assignee) =>
-                      report(
-                        mutations.assignment.mutateAsync({
-                          taskId: task.id,
-                          assignee,
-                        }),
-                        "Could not update task assignee",
-                      )
-                    }
-                  />
-                ) : null}
-              </div>;
-            })}
-          </div>
-        ) : null}
       </div>
     </CardState>
   );
 }
 
-export function WorkContextCards({ threadId }: { threadId: string }) {
+export function WorkContextCards({
+  threadId,
+  tracker,
+}: {
+  threadId: string;
+  tracker: ReturnType<typeof useTracker>;
+}) {
   const rpc = useRpc<typeof rpcContract>();
   const tasks = useTasksRead();
   const taskMutations = useTasksMutations(rpc);
   return (
     <section className="ws-work-context-cards" aria-label="Work context">
       <StatusCard threadId={threadId} />
-      <OutcomeCard
+      <WorkItemCard
         threadId={threadId}
         tasks={tasks}
         taskMutations={taskMutations}
+        tracker={tracker}
       />
       <TasksCard threadId={threadId} tasks={tasks} mutations={taskMutations} />
       <GoalCard threadId={threadId} />

@@ -118,6 +118,7 @@ afterEach(() => {
   cleanup();
   getPluginQueryClient().clear();
   clipboardWrite.mockReset();
+  vi.restoreAllMocks();
 });
 
 describe("R15 registered Agents Work slot", () => {
@@ -271,6 +272,30 @@ describe("R15 registered Agents Work slot", () => {
     expect(slot.getByRole("img", { name: "Working" }).classList).toContain(
       "ws-agent-state-working",
     );
+    slot.lifecycle.unmount();
+  });
+
+  it("uses one shared duration clock for every visible agent and clears it when Agents closes", async () => {
+    const setInterval = vi.spyOn(window, "setInterval");
+    const clearInterval = vi.spyOn(window, "clearInterval");
+    const slot = await agentsSlot({
+      status: "ready",
+      threads: [
+        thread("thr_root", null),
+        thread("thr_first", "thr_root", { createdAt: Date.now() - 65_000 }),
+        thread("thr_second", "thr_root", { createdAt: Date.now() - 125_000 }),
+      ],
+    });
+
+    await slot.findByRole("link", { name: "Open thr_first" });
+    await slot.findByRole("link", { name: "Open thr_second" });
+    const clockCalls = setInterval.mock.calls
+      .map((call, index) => ({ call, result: setInterval.mock.results[index] }))
+      .filter(({ call }) => call[1] === 1_000);
+    expect(clockCalls).toHaveLength(1);
+
+    fireEvent.click(slot.getByRole("tab", { name: "Work" }));
+    expect(clearInterval).toHaveBeenCalledWith(clockCalls[0]!.result.value);
     slot.lifecycle.unmount();
   });
 

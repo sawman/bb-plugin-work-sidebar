@@ -10,6 +10,8 @@ type SidebarWorkViewProps = {
   providersById: ThreadProviderDirectory;
   onNavigate(): void;
   subtextRefreshKey: number;
+  staleWorkingMinutes: number;
+  searchQuery: string;
   emptyMessage: string;
 };
 
@@ -20,6 +22,8 @@ export function SidebarWorkView({
   providersById,
   onNavigate,
   subtextRefreshKey,
+  staleWorkingMinutes,
+  searchQuery,
   emptyMessage,
 }: SidebarWorkViewProps) {
   return (
@@ -32,6 +36,8 @@ export function SidebarWorkView({
           providersById={providersById}
           onNavigate={onNavigate}
           subtextRefreshKey={subtextRefreshKey}
+          staleWorkingMinutes={staleWorkingMinutes}
+          searchQuery={searchQuery}
           emptyMessage={emptyMessage}
         />
       </div>

@@ -4,6 +4,7 @@ import {
   useMemo,
   useState,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
 } from "react";
 import { useStore } from "zustand";
 import { useRpc } from "@get-bb/plugin-sdk/app";
@@ -16,6 +17,8 @@ import {
   SidebarListActions,
   SidebarListIconButton,
 } from "@/components/ui/sidebar-list-actions";
+import { SidebarTable } from "@/components/ui/sidebar-table";
+import { SidebarSearch } from "@/components/ui/sidebar-search";
 import type { ThreadProvider } from "../../components/threads/thread-provider-logo";
 import { TaskRow } from "./task-row";
 import type { rpcContract } from "../../contracts";
@@ -32,6 +35,11 @@ import { useTasksMutations } from "./mutations";
 import { useTasksRead, useTasksRealtimeInvalidation } from "./queries";
 
 const EMPTY_TASKS: SidebarTask[] = [];
+const EMPTY_QUEUE: ReturnType<typeof projectTaskQueue> = [];
+const EMPTY_COUNTS = new Map<string, number>();
+const EMPTY_BINDING_LINKS = new Map<string, ThreadTaskLink>();
+const EMPTY_VISIBLE_IDS: string[] = [];
+const EMPTY_SELECTED_IDS = new Set<string>();
 
 export interface TasksLeftSidebarProps {
   active: boolean;
@@ -43,6 +51,7 @@ export interface TasksLeftSidebarProps {
   >;
   onOpenThread: (threadId: string, split?: boolean) => void;
   searchQuery: string;
+  settingsControl: ReactNode;
 }
 
 /** The Tasks slice owns task queries, mutations, selection, drag state, and composer UI. */
@@ -53,6 +62,7 @@ export function TasksLeftSidebar({
   ownerThreads,
   onOpenThread,
   searchQuery,
+  settingsControl,
 }: TasksLeftSidebarProps) {
   const rpc = useRpc<typeof rpcContract>();
   const { data, isPending, isError, error, refetch } = useTasksRead();
@@ -63,63 +73,86 @@ export function TasksLeftSidebar({
   const [composerOpen, setComposerOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [projectId, setProjectId] = useState("");
-  const selectedIds = useStore(tasksSidebarStore, (state) => state.selectedIds);
+  const [localSearchQuery, setLocalSearchQuery] = useState("");
+  const effectiveSearchQuery = localSearchQuery || searchQuery;
+  const selectedIds = useStore(tasksSidebarStore, (state) =>
+    active ? state.selectedIds : EMPTY_SELECTED_IDS,
+  );
   const anchorId = useStore(
     tasksSidebarStore,
-    (state) => state.selectionAnchorId,
+    (state) => (active ? state.selectionAnchorId : null),
   );
-  const dragTaskId = useStore(tasksSidebarStore, (state) => state.dragTaskId);
-  const dropTarget = useStore(tasksSidebarStore, (state) => state.dropTarget);
+  const dragTaskId = useStore(tasksSidebarStore, (state) =>
+    active ? state.dragTaskId : null,
+  );
+  const dropTarget = useStore(tasksSidebarStore, (state) =>
+    active ? state.dropTarget : null,
+  );
 
   useEffect(() => {
-    tasksSidebarStore.getState().reconcileRoster(tasks.map((task) => task.id));
-  }, [tasks]);
+    if (active)
+      tasksSidebarStore.getState().reconcileRoster(tasks.map((task) => task.id));
+  }, [active, tasks]);
   useEffect(() => {
-    if (data)
+    if (active && data)
       setProjectId((current) =>
         current && data.projects.some((project) => project.id === current)
           ? current
           : (data.projects[0]?.id ?? ""),
       );
-  }, [data]);
+  }, [active, data]);
 
   const filtered = useMemo(
-    () => tasks.filter((task) => taskMatchesSearch(task, searchQuery)),
-    [searchQuery, tasks],
+    () =>
+      active
+        ? tasks.filter((task) =>
+            taskMatchesSearch(task, effectiveSearchQuery),
+          )
+        : EMPTY_TASKS,
+    [active, effectiveSearchQuery, tasks],
   );
-  const queue = useMemo(() => projectTaskQueue(filtered), [filtered]);
+  const queue = useMemo(
+    () => (active ? projectTaskQueue(filtered) : EMPTY_QUEUE),
+    [active, filtered],
+  );
   const keys = useMemo(() => {
+    if (!active) return EMPTY_COUNTS;
     const counts = new Map<string, number>();
     for (const task of filtered)
       counts.set(task.key, (counts.get(task.key) ?? 0) + 1);
     return counts;
-  }, [filtered]);
+  }, [active, filtered]);
   const bindingLinks = useMemo(
     () =>
-      new Map(
-        (activeThreadId ? taskLinks[activeThreadId] ?? [] : []).map((link) => [
-          link.task.id,
-          link,
-        ]),
-      ),
-    [activeThreadId, taskLinks],
+      active
+        ? new Map(
+            (activeThreadId ? (taskLinks[activeThreadId] ?? []) : []).map(
+              (link) => [link.task.id, link],
+            ),
+          )
+        : EMPTY_BINDING_LINKS,
+    [active, activeThreadId, taskLinks],
   );
   const bindingOwnerLinks = useMemo(
     () =>
-      new Map(
-        Object.values(taskLinks).flatMap((links) =>
-          links.map((link) => [link.task.id, link] as const),
-        ),
-      ),
-    [taskLinks],
+      active
+        ? new Map(
+            Object.values(taskLinks).flatMap((links) =>
+              links.map((link) => [link.task.id, link] as const),
+            ),
+          )
+        : EMPTY_BINDING_LINKS,
+    [active, taskLinks],
   );
   const visibleIds = useMemo(
     () =>
-      queue.flatMap((node) => [
-        node.task.id,
-        ...node.children.map((child) => child.id),
-      ]),
-    [queue],
+      active
+        ? queue.flatMap((node) => [
+            node.task.id,
+            ...node.children.map((child) => child.id),
+          ])
+        : EMPTY_VISIBLE_IDS,
+    [active, queue],
   );
   const refresh = useCallback(async () => {
     await refetch();
@@ -163,9 +196,23 @@ export function TasksLeftSidebar({
             ? cause.message
             : `Could not ${attached ? "attach" : "detach"} task`,
         );
+        throw cause;
       }
     },
     [mutations.attachment],
+  );
+  const updateAssignee = useCallback(
+    async (taskId: string, assignee: SidebarTask["assignee"]) => {
+      try {
+        await mutations.assignment.mutateAsync({ taskId, assignee });
+      } catch (cause) {
+        toast.error(
+          cause instanceof Error ? cause.message : "Could not update assignment",
+        );
+        throw cause;
+      }
+    },
+    [mutations.assignment],
   );
   const remove = useCallback(
     async (task: SidebarTask) => {
@@ -196,7 +243,7 @@ export function TasksLeftSidebar({
       targetId: string,
       placement: "before" | "after",
     ) => {
-      if (searchQuery.trim()) return;
+      if (effectiveSearchQuery.trim()) return;
       const neighbors = taskReorderNeighbors(
         tasks,
         sourceId,
@@ -213,7 +260,7 @@ export function TasksLeftSidebar({
         );
       }
     },
-    [mutations.reorder, searchQuery, tasks],
+    [effectiveSearchQuery, mutations.reorder, tasks],
   );
   const move = useCallback(
     (taskId: string, direction: -1 | 1) => {
@@ -274,11 +321,21 @@ export function TasksLeftSidebar({
           {filtered.length} active task{filtered.length === 1 ? "" : "s"}
         </span>
         <SidebarListActions
-          context={selectedIds.size > 1 ? (
-            <span className="ws-selection-count" role="status">
-              {selectedIds.size} selected
-            </span>
-          ) : undefined}
+          context={
+            selectedIds.size > 1 ? (
+              <span className="ws-selection-count" role="status">
+                {selectedIds.size} selected
+              </span>
+            ) : undefined
+          }
+          search={
+            <SidebarSearch
+              label="tasks"
+              value={localSearchQuery}
+              onValueChange={setLocalSearchQuery}
+            />
+          }
+          settings={settingsControl}
           create={
             <SidebarListIconButton
               title="Add task"
@@ -289,9 +346,7 @@ export function TasksLeftSidebar({
               <Icon name="Plus" aria-hidden />
             </SidebarListIconButton>
           }
-          refresh={
-            <RefreshButton label="Refresh tasks" onRefresh={refresh} />
-          }
+          refresh={<RefreshButton label="Refresh tasks" onRefresh={refresh} />}
         />
       </div>
       <div className="ws-view-content">
@@ -348,65 +403,73 @@ export function TasksLeftSidebar({
             <button onClick={refresh}>Try again</button>
           </div>
         )}
-        {!isPending &&
-          !isError &&
-          queue.map((node) => (
-            <TaskRow
-              key={node.task.id}
-              node={node}
-              siblings={queue}
-              showProject={(keys.get(node.task.key) ?? 0) > 1}
-              reorderDisabled={Boolean(searchQuery.trim())}
-              dragTaskId={dragTaskId}
-              dropTarget={dropTarget}
-              onDragTaskChange={(taskId) =>
-                tasksSidebarStore
-                  .getState()
-                  .setDrag(taskId, tasksSidebarStore.getState().dropTarget)
-              }
-              onDragTargetChange={(taskId, placement) =>
-                tasksSidebarStore
-                  .getState()
-                  .setDrag(
-                    tasksSidebarStore.getState().dragTaskId,
-                    taskId && placement ? { taskId, placement } : null,
-                  )
-              }
-              onDropTask={(sourceId, targetId, placement) =>
-                void reorder(sourceId, targetId, placement)
-              }
-              onMoveTask={move}
-              onOpenThread={onOpenThread}
-              onUpdateStatus={updateStatus}
-              onDelete={remove}
-              activeThreadId={activeThreadId}
-              bindingLinks={bindingLinks}
-              bindingOwnerLinks={bindingOwnerLinks}
-              ownerThreads={ownerThreads}
-              onAttachToThread={(taskId, threadId) =>
-                updateAttachment(taskId, threadId, true)
-              }
-              onDetachFromThread={(taskId, threadId) =>
-                updateAttachment(taskId, threadId, false)
-              }
-              updatingTaskId={
-                mutations.status.isPending
-                  ? (mutations.status.variables?.taskId ?? null)
-                  : null
-              }
-              updatingAttachmentTaskId={
-                mutations.attachment.isPending
-                  ? (mutations.attachment.variables?.taskId ?? null)
-                  : null
-              }
-              selectedTaskIds={selectedIds}
-              onSelect={select}
-            />
-          ))}
+        {!isPending && !isError && queue.length > 0 ? (
+          <SidebarTable>
+            {queue.map((node) => (
+              <TaskRow
+                key={node.task.id}
+                node={node}
+                siblings={queue}
+                showProject={(keys.get(node.task.key) ?? 0) > 1}
+                reorderDisabled={Boolean(effectiveSearchQuery.trim())}
+                dragTaskId={dragTaskId}
+                dropTarget={dropTarget}
+                onDragTaskChange={(taskId) =>
+                  tasksSidebarStore
+                    .getState()
+                    .setDrag(taskId, tasksSidebarStore.getState().dropTarget)
+                }
+                onDragTargetChange={(taskId, placement) =>
+                  tasksSidebarStore
+                    .getState()
+                    .setDrag(
+                      tasksSidebarStore.getState().dragTaskId,
+                      taskId && placement ? { taskId, placement } : null,
+                    )
+                }
+                onDropTask={(sourceId, targetId, placement) =>
+                  void reorder(sourceId, targetId, placement)
+                }
+                onMoveTask={move}
+                onOpenThread={onOpenThread}
+                onUpdateStatus={updateStatus}
+                onDelete={remove}
+                activeThreadId={activeThreadId}
+                bindingLinks={bindingLinks}
+                bindingOwnerLinks={bindingOwnerLinks}
+                ownerThreads={ownerThreads}
+                onAttachToThread={(taskId, threadId) =>
+                  updateAttachment(taskId, threadId, true)
+                }
+                onDetachFromThread={(taskId, threadId) =>
+                  updateAttachment(taskId, threadId, false)
+                }
+                updatingTaskId={
+                  mutations.status.isPending
+                    ? (mutations.status.variables?.taskId ?? null)
+                    : null
+                }
+                onUpdateAssignee={updateAssignee}
+                updatingAssigneeTaskId={
+                  mutations.assignment.isPending
+                    ? (mutations.assignment.variables?.taskId ?? null)
+                    : null
+                }
+                updatingAttachmentTaskId={
+                  mutations.attachment.isPending
+                    ? (mutations.attachment.variables?.taskId ?? null)
+                    : null
+                }
+                selectedTaskIds={selectedIds}
+                onSelect={select}
+              />
+            ))}
+          </SidebarTable>
+        ) : null}
         {!isPending && !isError && !filtered.length && (
           <div className="ws-empty">
-            {searchQuery
-              ? `No tasks match “${searchQuery}”.`
+            {effectiveSearchQuery
+              ? `No tasks match “${effectiveSearchQuery}”.`
               : "No active tasks."}
           </div>
         )}

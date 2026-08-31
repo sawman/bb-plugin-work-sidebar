@@ -39,7 +39,7 @@ function WorkContextHeaderAction({
 function GitHubPollingSettings() {
   const { values, isLoading } = useSettings();
   return (
-    <section className="ws-settings-card">
+    <section className="ws-settings-card" data-layout="narrow">
       <strong>GitHub polling</strong>
       <p>
         Right Work polling checks only the current PR through REST; the left PR

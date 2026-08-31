@@ -1,25 +1,32 @@
 import { useRef } from "react";
-import {
-  experimental_useSidebarThreadPullRequest,
-  useComposerView,
-} from "@get-bb/plugin-sdk/app";
-import { Icon } from "@/components/ui/icon";
+import { experimental_useSidebarThreadPullRequest } from "@get-bb/plugin-sdk/app";
 import { Input } from "@/components/ui/input";
 import { ThreadRowContent } from "@/components/threads/thread-row-content";
 import { threadTitle } from "@/work-model";
-import { threadNeedsAttention } from "./thread-attention";
+import {
+  threadNeedsAttention,
+  threadReportsComposerDraft,
+  useStaleWorking,
+} from "./thread-attention";
 import { ThreadRowMenu } from "./thread-row-menu";
+import { ThreadAgentControl } from "./thread-agent-control";
 import { ThreadMetadata, ThreadStatus } from "./thread-row-presentation";
 import { ThreadRowStackNumber } from "./thread-row-stack-number";
 import type { ThreadRowProps } from "./thread-row-types";
 import { useThreadRowActions } from "./use-thread-row-actions";
 import { useThreadRowPointerDrag } from "./use-thread-row-pointer-drag";
+import { useThreadHierarchy } from "./thread-hierarchy-context";
+import {
+  THREAD_TO_TOP_DESCRIPTION,
+} from "./use-thread-hierarchy-menu";
+import { toast } from "sonner";
 
 export function ThreadRow({
   thread,
   active,
   children,
   activeChildren,
+  staleWorkingMinutes = 30,
   childrenExpanded,
   selected,
   groupId,
@@ -31,21 +38,19 @@ export function ThreadRow({
   provider,
   onNavigate,
   reorderDisabled,
-  canMoveUp,
-  canMoveDown,
   dragThreadId,
   onDragThreadChange,
   dropTarget,
   onDropTargetChange,
   canDropThread,
   onDropThread,
-  onMoveThread,
 }: ThreadRowProps) {
   const controlClick = useRef(false);
+  const anchorRef = useRef<HTMLAnchorElement>(null);
+  const hierarchy = useThreadHierarchy();
   // Per-row opt-in: never turn this into a list-wide PR metadata read.
   const { pullRequest, isLoading: pullRequestLoading } =
     experimental_useSidebarThreadPullRequest(thread.id);
-  const composerView = useComposerView();
   const rowActions = useThreadRowActions({
     thread,
     groupId,
@@ -62,15 +67,29 @@ export function ThreadRow({
     onMoveToGroup,
     onDropThread,
     onArchive: rowActions.archiveTree,
+    onReparentThread: (sourceId, parentThreadId) => {
+      void hierarchy
+        .move(sourceId, parentThreadId)
+        .then(() =>
+          toast.success(
+            parentThreadId
+              ? "Thread hierarchy updated"
+              : THREAD_TO_TOP_DESCRIPTION,
+          ),
+        )
+        .catch((error: unknown) =>
+          toast.error(
+            error instanceof Error ? error.message : "Could not move thread",
+          ),
+        );
+    },
   });
   const projectLabel = project?.isPersonal
     ? "Personal"
     : (project?.name ?? "Project");
   const title = threadTitle(thread);
-  const hasComposerDraft =
-    composerView.scope.kind === "thread" &&
-    composerView.scope.threadId === thread.id &&
-    !composerView.draft.isEmpty;
+  const hasComposerDraft = threadReportsComposerDraft(thread);
+  const staleWorking = useStaleWorking(thread, staleWorkingMinutes);
   return (
     <div
       className={`ws-thread ${active ? "ws-thread-active" : ""} ${selected ? "ws-thread-selected" : ""} ${dragThreadId === thread.id ? "ws-thread-dragging" : ""}`}
@@ -78,10 +97,27 @@ export function ThreadRow({
       data-ws-thread-group={groupId ?? "active"}
       data-depth={thread.parentThreadId ? "child" : "root"}
       data-drop-placement={
-        dropTarget?.threadId === thread.id ? dropTarget.placement : undefined
+        dropTarget?.kind === "reorder" && dropTarget.threadId === thread.id
+          ? dropTarget.placement
+          : undefined
+      }
+      data-reparent-target={
+        dropTarget?.kind === "reparent" &&
+        dropTarget.parentThreadId === thread.id
+          ? "true"
+          : undefined
       }
       onPointerDown={startUnifiedDrag}
     >
+      {dragThreadId ? (
+        <span
+          className="ws-thread-reparent-target"
+          data-ws-thread-reparent-target={thread.id}
+          role="note"
+          aria-label={`Move a thread under ${title}`}
+          title={`Drop to make ${title} the parent`}
+        />
+      ) : null}
       {rowActions.renaming ? (
         <div className="ws-rename">
           <Input
@@ -102,19 +138,18 @@ export function ThreadRow({
         <ThreadRowMenu
           title={title}
           threadId={thread.id}
+          parentThreadId={thread.parentThreadId}
           isPinned={thread.isPinned}
           isUnread={thread.isUnread}
           isAvailable={isAvailable}
-          reorderDisabled={reorderDisabled}
-          canMoveUp={canMoveUp}
-          canMoveDown={canMoveDown}
           groupId={groupId}
           groups={groups}
-          onMoveThread={onMoveThread}
           onMoveToGroup={onMoveToGroup}
+          onFocusReturn={() => anchorRef.current?.focus()}
           actions={rowActions}
         >
           <a
+            ref={anchorRef}
             href="#"
             data-sidebar-thread-shortcut-target=""
             data-sidebar-thread-id={thread.id}
@@ -159,29 +194,16 @@ export function ThreadRow({
           >
             <ThreadRowContent
               leading={
-                children > 0 ? (
-                  <button
-                    type="button"
-                    className={`ws-thread-agent-badge ${childrenExpanded ? "ws-thread-agent-badge-expanded" : ""}`}
-                    aria-label={`${children} child agent${children === 1 ? "" : "s"}${childrenExpanded ? ", expanded" : ", collapsed"}`}
-                    aria-expanded={childrenExpanded}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      onToggleChildren();
-                    }}
-                  >
-                    <Icon
-                      name="Bot"
-                      className={
-                        activeChildren ? "ws-child-agent-working" : undefined
-                      }
-                      aria-hidden
-                    />
-                    <small>{children}</small>
-                  </button>
-                ) : undefined
+                <ThreadAgentControl
+                  thread={thread}
+                  provider={provider}
+                  childCount={children}
+                  activeChildren={activeChildren}
+                  expanded={childrenExpanded}
+                  staleWorking={staleWorking}
+                  staleWorkingMinutes={staleWorkingMinutes}
+                  onToggle={onToggleChildren}
+                />
               }
               providerId={thread.providerId}
               provider={provider}
@@ -205,6 +227,8 @@ export function ThreadRow({
                 <ThreadStatus
                   thread={thread}
                   hasComposerDraft={hasComposerDraft}
+                  staleWorking={staleWorking}
+                  staleWorkingMinutes={staleWorkingMinutes}
                 />
               }
             />

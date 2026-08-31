@@ -17,9 +17,13 @@ import {
   type SidebarThreadGroup,
   type SidebarThreadGroupPreferences,
 } from "./model";
+import { invalidateTaskQueries } from "../tasks/mutations";
+import { invalidateTracker } from "../tracker/queries";
+import { invalidateWorkContextCards } from "../work-context/queries";
 
 const root = ["work-sidebar", "sidebar", "threads"] as const;
 export const threadQueryKeys = {
+  root,
   order: () => [...root, "order"] as const,
   groups: () => [...root, "groups"] as const,
   appearance: () => [...root, "appearance"] as const,
@@ -31,6 +35,33 @@ export const threadQueryPolicies = {
   appearance: queryPolicies.sidebarOrderPreferences,
 } as const;
 export type ThreadsRpc = PluginRpcClient<typeof rpcContract>;
+export type SidebarAppearance = {
+  rowHeight: number;
+  textScale: number;
+};
+export type SidebarAppearanceUpdate =
+  | { rowHeight: number }
+  | { textScale: number };
+
+export function useThreadHierarchyMutation(rpc: ThreadsRpc) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      threadId: string;
+      parentThreadId: string | null;
+    }) => rpc.call("moveSidebarThread", input),
+    onSuccess: async (result) => {
+      await client.invalidateQueries({ queryKey: threadQueryKeys.root });
+      await Promise.all(
+        result.affectedThreadIds.flatMap((threadId) => [
+          invalidateWorkContextCards(client, threadId),
+          invalidateTracker(client, threadId),
+        ]),
+      );
+      await invalidateTaskQueries(client, ["list", "links"]);
+    },
+  });
+}
 
 async function readSidebarAppearance(rpc: ThreadsRpc) {
   return rpc.call("getSidebarAppearance", null);
@@ -44,18 +75,38 @@ function sidebarAppearanceQuery(rpc: ThreadsRpc) {
   } as const;
 }
 
+export async function saveSidebarAppearance(
+  client: QueryClient,
+  rpc: ThreadsRpc,
+  update: SidebarAppearanceUpdate,
+) {
+  const result = await rpc.call("saveSidebarAppearance", update);
+  client.setQueryData(threadQueryKeys.appearance(), result);
+  return result;
+}
+
+function useSaveSidebarAppearance(
+  rpc: ThreadsRpc,
+  client: QueryClient,
+  field: "rowHeight" | "textScale",
+) {
+  return useMutation({
+    mutationFn: (value: number) =>
+      saveSidebarAppearance(
+        client,
+        rpc,
+        field === "rowHeight" ? { rowHeight: value } : { textScale: value },
+      ),
+  });
+}
+
 export function useSidebarAppearancePreferences() {
   const rpc = useRpc<typeof rpcContract>();
   const client = useQueryClient();
   const appearance = useQuery(sidebarAppearanceQuery(rpc));
-  const saveAppearance = useMutation({
-    mutationFn: (rowHeight: number) =>
-      rpc.call("saveSidebarAppearance", { rowHeight }),
-    onSuccess: (result) => {
-      client.setQueryData(threadQueryKeys.appearance(), result);
-    },
-  });
-  return { appearance, saveAppearance };
+  const saveRowHeight = useSaveSidebarAppearance(rpc, client, "rowHeight");
+  const saveTextScale = useSaveSidebarAppearance(rpc, client, "textScale");
+  return { appearance, saveRowHeight, saveTextScale };
 }
 
 export async function saveThreadGroups(
@@ -101,18 +152,23 @@ export function useThreadPreferences() {
     },
     ...threadQueryPolicies.groups,
   });
-  const appearance = useQuery(sidebarAppearanceQuery(rpc));
+  const appearancePreferences = useSidebarAppearancePreferences();
+  const appearance = appearancePreferences.appearance;
+  const saveRowHeight = appearancePreferences.saveRowHeight;
+  const saveTextScale = appearancePreferences.saveTextScale;
   useRealtime("sidebar-order:changed", () => {
-    void client.invalidateQueries({ queryKey: root });
+    for (const key of [
+      threadQueryKeys.order(),
+      threadQueryKeys.groups(),
+      threadQueryKeys.appearance(),
+      threadQueryKeys.archived(),
+    ]) {
+      void client.invalidateQueries({ queryKey: key });
+    }
   });
   const saveGroups = useMutation({
     mutationFn: (next: SidebarThreadGroupPreferences) =>
-      saveThreadGroups(
-        client,
-        rpc,
-        next.groups,
-        next.activeGroupPosition,
-      ),
+      saveThreadGroups(client, rpc, next.groups, next.activeGroupPosition),
   });
   const saveOrder = useMutation({
     mutationFn: async (threadIds: string[]) => {
@@ -121,7 +177,15 @@ export function useThreadPreferences() {
       return result.threadIds;
     },
   });
-  return { order, groups, appearance, saveGroups, saveOrder };
+  return {
+    order,
+    groups,
+    appearance,
+    saveRowHeight,
+    saveTextScale,
+    saveGroups,
+    saveOrder,
+  };
 }
 
 export const archivedThreadQueryPolicy = {

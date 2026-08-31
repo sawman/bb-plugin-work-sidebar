@@ -83,6 +83,7 @@ async function leftSlot({
   activeProjectId = null,
   sidebarPullRequests = {},
   providers = [],
+  settings,
   rpc = {},
 }: {
   threads?: ReturnType<typeof thread>[];
@@ -99,6 +100,7 @@ async function leftSlot({
     }
   >;
   providers?: unknown[];
+  settings?: Record<string, string | boolean>;
   rpc?: Record<string, unknown>;
 } = {}) {
   getPluginQueryClient().clear();
@@ -113,7 +115,7 @@ async function leftSlot({
     sidebarTaskLinks: () => ({ available: true, links: {}, error: null }),
     getSidebarOrder: () => ({ threadIds: threads.map(({ id }) => id) }),
     getThreadGroups: () => ({ groups }),
-    getSidebarAppearance: () => ({ rowHeight: 45 }),
+    getSidebarAppearance: () => ({ rowHeight: 40 }),
     saveThreadGroups: ({ groups: next }: { groups: unknown[] }) => ({
       groups: next,
     }),
@@ -163,6 +165,7 @@ async function leftSlot({
     {
       sidebarThreads: { status: "ready", projects: [project], threads },
       providers: { status: "ready", providers: providers as never },
+      settings,
       sidebarPullRequests,
       rpc: defaults as never,
     },
@@ -187,16 +190,46 @@ function mockElementAt(element: Element | null) {
 }
 
 describe("R18 registered left sidebar parity", () => {
+  it("applies the plugin-configured stale timeout to active goals", async () => {
+    vi.useFakeTimers();
+    const now = Date.UTC(2026, 7, 29, 3);
+    vi.setSystemTime(now);
+    try {
+      const goal = thread("thr_goal", "Goal thread");
+      Object.assign(goal, {
+        indicator: "goal",
+        indicatorLabel: "Goal active",
+        activity: { ...goal.activity, goals: 1 },
+        createdAt: now - 15 * 60_000,
+        updatedAt: now - 15 * 60_000,
+        latestAttentionAt: now - 15 * 60_000,
+      });
+      const slot = await leftSlot({
+        threads: [goal],
+        settings: { stuckThreadMinutes: "15" },
+      });
+
+      expect(
+        slot.getByRole("img", {
+          name: "Goal active; no agent update for 15 minutes",
+        }),
+      ).toBeTruthy();
+      slot.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("applies persisted precise row heights across the permitted range", async () => {
-    for (const rowHeight of [40, 46, 47.5, 60]) {
+    for (const rowHeight of [35, 40, 47.5, 60]) {
       const slot = await leftSlot({
         rpc: { getSidebarAppearance: () => ({ rowHeight }) },
       });
       await waitFor(() =>
         expect(
-        slot.container
-          .querySelector<HTMLElement>(".ws-list")
-          ?.style.getPropertyValue("--ws-sidebar-row-height"),
+          slot.container
+            .querySelector<HTMLElement>(".ws-list")
+            ?.style.getPropertyValue("--ws-sidebar-row-height"),
         ).toBe(`${rowHeight}px`),
       );
       slot.unmount();
@@ -211,8 +244,9 @@ describe("R18 registered left sidebar parity", () => {
       ].map((button) => button.getAttribute("aria-label"));
 
     expect(actionLabels()).toEqual([
-      "Thread list settings",
       "New thread in project",
+      "Search threads",
+      "Thread list settings",
       "Refresh threads",
     ]);
     expect(
@@ -220,13 +254,372 @@ describe("R18 registered left sidebar parity", () => {
     ).toContain("ws-refresh-button");
 
     fireEvent.click(slot.getByRole("button", { name: "Tasks" }));
-    expect(actionLabels()).toEqual(["Add task", "Refresh tasks"]);
+    expect(actionLabels()).toEqual([
+      "Add task",
+      "Search tasks",
+      "Thread list settings",
+      "Refresh tasks",
+    ]);
 
     fireEvent.click(slot.getByRole("button", { name: "PRs" }));
-    expect(actionLabels()).toEqual(["Refresh pull requests"]);
+    expect(actionLabels()).toEqual([
+      "Search pull requests",
+      "Thread list settings",
+      "Refresh pull requests",
+    ]);
     expect(
       slot.getByRole("button", { name: "Refresh pull requests" }).classList,
     ).toContain("ws-refresh-button");
+  });
+
+  it("searches each left tab and includes custom and archived thread groups", async () => {
+    const slot = await leftSlot({
+      threads: [
+        thread("thr_active", "Active alpha"),
+        thread("thr_later", "Custom beta"),
+      ],
+      groups: [
+        {
+          id: "group_later",
+          name: "Later",
+          threadIds: ["thr_later"],
+        },
+      ],
+      rpc: {
+        sidebarArchivedThreads: () => ({
+          available: true,
+          threads: [
+            {
+              id: "thr_archived",
+              projectId: project.id,
+              title: "Archived gamma",
+              titleFallback: null,
+              parentThreadId: null,
+              providerId: "codex",
+              environmentBranchName: "archive/gamma",
+              environmentName: "gamma worktree",
+              environmentWorkspaceDisplayKind: "managed-worktree",
+              isPinned: false,
+              isUnread: false,
+              createdAt: 1,
+              updatedAt: 2,
+              archivedAt: 3,
+            },
+          ],
+          error: null,
+        }),
+        sidebarTasks: () => ({
+          available: true,
+          tasks: [
+            {
+              id: "task_search",
+              projectId: "tasks_project",
+              projectName: "Sidebar",
+              key: "BBPLUG-404",
+              title: "Searchable task delta",
+              status: "todo",
+              priority: "medium",
+              dueDate: null,
+              parentTaskId: null,
+              linkedThreadIds: [],
+              assignee: "agent",
+              position: 1024,
+            },
+            {
+              id: "task_other",
+              projectId: "tasks_project",
+              projectName: "Sidebar",
+              key: "BBPLUG-405",
+              title: "Unrelated task",
+              status: "todo",
+              priority: "medium",
+              dueDate: null,
+              parentTaskId: null,
+              linkedThreadIds: [],
+              assignee: "agent",
+              position: 2048,
+            },
+          ],
+          projects: [{ id: "tasks_project", name: "Sidebar" }],
+          error: null,
+        }),
+        sidebarAuthoredPullRequests: () => ({
+          available: true,
+          pullRequests: [
+            {
+              number: 456,
+              title: "Searchable pull request epsilon",
+              url: "https://github.com/acme/repo/pull/456",
+              repository: "acme/repo",
+              state: "open",
+              draft: false,
+              head: "feature/epsilon",
+              base: "main",
+              checks: "passing",
+              review: "approved",
+              requestedReviewers: [],
+              reviewCommentCount: 0,
+              stack: null,
+            },
+            {
+              number: 457,
+              title: "Unrelated pull request",
+              url: "https://github.com/acme/repo/pull/457",
+              repository: "acme/repo",
+              state: "open",
+              draft: false,
+              head: "feature/other",
+              base: "main",
+              checks: "passing",
+              review: "approved",
+              requestedReviewers: [],
+              reviewCommentCount: 0,
+              stack: null,
+            },
+          ],
+          error: null,
+        }),
+        sidebarAuthoredPullRequestStacks: () => new Promise(() => undefined),
+      },
+    });
+
+    const threadSearchTrigger = slot.getByRole("button", {
+      name: "Search threads",
+    });
+    expect(
+      threadSearchTrigger.querySelector('[data-icon="Search"] path'),
+    ).toBeTruthy();
+    fireEvent.click(threadSearchTrigger);
+    const threadSearch = slot.getByRole("searchbox", {
+      name: "Search threads",
+    });
+    expect(threadSearchTrigger.getAttribute("aria-expanded")).toBe("true");
+    const searchPopover = threadSearch.closest(".ws-sidebar-search-popover");
+    expect(searchPopover?.getAttribute("data-portalled")).toBe("true");
+    expect(searchPopover?.parentElement).toBe(document.body);
+    expect(
+      slot.container.querySelector(
+        '.ws-work-toolbar-actions input[aria-label="Search threads"]',
+      ),
+    ).toBeNull();
+    fireEvent.change(threadSearch, { target: { value: "beta" } });
+    expect(slot.getByText("Custom beta")).toBeTruthy();
+    expect(slot.queryByText("Active alpha")).toBeNull();
+
+    fireEvent.change(threadSearch, { target: { value: "gamma" } });
+    expect(await slot.findByText("Archived gamma")).toBeTruthy();
+    expect(slot.getByRole("region", { name: "Archive threads" })).toBeTruthy();
+    fireEvent.keyDown(threadSearch, { key: "Escape" });
+    expect(
+      slot.queryByRole("searchbox", { name: "Search threads" }),
+    ).toBeNull();
+
+    fireEvent.click(slot.getByRole("button", { name: "Tasks" }));
+    fireEvent.click(slot.getByRole("button", { name: "Search tasks" }));
+    fireEvent.change(slot.getByRole("searchbox", { name: "Search tasks" }), {
+      target: { value: "delta" },
+    });
+    expect(await slot.findByText("Searchable task delta")).toBeTruthy();
+    expect(slot.queryByText("Unrelated task")).toBeNull();
+
+    fireEvent.click(slot.getByRole("button", { name: "PRs" }));
+    fireEvent.click(slot.getByRole("button", { name: "Search pull requests" }));
+    fireEvent.change(
+      slot.getByRole("searchbox", { name: "Search pull requests" }),
+      { target: { value: "#456" } },
+    );
+    expect(
+      await slot.findByRole("link", {
+        name: /Searchable pull request epsilon/,
+      }),
+    ).toBeTruthy();
+    expect(slot.queryByText("Unrelated pull request")).toBeNull();
+  });
+
+  it("keeps the PR refresh icon spinning while partial rows await stack enrichment", async () => {
+    const stacks = deferred<{
+      available: true;
+      pullRequests: Array<{
+        number: number;
+        title: string;
+        url: string;
+        repository: string;
+        state: "open";
+        draft: false;
+        head: string;
+        base: string;
+        checks: "passing";
+        review: "approved";
+        reviewCommentCount: number;
+        stack: null;
+      }>;
+      error: null;
+    }>();
+    const pullRequests = [
+      {
+        number: 151,
+        title: "Visible before Stack settles",
+        url: "https://github.com/acme/repo/pull/151",
+        repository: "acme/repo",
+        state: "open" as const,
+        draft: false as const,
+        head: "feature/partial-stack",
+        base: "main",
+        checks: "passing" as const,
+        review: "approved" as const,
+        reviewCommentCount: 0,
+        stack: null,
+      },
+    ];
+    const slot = await leftSlot({
+      rpc: {
+        sidebarAuthoredPullRequests: () => ({
+          available: true,
+          pullRequests,
+          error: null,
+        }),
+        sidebarAuthoredPullRequestStacks: () => stacks.promise,
+      },
+    });
+    fireEvent.click(slot.getByRole("button", { name: "PRs" }));
+    await slot.findByRole("link", {
+      name: /Visible before Stack settles/,
+    });
+    const refresh = slot.getByRole("button", {
+      name: "Refresh pull requests",
+    });
+    expect(refresh.getAttribute("aria-busy")).toBe("true");
+    expect(
+      refresh
+        .querySelector('[data-icon="RefreshCw"]')
+        ?.getAttribute("data-motion"),
+    ).toBe("spin");
+
+    stacks.resolve({ available: true, pullRequests, error: null });
+    await waitFor(() => expect(refresh.getAttribute("aria-busy")).toBeNull());
+    slot.unmount();
+  });
+
+  it("manages requested reviewers from both registered PR entrypoints", async () => {
+    const updateReviewers = vi.fn(({ reviewers }: { reviewers: string[] }) => ({
+      reviewers,
+    }));
+    const pullRequests = [
+      {
+        number: 153,
+        title: "Manage requested reviewers",
+        url: "https://github.com/acme/repo/pull/153",
+        repository: "acme/repo",
+        state: "open" as const,
+        draft: false as const,
+        head: "feature/reviewers",
+        base: "main",
+        checks: "passing" as const,
+        review: "review_required" as const,
+        requestedReviewers: ["alice"],
+        reviewCommentCount: 0,
+        stack: null,
+      },
+    ];
+    const slot = await leftSlot({
+      rpc: {
+        sidebarAuthoredPullRequests: () => ({
+          available: true,
+          pullRequests,
+          error: null,
+        }),
+        sidebarAuthoredPullRequestStacks: () => ({
+          available: true,
+          pullRequests,
+          error: null,
+        }),
+        getPullRequestReviewers: () => ({
+          available: true,
+          reviewers: [
+            { login: "alice", name: "Alice", avatarUrl: null },
+            { login: "bob", name: "Bob", avatarUrl: null },
+          ],
+          error: null,
+        }),
+        updatePullRequestReviewers: updateReviewers,
+      },
+    });
+    fireEvent.click(slot.getByRole("button", { name: "PRs" }));
+    const title = await slot.findByRole("link", {
+      name: "Open pull request #153: Manage requested reviewers",
+    });
+    fireEvent.contextMenu(title);
+    fireEvent.click(slot.getByRole("menuitem", { name: "Request reviewers…" }));
+    expect(
+      await slot.findByRole("combobox", { name: "Search reviewers" }),
+    ).toBeTruthy();
+    expect(slot.queryByRole("dialog")).toBeNull();
+    fireEvent.click(await slot.findByRole("option", { name: /bob.*Bob/i }));
+    fireEvent.click(slot.getByRole("button", { name: "Save reviewers" }));
+    await waitFor(() =>
+      expect(updateReviewers).toHaveBeenCalledWith({
+        repository: "acme/repo",
+        number: 153,
+        reviewers: ["alice", "bob"],
+      }),
+    );
+    await waitFor(() =>
+      expect(slot.queryByRole("combobox", { name: "Search reviewers" })).toBeNull(),
+    );
+
+    fireEvent.click(
+      slot.getByRole("button", {
+        name: "Manage reviewers: Review required",
+      }),
+    );
+    expect(
+      await slot.findByRole("combobox", { name: "Search reviewers" }),
+    ).toBeTruthy();
+    slot.lifecycle.unmount();
+  });
+
+  it("edits the shared row height from every left pane", async () => {
+    let rowHeight = 40;
+    const saveAppearance = vi.fn(
+      ({ rowHeight: next }: { rowHeight: number }) => {
+        rowHeight = next;
+        return { rowHeight };
+      },
+    );
+    const slot = await leftSlot({
+      rpc: {
+        getSidebarAppearance: () => ({ rowHeight }),
+        saveSidebarAppearance: saveAppearance,
+      },
+    });
+
+    for (const pane of ["Threads", "Tasks", "PRs"]) {
+      fireEvent.click(slot.getByRole("button", { name: pane }));
+      fireEvent.click(
+        slot.getByRole("button", { name: "Thread list settings" }),
+      );
+      expect(slot.getByRole("spinbutton", { name: "Row height" })).toBeTruthy();
+      fireEvent.keyDown(
+        slot.getByRole("dialog", { name: "Thread list settings" }),
+        { key: "Escape" },
+      );
+    }
+
+    fireEvent.click(slot.getByRole("button", { name: "Thread list settings" }));
+    const input = slot.getByRole("spinbutton", {
+      name: "Row height",
+    }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "38.5" } });
+    await waitFor(() =>
+      expect(saveAppearance).toHaveBeenCalledWith({ rowHeight: 38.5 }),
+    );
+    await waitFor(() =>
+      expect(
+        slot.container
+          .querySelector<HTMLElement>(".ws-list")
+          ?.style.getPropertyValue("--ws-sidebar-row-height"),
+      ).toBe("38.5px"),
+    );
   });
 
   it("keeps task mappings in Tasks without duplicating badges on thread rows", async () => {
@@ -498,6 +891,10 @@ describe("R18 registered left sidebar parity", () => {
     const betaRow = slot
       .getByRole("button", { name: "Drag Beta to reorder" })
       .closest("[data-group-position]")!;
+    vi.spyOn(betaRow, "getBoundingClientRect").mockReturnValue({
+      top: 100,
+      height: 40,
+    } as DOMRect);
     const betaHandle = slot.getByRole("button", {
       name: "Drag Beta to reorder",
     });
@@ -508,7 +905,8 @@ describe("R18 registered left sidebar parity", () => {
     fireEvent.dragStart(activeHandle, {
       dataTransfer: { setData: vi.fn(), effectAllowed: "move" },
     });
-    fireEvent.dragOver(betaRow);
+    fireEvent.dragOver(betaRow, { clientY: 139 });
+    expect(betaRow.getAttribute("data-drop-placement")).toBe("after");
     fireEvent.drop(betaRow);
     await waitFor(() =>
       expect(saveGroups).toHaveBeenLastCalledWith({
@@ -628,7 +1026,7 @@ describe("R18 registered left sidebar parity", () => {
     slot.lifecycle.unmount();
   });
 
-  it("disables occupied group removal and keeps one undecorated plugin settings link", async () => {
+  it("disables occupied group removal and keeps appearance editing inline", async () => {
     const slot = await leftSlot({
       threads: [
         thread("thr_one", "One"),
@@ -645,13 +1043,19 @@ describe("R18 registered left sidebar parity", () => {
     expect(slot.getByLabelText("Remove Later").hasAttribute("disabled")).toBe(
       true,
     );
-    const settingsLink = slot.getByRole("link", {
+    expect(slot.getByRole("spinbutton", { name: "Row height" })).toBeTruthy();
+    const appearance = slot.container.querySelector(
+      ".ws-thread-appearance-settings",
+    );
+    const rowHeight = slot.getByRole("spinbutton", { name: "Row height" });
+    const pluginSettings = slot.getByRole("link", {
       name: "Open Work Sidebar settings",
     });
-    expect(settingsLink.getAttribute("href")).toBe(
+    expect(appearance?.contains(rowHeight)).toBe(true);
+    expect(appearance?.contains(pluginSettings)).toBe(true);
+    expect(pluginSettings.getAttribute("href")).toBe(
       "/settings/plugins/work-sidebar",
     );
-    expect(settingsLink.querySelector("svg")).toBeNull();
     expect(
       slot.queryByRole("link", { name: "Open sidebar list settings" }),
     ).toBeNull();
@@ -775,7 +1179,7 @@ describe("R18 registered left sidebar parity", () => {
     expect(duration?.parentElement?.classList).toContain("ws-thread-trailing");
     expect(
       archivedLink.querySelector(
-        ".ws-thread-leading .ws-thread-agent-placeholder",
+        '.ws-thread-leading .ws-thread-provider[data-provider-id="codex"]',
       ),
     ).toBeTruthy();
     expect(
@@ -953,15 +1357,25 @@ describe("R18 registered left sidebar parity", () => {
     expect(baseLink.getAttribute("href")).toBe(
       "https://github.com/acme/repo/pull/1",
     );
-    expect(baseLink.getAttribute("target")).toBe("_blank");
-    const modifiedClick = new MouseEvent("click", {
-      bubbles: true,
-      cancelable: true,
-      ctrlKey: true,
+    expect(baseLink.hasAttribute("target")).toBe(false);
+    for (const modifier of [{ ctrlKey: true }, { metaKey: true }]) {
+      const modifiedClick = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        ...modifier,
+      });
+      expect(baseLink.dispatchEvent(modifiedClick)).toBe(true);
+      expect(modifiedClick.defaultPrevented).toBe(false);
+    }
+    expect(slot.inspection.navigateCalls).not.toContainEqual({
+      method: "openUrl",
+      url: "https://github.com/acme/repo/pull/1",
     });
-    expect(baseLink.dispatchEvent(modifiedClick)).toBe(true);
-    expect(modifiedClick.defaultPrevented).toBe(false);
     fireEvent.click(baseLink);
+    expect(slot.inspection.navigateCalls).toContainEqual({
+      method: "openUrl",
+      url: "https://github.com/acme/repo/pull/1",
+    });
     expect(baseLink.closest("article")?.hasAttribute("data-selected")).toBe(
       false,
     );
@@ -1145,6 +1559,223 @@ describe("R18 registered left sidebar parity", () => {
       threadId: "thr_one",
     });
     crossGroup.lifecycle.unmount();
+  });
+
+  it("reparents through the existing hierarchy mutation, promotes through To Top, and leaves rejected hierarchy drops unchanged", async () => {
+    const moveThread = vi.fn((input: {
+      threadId: string;
+      parentThreadId: string | null;
+    }) => ({
+      ...input,
+      oldRootThreadId: "thr_one",
+      newRootThreadId: input.parentThreadId ?? input.threadId,
+      affectedThreadIds: [input.threadId],
+    }));
+    const saveOrder = vi.fn(({ threadIds }: { threadIds: string[] }) => ({
+      threadIds,
+    }));
+    const reparent = await leftSlot({
+      rpc: { moveSidebarThread: moveThread, saveSiblingOrder: saveOrder },
+    });
+    await waitFor(() =>
+      expect(reparent.getByRole("link", { name: /One/ })).toBeTruthy(),
+    );
+    const source = reparent.container.querySelector<HTMLElement>(
+      '[data-ws-thread-id="thr_one"]',
+    )!;
+    const elementAt = mockElementAt(null);
+    fireEvent.pointerDown(source, {
+      button: 0,
+      pointerId: 31,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { pointerId: 31, clientX: 10, clientY: 20 });
+    const target = reparent.container.querySelector<HTMLElement>(
+      '[data-ws-thread-reparent-target="thr_two"]',
+    )!;
+    elementAt.mockReturnValue(target);
+    fireEvent.pointerMove(window, { pointerId: 31, clientX: 10, clientY: 20 });
+    const targetRow = reparent.container.querySelector<HTMLElement>(
+      '[data-ws-thread-id="thr_two"]',
+    )!;
+    expect(targetRow.getAttribute("data-reparent-target")).toBe("true");
+    expect(targetRow.hasAttribute("data-drop-placement")).toBe(false);
+    fireEvent.pointerUp(window, { pointerId: 31, clientX: 10, clientY: 20 });
+    await waitFor(() =>
+      expect(moveThread).toHaveBeenCalledWith({
+        threadId: "thr_one",
+        parentThreadId: "thr_two",
+      }),
+    );
+    expect(saveOrder).not.toHaveBeenCalled();
+    reparent.unmount();
+
+    const splitMove = vi.fn();
+    const splitYield = await leftSlot({ rpc: { moveSidebarThread: splitMove } });
+    const splitSource = splitYield.container.querySelector<HTMLElement>(
+      '[data-ws-thread-id="thr_one"]',
+    )!;
+    elementAt.mockReturnValue(null);
+    fireEvent.pointerDown(splitSource, {
+      button: 0,
+      pointerId: 35,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { pointerId: 35, clientX: 300, clientY: 20 });
+    fireEvent.pointerUp(window, { pointerId: 35, clientX: 300, clientY: 20 });
+    expect(splitMove).not.toHaveBeenCalled();
+    splitYield.unmount();
+
+    const promoteThread = vi.fn((input: {
+      threadId: string;
+      parentThreadId: string | null;
+    }) => ({
+      ...input,
+      oldRootThreadId: "thr_parent",
+      newRootThreadId: input.parentThreadId ?? input.threadId,
+      affectedThreadIds: [input.threadId],
+    }));
+    const promote = await leftSlot({
+      threads: [
+        thread("thr_parent", "Parent"),
+        thread("thr_child", "Child", "thr_parent"),
+      ],
+      rpc: { moveSidebarThread: promoteThread },
+    });
+    fireEvent.click(
+      promote.getByRole("button", { name: "1 child agent, collapsed" }),
+    );
+    const child = promote.container.querySelector<HTMLElement>(
+      '[data-ws-thread-id="thr_child"]',
+    )!;
+    elementAt.mockReturnValue(null);
+    fireEvent.pointerDown(child, {
+      button: 0,
+      pointerId: 32,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { pointerId: 32, clientX: 10, clientY: 20 });
+    const toTop = await promote.findByRole("note", { name: "To Top" });
+    const descriptionId = toTop.getAttribute("aria-describedby");
+    expect(descriptionId).toBeTruthy();
+    expect(document.getElementById(descriptionId!)?.textContent).toBe(
+      "Move this thread out of its parent and make it a top-level thread",
+    );
+    elementAt.mockReturnValue(toTop);
+    fireEvent.pointerMove(window, { pointerId: 32, clientX: 10, clientY: 20 });
+    expect(toTop.getAttribute("data-drop-target")).toBe("true");
+    expect(
+      promote.container.querySelector('[data-drop-placement]'),
+    ).toBeNull();
+    fireEvent.pointerUp(window, { pointerId: 32, clientX: 10, clientY: 20 });
+    await waitFor(() =>
+      expect(promoteThread).toHaveBeenCalledWith({
+        threadId: "thr_child",
+        parentThreadId: null,
+      }),
+    );
+    promote.unmount();
+
+    const rejectedMove = vi.fn();
+    const rejected = await leftSlot({
+      threads: [
+        thread("thr_parent", "Parent"),
+        thread("thr_child", "Child", "thr_parent"),
+      ],
+      rpc: { moveSidebarThread: rejectedMove },
+    });
+    if (!rejected.container.querySelector('[data-ws-thread-id="thr_child"]'))
+      fireEvent.click(
+        rejected.getByRole("button", { name: /1 child agent/ }),
+      );
+    const rejectedSource = rejected.container.querySelector<HTMLElement>(
+      '[data-ws-thread-id="thr_parent"]',
+    )!;
+    const rejectedElementAt = mockElementAt(null);
+    fireEvent.pointerDown(rejectedSource, {
+      button: 0,
+      pointerId: 33,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { pointerId: 33, clientX: 10, clientY: 20 });
+    const descendantTarget = rejected.container.querySelector<HTMLElement>(
+      '[data-ws-thread-reparent-target="thr_child"]',
+    )!;
+    rejectedElementAt.mockReturnValue(descendantTarget);
+    fireEvent.pointerMove(window, { pointerId: 33, clientX: 10, clientY: 20 });
+    fireEvent.pointerUp(window, { pointerId: 33, clientX: 10, clientY: 20 });
+    await waitFor(() => expect(rejectedMove).not.toHaveBeenCalled());
+    rejected.unmount();
+
+    const unchangedMove = vi.fn();
+    const unchanged = await leftSlot({
+      threads: [
+        thread("thr_parent", "Parent"),
+        thread("thr_child", "Child", "thr_parent"),
+      ],
+      rpc: { moveSidebarThread: unchangedMove },
+    });
+    if (!unchanged.container.querySelector('[data-ws-thread-id="thr_child"]'))
+      fireEvent.click(
+        unchanged.getByRole("button", { name: /1 child agent/ }),
+      );
+    const unchangedSource = unchanged.container.querySelector<HTMLElement>(
+      '[data-ws-thread-id="thr_child"]',
+    )!;
+    const unchangedElementAt = mockElementAt(null);
+    fireEvent.pointerDown(unchangedSource, {
+      button: 0,
+      pointerId: 34,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { pointerId: 34, clientX: 10, clientY: 20 });
+    const currentParentTarget = unchanged.container.querySelector<HTMLElement>(
+      '[data-ws-thread-reparent-target="thr_parent"]',
+    )!;
+    unchangedElementAt.mockReturnValue(currentParentTarget);
+    fireEvent.pointerMove(window, { pointerId: 34, clientX: 10, clientY: 20 });
+    fireEvent.pointerUp(window, { pointerId: 34, clientX: 10, clientY: 20 });
+    await waitFor(() => expect(unchangedMove).not.toHaveBeenCalled());
+    unchanged.unmount();
+  });
+
+  it("renders one To Top drop target for the whole thread tree", async () => {
+    const slot = await leftSlot({
+      threads: [
+        thread("thr_active", "Active"),
+        thread("thr_later", "Later"),
+        thread("thr_archive", "Archive"),
+      ],
+      groups: [
+        { id: "group_later", name: "Later", threadIds: ["thr_later"] },
+        { id: "group_archive", name: "Archive", threadIds: ["thr_archive"] },
+      ],
+    });
+    await waitFor(() =>
+      expect(
+        slot.container.querySelector('[data-ws-thread-id="thr_active"]'),
+      ).toBeTruthy(),
+    );
+    const source = slot.container.querySelector<HTMLElement>(
+      '[data-ws-thread-id="thr_active"]',
+    )!;
+    mockElementAt(null);
+    fireEvent.pointerDown(source, {
+      button: 0,
+      pointerId: 36,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { pointerId: 36, clientX: 10, clientY: 20 });
+
+    expect(slot.getAllByRole("note", { name: "To Top" })).toHaveLength(1);
+    fireEvent.pointerCancel(window, { pointerId: 36 });
+    slot.unmount();
   });
 
   it("refreshes exactly the advertised thread, archive, subtext, and authored-PR domains", async () => {

@@ -1,47 +1,21 @@
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { Input } from "../../components/ui/input";
-import {
-  SurfaceCard,
-  SurfaceCardHeading,
-} from "../../components/ui/surface-card";
+import { useState } from "react";
+import { SearchCombobox } from "../../components/ui/combobox";
 import type { TrackerContext } from "./schemas";
 import type { useTrackerSearch } from "./queries";
-
-export function TrackerLoading() {
-  return (
-    <SurfaceCard className="ws-empty-state-card" aria-busy="true">
-      <SurfaceCardHeading title="Linear" />
-      <p className="ws-card-note">Loading linked work…</p>
-    </SurfaceCard>
-  );
-}
-
-export function TrackerError({
-  message,
-  retry,
-}: {
-  message: string;
-  retry(): void;
-}) {
-  return (
-    <SurfaceCard className="ws-linear-card" role="alert">
-      <SurfaceCardHeading title="Linear" />
-      <small className="ws-linear-error">{message}</small>
-      <button type="button" className="ws-text-button" onClick={retry}>
-        Try again
-      </button>
-    </SurfaceCard>
-  );
-}
 
 export function LinkedTrackerRow({
   linked,
   busy,
+  primary = false,
+  onSetPrimary,
   onStatus,
   onUnlink,
 }: {
   linked: TrackerContext["items"][number];
   busy: boolean;
+  primary?: boolean;
+  onSetPrimary?(): void;
   onStatus(statusId: string): void;
   onUnlink(): void;
 }) {
@@ -61,6 +35,18 @@ export function LinkedTrackerRow({
         <span>{item.title}</span>
       </button>
       <div className="ws-linear-controls">
+        {onSetPrimary ? (
+          <button
+            type="button"
+            className="ws-text-button"
+            aria-label={primary ? `${item.key} is the primary Linear issue` : `Make ${item.key} the primary Linear issue`}
+            aria-pressed={primary}
+            disabled={busy || primary}
+            onClick={onSetPrimary}
+          >
+            {primary ? "Primary" : "Make primary"}
+          </button>
+        ) : null}
         <select
           aria-label={`${item.key} status`}
           value={currentStatus}
@@ -102,6 +88,7 @@ export function TrackerSearch({
   onLink(key: string): void;
   search: ReturnType<typeof useTrackerSearch>;
 }) {
+  const [open, setOpen] = useState(false);
   const linkedKeys = new Set(
     data.items.map(({ item }) => item.key.toUpperCase()),
   );
@@ -118,55 +105,32 @@ export function TrackerSearch({
     );
   return (
     <>
-      <div className="ws-linear-search-row">
-        <Input
-          id="ws-linear-key"
-          aria-label="Search Linear issues"
-          value={query}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder="Search issues by key or title"
-          disabled={busy}
-        />
-      </div>
-      {search.isFetching && <small>Searching…</small>}
-      {search.isError && (
-        <div className="ws-linear-error" role="alert">
-          <small>{search.error.message}</small>
-          <button
-            type="button"
-            className="ws-text-button"
-            onClick={() => void search.refetch()}
-          >
-            Try again
-          </button>
-        </div>
-      )}
-      {!search.isFetching && !search.isError && suggestions.length === 0 && (
-        <small>
-          {query ? "No matching issues." : "No related issues found."}
-        </small>
-      )}
-      {suggestions.length > 0 && (
-        <div
-          className="ws-linear-options"
-          role="listbox"
-          aria-label="Suggested Linear issues"
-        >
-          {suggestions.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              role="option"
-              aria-selected="false"
-              onClick={() => onLink(item.key)}
-              disabled={busy}
-            >
-              <b>{item.key}</b>
-              <span>{item.title}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      <SearchCombobox
+        ariaLabel="Search Linear issues"
+        busy={search.isFetching}
+        closeOnSelect={false}
+        emptyMessage={query ? "No matching issues." : "No related issues found."}
+        error={search.isError ? { message: search.error.message } : null}
+        listboxLabel="Suggested Linear issues"
+        onOpenChange={setOpen}
+        onQueryChange={onChange}
+        onRetry={() => void search.refetch()}
+        onSelectionChange={(values) => {
+          const key = values[0];
+          if (key) onLink(key);
+        }}
+        open={open}
+        options={suggestions.map((item) => ({
+          value: item.key,
+          label: item.key,
+          detail: item.title,
+          disabled: busy,
+        }))}
+        placeholder="Search issues by key or title"
+        portal
+        query={query}
+        selectedValues={[]}
+      />
     </>
   );
 }

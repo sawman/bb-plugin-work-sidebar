@@ -44,8 +44,14 @@ function fixture() {
       groups: [{ id: "group_later", name: "Later", threadIds: [] }],
     }),
     saveThreadGroups: ({ groups }: { groups: unknown[] }) => ({ groups }),
-    saveSiblingOrder: ({ threadIds }: { threadIds: string[] }) => ({ threadIds }),
-    sidebarArchivedThreads: () => ({ available: true, threads: [], error: null }),
+    saveSiblingOrder: ({ threadIds }: { threadIds: string[] }) => ({
+      threadIds,
+    }),
+    sidebarArchivedThreads: () => ({
+      available: true,
+      threads: [],
+      error: null,
+    }),
     sidebarTasks: () => ({
       available: true,
       tasks: [task],
@@ -55,21 +61,23 @@ function fixture() {
     sidebarTaskLinks: () => ({
       available: true,
       links: {
-        thr_agent: [{
-          task: {
-            ...task,
-            id: "task_agent",
-            key: "PROJ-4",
-            title: "Accessible delegated task",
-            assignee: "agent",
+        thr_agent: [
+          {
+            task: {
+              ...task,
+              id: "task_agent",
+              key: "PROJ-4",
+              title: "Accessible delegated task",
+              assignee: "agent",
+            },
+            threadId: "thr_agent",
+            liveStatus: "working",
+            role: "execution",
+            mode: "delegated",
+            idempotencyKey: "accessible-agent",
+            dispatchState: "ready",
           },
-          threadId: "thr_agent",
-          liveStatus: "working",
-          role: "execution",
-          mode: "delegated",
-          idempotencyKey: "accessible-agent",
-          dispatchState: "ready",
-        }],
+        ],
       },
       error: null,
     }),
@@ -281,16 +289,35 @@ describe("R19D registered slot accessibility", () => {
     );
     expect(threadLink.getAttribute("aria-current")).toBe("true");
     expect(threadLink.hasAttribute("aria-selected")).toBe(false);
+    fireEvent.click(slot.getByRole("button", { name: "Search threads" }));
+    fireEvent.change(slot.getByRole("searchbox", { name: "Search threads" }), {
+      target: { value: "Accessible" },
+    });
+    await expectNoAriaViolations(slot.container);
+    fireEvent.keyDown(slot.getByRole("searchbox", { name: "Search threads" }), {
+      key: "Escape",
+    });
     fireEvent.click(slot.getByRole("button", { name: "Thread list settings" }));
     await waitFor(() =>
-      expect(slot.getByRole("dialog", { name: "Thread list settings" })).toBeTruthy(),
+      expect(
+        slot.getByRole("dialog", { name: "Thread list settings" }),
+      ).toBeTruthy(),
     );
     await expectNoAriaViolations(slot.container);
     fireEvent.click(slot.getByRole("button", { name: "Tasks" }));
     await waitFor(() => expect(slot.getByText("Accessible task")).toBeTruthy());
+    fireEvent.click(slot.getByRole("button", { name: "Search tasks" }));
+    fireEvent.change(slot.getByRole("searchbox", { name: "Search tasks" }), {
+      target: { value: "Accessible" },
+    });
     await expectNoAriaViolations(slot.container);
     fireEvent.click(slot.getByRole("button", { name: "PRs" }));
     await waitFor(() => expect(slot.getByText("Accessible PR")).toBeTruthy());
+    fireEvent.click(slot.getByRole("button", { name: "Search pull requests" }));
+    fireEvent.change(
+      slot.getByRole("searchbox", { name: "Search pull requests" }),
+      { target: { value: "Accessible" } },
+    );
     await expectNoAriaViolations(slot.container);
     slot.lifecycle.unmount();
   });
@@ -311,7 +338,13 @@ describe("R19D registered slot accessibility", () => {
           originPluginId: null,
           providerId: "codex",
           hasPendingInteraction: false,
-          activity: { workflows: 0, backgroundAgents: 1, backgroundCommands: 0, planMode: 0, goals: 0 },
+          activity: {
+            workflows: 0,
+            backgroundAgents: 1,
+            backgroundCommands: 0,
+            planMode: 0,
+            goals: 0,
+          },
           indicator: "runtime",
           indicatorLabel: "Agent is working",
           isUnread: false,
@@ -335,7 +368,13 @@ describe("R19D registered slot accessibility", () => {
           originPluginId: "work-sidebar",
           providerId: "codex",
           hasPendingInteraction: false,
-          activity: { workflows: 0, backgroundAgents: 1, backgroundCommands: 0, planMode: 0, goals: 0 },
+          activity: {
+            workflows: 0,
+            backgroundAgents: 1,
+            backgroundCommands: 0,
+            planMode: 0,
+            goals: 0,
+          },
           indicator: "runtime",
           indicatorLabel: "Agent is working",
           isUnread: false,
@@ -371,10 +410,7 @@ describe("R19D registered slot accessibility", () => {
     await waitFor(() =>
       expect(slot.getByText("Accessible execution task")).toBeTruthy(),
     );
-    const executionTasks = slot.getByRole("group", { name: "Execution tasks" });
-    expect(
-      executionTasks.querySelector(".ws-status-dot")?.getAttribute("aria-hidden"),
-    ).toBe("true");
+    expect(slot.getByRole("heading", { name: "Next" })).toBeTruthy();
     await expectNoAriaViolations(slot.container);
     fireEvent.click(slot.getByRole("tab", { name: "Changes" }));
     await waitFor(() =>
@@ -382,9 +418,7 @@ describe("R19D registered slot accessibility", () => {
     );
     await expectNoAriaViolations(slot.container);
     fireEvent.click(slot.getByRole("tab", { name: "Agents" }));
-    await waitFor(() =>
-      expect(slot.getByText("gpt-5.6-terra")).toBeTruthy(),
-    );
+    await waitFor(() => expect(slot.getByText("gpt-5.6-terra")).toBeTruthy());
     expect(slot.getByText("bb/accessible-agent")).toBeTruthy();
     expect(slot.getByText("Accessible delegated task")).toBeTruthy();
     await expectNoAriaViolations(slot.container);

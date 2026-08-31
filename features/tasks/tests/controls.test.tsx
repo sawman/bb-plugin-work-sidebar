@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { configureAxe } from "vitest-axe";
+import { toast } from "sonner";
 import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
@@ -61,6 +62,7 @@ function sidebarThread(id: string, title: string): PluginSidebarThread {
 const sidebarThreads = [
   sidebarThread("thr_test", "Fixture thread"),
   sidebarThread("thr_two", "Second thread"),
+  sidebarThread("thr_three", "Third thread"),
 ];
 const workContext = {
   rootThreadId: "thr_test", tasksAvailable: true, currentThread: { title: "Fixture thread", status: "idle" as const, runtimeStatus: "idle", providerId: "codex" }, tasks: [], subtasks: [], outcome: null, executionTasks: [], bindings: [], legacy: { state: "none" as const, taskIds: [], message: null }, goal: null, todos: [], children: [],
@@ -150,12 +152,10 @@ describe("Tasks registered controls", () => {
     const picker = await rendered.findByRole("combobox", {
       name: "Add task to this thread",
     });
-    expect(picker.closest(".ws-combobox")?.classList).toContain(
-      "ws-task-attachment-picker",
-    );
 
     fireEvent.focus(picker);
-    await rendered.findByRole("listbox");
+    const listbox = await rendered.findByRole("listbox");
+    expect(listbox.closest("[data-portalled=true]")).toBeTruthy();
     fireEvent.click(document.body);
 
     await waitFor(() => expect(rendered.queryByRole("listbox")).toBeNull());
@@ -321,7 +321,7 @@ describe("Tasks registered controls", () => {
     rendered.lifecycle.unmount();
   });
 
-  it("edits left-row thread links without exposing Human/Agent assignment", async () => {
+  it("edits one searchable left-row owner thread without exposing assignment controls", async () => {
     const pending = deferred<unknown>();
     const { rendered, call } = await leftSlot(
       [{ ...task, priority: "high" }],
@@ -346,7 +346,13 @@ describe("Tasks registered controls", () => {
     expect(
       trailing.querySelector('[aria-label="Change status for WORK-1: To do"]'),
     ).toBeTruthy();
+    expect(
+      primaryInfo.querySelector(".ws-task-priority-slot")?.compareDocumentPosition(
+        trailing.querySelector('[aria-label="Change status for WORK-1: To do"]')!,
+      )! & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
 
+    expect(rendered.getByLabelText("Human assigned (read-only)")).toBeTruthy();
     expect(rendered.queryByLabelText("Human assigned")).toBeNull();
     expect(rendered.queryByLabelText("Agent assigned")).toBeNull();
     expect(
@@ -363,7 +369,7 @@ describe("Tasks registered controls", () => {
     const listbox = rendered.getByRole("listbox", {
       name: "Thread assignment for WORK-1",
     });
-    expect(listbox.getAttribute("aria-multiselectable")).toBe("true");
+    expect(listbox.hasAttribute("aria-multiselectable")).toBe(false);
     expect(
       rendered.getByRole("option", { name: "Fixture thread" }).getAttribute(
         "aria-selected",
@@ -402,6 +408,23 @@ describe("Tasks registered controls", () => {
     rendered.lifecycle.unmount();
     getPluginQueryClient().clear();
 
+    const failedAttach = await leftSlot(
+      [task],
+      vi.fn((method) => method === "attachTaskToThread"
+        ? Promise.reject(new Error("owner attach failed"))
+        : Promise.resolve({})),
+    );
+    const failedTrigger = failedAttach.rendered.getByRole("button", { name: "Edit threads for WORK-1" });
+    fireEvent.click(failedTrigger);
+    fireEvent.click(failedAttach.rendered.getByRole("option", { name: "Fixture thread" }));
+    await waitFor(() => expect(failedAttach.call).toHaveBeenCalledWith("attachTaskToThread", {
+      taskId: "task_1",
+      threadId: "thr_test",
+    }));
+    await waitFor(() => expect((failedTrigger as HTMLButtonElement).disabled).toBe(false));
+    failedAttach.rendered.lifecycle.unmount();
+    getPluginQueryClient().clear();
+
     const attached = await leftSlot([
       { ...task, linkedThreadIds: ["thr_test"] },
     ]);
@@ -433,7 +456,6 @@ describe("Tasks registered controls", () => {
         threadId: "thr_two",
       }),
     );
-    fireEvent.click(assignedThread);
     await waitFor(() =>
       expect(attached.call).toHaveBeenCalledWith("detachTaskFromThread", {
         taskId: "task_1",
@@ -469,6 +491,51 @@ describe("Tasks registered controls", () => {
     rendered.lifecycle.unmount();
   });
 
+  it("keeps assignee read-only except for the unowned left-row escape hatch", async () => {
+    const pending = deferred<unknown>();
+    const { rendered, call } = await leftSlot(
+      [task],
+      vi.fn((method) => method === "updateTaskAssignee" ? pending.promise : Promise.resolve({})),
+    );
+    expect(rendered.getByLabelText("Human assigned (read-only)")).toBeTruthy();
+    fireEvent.contextMenu(rendered.getByText(task.title));
+    fireEvent.click(rendered.getByRole("menuitem", { name: "Assign to Agent" }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith("updateTaskAssignee", {
+      taskId: "task_1",
+      assignee: "agent",
+    }));
+    pending.reject(new Error("assignment failed"));
+    await waitFor(() => expect(rendered.getByText(task.title)).toBeTruthy());
+    rendered.lifecycle.unmount();
+    getPluginQueryClient().clear();
+
+    const owned = await leftSlot([{ ...task, linkedThreadIds: ["thr_test"] }]);
+    fireEvent.contextMenu(owned.rendered.getByText(task.title));
+    expect(owned.rendered.queryByRole("menuitem", { name: "Assign to Agent" })).toBeNull();
+    owned.rendered.lifecycle.unmount();
+  });
+
+  it("presents unavailable owners without binding jargon", async () => {
+    const bound = { ...task, linkedThreadIds: ["thr_missing"] };
+    const { rendered } = await leftSlot([bound], vi.fn(() => Promise.resolve({})), {
+      thr_missing: [{
+        task: bound,
+        threadId: "thr_missing",
+        threadTitle: "Archived owner",
+        liveStatus: "completed",
+        role: "execution",
+        mode: "delegated",
+        idempotencyKey: null,
+        dispatchState: null,
+      }],
+    });
+    expect(rendered.getByText("Archived owner")).toBeTruthy();
+    expect(rendered.getByText("Owner thread unavailable")).toBeTruthy();
+    for (const legacy of ["Bound outcome task", "Bound delegated execution task", "Bound direct execution task"])
+      expect(rendered.queryByText(legacy)).toBeNull();
+    rendered.lifecycle.unmount();
+  });
+
   it("keeps a binding-owned Queue row selectable while clearly preventing a destructive detach", async () => {
     const bound = { ...task, linkedThreadIds: ["thr_test"] };
     const { rendered, call } = await leftSlot([bound], vi.fn(() => Promise.resolve({})), {
@@ -483,12 +550,8 @@ describe("Tasks registered controls", () => {
       }],
     });
     const row = rendered.getByRole("button", { name: bound.title });
-    expect(rendered.getByText("Bound outcome task")).toBeTruthy();
-    const bindingDescription = document.getElementById(
-      row.getAttribute("aria-describedby")!,
-    );
-    expect(bindingDescription?.textContent).toBe("Bound outcome task");
-    expect(bindingDescription?.getAttribute("role")).toBeNull();
+    expect(rendered.getByText("Fixture thread")).toBeTruthy();
+    expect(rendered.queryByText("Bound outcome task")).toBeNull();
     fireEvent.click(row);
     expect(call).not.toHaveBeenCalled();
     fireEvent.click(
@@ -497,9 +560,61 @@ describe("Tasks registered controls", () => {
     expect(
       rendered.getByRole("option", { name: "Fixture thread" }),
     ).toHaveProperty("disabled", true);
+    const alternate = rendered.getByRole("option", { name: "Second thread" });
+    expect(alternate).toHaveProperty("disabled", true);
     expect(
-      rendered.getByRole("option", { name: "Second thread" }),
-    ).toHaveProperty("disabled", false);
+      rendered.getByText("This owner thread is managed by a durable Work binding."),
+    ).toBeTruthy();
+    fireEvent.click(alternate);
+    expect(call).not.toHaveBeenCalled();
+    rendered.lifecycle.unmount();
+  });
+
+  it("replaces and removes every legacy generic owner link in exact order", async () => {
+    const linked = { ...task, linkedThreadIds: ["thr_test", "thr_two"] };
+    const calls: Array<{ method: string; input: unknown }> = [];
+    const { rendered } = await leftSlot([linked], vi.fn(async (method, input) => {
+      calls.push({ method, input });
+      return {};
+    }));
+    fireEvent.click(rendered.getByRole("button", { name: "Edit threads for WORK-1" }));
+    fireEvent.click(rendered.getByRole("option", { name: "Third thread" }));
+    await waitFor(() => expect(calls).toEqual([
+      { method: "attachTaskToThread", input: { taskId: "task_1", threadId: "thr_three" } },
+      { method: "detachTaskFromThread", input: { taskId: "task_1", threadId: "thr_test" } },
+      { method: "detachTaskFromThread", input: { taskId: "task_1", threadId: "thr_two" } },
+    ]));
+    rendered.lifecycle.unmount();
+    getPluginQueryClient().clear();
+
+    const removed: Array<{ method: string; input: unknown }> = [];
+    const remove = await leftSlot([linked], vi.fn(async (method, input) => {
+      removed.push({ method, input });
+      return {};
+    }));
+    fireEvent.click(remove.rendered.getByRole("button", { name: "Edit threads for WORK-1" }));
+    fireEvent.click(remove.rendered.getByRole("option", { name: "Fixture thread" }));
+    await waitFor(() => expect(removed).toEqual([
+      { method: "detachTaskFromThread", input: { taskId: "task_1", threadId: "thr_test" } },
+      { method: "detachTaskFromThread", input: { taskId: "task_1", threadId: "thr_two" } },
+    ]));
+    remove.rendered.lifecycle.unmount();
+  });
+
+  it("does not detach any generic owner link when its replacement attach fails", async () => {
+    const linked = { ...task, linkedThreadIds: ["thr_test", "thr_two"] };
+    const { rendered, call } = await leftSlot([linked], vi.fn((method) =>
+      method === "attachTaskToThread"
+        ? Promise.reject(new Error("owner replacement failed"))
+        : Promise.resolve({}),
+    ));
+    fireEvent.click(rendered.getByRole("button", { name: "Edit threads for WORK-1" }));
+    fireEvent.click(rendered.getByRole("option", { name: "Third thread" }));
+    await waitFor(() => expect(call).toHaveBeenCalledWith("attachTaskToThread", {
+      taskId: "task_1",
+      threadId: "thr_three",
+    }));
+    await waitFor(() => expect(call).toHaveBeenCalledTimes(1));
     rendered.lifecycle.unmount();
   });
 
@@ -516,7 +631,7 @@ describe("Tasks registered controls", () => {
       }],
     });
     const row = rendered.getByRole("button", { name: task.title });
-    expect(rendered.getByText("Bound outcome task")).toBeTruthy();
+    expect(rendered.getByText("Owner thread unavailable")).toBeTruthy();
     expect(row.getAttribute("aria-describedby")).toBeTruthy();
     fireEvent.contextMenu(rendered.getByText(task.title));
     expect(
@@ -544,15 +659,17 @@ describe("Tasks registered controls", () => {
     await waitFor(() => expect((rendered.getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(true)); rendered.lifecycle.unmount(); getPluginQueryClient().clear();
 
     const successfulAssignment = deferred<unknown>(); const successfulCall = vi.fn((method) => method === "updateTaskAssignee" ? successfulAssignment.promise : Promise.resolve({})); const successful = renderSlot(captured.threadPanelActions[0]!, { threadId: "thr_test", params: null }, { rpc: rpcFixtures(() => tasks([{ ...task, linkedThreadIds: ["thr_test"] }]), successfulCall) });
-    await waitFor(() => expect(successful.getByLabelText("Human assigned")).toBeTruthy()); fireEvent.click(successful.getByLabelText("Human assigned")); fireEvent.click(successful.getByRole("option", { name: "Agent" }));
-    await waitFor(() => expect(successfulCall).toHaveBeenCalledWith("updateTaskAssignee", { taskId: "task_1", assignee: "agent" })); expect(successful.getByLabelText("Agent assigned")).toBeTruthy(); successfulAssignment.resolve({});
-    await waitFor(() => expect(successful.getByLabelText("Human assigned")).toBeTruthy()); successful.lifecycle.unmount(); getPluginQueryClient().clear();
+    await waitFor(() => expect(successful.getByLabelText("Human assigned to WORK-1")).toBeTruthy()); fireEvent.click(successful.getByLabelText("Human assigned to WORK-1")); fireEvent.click(successful.getByRole("option", { name: "Agent" }));
+    await waitFor(() => expect(successfulCall).toHaveBeenCalledWith("updateTaskAssignee", { taskId: "task_1", assignee: "agent" })); expect((successful.getByLabelText("Agent assigned to WORK-1") as HTMLButtonElement).disabled).toBe(true); successfulAssignment.resolve({});
+    await waitFor(() => expect(successful.getByLabelText("Human assigned to WORK-1")).toBeTruthy()); successful.lifecycle.unmount(); getPluginQueryClient().clear();
 
-    const assignment = deferred<unknown>(); const detach = deferred<unknown>(); const rightCall = vi.fn((method) => method === "updateTaskAssignee" ? assignment.promise : method === "detachTaskFromThread" ? detach.promise : Promise.resolve({}));
+    const assignment = deferred<unknown>(); const detach = deferred<unknown>(); const toastError = vi.spyOn(toast, "error"); const rightCall = vi.fn((method) => method === "updateTaskAssignee" ? assignment.promise : method === "detachTaskFromThread" ? detach.promise : Promise.resolve({}));
     const right = renderSlot(captured.threadPanelActions[0]!, { threadId: "thr_test", params: null }, { rpc: rpcFixtures(() => tasks([{ ...task, linkedThreadIds: ["thr_test"] }]), rightCall) });
-    await waitFor(() => expect(right.getByLabelText("Human assigned")).toBeTruthy()); fireEvent.click(right.getByLabelText("Human assigned")); fireEvent.click(right.getByRole("option", { name: "Agent" }));
-    await waitFor(() => expect(rightCall).toHaveBeenCalledWith("updateTaskAssignee", { taskId: "task_1", assignee: "agent" })); expect(right.getByLabelText("Agent assigned")).toBeTruthy(); assignment.reject(new Error("assignment failed"));
-    await waitFor(() => expect(right.getByLabelText("Human assigned")).toBeTruthy()); const detachButton = right.getByLabelText("Detach WORK-1 from this thread") as HTMLButtonElement; fireEvent.click(detachButton); await waitFor(() => expect(rightCall).toHaveBeenCalledWith("detachTaskFromThread", { taskId: "task_1", threadId: "thr_test" })); expect(detachButton.disabled).toBe(true); detach.reject(new Error("detach failed")); await waitFor(() => expect(detachButton.disabled).toBe(false));
-    expect(right.container.querySelector(".ws-thread-task-card > .ws-work-card-list")).toBeTruthy(); right.lifecycle.unmount();
+    await waitFor(() => expect(right.getByLabelText("Human assigned to WORK-1")).toBeTruthy()); fireEvent.click(right.getByLabelText("Human assigned to WORK-1")); fireEvent.click(right.getByRole("option", { name: "Agent" }));
+    await waitFor(() => expect(rightCall).toHaveBeenCalledWith("updateTaskAssignee", { taskId: "task_1", assignee: "agent" })); expect((right.getByLabelText("Agent assigned to WORK-1") as HTMLButtonElement).disabled).toBe(true); assignment.reject(new Error("assignment failed"));
+    await waitFor(() => expect((right.getByLabelText("Human assigned to WORK-1") as HTMLButtonElement).disabled).toBe(false));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("assignment failed"));
+    const detachButton = right.getByLabelText("Detach WORK-1 from this thread") as HTMLButtonElement; fireEvent.click(detachButton); await waitFor(() => expect(rightCall).toHaveBeenCalledWith("detachTaskFromThread", { taskId: "task_1", threadId: "thr_test" })); expect(detachButton.disabled).toBe(true); detach.reject(new Error("detach failed")); await waitFor(() => expect(detachButton.disabled).toBe(false));
+    expect(right.container.querySelector(".ws-thread-task-card .ws-task-workflow")).toBeTruthy(); right.lifecycle.unmount();
   });
 });

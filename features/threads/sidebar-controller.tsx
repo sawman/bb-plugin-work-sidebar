@@ -11,16 +11,20 @@ import {
   experimental_useSidebarThreads,
   experimental_useProviders,
   type PluginThreadListProps,
+  useSettings,
 } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { TabSelector } from "@/components/ui/tab-selector";
+import type { ThreadProvider } from "@/components/threads/thread-provider-logo";
 import { threadTitle } from "@/work-model";
 import { TasksLeftSidebar } from "@/features/tasks/left-sidebar";
 import { invalidateTaskQueries } from "@/features/tasks/mutations";
 import { useTaskLinksRead } from "@/features/tasks/queries";
 import { PullRequestsLeftSidebar } from "@/features/pull-requests/left-sidebar";
 import { invalidateSidebarPullRequestStacks } from "@/features/pull-requests/queries";
+import type { PullRequestThreadReference } from "@/features/pull-requests/thread-link";
 import { DEFAULT_SIDEBAR_ROW_HEIGHT } from "./sidebar-appearance";
+import { DEFAULT_TEXT_SCALE } from "./sidebar-appearance";
 import "../../app.css";
 import "../../scrollbar.css";
 import "../../views.css";
@@ -38,10 +42,19 @@ import { useSidebarThreadOrganization } from "./sidebar-organization";
 import { threadInteractionStore } from "./store";
 import { SidebarThreadToolbar } from "./sidebar-toolbar";
 import { SidebarWorkView } from "./sidebar-work-view";
+import { ThreadListSettings } from "./sidebar-group-settings";
+import { ThreadHierarchyProvider } from "./thread-hierarchy-context";
+import { ThreadHierarchyPickerHost } from "./thread-hierarchy-picker-host";
+import { TextScaleProvider, textScaleStyle } from "../../shared/text-scale";
 
 const SIDEBAR_TABS: readonly { id: SidebarView; label: string }[] = (
   ["work", "queue", "prs"] as const
 ).map((id) => ({ id, label: sidebarViewLabel(id) }));
+const EMPTY_TASK_OWNER_THREADS: ReadonlyMap<
+  string,
+  { title: string; providerId: string; provider?: ThreadProvider }
+> = new Map();
+const EMPTY_PULL_REQUEST_THREADS: readonly PullRequestThreadReference[] = [];
 
 function EmptyOriginal() {
   return null;
@@ -52,6 +65,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     props.Original ?? props.experimental_Original ?? EmptyOriginal;
   const { status, threads, projects } = experimental_useSidebarThreads();
   const providerDirectory = experimental_useProviders();
+  const pluginSettings = useSettings();
   const actions = experimental_useSidebarThreadActions();
   const queryClient = useQueryClient();
   const threadPreferences = useThreadPreferences();
@@ -59,6 +73,9 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   // cache and polling owner rather than creating per-consumer intervals.
   const { data: taskLinksData, refetch: refetchTaskLinks } = useTaskLinksRead();
   const unarchiveMutation = useUnarchiveSidebarThread();
+  const [view, setView] = useState<SidebarView>("work");
+  const [threadSearchQuery, setThreadSearchQuery] = useState("");
+  const [subtextRefreshKey, setSubtextRefreshKey] = useState(0);
   const providersById = useMemo(
     () =>
       new Map(
@@ -68,32 +85,34 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   );
   const taskOwnerThreads = useMemo(
     () =>
-      new Map(
-        threads.map((thread) => [
-          thread.id,
-          {
-            title: threadTitle(thread),
-            providerId: thread.providerId,
-            provider: providersById.get(thread.providerId),
-          },
-        ]),
-      ),
-    [providersById, threads],
+      view === "queue"
+        ? new Map(
+            threads.map((thread) => [
+              thread.id,
+              {
+                title: threadTitle(thread),
+                providerId: thread.providerId,
+                provider: providersById.get(thread.providerId),
+              },
+            ]),
+          )
+        : EMPTY_TASK_OWNER_THREADS,
+    [providersById, threads, view],
   );
   const pullRequestThreads = useMemo(
     () =>
-      threads.map((thread) => ({
-        id: thread.id,
-        title: threadTitle(thread),
-        branchName: thread.environment?.branchName ?? null,
-        parentThreadId: thread.parentThreadId,
-        providerId: thread.providerId,
-        provider: providersById.get(thread.providerId),
-      })),
-    [providersById, threads],
+      view === "prs"
+        ? threads.map((thread) => ({
+            id: thread.id,
+            title: threadTitle(thread),
+            branchName: thread.environment?.branchName ?? null,
+            parentThreadId: thread.parentThreadId,
+            providerId: thread.providerId,
+            provider: providersById.get(thread.providerId),
+          }))
+        : EMPTY_PULL_REQUEST_THREADS,
+    [providersById, threads, view],
   );
-  const [view, setView] = useState<SidebarView>("work");
-  const [subtextRefreshKey, setSubtextRefreshKey] = useState(0);
   const groupPreferences = threadPreferences.groups.data ?? {
     groups: [],
     activeGroupPosition: 0,
@@ -135,13 +154,15 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     },
     [threadPreferences.saveOrder],
   );
+  const effectiveThreadSearchQuery = threadSearchQuery || props.searchQuery;
   const organization = useSidebarThreadOrganization({
+    active: view === "work",
     threads,
     projects,
     order: threadPreferences.order.data ?? [],
     groups: groupPreferences.groups,
     activeGroupPosition: groupPreferences.activeGroupPosition,
-    searchQuery: props.searchQuery,
+    searchQuery: effectiveThreadSearchQuery,
     saveGroups,
     saveOrder,
     unarchive: unarchiveMutation.mutateAsync,
@@ -189,73 +210,114 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   if (status !== "ready") return <Original />;
 
   const taskLinks = taskLinksData?.links ?? {};
+  const textScale =
+    threadPreferences.appearance.data?.textScale ?? DEFAULT_TEXT_SCALE;
+  const settings = (
+    <ThreadListSettings
+      rowHeight={threadPreferences.appearance.data?.rowHeight}
+      rowHeightPending={threadPreferences.saveRowHeight.isPending}
+      onSaveRowHeight={(rowHeight) =>
+        threadPreferences.saveRowHeight.mutateAsync(rowHeight)
+      }
+      textScale={threadPreferences.appearance.data?.textScale}
+      textScalePending={threadPreferences.saveTextScale.isPending}
+      onSaveTextScale={(textScale) =>
+        threadPreferences.saveTextScale.mutateAsync(textScale)
+      }
+      groups={
+        view === "work"
+          ? {
+              groupPositions: organization.groupPositions,
+              occupiedGroupIds: organization.occupiedGroupIds,
+              groupReorderPending: threadPreferences.saveGroups.isPending,
+              onAddGroup: organization.addGroup,
+              onMoveGroup: organization.moveGroup,
+              onReorderGroup: organization.reorderGroup,
+              onRenameGroup: organization.renameGroup,
+              onRemoveGroup: organization.removeGroup,
+            }
+          : undefined
+      }
+    />
+  );
   const toolbar = (
     <SidebarThreadToolbar
       threadCountLabel={threadCount.label}
       selectedCount={organization.selectedThreadIds.size}
       reorderDisabled={organization.reorderDisabled}
-      groupPositions={organization.groupPositions}
-      occupiedGroupIds={organization.occupiedGroupIds}
-      groupReorderPending={threadPreferences.saveGroups.isPending}
+      settings={settings}
       activeProjectId={props.activeProjectId}
       onArchiveSelected={() => void organization.archiveSelected()}
-      onAddGroup={organization.addGroup}
-      onMoveGroup={organization.moveGroup}
-      onReorderGroup={organization.reorderGroup}
-      onRenameGroup={organization.renameGroup}
-      onRemoveGroup={organization.removeGroup}
       onRefresh={refreshThreadDetails}
+      searchQuery={threadSearchQuery}
+      onSearchQueryChange={setThreadSearchQuery}
       onNewThread={(projectId) =>
         actions.openNewThread({ projectId, focusPrompt: true })
       }
     />
   );
   return (
-    <div
-      className="ws-list"
-      style={
-        {
-          "--ws-sidebar-row-height": `${threadPreferences.appearance.data?.rowHeight ?? DEFAULT_SIDEBAR_ROW_HEIGHT}px`,
-        } as CSSProperties
-      }
-    >
-      <TabSelector
-        ariaLabel="Sidebar views"
-        idPrefix="ws-sidebar"
-        items={SIDEBAR_TABS}
-        sticky
-        value={view}
-        onValueChange={activateView}
-      />
-      <TasksLeftSidebar
-        active={view === "queue"}
-        activeThreadId={props.activeThreadId}
-        taskLinks={taskLinks}
-        ownerThreads={taskOwnerThreads}
-        onOpenThread={navigateToThread}
-        searchQuery={props.searchQuery}
-      />
-      <PullRequestsLeftSidebar
-        active={view === "prs"}
-        searchQuery={props.searchQuery}
-        threads={pullRequestThreads}
-        onOpenThread={navigateToThread}
-      />
-      {view === "work" && (
-        <SidebarWorkView
-          toolbar={toolbar}
-          organization={organization}
-          activeThreadId={props.activeThreadId}
-          providersById={providersById}
-          onNavigate={props.onNavigate}
-          subtextRefreshKey={subtextRefreshKey}
-          emptyMessage={
-            props.searchQuery
-              ? `No threads match “${props.searchQuery}”.`
-              : "No active threads."
-          }
+    <TextScaleProvider scale={textScale}>
+      <div
+        className="ws-list"
+        style={
+          {
+            "--ws-sidebar-row-height": `${threadPreferences.appearance.data?.rowHeight ?? DEFAULT_SIDEBAR_ROW_HEIGHT}px`,
+            ...textScaleStyle(textScale),
+          } as CSSProperties
+        }
+      >
+        <TabSelector
+          ariaLabel="Sidebar views"
+          idPrefix="ws-sidebar"
+          items={SIDEBAR_TABS}
+          sticky
+          value={view}
+          onValueChange={activateView}
         />
-      )}
-    </div>
+        <TasksLeftSidebar
+          active={view === "queue"}
+          activeThreadId={props.activeThreadId}
+          taskLinks={taskLinks}
+          ownerThreads={taskOwnerThreads}
+          onOpenThread={navigateToThread}
+          searchQuery={props.searchQuery}
+          settingsControl={settings}
+        />
+        <PullRequestsLeftSidebar
+          active={view === "prs"}
+          searchQuery={props.searchQuery}
+          threads={pullRequestThreads}
+          onOpenThread={navigateToThread}
+          settingsControl={settings}
+        />
+        {view === "work" && (
+          <ThreadHierarchyProvider
+            threads={threads}
+            taskLinks={taskLinks}
+            ready={taskLinksData !== undefined}
+          >
+            <SidebarWorkView
+              toolbar={toolbar}
+              organization={organization}
+              activeThreadId={props.activeThreadId}
+              providersById={providersById}
+              onNavigate={props.onNavigate}
+              subtextRefreshKey={subtextRefreshKey}
+              staleWorkingMinutes={Number(
+                pluginSettings.values?.stuckThreadMinutes ?? "30",
+              )}
+              searchQuery={effectiveThreadSearchQuery}
+              emptyMessage={
+                effectiveThreadSearchQuery
+                  ? `No threads match “${effectiveThreadSearchQuery}”.`
+                  : "No active threads."
+              }
+            />
+            <ThreadHierarchyPickerHost />
+          </ThreadHierarchyProvider>
+        )}
+      </div>
+    </TextScaleProvider>
   );
 }

@@ -25,9 +25,7 @@ export type ArchivedThread = {
   environmentBranchName: string | null;
   environmentName: string | null;
   environmentWorkspaceDisplayKind:
-    | "managed-worktree"
-    | "unmanaged-worktree"
-    | "other";
+    "managed-worktree" | "unmanaged-worktree" | "other";
   isPinned: boolean;
   isUnread: boolean;
   createdAt: number;
@@ -57,7 +55,10 @@ export function ArchivedThreadRow({
   dragging: boolean;
   onDragThreadChange(threadId: string | null): void;
   onDropTargetChange(
-    target: { threadId: string; placement: "before" | "after" } | null,
+    target:
+      | { kind: "reorder"; threadId: string; placement: "before" | "after" }
+      | { kind: "reparent"; parentThreadId: string | null }
+      | null,
   ): void;
 }) {
   const actions = experimental_useSidebarThreadActions();
@@ -162,12 +163,16 @@ export function ArchivedThreadRow({
             </ContextMenuItem>
           )}
           <ContextMenuSeparator />
-          <ContextMenuItem onSelect={() => onUnarchive(thread.id, null)}>
+          <ContextMenuItem
+            className="ws-thread-menu-destination"
+            onSelect={() => onUnarchive(thread.id, null)}
+          >
             Active
           </ContextMenuItem>
           {groups.map((group) => (
             <ContextMenuItem
               key={group.id}
+              className="ws-thread-menu-destination"
               onSelect={() => onUnarchive(thread.id, group.id)}
             >
               {group.name}
@@ -175,7 +180,7 @@ export function ArchivedThreadRow({
           ))}
           <ContextMenuSeparator />
           <ContextMenuItem
-            className="text-destructive focus:text-destructive"
+            data-tone="destructive"
             onSelect={() => actions.requestDelete(thread.id)}
           >
             Delete

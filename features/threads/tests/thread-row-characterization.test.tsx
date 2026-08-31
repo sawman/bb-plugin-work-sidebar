@@ -17,10 +17,6 @@ const host = vi.hoisted(() => ({
   pullRequestLoading: false,
   stackNumber: null as number | null,
   rpcCall: vi.fn(),
-  composerView: {
-    scope: { kind: "none" },
-    draft: { isEmpty: true },
-  } as unknown,
 }));
 
 const clipboardWrite = vi.fn(() => Promise.resolve());
@@ -42,12 +38,15 @@ vi.mock("@get-bb/plugin-sdk/app", async () => {
       isLoading: host.pullRequestLoading,
     }),
     useRpc: () => ({ call: host.rpcCall }),
-    useComposerView: () => host.composerView,
   };
 });
 
 import { ThreadRow } from "../thread-row";
 import type { ThreadRowProps } from "../thread-row-types";
+
+type SidebarThreadWithDraft = PluginSidebarThread & {
+  hasComposerDraft?: boolean;
+};
 
 const thread = {
   id: "thr_one",
@@ -55,6 +54,7 @@ const thread = {
   title: "One",
   titleFallback: null,
   parentThreadId: null,
+  providerId: "codex",
   indicator: "runtime",
   indicatorLabel: "Thread is running",
   isUnread: true,
@@ -65,18 +65,22 @@ const thread = {
     branchName: "feature/m7",
     workspaceDisplayKind: "managed-worktree",
   },
-} as PluginSidebarThread;
+} as SidebarThreadWithDraft;
 
 function renderRow({
   onSelect = () => false,
   groupId = "later",
   groups = [{ id: "later", name: "Later", threadIds: [] }],
   threadOverrides = {},
+  children = 1,
+  activeChildren = children,
 }: {
   onSelect?: ThreadRowProps["onSelect"];
   groupId?: string | null;
   groups?: { id: string; name: string; threadIds: string[] }[];
-  threadOverrides?: Partial<PluginSidebarThread>;
+  threadOverrides?: Partial<SidebarThreadWithDraft>;
+  children?: number;
+  activeChildren?: number;
 } = {}) {
   const renderedThread = { ...thread, ...threadOverrides };
   const props = {
@@ -87,7 +91,6 @@ function renderRow({
     onDragThreadChange: vi.fn(),
     onDropTargetChange: vi.fn(),
     onDropThread: vi.fn(),
-    onMoveThread: vi.fn(),
   };
   host.rpcCall.mockImplementation(
     async (method: string, input: { threadIds?: string[] }) => {
@@ -116,29 +119,28 @@ function renderRow({
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  const view = render(
+  const tree = () => (
     <QueryClientProvider client={client}>
       <ThreadRow
         thread={renderedThread}
         active={false}
-        children={1}
-        activeChildren={1}
+        children={children}
+        activeChildren={activeChildren}
         childrenExpanded={false}
         selected={false}
         groupId={groupId}
         groups={groups}
         project={{ name: "Project", isPersonal: false }}
         reorderDisabled={false}
-        canMoveUp={true}
-        canMoveDown={true}
         dragThreadId={null}
         dropTarget={null}
         canDropThread={() => true}
         {...props}
       />
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
-  return { ...view, ...props };
+  const view = render(tree());
+  return { ...view, ...props, rerenderRow: () => view.rerender(tree()) };
 }
 
 function openMenu(view: ReturnType<typeof renderRow>) {
@@ -152,7 +154,6 @@ afterEach(() => {
   host.pullRequestLoading = false;
   host.stackNumber = null;
   host.rpcCall.mockReset();
-  host.composerView = { scope: { kind: "none" }, draft: { isEmpty: true } };
   clipboardWrite.mockClear();
 });
 
@@ -243,12 +244,8 @@ describe("R21D ThreadRow characterization", () => {
       state: "open",
       attention: "review_requested",
     };
-    host.composerView = {
-      scope: { kind: "thread", threadId: thread.id },
-      draft: { isEmpty: false },
-    };
     host.stackNumber = 17;
-    const view = renderRow();
+    const view = renderRow({ threadOverrides: { hasComposerDraft: true } });
 
     expect(view.getByText("feature/m7")).toBeTruthy();
     expect(view.queryByText("WORK-1")).toBeNull();
@@ -256,11 +253,47 @@ describe("R21D ThreadRow characterization", () => {
     expect(
       (await view.findByLabelText("Copy stack number #17")).textContent,
     ).toBe("#17");
-    expect(view.getByTitle("PR #42 · Open")).toBeTruthy();
-    expect(view.getByRole("img", { name: "Thread is running" })).toBeTruthy();
+    expect(view.getByTitle("PR #42 · Review pending")).toBeTruthy();
+    const provider = view.getByRole("img", {
+      name: "codex provider status: Thread is running; 1 child agent working",
+    });
+    expect(provider.closest(".ws-thread-leading")).toBeTruthy();
+    expect(provider.getAttribute("data-runtime-state")).toBe("working");
+    expect(view.container.querySelector(".ws-status-dots")).toBeNull();
     expect(view.getByRole("img", { name: "Unsent draft" })).toBeTruthy();
     expect(view.getByRole("img", { name: "Pinned" })).toBeTruthy();
-    expect(view.getByRole("button", { name: "1 child agent, collapsed" })).toBeTruthy();
+    expect(
+      view.getByRole("button", { name: "1 child agent, collapsed" }),
+    ).toBeTruthy();
+  });
+
+  it("keeps one provider and child-agent disclosure target even at zero", () => {
+    const view = renderRow({ children: 0, activeChildren: 0 });
+    const disclosure = view.getByRole("button", {
+      name: "No child agents, collapsed",
+    });
+
+    expect(disclosure.getAttribute("data-empty")).toBe("true");
+    expect(disclosure.querySelector("small")?.textContent).toBe("");
+    expect(
+      disclosure.querySelector('.ws-thread-provider[data-provider-id="codex"]'),
+    ).toBeTruthy();
+    fireEvent.click(disclosure.querySelector(".ws-thread-provider")!);
+    expect(view.onToggleChildren).toHaveBeenCalledOnce();
+    expect(view.onSelect).not.toHaveBeenCalled();
+    expect(host.actions.open).not.toHaveBeenCalled();
+  });
+
+  it("shows a durable host draft without selecting or visiting the thread", () => {
+    const view = renderRow({ threadOverrides: { hasComposerDraft: true } });
+
+    expect(view.getByRole("img", { name: "Unsent draft" })).toBeTruthy();
+  });
+
+  it("requires row-level host state before showing a durable draft", () => {
+    const view = renderRow();
+
+    expect(view.queryByRole("img", { name: "Unsent draft" })).toBeNull();
   });
 
   it("preserves modifier selection, native row attributes, rename, and every BB-owned menu action", () => {
@@ -271,7 +304,10 @@ describe("R21D ThreadRow characterization", () => {
     expect(link.getAttribute("data-sidebar-thread-shortcut-target")).toBe("");
     expect(link.getAttribute("data-sidebar-thread-id")).toBe(thread.id);
     fireEvent.click(link, { ctrlKey: true });
-    expect(onSelect).toHaveBeenCalledWith(thread, expect.objectContaining({ ctrlKey: true }));
+    expect(onSelect).toHaveBeenCalledWith(
+      thread,
+      expect.objectContaining({ ctrlKey: true }),
+    );
     expect(host.actions.open).not.toHaveBeenCalled();
     fireEvent.keyDown(link, { key: "ContextMenu" });
     expect(view.getByRole("menu", { name: "Actions for One" })).toBeTruthy();
@@ -309,7 +345,7 @@ describe("R21D ThreadRow characterization", () => {
     expect(host.actions.requestDelete).toHaveBeenCalledWith(thread.id);
   });
 
-  it("routes extracted menu movement and destination actions to the row owners", () => {
+  it("keeps pin first, delegates ordering to drag, and normalizes destination actions", () => {
     const view = renderRow({
       groups: [
         { id: "later", name: "Later", threadIds: [] },
@@ -318,15 +354,22 @@ describe("R21D ThreadRow characterization", () => {
     });
 
     openMenu(view);
-    fireEvent.click(view.getByRole("menuitem", { name: "Move up" }));
-    expect(view.onMoveThread).toHaveBeenCalledWith(thread.id, -1);
+    const menu = view.getByRole("menu", { name: "Actions for One" });
+    const items = view.getAllByRole("menuitem");
+    expect(items[0]?.textContent).toBe("Unpin");
+    expect(items[0]?.nextElementSibling).toBe(
+      view.getByRole("menuitem", { name: "Open" }),
+    );
+    expect(view.queryByRole("menuitem", { name: "Move up" })).toBeNull();
+    expect(view.queryByRole("menuitem", { name: "Move down" })).toBeNull();
+    const active = view.getByRole("menuitem", { name: "Active" });
+    const later = view.getByRole("menuitem", { name: "Later" });
+    expect(active.className).toBe(later.className);
+    expect(menu.querySelector('[data-tone="destructive"]')?.textContent).toBe(
+      "Delete",
+    );
 
-    openMenu(view);
-    fireEvent.click(view.getByRole("menuitem", { name: "Move down" }));
-    expect(view.onMoveThread).toHaveBeenCalledWith(thread.id, 1);
-
-    openMenu(view);
-    fireEvent.click(view.getByRole("menuitem", { name: "Active" }));
+    fireEvent.click(active);
     expect(view.onMoveToGroup).toHaveBeenCalledWith(thread.id, null);
 
     openMenu(view);

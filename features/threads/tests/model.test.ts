@@ -89,19 +89,27 @@ describe("thread group ordering", () => {
     ).toEqual(["group_alpha", "group_beta", "active", "group_gamma"]);
   });
 
-  it("reorders a dragged group directly onto another group", () => {
-    expect(reorderThreadGroup(groups, 0, "active", "group_beta")).toEqual({
+  it("reorders a dragged group at the requested insertion edge", () => {
+    expect(
+      reorderThreadGroup(groups, 0, "active", "group_beta", "after"),
+    ).toEqual({
       groups: [groups[0], groups[1], groups[2]],
       activeGroupPosition: 2,
     });
     expect(
-      reorderThreadGroup(groups, 2, "group_gamma", "group_alpha"),
+      reorderThreadGroup(groups, 2, "group_gamma", "group_alpha", "before"),
     ).toEqual({
       groups: [groups[2], groups[0], groups[1]],
       activeGroupPosition: 3,
     });
     expect(
-      reorderThreadGroup(groups, 0, "group_missing", "group_beta"),
+      reorderThreadGroup(
+        groups,
+        0,
+        "group_missing",
+        "group_beta",
+        "before",
+      ),
     ).toBeNull();
   });
 });

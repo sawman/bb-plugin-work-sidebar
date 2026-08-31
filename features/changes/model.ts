@@ -3,7 +3,7 @@ import type { Changes, Repository } from "./schemas.js";
 
 export type StackBranchSignals = Pick<
   GitHubStackSignal,
-  "state" | "draft" | "checks" | "review" | "reviewCommentCount"
+  "state" | "draft" | "attention" | "checks" | "review" | "reviewCommentCount"
 >;
 
 /** Merge the stack summary and branch-local signals without weakening RPC types. */
@@ -26,6 +26,7 @@ export function mergeStackBranchSignals(
       ...stackPullRequest,
       state: current.state,
       draft: current.state === "draft",
+      attention: current.attention,
       ...current.signal,
     };
   }
@@ -34,6 +35,7 @@ export function mergeStackBranchSignals(
     ...stackPullRequest,
     state: stackPullRequest?.state ?? branch.pr.state,
     draft: stackPullRequest?.draft ?? branch.pr.isDraft,
+    attention: stackPullRequest?.attention,
     checks: branch.checks ?? stackPullRequest?.checks ?? "unknown",
     review: branch.review ?? stackPullRequest?.review ?? "none",
     reviewCommentCount: stackPullRequest?.reviewCommentCount ?? 0,

@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  MAX_SIDEBAR_ROW_HEIGHT,
+  MIN_SIDEBAR_ROW_HEIGHT,
+  MAX_TEXT_SCALE,
+  MIN_TEXT_SCALE,
+} from "./sidebar-appearance";
 
 const sidebarThreadGroup = z.object({
   id: z.string().regex(/^group_[a-z0-9_-]{1,48}$/),
@@ -75,13 +81,46 @@ export const threadPreferenceSchemas = {
   },
   getSidebarAppearance: {
     input: z.null(),
-    output: z.object({ rowHeight: z.number().min(40).max(60) }).strict(),
+    output: z
+      .object({
+        rowHeight: z
+          .number()
+          .min(MIN_SIDEBAR_ROW_HEIGHT)
+          .max(MAX_SIDEBAR_ROW_HEIGHT),
+        textScale: z.number().min(MIN_TEXT_SCALE).max(MAX_TEXT_SCALE),
+      })
+      .strict(),
   },
   saveSidebarAppearance: {
-    input: z
-      .object({ rowHeight: z.number().min(40).max(60).multipleOf(0.1) })
+    input: z.union([
+      z
+        .object({
+          rowHeight: z
+            .number()
+            .min(MIN_SIDEBAR_ROW_HEIGHT)
+            .max(MAX_SIDEBAR_ROW_HEIGHT)
+            .multipleOf(0.1),
+        })
+        .strict(),
+      z
+        .object({
+          textScale: z
+            .number()
+            .min(MIN_TEXT_SCALE)
+            .max(MAX_TEXT_SCALE)
+            .multipleOf(0.01),
+        })
+        .strict(),
+    ]),
+    output: z
+      .object({
+        rowHeight: z
+          .number()
+          .min(MIN_SIDEBAR_ROW_HEIGHT)
+          .max(MAX_SIDEBAR_ROW_HEIGHT),
+        textScale: z.number().min(MIN_TEXT_SCALE).max(MAX_TEXT_SCALE),
+      })
       .strict(),
-    output: z.object({ rowHeight: z.number().min(40).max(60) }).strict(),
   },
 } as const;
 
@@ -102,7 +141,28 @@ export const threadArchiveSchemas = {
   },
 } as const;
 
+export const threadHierarchySchemas = {
+  moveSidebarThread: {
+    input: z
+      .object({
+        threadId: z.string().startsWith("thr_"),
+        parentThreadId: z.string().startsWith("thr_").nullable(),
+      })
+      .strict(),
+    output: z
+      .object({
+        threadId: z.string().startsWith("thr_"),
+        parentThreadId: z.string().startsWith("thr_").nullable(),
+        oldRootThreadId: z.string().startsWith("thr_"),
+        newRootThreadId: z.string().startsWith("thr_"),
+        affectedThreadIds: z.array(z.string().startsWith("thr_")).min(1),
+      })
+      .strict(),
+  },
+} as const;
+
 export const threadSchemas = {
   ...threadPreferenceSchemas,
   ...threadArchiveSchemas,
+  ...threadHierarchySchemas,
 } as const;

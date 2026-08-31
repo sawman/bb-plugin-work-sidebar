@@ -1,10 +1,7 @@
-import {
-  useEffect,
-  useRef,
-  type PointerEvent as ReactPointerEvent,
-} from "react";
+import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
 import { experimental_useSidebarThreadSplit } from "@get-bb/plugin-sdk/app";
 import type { ThreadRowProps } from "./thread-row-types";
+import { threadPointerDropTargetAt } from "./thread-pointer-drop-target";
 
 type ThreadRowPointerDragInput = Pick<
   ThreadRowProps,
@@ -18,6 +15,7 @@ type ThreadRowPointerDragInput = Pick<
   | "onDropThread"
 > & {
   onArchive(): void;
+  onReparentThread(threadId: string, parentThreadId: string | null): void;
 };
 
 export function useThreadRowPointerDrag({
@@ -30,6 +28,7 @@ export function useThreadRowPointerDrag({
   onMoveToGroup,
   onDropThread,
   onArchive,
+  onReparentThread,
 }: ThreadRowPointerDragInput) {
   const { splitProps, isAvailable } = experimental_useSidebarThreadSplit(
     thread.id,
@@ -47,19 +46,10 @@ export function useThreadRowPointerDrag({
     if (reorderDisabled) return;
     const pointerId = event.pointerId;
     let active = false;
-    const targetAt = (x: number, y: number) =>
-      document
-        .elementFromPoint(x, y)
-        ?.closest<HTMLElement>("[data-ws-thread-id]") ?? null;
-    const zoneAt = (x: number, y: number) =>
-      document
-        .elementFromPoint(x, y)
-        ?.closest<HTMLElement>("[data-ws-thread-drop-zone]")?.dataset
-        .wsThreadDropZone ?? null;
     const clear = () => {
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", finish);
-      window.removeEventListener("pointercancel", finish);
+      window.removeEventListener("pointercancel", cancel);
       cleanupRef.current = null;
       onDragThreadChange(null);
       onDropTargetChange(null);
@@ -74,17 +64,34 @@ export function useThreadRowPointerDrag({
         ) < 5
       )
         return;
-      const target = targetAt(moveEvent.clientX, moveEvent.clientY);
+      if (!active) {
+        active = true;
+        onDragThreadChange(thread.id);
+      }
+      const pointerTarget = threadPointerDropTargetAt(
+        moveEvent.clientX,
+        moveEvent.clientY,
+      );
+      const target = pointerTarget.thread;
       const targetId = target?.dataset.wsThreadId ?? null;
       const targetGroup = target?.dataset.wsThreadGroup ?? null;
-      const zone = zoneAt(moveEvent.clientX, moveEvent.clientY);
+      const { parentThreadId: parentId, toTop, zone } = pointerTarget;
+      if (toTop) {
+        onDropTargetChange({ kind: "reparent", parentThreadId: null });
+        moveEvent.preventDefault();
+        return;
+      }
+      if (parentId && parentId !== thread.id) {
+        onDropTargetChange({ kind: "reparent", parentThreadId: parentId });
+        moveEvent.preventDefault();
+        return;
+      }
       if (
         (targetGroup && targetGroup !== (groupId ?? "active")) ||
         (!targetId && zone && zone !== groupId)
       ) {
-        active = true;
-        onDragThreadChange(thread.id);
         onDropTargetChange({
+          kind: "reorder",
           threadId: targetGroup ?? zone!,
           placement: "after",
         });
@@ -92,20 +99,19 @@ export function useThreadRowPointerDrag({
         return;
       }
       if (!targetId || targetId === thread.id || !canDropThread(thread.id)) {
-        if (active) {
-          onDragThreadChange(null);
-          onDropTargetChange(null);
-        }
+        onDropTargetChange(null);
         return;
       }
       const targetElement = document.querySelector<HTMLElement>(
         `[data-ws-thread-id="${CSS.escape(targetId)}"]`,
       );
-      if (!targetElement) return;
-      active = true;
+      if (!targetElement) {
+        onDropTargetChange(null);
+        return;
+      }
       const bounds = targetElement.getBoundingClientRect();
-      onDragThreadChange(thread.id);
       onDropTargetChange({
+        kind: "reorder",
         threadId: targetId,
         placement:
           moveEvent.clientY > bounds.top + bounds.height / 2
@@ -116,11 +122,18 @@ export function useThreadRowPointerDrag({
     };
     const finish = (finishEvent: PointerEvent) => {
       if (finishEvent.pointerId === pointerId && active) {
-        const zone = zoneAt(finishEvent.clientX, finishEvent.clientY);
-        const target = targetAt(finishEvent.clientX, finishEvent.clientY);
+        const pointerTarget = threadPointerDropTargetAt(
+          finishEvent.clientX,
+          finishEvent.clientY,
+        );
+        const { parentThreadId: parentId, toTop, zone } = pointerTarget;
+        const target = pointerTarget.thread;
         const targetId = target?.dataset.wsThreadId ?? null;
         const targetGroup = target?.dataset.wsThreadGroup ?? null;
-        if (!targetId && zone === "archive") onArchive();
+        if (toTop) onReparentThread(thread.id, null);
+        else if (parentId && parentId !== thread.id)
+          onReparentThread(thread.id, parentId);
+        else if (!targetId && zone === "archive") onArchive();
         else if (!targetId && zone && zone !== groupId)
           onMoveToGroup(thread.id, zone === "active" ? null : zone);
         else if (targetGroup && targetGroup !== (groupId ?? "active"))
@@ -145,11 +158,14 @@ export function useThreadRowPointerDrag({
       }
       clear();
     };
+    const cancel = (cancelEvent: PointerEvent) => {
+      if (cancelEvent.pointerId === pointerId) clear();
+    };
     cleanupRef.current?.();
     cleanupRef.current = clear;
     window.addEventListener("pointermove", move, { passive: false });
     window.addEventListener("pointerup", finish);
-    window.addEventListener("pointercancel", finish);
+    window.addEventListener("pointercancel", cancel);
   };
   return { isAvailable, startUnifiedDrag };
 }

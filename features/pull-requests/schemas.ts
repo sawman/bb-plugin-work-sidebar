@@ -100,5 +100,48 @@ export const authoredPullRequest = pullRequestSignal.extend({
   stack: sidebarStack.nullable(),
 });
 
+export const pullRequestReviewer = z
+  .object({
+    login: z.string(),
+    name: z.string().nullable(),
+    avatarUrl: z.string().url().nullable(),
+  })
+  .strict();
+
+const repositoryName = z
+  .string()
+  .regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/);
+const reviewerLogin = z
+  .string()
+  .min(1)
+  .max(39)
+  .regex(/^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/);
+
+export const pullRequestReviewerRpcSchemas = {
+  getPullRequestReviewers: {
+    input: z
+      .object({ repository: repositoryName, force: z.boolean().optional() })
+      .strict(),
+    output: z
+      .object({
+        available: z.boolean(),
+        reviewers: z.array(pullRequestReviewer),
+        error: z.string().nullable(),
+      })
+      .strict(),
+  },
+  updatePullRequestReviewers: {
+    input: z
+      .object({
+        repository: repositoryName,
+        number: z.number().int().positive(),
+        reviewers: z.array(reviewerLogin).max(100),
+      })
+      .strict(),
+    output: z.object({ reviewers: z.array(reviewerLogin) }).strict(),
+  },
+} as const;
+
 export type PullRequestContract = z.infer<typeof pullRequest>;
 export type AuthoredPullRequestContract = z.infer<typeof authoredPullRequest>;
+export type PullRequestReviewerContract = z.infer<typeof pullRequestReviewer>;

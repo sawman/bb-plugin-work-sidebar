@@ -14,11 +14,16 @@ import { changesInteractionStore } from "../changes/store";
 import { AgentsView } from "../agents/views";
 import { invalidateGitHubApiHealth } from "../pull-requests/queries";
 import { threadInteractionStore, type WorkTab } from "../threads/store";
-import { TrackerCard, TrackerHeaderBadge } from "../tracker/card";
-import { invalidateTracker } from "../tracker/queries";
+import { TrackerHeaderBadge } from "../tracker/card";
+import { invalidateTracker, useTracker } from "../tracker/queries";
 import { invalidateWorkContextCards, useWorkStatus } from "./queries";
 import { parseWorkSidebarRealtimeEvent } from "../../shared/work-realtime";
 import { WorkContextCards } from "./views";
+import {
+  DEFAULT_TEXT_SCALE,
+} from "../threads/sidebar-appearance";
+import { useSidebarAppearancePreferences } from "../threads/queries";
+import { TextScaleProvider, textScaleStyle } from "../../shared/text-scale";
 
 const WORK_TABS: readonly {
   id: WorkTab;
@@ -54,7 +59,9 @@ function queueRootEvent(scope: WorkPanelScope, rootThreadId: string) {
 
 export function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const queryClient = useQueryClient();
+  const appearance = useSidebarAppearancePreferences();
   const status = useWorkStatus(threadId);
+  const tracker = useTracker(threadId);
   const workScopeRef = useRef<WorkPanelScope>({
     threadId,
     rootThreadId: null,
@@ -107,80 +114,82 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const selectTab = (next: WorkTab) =>
     threadInteractionStore.getState().setWorkTab(threadId, next);
   const tabIdPrefix = `ws-work-${threadId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const textScale = appearance.appearance.data?.textScale ?? DEFAULT_TEXT_SCALE;
   return (
-    <div className="ws-panel">
-      <header className="ws-panel-header">
-        <div className="ws-panel-heading">
-          <Icon name="ListTodo" className="ws-panel-icon" aria-hidden />
-          <div>
-            <strong>Work</strong>
-            <span>{status.data?.currentThread.title ?? "Active thread"}</span>
+    <TextScaleProvider scale={textScale}>
+      <div className="ws-panel" style={textScaleStyle(textScale)}>
+        <header className="ws-panel-header">
+          <div className="ws-panel-heading">
+            <Icon name="ListTodo" className="ws-panel-icon" aria-hidden />
+            <div>
+              <strong>Work</strong>
+              <span>{status.data?.currentThread.title ?? "Active thread"}</span>
+            </div>
           </div>
-        </div>
-        <RefreshButton
-          label="Refresh work context"
-          onRefresh={() =>
-            Promise.all([
-              invalidateWorkContextCards(queryClient, threadId),
-              invalidateTracker(queryClient, threadId),
-              invalidateChanges(queryClient, threadId),
-              invalidateGitHubApiHealth(queryClient),
-            ])
-          }
-          disabled={tab === "work" && status.isPending}
+          <RefreshButton
+            label="Refresh work context"
+            onRefresh={() =>
+              Promise.all([
+                invalidateWorkContextCards(queryClient, threadId),
+                invalidateTracker(queryClient, threadId),
+                invalidateChanges(queryClient, threadId),
+                invalidateGitHubApiHealth(queryClient),
+              ])
+            }
+            disabled={tab === "work" && status.isPending}
+          />
+        </header>
+        <TabSelector
+          ariaLabel="Work context views"
+          controls={(id) => `${tabIdPrefix}-panel-${id}`}
+          idPrefix={tabIdPrefix}
+          items={WORK_TABS}
+          value={tab}
+          onValueChange={selectTab}
         />
-      </header>
-      <TabSelector
-        ariaLabel="Work context views"
-        controls={(id) => `${tabIdPrefix}-panel-${id}`}
-        idPrefix={tabIdPrefix}
-        items={WORK_TABS}
-        value={tab}
-        onValueChange={selectTab}
-      />
-      <div
-        className="ws-panel-body"
-        role="tabpanel"
-        id={`${tabIdPrefix}-panel-work`}
-        aria-labelledby={`${tabIdPrefix}-tab-work`}
-        hidden={tab !== "work"}
-        tabIndex={0}
-      >
-        {tab === "work" && (
-          <div className="ws-section-stack">
-            <header>
-              <div>
-                <h2>Work</h2>
-              </div>
-              <span className="ws-work-header-badges">
-                <TrackerHeaderBadge threadId={threadId} />
-              </span>
-            </header>
-            <WorkContextCards threadId={threadId} />
-            <TrackerCard threadId={threadId} />
-          </div>
-        )}
+        <div
+          className="ws-panel-body"
+          role="tabpanel"
+          id={`${tabIdPrefix}-panel-work`}
+          aria-labelledby={`${tabIdPrefix}-tab-work`}
+          hidden={tab !== "work"}
+          tabIndex={0}
+        >
+          {tab === "work" && (
+            <div className="ws-section-stack">
+              <header>
+                <div>
+                  <h2>Work</h2>
+                </div>
+                <span className="ws-work-header-badges">
+                  <TrackerHeaderBadge items={tracker.data} />
+                </span>
+              </header>
+              <WorkContextCards threadId={threadId} tracker={tracker} />
+            </div>
+          )}
+        </div>
+        <div
+          className="ws-panel-body"
+          role="tabpanel"
+          id={`${tabIdPrefix}-panel-changes`}
+          aria-labelledby={`${tabIdPrefix}-tab-changes`}
+          hidden={tab !== "changes"}
+          tabIndex={0}
+        >
+          {tab === "changes" && <ChangesPanel threadId={threadId} />}
+        </div>
+        <div
+          className="ws-panel-body"
+          role="tabpanel"
+          id={`${tabIdPrefix}-panel-agents`}
+          aria-labelledby={`${tabIdPrefix}-tab-agents`}
+          hidden={tab !== "agents"}
+          tabIndex={0}
+        >
+          {tab === "agents" && <AgentsView threadId={threadId} />}
+        </div>
       </div>
-      <div
-        className="ws-panel-body"
-        role="tabpanel"
-        id={`${tabIdPrefix}-panel-changes`}
-        aria-labelledby={`${tabIdPrefix}-tab-changes`}
-        hidden={tab !== "changes"}
-        tabIndex={0}
-      >
-        {tab === "changes" && <ChangesPanel threadId={threadId} />}
-      </div>
-      <div
-        className="ws-panel-body"
-        role="tabpanel"
-        id={`${tabIdPrefix}-panel-agents`}
-        aria-labelledby={`${tabIdPrefix}-tab-agents`}
-        hidden={tab !== "agents"}
-        tabIndex={0}
-      >
-        {tab === "agents" && <AgentsView threadId={threadId} />}
-      </div>
-    </div>
+    </TextScaleProvider>
   );
 }

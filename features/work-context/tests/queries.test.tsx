@@ -3,7 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type PropsWithChildren } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useWorkProviderHealth } from "../queries";
+import { useWorkOutcomeMutation, useWorkProviderHealth } from "../queries";
 
 const { rpcClient } = vi.hoisted(() => ({
   rpcClient: { call: vi.fn() },
@@ -62,5 +62,36 @@ describe("work-context provider health query", () => {
     client.clear();
     if (previousVisibility) Object.defineProperty(document, "visibilityState", previousVisibility);
     else delete (document as { visibilityState?: string }).visibilityState;
+  });
+});
+
+describe("R32.2 outcome creation query", () => {
+  it("forwards an optional mapped priority and invalidates only the outcome query", async () => {
+    rpcClient.call.mockResolvedValue({ task: { id: "task_outcome" } });
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const hook = renderHook(() => useWorkOutcomeMutation("thr_priority"), {
+      wrapper: wrapper(client),
+    });
+
+    await act(async () => {
+      await hook.result.current.create.mutateAsync({
+        title: "Create from Linear",
+        priority: "high",
+      });
+    });
+
+    expect(rpcClient.call).toHaveBeenCalledWith("createWorkTask", {
+      threadId: "thr_priority",
+      title: "Create from Linear",
+      description: "Created from the Work sidebar.",
+      parentTaskId: null,
+      priority: "high",
+    });
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: ["work-sidebar", "work", "outcome", "thr_priority"],
+    });
+    hook.unmount();
+    client.clear();
   });
 });

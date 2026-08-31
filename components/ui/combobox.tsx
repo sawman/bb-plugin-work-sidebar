@@ -1,9 +1,437 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Input } from "./input";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FocusEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import { createPortal } from "react-dom";
+import { fitContextMenuPosition } from "./context-menu";
+import { textScaleStyle, useTextScale } from "../../shared/text-scale";
 
-export type ComboboxOption = { value: string; label: string; detail?: string };
+export type ComboboxOption = {
+  value: string;
+  label: string;
+  detail?: string;
+  disabled?: boolean;
+  leading?: ReactNode;
+  trailing?: ReactNode;
+  title?: string;
+};
 
-/** Compact, local searchable picker for short sidebar option lists. */
+type AnchorRect = Pick<DOMRect, "bottom" | "left" | "right" | "top">;
+
+export type SearchComboboxProps = {
+  ariaDescribedBy?: string;
+  ariaLabel: string;
+  emptyMessage: string;
+  listboxLabel: string;
+  onOpenChange(open: boolean): void;
+  onSelectionChange(values: string[]): void;
+  open: boolean;
+  options: readonly ComboboxOption[];
+  placeholder: string;
+  selectedValues: readonly string[];
+  anchor?: HTMLElement | null;
+  anchorRef?: RefObject<HTMLElement | null>;
+  anchorRect?: AnchorRect | null;
+  autoFocus?: boolean;
+  busy?: boolean;
+  className?: string;
+  closeOnSelect?: boolean;
+  disabled?: boolean;
+  emptyOption?: boolean;
+  error?: { message: string } | null;
+  footer?: ReactNode;
+  header?: ReactNode;
+  hideResults?: boolean;
+  inputClassName?: string;
+  multiple?: boolean;
+  onDismiss?(): void;
+  onQueryChange?(value: string): void;
+  onRetry?(): void;
+  portal?: boolean;
+  query?: string;
+  searchOnly?: boolean;
+};
+
+function contains(target: EventTarget | null, element: Element | null) {
+  const NodeConstructor = element?.ownerDocument.defaultView?.Node;
+  return Boolean(
+    NodeConstructor && target instanceof NodeConstructor && element?.contains(target),
+  );
+}
+
+/**
+ * The one plugin-local compact search and combobox interaction shell. Feature
+ * code owns option data and mutations; this primitive owns popup/focus/ARIA.
+ */
+export function SearchCombobox({
+  ariaDescribedBy,
+  anchor,
+  anchorRef,
+  anchorRect = null,
+  ariaLabel,
+  autoFocus = false,
+  busy = false,
+  className = "",
+  closeOnSelect = true,
+  disabled = false,
+  emptyOption = false,
+  emptyMessage,
+  error = null,
+  footer,
+  header,
+  hideResults = false,
+  inputClassName = "",
+  listboxLabel,
+  multiple = false,
+  onDismiss,
+  onOpenChange,
+  onQueryChange,
+  onRetry,
+  open,
+  options,
+  placeholder,
+  portal = false,
+  query,
+  searchOnly = false,
+  selectedValues,
+  onSelectionChange,
+}: SearchComboboxProps) {
+  const textScale = useTextScale();
+  const [uncontrolledQuery, setUncontrolledQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(
+    null,
+  );
+  const inputRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const restoreFocus = useRef(false);
+  const focusInputOnOpen = useRef(false);
+  const wasOpen = useRef(false);
+  const dismissedByPointer = useRef(false);
+  const listId = useId();
+  const activeOptionId =
+    activeIndex === null ? undefined : `${listId}-option-${activeIndex}`;
+  const selectedLabel = !multiple
+    ? options.find((option) => option.value === selectedValues[0])?.label ?? ""
+    : "";
+  const inputValue =
+    open || searchOnly ? query ?? uncontrolledQuery : selectedLabel;
+  const visible = useMemo(() => {
+    if (query !== undefined) return options;
+    const needle = inputValue.trim().toLocaleLowerCase();
+    if (!needle) return options;
+    return options.filter((option) =>
+      `${option.label} ${option.detail ?? ""}`
+        .toLocaleLowerCase()
+        .includes(needle),
+    );
+  }, [inputValue, options]);
+  const showListbox = open && !hideResults && !busy && !error && visible.length > 0;
+  const hasListbox =
+    open && !hideResults && (visible.length > 0 || emptyOption);
+  const inputIsSearchOnly = searchOnly;
+  const showPopup = open && (Boolean(anchor || anchorRef) || portal);
+  const inputInContent = showPopup && Boolean(anchor || anchorRef);
+
+  const setQuery = (next: string) => {
+    if (query === undefined) setUncontrolledQuery(next);
+    onQueryChange?.(next);
+  };
+  const close = () => {
+    restoreFocus.current = true;
+    setActiveIndex(null);
+    onDismiss?.();
+    onOpenChange(false);
+  };
+
+  useEffect(() => {
+    if (open) {
+      const openedByUser = focusInputOnOpen.current;
+      if ((autoFocus && !wasOpen.current) || openedByUser)
+        inputRef.current?.focus();
+      focusInputOnOpen.current = false;
+      wasOpen.current = true;
+      return;
+    }
+    wasOpen.current = false;
+    if (!restoreFocus.current) return;
+    restoreFocus.current = false;
+    (anchor ?? anchorRef?.current ?? inputRef.current)?.focus();
+  }, [anchor, anchorRef, autoFocus, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    dismissedByPointer.current = false;
+    const ownerDocument = contentRef.current?.ownerDocument ?? document;
+    const dismissOutside = (event: PointerEvent | MouseEvent) => {
+      if (
+        contains(event.target, contentRef.current) ||
+        contains(event.target, rootRef.current) ||
+        contains(event.target, anchor ?? anchorRef?.current ?? null)
+      )
+        return;
+      if (event.type === "click" && dismissedByPointer.current) return;
+      if (event.type === "pointerdown") dismissedByPointer.current = true;
+      close();
+    };
+    ownerDocument.addEventListener("pointerdown", dismissOutside, true);
+    ownerDocument.addEventListener("click", dismissOutside, true);
+    return () => {
+      ownerDocument.removeEventListener("pointerdown", dismissOutside, true);
+      ownerDocument.removeEventListener("click", dismissOutside, true);
+    };
+  }, [anchor, anchorRef, open]);
+
+  useLayoutEffect(() => {
+    if (!showPopup) {
+      setPosition(null);
+      return;
+    }
+    const updatePosition = () => {
+      const content = contentRef.current?.getBoundingClientRect();
+      const anchorBounds = anchorRect ?? anchor?.getBoundingClientRect() ?? anchorRef?.current?.getBoundingClientRect() ?? inputRef.current?.getBoundingClientRect();
+      if (!content || !anchorBounds) return;
+      setPosition(
+        fitContextMenuPosition(
+          { x: anchorBounds.left, y: anchorBounds.bottom + 4 },
+          { width: content.width, height: content.height },
+          { width: window.innerWidth, height: window.innerHeight },
+        ),
+      );
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [anchor, anchorRect, anchorRef, busy, error, showPopup, visible.length]);
+
+  useLayoutEffect(() => {
+    if (!showListbox || activeIndex === null) return;
+    const option = contentRef.current?.ownerDocument.getElementById(activeOptionId ?? "");
+    if (option && "scrollIntoView" in option)
+      option.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, activeOptionId, showListbox]);
+
+  const choose = (option: ComboboxOption) => {
+    if (disabled || option.disabled) return;
+    const selected = selectedValues.includes(option.value);
+    const next = multiple
+      ? selected
+        ? selectedValues.filter((value) => value !== option.value)
+        : [...selectedValues, option.value]
+      : [option.value];
+    onSelectionChange(next);
+    setQuery("");
+    if (closeOnSelect && !multiple) close();
+  };
+  const input = (
+    <input
+      ref={inputRef}
+      value={inputValue}
+      className={`ws-search-shell-input ${inputClassName}`}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      aria-describedby={ariaDescribedBy}
+      disabled={disabled}
+      role={inputIsSearchOnly ? "searchbox" : "combobox"}
+      aria-autocomplete={inputIsSearchOnly ? undefined : "list"}
+      aria-controls={hasListbox && !inputIsSearchOnly ? listId : undefined}
+      aria-activedescendant={showListbox ? activeOptionId : undefined}
+      aria-expanded={inputIsSearchOnly ? undefined : hasListbox}
+      onFocus={() => {
+        if (disabled) return;
+        if (!open) {
+          focusInputOnOpen.current = true;
+          if (query === undefined) setUncontrolledQuery("");
+        }
+        onOpenChange(true);
+      }}
+      onClick={() => {
+        if (!disabled) {
+          if (!open) focusInputOnOpen.current = true;
+          onOpenChange(true);
+        }
+      }}
+      onChange={(event) => {
+        setQuery(event.target.value);
+        setActiveIndex(null);
+        if (!disabled) {
+          if (!open) focusInputOnOpen.current = true;
+          onOpenChange(true);
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          close();
+        } else if (!inputIsSearchOnly && event.key === "ArrowDown") {
+          event.preventDefault();
+          if (!disabled && visible.length) {
+            onOpenChange(true);
+            setActiveIndex((current) =>
+              current === null ? 0 : Math.min(current + 1, visible.length - 1),
+            );
+          }
+        } else if (!inputIsSearchOnly && event.key === "ArrowUp") {
+          event.preventDefault();
+          if (!disabled && visible.length) {
+            onOpenChange(true);
+            setActiveIndex((current) =>
+              current === null ? visible.length - 1 : Math.max(current - 1, 0),
+            );
+          }
+        } else if (!inputIsSearchOnly && event.key === "Home") {
+          event.preventDefault();
+          if (!disabled && visible.length) {
+            onOpenChange(true);
+            setActiveIndex(0);
+          }
+        } else if (!inputIsSearchOnly && event.key === "End") {
+          event.preventDefault();
+          if (!disabled && visible.length) {
+            onOpenChange(true);
+            setActiveIndex(visible.length - 1);
+          }
+        } else if (!inputIsSearchOnly && event.key === "Enter" && activeIndex !== null) {
+          event.preventDefault();
+          const option = visible[activeIndex];
+          if (option) choose(option);
+        }
+      }}
+    />
+  );
+
+  const listbox = !hasListbox ? null : (
+    <div
+      id={listId}
+      className="ws-search-shell-options"
+      role="listbox"
+      aria-label={listboxLabel}
+      aria-multiselectable={multiple || undefined}
+    >
+      {busy ? (
+        <button type="button" role="option" aria-disabled="true" disabled tabIndex={-1}>
+          Loading options…
+        </button>
+      ) : error ? (
+        <button type="button" role="option" aria-disabled="true" disabled tabIndex={-1}>
+          {error.message}
+        </button>
+      ) : visible.length ? visible.map((option, index) => (
+        <button
+          key={option.value}
+          id={`${listId}-option-${index}`}
+          type="button"
+          role="option"
+          aria-selected={selectedValues.includes(option.value)}
+          aria-disabled={option.disabled || undefined}
+          data-active={activeIndex === index || undefined}
+          disabled={option.disabled}
+          tabIndex={-1}
+          title={option.title}
+          onMouseDown={(event) => event.preventDefault()}
+          onPointerMove={() => setActiveIndex(index)}
+          onClick={() => choose(option)}
+        >
+          {option.leading ? <span className="ws-search-shell-leading" aria-hidden>{option.leading}</span> : null}
+          <span className="ws-search-shell-option-label">{option.label}</span>
+          {option.detail ? <small>{option.detail}</small> : null}
+          {option.trailing ? <span className="ws-search-shell-trailing" aria-hidden>{option.trailing}</span> : null}
+        </button>
+      )) : (
+        <button type="button" role="option" aria-disabled="true" disabled tabIndex={-1}>
+          {emptyMessage}
+        </button>
+      )}
+    </div>
+  );
+  const results = hideResults ? null : busy ? (
+    <>
+      <div className="ws-search-shell-state" role="status" aria-live="polite">
+        Loading options…
+      </div>
+      {listbox}
+    </>
+  ) : error ? (
+    <>
+      <div className="ws-search-shell-state" role="alert">
+        <span>{error.message}</span>
+        {onRetry ? <button type="button" onClick={onRetry}>Try again</button> : null}
+      </div>
+      {listbox}
+    </>
+  ) : (
+    listbox ?? (
+      <div className="ws-search-shell-state" role="status">
+        {emptyMessage}
+      </div>
+    )
+  );
+
+  const contentStyle: CSSProperties | undefined = showPopup
+    ? {
+        ...textScaleStyle(textScale),
+        left: position?.left ?? 8,
+        top: position?.top ?? 8,
+        visibility: position ? undefined : "hidden",
+      }
+    : undefined;
+  const content = (
+    <div
+      ref={contentRef}
+      className={`ws-search-shell-content ${className}`}
+      data-portalled={showPopup || undefined}
+      style={contentStyle}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      {header ? <div className="ws-search-shell-header">{header}</div> : null}
+      {inputInContent ? input : null}
+      {open ? results : null}
+      {footer ? <div className="ws-search-shell-footer">{footer}</div> : null}
+    </div>
+  );
+
+  const dismissOnBlur = (event: FocusEvent<HTMLDivElement>) => {
+    const next = event.relatedTarget;
+    if (
+      contains(next, contentRef.current) ||
+      contains(next, rootRef.current) ||
+      contains(next, anchor ?? anchorRef?.current ?? null)
+    )
+      return;
+    close();
+  };
+
+  if (!open && (anchor || anchorRef)) return null;
+  if (showPopup && typeof document !== "undefined")
+    return (
+      <div ref={rootRef} className="ws-search-shell" onBlur={dismissOnBlur}>
+        {!inputInContent && input}
+        {createPortal(content, document.body)}
+      </div>
+    );
+  return (
+    <div ref={rootRef} className="ws-search-shell" onBlur={dismissOnBlur}>
+      {!inputInContent && input}
+      {content}
+    </div>
+  );
+}
+
+/** Backward-compatible single-select entrypoint for the short local pickers. */
 export function Combobox({
   value,
   options,
@@ -12,6 +440,7 @@ export function Combobox({
   ariaLabel,
   disabled = false,
   className = "",
+  portal = false,
 }: {
   value: string;
   options: readonly ComboboxOption[];
@@ -20,183 +449,23 @@ export function Combobox({
   ariaLabel: string;
   disabled?: boolean;
   className?: string;
+  portal?: boolean;
 }) {
-  const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const optionsId = useId();
-  const selected = options.find((option) => option.value === value);
-  const visible = useMemo(
-    () =>
-      options.filter((option) =>
-        `${option.label} ${option.detail ?? ""}`
-          .toLocaleLowerCase()
-          .includes(query.toLocaleLowerCase()),
-      ),
-    [options, query],
-  );
-  const showPopup = open && !disabled;
-  const activeOption = activeIndex === null ? null : visible[activeIndex] ?? null;
-  const optionId = (index: number) => `${optionsId}-option-${index}`;
-
-  useEffect(() => {
-    if (!open) return;
-    const root = rootRef.current;
-    if (!root) return;
-    const ownerDocument = root.ownerDocument;
-    const dismissOutside = (event: Event) => {
-      const target = event.target;
-      const NodeConstructor = ownerDocument.defaultView?.Node;
-      if (
-        NodeConstructor &&
-        target instanceof NodeConstructor &&
-        !root.contains(target)
-      ) {
-        setOpen(false);
-        setActiveIndex(null);
-      }
-    };
-    ownerDocument.addEventListener("pointerdown", dismissOutside, true);
-    ownerDocument.addEventListener("click", dismissOutside, true);
-    return () => {
-      ownerDocument.removeEventListener("pointerdown", dismissOutside, true);
-      ownerDocument.removeEventListener("click", dismissOutside, true);
-    };
-  }, [open]);
-
-  useLayoutEffect(() => {
-    if (activeIndex === null || !showPopup) return;
-    document
-      .getElementById(optionId(activeIndex))
-      ?.scrollIntoView({ block: "nearest" });
-  }, [activeIndex, optionsId, showPopup]);
-
-  const selectOption = (option: ComboboxOption) => {
-    onChange(option.value);
-    setQuery("");
-    setOpen(false);
-    setActiveIndex(null);
-  };
-
   return (
-    <div
-      ref={rootRef}
+    <SearchCombobox
+      ariaLabel={ariaLabel}
       className={`ws-combobox ${className}`}
-      onBlur={(event) => {
-        const nextFocused = event.relatedTarget as Node | null;
-        if (!nextFocused || !event.currentTarget.contains(nextFocused)) {
-          setOpen(false);
-          setActiveIndex(null);
-        }
-      }}
-    >
-      <Input
-        value={open ? query : (selected?.label ?? "")}
-        placeholder={placeholder}
-        aria-label={ariaLabel}
-        disabled={disabled}
-        role="combobox"
-        aria-expanded={showPopup}
-        aria-controls={showPopup ? optionsId : undefined}
-        aria-activedescendant={
-          showPopup && activeOption && activeIndex !== null
-            ? optionId(activeIndex)
-            : undefined
-        }
-        aria-autocomplete="list"
-        onFocus={() => {
-          setQuery("");
-          setOpen(true);
-          setActiveIndex(null);
-        }}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          setOpen(true);
-          setActiveIndex(null);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowDown") {
-            event.preventDefault();
-            if (!open) {
-              setOpen(true);
-              setActiveIndex(visible.length ? 0 : null);
-            } else if (visible.length) {
-              setActiveIndex((current) =>
-                current === null ? 0 : Math.min(current + 1, visible.length - 1),
-              );
-            }
-          } else if (event.key === "ArrowUp") {
-            event.preventDefault();
-            if (!open) {
-              setOpen(true);
-              setActiveIndex(visible.length ? visible.length - 1 : null);
-            } else if (visible.length) {
-              setActiveIndex((current) =>
-                current === null ? visible.length - 1 : Math.max(current - 1, 0),
-              );
-            }
-          } else if (event.key === "Home") {
-            event.preventDefault();
-            if (!open) {
-              setOpen(true);
-            }
-            setActiveIndex(visible.length ? 0 : null);
-          } else if (event.key === "End") {
-            event.preventDefault();
-            if (!open) {
-              setOpen(true);
-            }
-            setActiveIndex(visible.length ? visible.length - 1 : null);
-          } else if (event.key === "Enter" && activeOption) {
-            event.preventDefault();
-            selectOption(activeOption);
-          } else if (event.key === "Escape") {
-            setOpen(false);
-            setActiveIndex(null);
-          }
-        }}
-        onClick={() => {
-          if (!open) {
-            setQuery("");
-            setOpen(true);
-            setActiveIndex(null);
-          }
-        }}
-      />
-      {showPopup && (
-        <div
-          id={optionsId}
-          className="ws-combobox-options"
-          role="listbox"
-        >
-          {visible.length === 0 ? (
-            <small role="option" aria-disabled="true">
-              No matching options.
-            </small>
-          ) : (
-            visible.map((option, index) => {
-              const active = activeIndex === index;
-              return (
-                <button
-                  key={option.value}
-                  id={optionId(index)}
-                  type="button"
-                  role="option"
-                  aria-selected={option.value === value}
-                  data-active={active || undefined}
-                  tabIndex={-1}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => selectOption(option)}
-                >
-                  <span>{option.label}</span>
-                  {option.detail && <small>{option.detail}</small>}
-                </button>
-              );
-            })
-          )}
-        </div>
-      )}
-    </div>
+      emptyMessage="No matching options."
+      emptyOption
+      listboxLabel={ariaLabel}
+      onOpenChange={setOpen}
+      onSelectionChange={(values) => onChange(values[0] ?? "")}
+      open={open && !disabled}
+      options={options.map((option) => ({ ...option, disabled: disabled || option.disabled }))}
+      placeholder={placeholder}
+      portal={portal}
+      selectedValues={value ? [value] : []}
+    />
   );
 }

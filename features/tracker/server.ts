@@ -8,10 +8,12 @@ import {
   type TrackerContext,
 } from "./schemas.js";
 
-export const TRACKER_LINKS_KEY = "work-linear-links:v1";
+export const TRACKER_LINKS_KEY = "work-linear-links:v2";
+export const LEGACY_TRACKER_LINKS_KEY = "work-linear-links:v1";
 export const TASKBOARD_PLUGIN_ID = "taskboard";
 type Link = { projectId: string; locator: string; key: string };
-type Links = Record<string, Link[]>;
+type LinkState = { keys: Link[]; primaryKey: string | null };
+type Links = Record<string, LinkState>;
 
 export type TrackerServiceDependencies = {
   call<T>(
@@ -19,12 +21,16 @@ export type TrackerServiceDependencies = {
     input: PluginRpcInput,
     outputSchema: z.ZodType<T>,
   ): Promise<T>;
-  getStorage(): Promise<unknown>;
+  getStorage(key: string): Promise<unknown>;
   setStorage(value: Links): Promise<void>;
   rootThread(threadId: string): Promise<{ id: string; projectId: string }>;
   threadTitle(threadId: string): Promise<string>;
   publish(rootThreadId: string): void;
 };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 
 function linkFrom(value: unknown): Link | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -36,13 +42,16 @@ function linkFrom(value: unknown): Link | null {
     : null;
 }
 
-/** Reads both the v1 single-link record and the additive array shape. */
-function linksFrom(value: unknown): Links {
+/** Recovers valid links while keeping each v2 primary tied to its list. */
+function linksFrom(value: unknown, version: "v1" | "v2"): Links {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return Object.fromEntries(
     Object.entries(value).flatMap(([threadId, stored]) => {
       if (!threadId.startsWith("thr_")) return [];
-      const candidates = Array.isArray(stored) ? stored : [stored];
+      const v2State = version === "v2" && isRecord(stored) ? stored : null;
+      const candidates = v2State
+        ? (Array.isArray(v2State.keys) ? v2State.keys : [])
+        : (Array.isArray(stored) ? stored : [stored]);
       const links = candidates
         .map(linkFrom)
         .filter((link): link is Link => link !== null)
@@ -53,7 +62,15 @@ function linksFrom(value: unknown): Links {
                 candidate.key.toUpperCase() === link.key.toUpperCase(),
             ) === index,
         );
-      return links.length ? [[threadId, links]] : [];
+      if (!links.length) return [];
+      const storedPrimary = v2State?.primaryKey;
+      const primary =
+        typeof storedPrimary === "string"
+          ? links.find(
+              (link) => link.key.toUpperCase() === storedPrimary.toUpperCase(),
+            )
+          : undefined;
+      return [[threadId, { keys: links, primaryKey: (primary ?? links[0])!.key }]];
     }),
   );
 }
@@ -65,6 +82,7 @@ function unavailable(error: unknown): TrackerContext {
     visible: !/Linear is not the selected tracker/i.test(message),
     available: false,
     message,
+    primaryKey: null,
     suggestions: [],
     items: [],
   };
@@ -72,12 +90,20 @@ function unavailable(error: unknown): TrackerContext {
 
 /** Server-only Taskboard adapter; all plugin responses are schema-validated. */
 export function createTrackerService(dependencies: TrackerServiceDependencies) {
-  const links = async () => linksFrom(await dependencies.getStorage());
+  const links = async () => {
+    const current = await dependencies.getStorage(TRACKER_LINKS_KEY);
+    if (current !== undefined && current !== null)
+      return linksFrom(current, "v2");
+    return linksFrom(
+      await dependencies.getStorage(LEGACY_TRACKER_LINKS_KEY),
+      "v1",
+    );
+  };
   const list = (projectId: string, query: string, limit: number) =>
     dependencies.call(
       "listItems",
       { projectId, source: "linear", query, limit },
-      z.object({ items: z.array(taskboardItemSchema) }),
+      z.object({ items: z.array(taskboardItemSchema) }).strict(),
     );
   const suggestions = async (projectId: string, title: string) => {
     const matching = await list(projectId, title, 8);
@@ -94,10 +120,10 @@ export function createTrackerService(dependencies: TrackerServiceDependencies) {
       ]);
       try {
         const suggested = suggestions(root.projectId, title);
-        const rootLinks = stored[root.id] ?? [];
+        const rootLinks = stored[root.id] ?? { keys: [], primaryKey: null };
         const [linkedItems, { items: suggestedItems }] = await Promise.all([
           Promise.all(
-            rootLinks.map(async (link) => {
+            rootLinks.keys.map(async (link) => {
               const [{ item }, { options }] = await Promise.all([
                 dependencies.call(
                   "getItem",
@@ -106,7 +132,7 @@ export function createTrackerService(dependencies: TrackerServiceDependencies) {
                     source: "linear",
                     locator: link.locator,
                   },
-                  z.object({ item: taskboardDetailSchema }),
+                  z.object({ item: taskboardDetailSchema }).strict(),
                 ),
                 dependencies.call(
                   "statusOptions",
@@ -115,9 +141,9 @@ export function createTrackerService(dependencies: TrackerServiceDependencies) {
                     source: "linear",
                     locator: link.locator,
                   },
-                  z.object({
-                    options: z.array(taskboardStatusOptionSchema),
-                  }),
+                  z
+                    .object({ options: z.array(taskboardStatusOptionSchema) })
+                    .strict(),
                 ),
               ]);
               return {
@@ -148,6 +174,7 @@ export function createTrackerService(dependencies: TrackerServiceDependencies) {
           visible: true,
           available: true,
           message: null,
+          primaryKey: rootLinks.primaryKey,
           suggestions: suggestedItems
             .filter((item) => !linkedKeys.has(item.key.toUpperCase()))
             .map(({ key, title: itemTitle, url }) => ({
@@ -182,23 +209,26 @@ export function createTrackerService(dependencies: TrackerServiceDependencies) {
           `No Linear issue matching ${normalized} was found in this BB project.`,
         );
       const stored = await links();
-      const rootLinks = stored[root.id] ?? [];
+      const rootLinks = stored[root.id] ?? { keys: [], primaryKey: null };
       if (
-        rootLinks.some(
+        rootLinks.keys.some(
           (link) => link.key.toUpperCase() === item.key.toUpperCase(),
         )
       )
         return { key: item.key, title: item.title };
       await dependencies.setStorage({
         ...stored,
-        [root.id]: [
-          ...rootLinks,
-          {
-            projectId: root.projectId,
-            locator: item.locator,
-            key: item.key,
-          },
-        ],
+        [root.id]: {
+          keys: [
+            ...rootLinks.keys,
+            {
+              projectId: root.projectId,
+              locator: item.locator,
+              key: item.key,
+            },
+          ],
+          primaryKey: rootLinks.primaryKey ?? item.key,
+        },
       });
       dependencies.publish(root.id);
       return { key: item.key, title: item.title };
@@ -207,22 +237,47 @@ export function createTrackerService(dependencies: TrackerServiceDependencies) {
       const root = await dependencies.rootThread(threadId);
       const stored = await links();
       const normalized = key.trim().toUpperCase();
-      const rootLinks = stored[root.id] ?? [];
-      const nextLinks = rootLinks.filter(
+      const rootLinks = stored[root.id] ?? { keys: [], primaryKey: null };
+      const nextLinks = rootLinks.keys.filter(
         (link) => link.key.toUpperCase() !== normalized,
       );
-      if (nextLinks.length === rootLinks.length)
+      if (nextLinks.length === rootLinks.keys.length)
         throw new Error(`${normalized} is not linked to this work thread.`);
-      if (nextLinks.length) stored[root.id] = nextLinks;
+      if (nextLinks.length)
+        stored[root.id] = {
+          keys: nextLinks,
+          primaryKey:
+            rootLinks.primaryKey?.toUpperCase() === normalized
+              ? nextLinks[0]!.key
+              : rootLinks.primaryKey ?? nextLinks[0]!.key,
+        };
       else delete stored[root.id];
       await dependencies.setStorage(stored);
       dependencies.publish(root.id);
       return { ok: true as const };
     },
+    async setPrimary(threadId: string, key: string) {
+      const root = await dependencies.rootThread(threadId);
+      const stored = await links();
+      const normalized = key.trim().toUpperCase();
+      const rootLinks = stored[root.id] ?? { keys: [], primaryKey: null };
+      const primary = rootLinks.keys.find(
+        (link) => link.key.toUpperCase() === normalized,
+      );
+      if (!primary)
+        throw new Error(`${normalized} is not linked to this work thread.`);
+      if (rootLinks.primaryKey === primary.key) return { key: primary.key };
+      await dependencies.setStorage({
+        ...stored,
+        [root.id]: { ...rootLinks, primaryKey: primary.key },
+      });
+      dependencies.publish(root.id);
+      return { key: primary.key };
+    },
     async updateStatus(threadId: string, key: string, statusId: string) {
       const root = await dependencies.rootThread(threadId);
       const normalized = key.trim().toUpperCase();
-      const link = (await links())[root.id]?.find(
+      const link = (await links())[root.id]?.keys.find(
         (candidate) => candidate.key.toUpperCase() === normalized,
       );
       if (!link)
@@ -235,7 +290,7 @@ export function createTrackerService(dependencies: TrackerServiceDependencies) {
           locator: link.locator,
           statusId,
         },
-        z.object({ item: taskboardItemSchema }),
+        z.object({ item: taskboardItemSchema }).strict(),
       );
       dependencies.publish(root.id);
       return { key: item.key, status: item.status };

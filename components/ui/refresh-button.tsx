@@ -11,6 +11,7 @@ type RefreshButtonProps = Omit<
   "aria-label" | "children" | "className" | "onClick"
 > & {
   label: string;
+  refreshing?: boolean;
   onRefresh(): void | Promise<unknown>;
 };
 
@@ -18,23 +19,32 @@ export const RefreshButton = forwardRef<
   HTMLButtonElement,
   RefreshButtonProps
 >(function RefreshButton(
-  { disabled = false, label, onRefresh, title, type = "button", ...props },
+  {
+    disabled = false,
+    label,
+    refreshing: ownerRefreshing = false,
+    onRefresh,
+    title,
+    type = "button",
+    ...props
+  },
   ref,
 ) {
-  const [refreshing, setRefreshing] = useState(false);
+  const [localRefreshing, setLocalRefreshing] = useState(false);
+  const refreshing = ownerRefreshing || localRefreshing;
   const refresh = useCallback(() => {
     if (disabled || refreshing) return;
-    setRefreshing(true);
+    setLocalRefreshing(true);
     let result: void | Promise<unknown>;
     try {
       result = onRefresh();
     } catch {
-      setRefreshing(false);
+      setLocalRefreshing(false);
       return;
     }
     void Promise.resolve(result)
       .catch(() => undefined)
-      .finally(() => setRefreshing(false));
+      .finally(() => setLocalRefreshing(false));
   }, [disabled, onRefresh, refreshing]);
 
   return (

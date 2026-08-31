@@ -68,11 +68,15 @@ type TaskHandlers = Pick<
 
 export type TasksRegistration = TaskHandlers & Pick<
   ReturnType<typeof createTasksPluginAdapter>,
-  "available" | "projects" | "allTasksById"
+  "available" | "projects" | "allTasksById" | "readAssignees"
 > & Pick<
   ReturnType<typeof createWorkBindingsService>,
   "rootThread" | "descendants" | "summarize" | "links" | "legacy" | "context" | "outcome" | "execution" | "owner"
 > & {
+  projectTaskSummary(
+    task: Parameters<typeof summarizeTask>[0],
+    projectName: string,
+  ): ReturnType<typeof summarizeTask>;
   bindings(): ReturnType<ReturnType<typeof createWorkBindingsService>["read"]>;
   registerTools(): void;
 };
@@ -117,7 +121,8 @@ export function createTasksService(
     },
     async createExecutionTask(input) {
       const result = await bindings.execution(input);
-      return { task: await taskWithProject(result.task), binding: bindings.summarize(result.binding), reused: result.reused };
+      const assignee = (await adapter.readAssignees())[result.task.id] ?? "human";
+      return { task: { ...(await taskWithProject(result.task)), assignee }, binding: bindings.summarize(result.binding), reused: result.reused };
     },
     async bindExecutionOwner(input) {
       const result = await bindings.owner(input);
@@ -181,6 +186,8 @@ export function createTasksService(
     available: adapter.available,
     projects: adapter.projects,
     allTasksById: adapter.allTasksById,
+    readAssignees: adapter.readAssignees,
+    projectTaskSummary: summarizeTask,
     bindings: bindings.read,
     rootThread: bindings.rootThread,
     descendants: bindings.descendants,

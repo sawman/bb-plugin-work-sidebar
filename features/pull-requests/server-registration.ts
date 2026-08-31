@@ -16,6 +16,8 @@ type PullRequestHandlers = Pick<
   | "sidebarAuthoredPullRequests"
   | "sidebarAuthoredPullRequestStacks"
   | "setAuthoredPullRequestDraft"
+  | "getPullRequestReviewers"
+  | "updatePullRequestReviewers"
 >;
 
 export type PullRequestRegistration = PullRequestHandlers & PullRequestChangesAdapter;

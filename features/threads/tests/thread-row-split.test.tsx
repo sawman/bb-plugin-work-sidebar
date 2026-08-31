@@ -28,10 +28,6 @@ vi.mock("@get-bb/plugin-sdk/app", async () => {
       pullRequest: null,
       isLoading: false,
     }),
-    useComposerView: () => ({
-      scope: { kind: "none" },
-      draft: { isEmpty: true },
-    }),
   };
 });
 
@@ -43,6 +39,7 @@ const thread = {
   title: "One",
   titleFallback: null,
   parentThreadId: null,
+  providerId: "codex",
   indicator: "none",
   indicatorLabel: null,
   isUnread: false,
@@ -50,7 +47,10 @@ const thread = {
   environment: null,
 } as PluginSidebarThread;
 
-function renderRow(reorderDisabled: boolean) {
+function renderRow(
+  reorderDisabled: boolean,
+  dragThreadId: string | null = null,
+) {
   const onDragThreadChange = vi.fn();
   const onDropTargetChange = vi.fn();
   const onDropThread = vi.fn();
@@ -69,15 +69,12 @@ function renderRow(reorderDisabled: boolean) {
       onMoveToGroup={vi.fn()}
       onNavigate={vi.fn()}
       reorderDisabled={reorderDisabled}
-      canMoveUp={false}
-      canMoveDown={false}
-      dragThreadId={null}
+      dragThreadId={dragThreadId}
       onDragThreadChange={onDragThreadChange}
       dropTarget={null}
       onDropTargetChange={onDropTargetChange}
       canDropThread={() => true}
       onDropThread={onDropThread}
-      onMoveThread={vi.fn()}
     />,
   );
   return { ...view, onDragThreadChange, onDropTargetChange, onDropThread };
@@ -90,11 +87,31 @@ afterEach(() => {
 });
 
 describe("ThreadRow split ownership", () => {
+  it("exposes an accessible reparent drop target only during a drag", () => {
+    const idle = renderRow(false);
+    expect(
+      idle.queryByRole("note", { name: "Move a thread under One" }),
+    ).toBeNull();
+    idle.unmount();
+
+    const dragging = renderRow(false, "thr_two");
+    expect(
+      dragging.getByRole("note", { name: "Move a thread under One" }),
+    ).toBeTruthy();
+  });
+
   it("keeps native split off excluded targets and non-primary pointers, but hands primary row pointers to BB before optional reorder", () => {
     const disabled = renderRow(true);
-    const row = disabled.container.querySelector<HTMLElement>("[data-ws-thread-id]")!;
+    const row = disabled.container.querySelector<HTMLElement>(
+      "[data-ws-thread-id]",
+    )!;
 
-    fireEvent.pointerDown(row, { button: 0, pointerId: 1, clientX: 0, clientY: 0 });
+    fireEvent.pointerDown(row, {
+      button: 0,
+      pointerId: 1,
+      clientX: 0,
+      clientY: 0,
+    });
     expect(host.splitPointerDown).toHaveBeenCalledTimes(1);
     expect(disabled.onDragThreadChange).not.toHaveBeenCalled();
 
@@ -102,15 +119,27 @@ describe("ThreadRow split ownership", () => {
     for (const tag of ["button", "input", "textarea"] as const) {
       const target = document.createElement(tag);
       row.append(target);
-      fireEvent.pointerDown(target, { button: 0, pointerId: 2, clientX: 0, clientY: 0 });
+      fireEvent.pointerDown(target, {
+        button: 0,
+        pointerId: 2,
+        clientX: 0,
+        clientY: 0,
+      });
       target.remove();
     }
-    fireEvent.pointerDown(row, { button: 2, pointerId: 3, clientX: 0, clientY: 0 });
+    fireEvent.pointerDown(row, {
+      button: 2,
+      pointerId: 3,
+      clientX: 0,
+      clientY: 0,
+    });
     expect(host.splitPointerDown).not.toHaveBeenCalled();
     expect(disabled.onDragThreadChange).not.toHaveBeenCalled();
 
     const enabled = renderRow(false);
-    const enabledRow = enabled.container.querySelector<HTMLElement>("[data-ws-thread-id]")!;
+    const enabledRow = enabled.container.querySelector<HTMLElement>(
+      "[data-ws-thread-id]",
+    )!;
     const target = document.createElement("div");
     target.dataset.wsThreadId = "thr_two";
     enabledRow.parentElement!.append(target);
@@ -122,7 +151,12 @@ describe("ThreadRow split ownership", () => {
       top: 0,
       height: 100,
     } as DOMRect);
-    fireEvent.pointerDown(enabledRow, { button: 0, pointerId: 4, clientX: 0, clientY: 0 });
+    fireEvent.pointerDown(enabledRow, {
+      button: 0,
+      pointerId: 4,
+      clientX: 0,
+      clientY: 0,
+    });
     fireEvent.pointerMove(window, { pointerId: 4, clientX: 10, clientY: 10 });
     expect(host.splitPointerDown).toHaveBeenCalledTimes(1);
     expect(enabled.onDragThreadChange).toHaveBeenCalledWith("thr_one");
@@ -130,7 +164,9 @@ describe("ThreadRow split ownership", () => {
 
   it("cleans up an active pointer drag when the row unmounts", () => {
     const view = renderRow(false);
-    const row = view.container.querySelector<HTMLElement>("[data-ws-thread-id]")!;
+    const row = view.container.querySelector<HTMLElement>(
+      "[data-ws-thread-id]",
+    )!;
     const target = document.createElement("div");
     target.dataset.wsThreadId = "thr_two";
     row.parentElement!.append(target);
@@ -143,7 +179,12 @@ describe("ThreadRow split ownership", () => {
       height: 100,
     } as DOMRect);
 
-    fireEvent.pointerDown(row, { button: 0, pointerId: 5, clientX: 0, clientY: 0 });
+    fireEvent.pointerDown(row, {
+      button: 0,
+      pointerId: 5,
+      clientX: 0,
+      clientY: 0,
+    });
     fireEvent.pointerMove(window, { pointerId: 5, clientX: 10, clientY: 10 });
     expect(view.onDragThreadChange).toHaveBeenCalledWith("thr_one");
     view.unmount();
@@ -152,5 +193,74 @@ describe("ThreadRow split ownership", () => {
 
     fireEvent.pointerUp(window, { pointerId: 5, clientX: 10, clientY: 10 });
     expect(view.onDropThread).not.toHaveBeenCalled();
+  });
+
+  it("cleans up an active pointer drag when the browser cancels it", () => {
+    const view = renderRow(false);
+    const row = view.container.querySelector<HTMLElement>(
+      "[data-ws-thread-id]",
+    )!;
+    const target = document.createElement("div");
+    target.dataset.wsThreadId = "thr_two";
+    row.parentElement!.append(target);
+    Object.defineProperty(document, "elementFromPoint", {
+      configurable: true,
+      value: () => target,
+    });
+    vi.spyOn(target, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      height: 100,
+    } as DOMRect);
+
+    fireEvent.pointerDown(row, {
+      button: 0,
+      pointerId: 6,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { pointerId: 6, clientX: 10, clientY: 10 });
+    fireEvent.pointerCancel(window, { pointerId: 6, clientX: 10, clientY: 10 });
+
+    expect(view.onDragThreadChange).toHaveBeenLastCalledWith(null);
+    expect(view.onDropTargetChange).toHaveBeenLastCalledWith(null);
+    fireEvent.pointerUp(window, { pointerId: 6, clientX: 10, clientY: 10 });
+    expect(view.onDropThread).not.toHaveBeenCalled();
+  });
+
+  it("clears a stale reorder target when its DOM target disappears", () => {
+    const view = renderRow(false);
+    const row = view.container.querySelector<HTMLElement>(
+      "[data-ws-thread-id]",
+    )!;
+    const target = document.createElement("div");
+    target.dataset.wsThreadId = "thr_two";
+    row.parentElement!.append(target);
+    const elementAt = vi.fn(() => target);
+    Object.defineProperty(document, "elementFromPoint", {
+      configurable: true,
+      value: elementAt,
+    });
+    vi.spyOn(target, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      height: 100,
+    } as DOMRect);
+
+    fireEvent.pointerDown(row, {
+      button: 0,
+      pointerId: 7,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { pointerId: 7, clientX: 10, clientY: 10 });
+    expect(view.onDropTargetChange).toHaveBeenLastCalledWith({
+      kind: "reorder",
+      threadId: "thr_two",
+      placement: "before",
+    });
+
+    target.remove();
+    fireEvent.pointerMove(window, { pointerId: 7, clientX: 11, clientY: 11 });
+    expect(view.onDropTargetChange).toHaveBeenLastCalledWith(null);
+    fireEvent.pointerCancel(window, { pointerId: 7 });
   });
 });

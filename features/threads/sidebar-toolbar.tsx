@@ -1,48 +1,35 @@
 import { Icon } from "@/components/ui/icon";
+import type { ReactNode } from "react";
 import {
   SidebarListActions,
   SidebarListIconButton,
 } from "@/components/ui/sidebar-list-actions";
 import { RefreshButton } from "@/components/ui/refresh-button";
-import type {
-  SidebarThreadGroup,
-  SidebarThreadGroupPosition,
-} from "./model";
-import { ThreadListSettings } from "./sidebar-group-settings";
+import { SidebarSearch } from "@/components/ui/sidebar-search";
 type SidebarToolbarProps = {
   threadCountLabel: string;
   selectedCount: number;
   reorderDisabled: boolean;
-  groupPositions: readonly SidebarThreadGroupPosition[];
-  occupiedGroupIds: ReadonlySet<string>;
-  groupReorderPending: boolean;
+  settings: ReactNode;
   activeProjectId: string | null;
   onArchiveSelected(): void;
-  onAddGroup(name: string): boolean;
-  onMoveGroup(groupId: string, direction: -1 | 1): void;
-  onReorderGroup(sourceId: string, targetId: string): void;
-  onRenameGroup(group: SidebarThreadGroup): void;
-  onRemoveGroup(group: SidebarThreadGroup): void;
   onRefresh(): void | Promise<unknown>;
   onNewThread(projectId: string): void;
+  searchQuery: string;
+  onSearchQueryChange(value: string): void;
 };
 
 export function SidebarThreadToolbar({
   threadCountLabel,
   selectedCount,
   reorderDisabled,
-  groupPositions,
-  occupiedGroupIds,
-  groupReorderPending,
+  settings,
   activeProjectId,
   onArchiveSelected,
-  onAddGroup,
-  onMoveGroup,
-  onReorderGroup,
-  onRenameGroup,
-  onRemoveGroup,
   onRefresh,
   onNewThread,
+  searchQuery,
+  onSearchQueryChange,
 }: SidebarToolbarProps) {
   return (
     <>
@@ -68,18 +55,16 @@ export function SidebarThreadToolbar({
                 Clear search to reorder
               </span>
             )}
-            <ThreadListSettings
-              groupPositions={groupPositions}
-              occupiedGroupIds={occupiedGroupIds}
-              groupReorderPending={groupReorderPending}
-              onAddGroup={onAddGroup}
-              onMoveGroup={onMoveGroup}
-              onReorderGroup={onReorderGroup}
-              onRenameGroup={onRenameGroup}
-              onRemoveGroup={onRemoveGroup}
-            />
           </>
         }
+        search={
+          <SidebarSearch
+            label="threads"
+            value={searchQuery}
+            onValueChange={onSearchQueryChange}
+          />
+        }
+        settings={settings}
         create={
           activeProjectId ? (
             <SidebarListIconButton
