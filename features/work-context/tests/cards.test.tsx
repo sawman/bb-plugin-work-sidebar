@@ -1569,6 +1569,10 @@ describe("registered Work context cards", () => {
     const statusControl = await completionSlot.findByRole("button", {
       name: "Change status for WORK-3: To do",
     });
+    const taskRow = statusControl.closest(".ws-task-workflow-row")!;
+    const actions = taskRow.querySelector(".ws-task-workflow-actions")!;
+    expect(actions.contains(statusControl)).toBe(true);
+    expect(actions.querySelector('[role="switch"]')).toBeTruthy();
     fireEvent.click(statusControl);
     fireEvent.click(completionSlot.getByRole("option", { name: "In Review" }));
     await waitFor(() =>

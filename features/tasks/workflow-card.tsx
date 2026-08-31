@@ -180,12 +180,6 @@ function WorkflowRow({
       data-owner-unavailable={ownerUnavailable || undefined}
       aria-label={`${task.key}: ${task.title}. ${accessibleStatus}.`}
     >
-      <TaskStatusControl
-        taskKey={task.key}
-        status={task.status}
-        busy={busy}
-        onChange={(next) => onStatusChange(task.id, next)}
-      />
       <span className="ws-task-workflow-copy">
         <span className="ws-task-workflow-title-line">
           <TaskPriorityIcon priority={task.priority ?? "none"} />
@@ -226,6 +220,12 @@ function WorkflowRow({
           taskKey={task.key}
           disabled={busy}
           onChange={(assignee) => onAssigneeChange(task.id, assignee)}
+        />
+        <TaskStatusControl
+          taskKey={task.key}
+          status={task.status}
+          busy={busy}
+          onChange={(next) => onStatusChange(task.id, next)}
         />
         {detachable ? (
           <button
