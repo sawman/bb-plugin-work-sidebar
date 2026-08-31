@@ -879,9 +879,6 @@ function OutcomeStatusControls({
   onMove(status: TaskStatus): void;
 }) {
   const current = taskStatusPresentation(status);
-  // A task being worked does not mean this control is loading. Reserve the
-  // spinner for transport activity and use a stable work mark for its state.
-  const currentIcon = status === "in_progress" ? "Hammer" : current.icon;
   const previousLabel = previous
     ? `Move ${title} back to ${taskStatusPresentation(previous).label}`
     : `No previous outcome status for ${title}`;
@@ -912,7 +909,7 @@ function OutcomeStatusControls({
         aria-label={`Current outcome status: ${current.label}`}
         title={current.label}
       >
-        <Icon name={currentIcon} aria-hidden />
+        <Icon name={current.icon} aria-hidden />
         <span aria-hidden>{current.label}</span>
       </span>
       <button

@@ -1127,7 +1127,7 @@ describe("registered Work context cards", () => {
       ).toBe(false);
       expect(previous.querySelector("svg")).toBeTruthy();
       expect(next.querySelector("svg")).toBeTruthy();
-      expect(current.querySelector('svg[data-icon="Hammer"]')).toBeTruthy();
+      expect(current.querySelector('svg[data-icon="CircleHalf"]')).toBeTruthy();
       fireEvent.click(previous);
       await waitFor(() =>
         expect(updateWorkTask).toHaveBeenCalledWith({

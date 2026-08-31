@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { Icon } from "../../components/ui/icon";
+import { Icon, type IconName } from "../../components/ui/icon";
 import { ThreadProviderLogo } from "../../components/threads/thread-provider-logo";
 import { taskStatusPresentation } from "./model";
 import { TaskPriorityIcon } from "./priority";
@@ -48,7 +48,7 @@ export function TaskWorkflowCard({
         id={`${idPrefix}-queue`}
         title="Queue"
         items={sections.queue}
-        icon="Hammer"
+        icon="CircleHalf"
         defaultOpen
         busy={busy}
         onAssigneeChange={onAssigneeChange}
@@ -95,7 +95,7 @@ function WorkflowSection({
   id: string;
   title: "Needs you" | "Queue" | "Completed";
   tone?: "attention";
-  icon?: "Hammer";
+  icon?: IconName;
   items: readonly TaskWorkflowItem[];
   total?: number;
   itemLimit?: number;
