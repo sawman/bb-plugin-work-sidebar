@@ -17,9 +17,9 @@ export function SurfaceCardHeading({ title, trailing }: { title: string; trailin
   return (
     <div className="ws-card-heading">
       <strong>{title}</strong>
-      {trailing ? (
-        <span className="ws-card-heading-info">{trailing}</span>
-      ) : null}
+      <span className="ws-card-heading-info" data-empty={trailing ? undefined : "true"}>
+        {trailing}
+      </span>
     </div>
   );
 }

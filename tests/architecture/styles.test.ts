@@ -104,6 +104,15 @@ describe("stylesheet policy", () => {
     expect(violations).toEqual([]);
   });
 
+  test("reserves a uniform card heading row for optional metadata", () => {
+    const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    const heading = source.match(/\.ws-card-heading\s*\{([\s\S]*?)\}/)?.[1];
+    const info = source.match(/\.ws-card-heading-info\s*\{([\s\S]*?)\}/)?.[1];
+
+    expect(heading).toContain("min-height: 1.6rem");
+    expect(info).toContain("min-height: 1.6rem");
+  });
+
   test("keeps working-provider animation modes visible and motion-safe", () => {
     const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
     const sheenStart = source.indexOf(".ws-thread-provider-fallback-shine");

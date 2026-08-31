@@ -1939,7 +1939,8 @@ button.ws-change-file-row:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 0.8rem;
+  /* Every card keeps this space even when it has no heading metadata. */
+  min-height: 1.6rem;
   gap: 0.4rem;
   font: var(--ws-text-label);
   line-height: 1;
@@ -1955,6 +1956,7 @@ button.ws-change-file-row:hover {
   align-items: center;
 }
 .ws-card-heading-info {
+  min-height: 1.6rem;
   min-width: 0;
   justify-content: flex-end;
   color: var(--muted-foreground);
