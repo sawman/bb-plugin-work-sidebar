@@ -109,8 +109,8 @@ describe("stylesheet policy", () => {
     const heading = source.match(/\.ws-card-heading\s*\{([\s\S]*?)\}/)?.[1];
     const info = source.match(/\.ws-card-heading-info\s*\{([\s\S]*?)\}/)?.[1];
 
-    expect(heading).toContain("min-height: 1.6rem");
-    expect(info).toContain("min-height: 1.6rem");
+    expect(heading).toContain("min-height: 0.8rem");
+    expect(info).toContain("min-height: 0.8rem");
   });
 
   test("keeps working-provider animation modes visible and motion-safe", () => {
