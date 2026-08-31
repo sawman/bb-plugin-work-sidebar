@@ -1,6 +1,11 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useId } from "react";
 import { toast } from "sonner";
 import { useSidebarAppearancePreferences } from "./queries";
+import {
+  NumericAutosaveEditor,
+  SettingsCard,
+  type NumericSettingDescriptor,
+} from "./settings-editor";
 import {
   DEFAULT_SIDEBAR_ROW_HEIGHT,
   DEFAULT_TEXT_SCALE,
@@ -17,6 +22,28 @@ import {
   validateTextScale,
 } from "./sidebar-appearance";
 
+const ROW_HEIGHT_SETTING: NumericSettingDescriptor = {
+  label: "Row height",
+  min: MIN_SIDEBAR_ROW_HEIGHT,
+  max: MAX_SIDEBAR_ROW_HEIGHT,
+  step: "0.1",
+  suffix: "px",
+  validate: validateSidebarRowHeight,
+  successMessage: (value) => `Sidebar rows set to ${value}px`,
+  initialValue: DEFAULT_SIDEBAR_ROW_HEIGHT,
+};
+
+const TEXT_SCALE_SETTING: NumericSettingDescriptor = {
+  label: "Text scale",
+  min: MIN_TEXT_SCALE,
+  max: MAX_TEXT_SCALE,
+  step: "0.01",
+  suffix: "×",
+  validate: validateTextScale,
+  successMessage: (value) => `Text scale set to ${value}`,
+  initialValue: DEFAULT_TEXT_SCALE,
+};
+
 type SidebarRowHeightEditorProps = {
   saved: number | undefined;
   pending: boolean;
@@ -24,124 +51,41 @@ type SidebarRowHeightEditorProps = {
   onSave(rowHeight: number): Promise<{ rowHeight: number }>;
 };
 
-type NumericAppearanceEditorProps = {
-  saved: number | undefined;
-  pending: boolean;
-  label: string;
-  min: number;
-  max: number;
-  step: string;
-  suffix: string;
-  validate(value: string): { value: number | null; error: string | null };
-  onSave(value: number): Promise<number>;
-  successMessage(value: number): string;
-  initialValue: number;
-  className: string;
-};
-
-function NumericAppearanceEditor({
+function SidebarNumericEditor({
+  setting,
   saved,
   pending,
-  label,
-  min,
-  max,
-  step,
-  suffix,
-  validate,
+  compact,
   onSave,
-  successMessage,
-  initialValue,
   className,
-}: NumericAppearanceEditorProps) {
-  const inputId = useId();
-  const errorId = `${inputId}-error`;
-  const [draft, setDraft] = useState(String(initialValue));
-  const [dirty, setDirty] = useState(false);
-  const [changeVersion, setChangeVersion] = useState(0);
-  const latestDraft = useRef(draft);
-  const lastAttemptedDraft = useRef<string | null>(null);
-  const onSaveRef = useRef(onSave);
-  const successMessageRef = useRef(successMessage);
-  const labelRef = useRef(label);
-  const validation = validate(draft);
-
-  useEffect(() => {
-    onSaveRef.current = onSave;
-    successMessageRef.current = successMessage;
-    labelRef.current = label;
-  }, [label, onSave, successMessage]);
-
-  useEffect(() => {
-    if (saved === undefined || dirty) return;
-    const next = String(saved);
-    latestDraft.current = next;
-    lastAttemptedDraft.current = null;
-    setDraft(next);
-  }, [dirty, saved]);
-
-  useEffect(() => {
-    if (!dirty || pending || validation.value === null) return;
-    if (validation.value === saved) {
-      lastAttemptedDraft.current = null;
-      setDirty(false);
-      return;
-    }
-    const requested = validation.value;
-    const attemptedDraft = draft;
-    if (lastAttemptedDraft.current === attemptedDraft) return;
-    const timer = window.setTimeout(() => {
-      lastAttemptedDraft.current = attemptedDraft;
-      void onSaveRef
-        .current(requested)
-        .then((savedValue) => {
-          if (latestDraft.current !== attemptedDraft) return;
-          const next = String(savedValue);
-          latestDraft.current = next;
-          setDraft(next);
-          setDirty(false);
-          toast.success(successMessageRef.current(savedValue));
-        })
-        .catch((error: unknown) => {
-          toast.error(
-            error instanceof Error
-              ? error.message
-              : `Could not save ${labelRef.current.toLowerCase()}`,
-          );
-        });
-    }, 250);
-    return () => window.clearTimeout(timer);
-  }, [changeVersion, dirty, draft, pending, saved, validation.value]);
-
-  return (
-    <div className={className}>
-      <label htmlFor={inputId}>{label}</label>
-      <div className="ws-settings-input-row">
-        <input
-          id={inputId}
-          type="number"
-          min={min}
-          max={max}
-          step={step}
-          inputMode="decimal"
-          value={draft}
-          aria-invalid={validation.error ? "true" : undefined}
-          aria-describedby={validation.error ? errorId : undefined}
-          onChange={(event) => {
-            latestDraft.current = event.currentTarget.value;
-            lastAttemptedDraft.current = null;
-            setDraft(latestDraft.current);
-            setDirty(true);
-            setChangeVersion((current) => current + 1);
-          }}
-        />
-        <span aria-hidden>{suffix}</span>
-      </div>
-      {validation.error ? (
-        <small id={errorId} className="ws-settings-error" role="alert">
-          {validation.error}
-        </small>
-      ) : null}
-    </div>
+  cardClassName,
+  cardTitle,
+}: {
+  setting: NumericSettingDescriptor;
+  saved: number | undefined;
+  pending: boolean;
+  compact: boolean;
+  onSave(value: number): Promise<number>;
+  className: string;
+  cardClassName: string;
+  cardTitle?: string;
+}) {
+  const editor = (
+    <NumericAutosaveEditor
+      setting={setting}
+      saved={saved}
+      pending={pending}
+      compact={compact}
+      className={className}
+      onSave={onSave}
+    />
+  );
+  return compact ? (
+    editor
+  ) : (
+    <SettingsCard title={cardTitle} className={cardClassName}>
+      {editor}
+    </SettingsCard>
   );
 }
 
@@ -151,42 +95,17 @@ export function SidebarRowHeightEditor({
   compact = false,
   onSave,
 }: SidebarRowHeightEditorProps) {
-  return compact ? (
-    <NumericAppearanceEditor
+  return (
+    <SidebarNumericEditor
+      setting={ROW_HEIGHT_SETTING}
       saved={saved}
       pending={pending}
-      label="Row height"
-      min={MIN_SIDEBAR_ROW_HEIGHT}
-      max={MAX_SIDEBAR_ROW_HEIGHT}
-      step="0.1"
-      suffix="px"
-      validate={validateSidebarRowHeight}
+      compact={compact}
       onSave={async (value) => (await onSave(value)).rowHeight}
-      successMessage={(value) => `Sidebar rows set to ${value}px`}
-      initialValue={DEFAULT_SIDEBAR_ROW_HEIGHT}
-      className="ws-thread-appearance-entry ws-sidebar-row-height-editor"
+      className={compact ? "ws-sidebar-row-height-editor" : "ws-sidebar-appearance-field"}
+      cardClassName="ws-sidebar-appearance-settings"
+      cardTitle="Sidebar appearance"
     />
-  ) : (
-    <div
-      data-layout="narrow"
-      className="ws-settings-card ws-sidebar-appearance-settings"
-    >
-      <strong>Sidebar appearance</strong>
-      <NumericAppearanceEditor
-        saved={saved}
-        pending={pending}
-        label="Row height"
-        min={MIN_SIDEBAR_ROW_HEIGHT}
-        max={MAX_SIDEBAR_ROW_HEIGHT}
-        step="0.1"
-        suffix="px"
-        validate={validateSidebarRowHeight}
-        onSave={async (value) => (await onSave(value)).rowHeight}
-        successMessage={(value) => `Sidebar rows set to ${value}px`}
-        initialValue={DEFAULT_SIDEBAR_ROW_HEIGHT}
-        className="ws-sidebar-appearance-field"
-      />
-    </div>
   );
 }
 
@@ -203,52 +122,23 @@ export function SidebarTextScaleEditor({
   compact = false,
   onSave,
 }: SidebarTextScaleEditorProps) {
-  return compact ? (
-    <NumericAppearanceEditor
+  return (
+    <SidebarNumericEditor
+      setting={TEXT_SCALE_SETTING}
       saved={saved}
       pending={pending}
-      label="Text scale"
-      min={MIN_TEXT_SCALE}
-      max={MAX_TEXT_SCALE}
-      step="0.01"
-      suffix="×"
-      validate={validateTextScale}
+      compact={compact}
       onSave={async (value) => (await onSave(value)).textScale}
-      successMessage={(value) => `Text scale set to ${value}`}
-      initialValue={DEFAULT_TEXT_SCALE}
-      className="ws-thread-appearance-entry ws-sidebar-text-scale-editor"
+      className={compact ? "ws-sidebar-text-scale-editor" : "ws-sidebar-appearance-field"}
+      cardClassName="ws-sidebar-text-scale-editor"
     />
-  ) : (
-    <div
-      data-layout="narrow"
-      className="ws-settings-card ws-sidebar-text-scale-editor"
-    >
-      <NumericAppearanceEditor
-        saved={saved}
-        pending={pending}
-        label="Text scale"
-        min={MIN_TEXT_SCALE}
-        max={MAX_TEXT_SCALE}
-        step="0.01"
-        suffix="×"
-        validate={validateTextScale}
-        onSave={async (value) => (await onSave(value)).textScale}
-        successMessage={(value) => `Text scale set to ${value}`}
-        initialValue={DEFAULT_TEXT_SCALE}
-        className="ws-sidebar-appearance-field"
-      />
-    </div>
   );
 }
 
 export function SidebarAppearanceSettings() {
   const preferences = useSidebarAppearancePreferences();
   return (
-    <div
-      className="ws-settings-card ws-sidebar-appearance-settings"
-      data-layout="narrow"
-    >
-      <strong>Sidebar appearance</strong>
+    <SettingsCard className="ws-sidebar-appearance-settings" title="Sidebar appearance">
       <SidebarRowHeightEditor
         saved={preferences.appearance.data?.rowHeight}
         pending={preferences.saveRowHeight.isPending}
@@ -270,7 +160,7 @@ export function SidebarAppearanceSettings() {
           )
         }
       />
-    </div>
+    </SettingsCard>
   );
 }
 
