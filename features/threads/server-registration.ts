@@ -43,8 +43,8 @@ export function createThreadRegistration(
     async getThreadGroups() {
       return preferences.groups();
     },
-    async saveThreadGroups({ groups, activeGroupPosition }) {
-      return preferences.saveGroups(groups, activeGroupPosition);
+    async saveThreadGroups({ groups, activeGroupPosition, disclosures }) {
+      return preferences.saveGroups(groups, activeGroupPosition, disclosures);
     },
     async getSidebarAppearance() {
       return preferences.appearance();

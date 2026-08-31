@@ -28,6 +28,8 @@ export function RecycleBinView({
   providersById,
   onRestore,
   searchQuery,
+  open,
+  onOpenChange,
 }: {
   entries: readonly RecycleBinEntry[];
   threads: readonly PluginSidebarThread[];
@@ -35,8 +37,9 @@ export function RecycleBinView({
   providersById: ThreadProviderDirectory;
   onRestore(threadId: string): void;
   searchQuery: string;
+  open: boolean;
+  onOpenChange(open: boolean): void;
 }) {
-  const [open, setOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const byId = useMemo(
     () => new Map(threads.map((thread) => [thread.id, thread])),
@@ -73,7 +76,7 @@ export function RecycleBinView({
       data-ws-thread-drop-zone="recycle-bin"
       open={effectivelyOpen}
       onToggle={(event) => {
-        if (!searching) setOpen(event.currentTarget.open);
+        if (!searching) onOpenChange(event.currentTarget.open);
       }}
     >
       <summary>

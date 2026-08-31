@@ -90,6 +90,7 @@ describe("R9 Threads query ownership", () => {
         { id: "group_later", name: "Later", threadIds: ["thr_1"] },
       ],
       activeGroupPosition: 0,
+      disclosures: {},
     });
   });
 

@@ -1,5 +1,6 @@
 import {
   normalizeActiveGroupPosition,
+  normalizeThreadGroupDisclosures,
   normalizeThreadGroups,
   type SidebarThreadGroup,
   type SidebarThreadGroupPreferences,
@@ -199,15 +200,34 @@ export function createThreadPreferencesService(
               groups.length,
             )
           : 0;
-      return { groups, activeGroupPosition };
+      return {
+        groups,
+        activeGroupPosition,
+        disclosures: normalizeThreadGroupDisclosures(
+          typeof stored === "object" && stored !== null
+            ? Reflect.get(stored, "disclosures")
+            : undefined,
+        ),
+      };
     },
-    async saveGroups(groups: SidebarThreadGroup[], activeGroupPosition = 0) {
+    async saveGroups(
+      groups: SidebarThreadGroup[],
+      activeGroupPosition = 0,
+      disclosures?: Record<string, boolean>,
+    ): Promise<SidebarThreadGroupPreferences> {
+      const existing = await adapter.get(THREAD_PREFERENCE_KEYS.groups);
       const value = normalizeThreadGroups({ groups });
       const preferences = {
         groups: value,
         activeGroupPosition: normalizeActiveGroupPosition(
           activeGroupPosition,
           value.length,
+        ),
+        disclosures: normalizeThreadGroupDisclosures(
+          disclosures ??
+            (typeof existing === "object" && existing !== null
+              ? Reflect.get(existing, "disclosures")
+              : undefined),
         ),
       };
       await adapter.set(THREAD_PREFERENCE_KEYS.groups, preferences);

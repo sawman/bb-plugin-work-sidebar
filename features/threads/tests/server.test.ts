@@ -38,6 +38,7 @@ describe("R9 Threads server preferences", () => {
         { id: "group_later", name: "Later", threadIds: ["thr_b"] },
       ],
       activeGroupPosition: 0,
+      disclosures: {},
     });
     await expect(
       service.saveOrder(["thr_b", "thr_a", "thr_b", "bad"]),
@@ -52,6 +53,7 @@ describe("R9 Threads server preferences", () => {
         { id: "group_later", name: "Later", threadIds: ["thr_a"] },
       ],
       activeGroupPosition: 1,
+      disclosures: {},
     });
     await expect(service.appearance()).resolves.toEqual({
       rowHeight: 47.5,
@@ -93,6 +95,7 @@ describe("R9 Threads server preferences", () => {
         { id: "group_later", name: "Later", threadIds: ["thr_a"] },
       ],
       activeGroupPosition: 1,
+      disclosures: {},
     });
     await expect(service.binThread("thr_a", "group_later")).resolves.toEqual([
       { threadId: "thr_a", originGroupId: "group_later", binnedAt: expect.any(Number) },
@@ -107,6 +110,7 @@ describe("R9 Threads server preferences", () => {
           { id: "group_later", name: "Later", threadIds: ["thr_a"] },
         ],
         activeGroupPosition: 1,
+        disclosures: {},
       },
     });
     expect(published[2]).toEqual({

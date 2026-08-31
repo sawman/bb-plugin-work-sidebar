@@ -19,14 +19,17 @@ export function ArchivedThreads({
   providersById,
   onNavigate,
   searchQuery,
+  open,
+  onOpenChange,
 }: {
   threads: readonly PluginSidebarThread[];
   projectsById: ReadonlyMap<string, Project>;
   providersById: ThreadProviderDirectory;
   onNavigate(): void;
   searchQuery: string;
+  open: boolean;
+  onOpenChange(open: boolean): void;
 }) {
-  const [open, setOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const fingerprint = useMemo(
     () =>
@@ -78,7 +81,7 @@ export function ArchivedThreads({
       className="ws-thread-group ws-archived"
       open={effectivelyOpen}
       onToggle={(event) => {
-        if (!searching) setOpen(event.currentTarget.open);
+        if (!searching) onOpenChange(event.currentTarget.open);
       }}
     >
       <summary>

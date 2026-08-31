@@ -13,7 +13,32 @@ export type SidebarThreadGroupPosition = Readonly<{
 export type SidebarThreadGroupPreferences = Readonly<{
   groups: SidebarThreadGroup[];
   activeGroupPosition: number;
+  disclosures?: Record<string, boolean>;
 }>;
+
+export const THREAD_DISCLOSURE_IDS = [
+  ACTIVE_THREAD_GROUP_ID,
+  "recycle-bin",
+  "archive",
+] as const;
+
+export function normalizeThreadGroupDisclosures(value: unknown) {
+  if (typeof value !== "object" || value === null) return {};
+  return Object.entries(value).reduce<Record<string, boolean>>(
+    (result, [id, open]) => {
+      if (
+        (id === ACTIVE_THREAD_GROUP_ID ||
+          id === "recycle-bin" ||
+          id === "archive" ||
+          /^group_[a-z0-9_-]{1,48}$/.test(id)) &&
+        typeof open === "boolean"
+      )
+        result[id] = open;
+      return result;
+    },
+    {},
+  );
+}
 
 export function normalizeActiveGroupPosition(value: unknown, groupCount: number) {
   const position = typeof value === "number" && Number.isInteger(value) ? value : 0;

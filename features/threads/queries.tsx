@@ -14,6 +14,7 @@ import type { rpcContract } from "../../contracts";
 import { queryPolicies } from "../../query-runtime";
 import {
   normalizeActiveGroupPosition,
+  normalizeThreadGroupDisclosures,
   type SidebarThreadGroup,
   type SidebarThreadGroupPreferences,
 } from "./model";
@@ -131,10 +132,12 @@ export async function saveThreadGroups(
   rpc: ThreadsRpc,
   groups: SidebarThreadGroup[],
   activeGroupPosition = 0,
+  disclosures: Record<string, boolean> = {},
 ) {
   const result = await rpc.call("saveThreadGroups", {
     groups,
     activeGroupPosition,
+    ...(Object.keys(disclosures).length ? { disclosures } : {}),
   });
   const preferences: SidebarThreadGroupPreferences = {
     groups: result.groups as SidebarThreadGroup[],
@@ -142,6 +145,7 @@ export async function saveThreadGroups(
       result.activeGroupPosition ?? activeGroupPosition,
       result.groups.length,
     ),
+    disclosures: normalizeThreadGroupDisclosures(result.disclosures ?? disclosures),
   };
   client.setQueryData(threadQueryKeys.groups(), preferences);
   return preferences;
@@ -165,6 +169,7 @@ export function useThreadPreferences() {
           result.activeGroupPosition,
           result.groups.length,
         ),
+        disclosures: normalizeThreadGroupDisclosures(result.disclosures),
       } satisfies SidebarThreadGroupPreferences;
     },
     ...threadQueryPolicies.groups,
@@ -188,7 +193,13 @@ export function useThreadPreferences() {
   });
   const saveGroups = useMutation({
     mutationFn: (next: SidebarThreadGroupPreferences) =>
-      saveThreadGroups(client, rpc, next.groups, next.activeGroupPosition),
+      saveThreadGroups(
+        client,
+        rpc,
+        next.groups,
+        next.activeGroupPosition,
+        next.disclosures ?? {},
+      ),
   });
   const saveOrder = useMutation({
     mutationFn: async (threadIds: string[]) => {

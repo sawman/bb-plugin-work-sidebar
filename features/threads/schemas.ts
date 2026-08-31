@@ -12,6 +12,10 @@ const sidebarThreadGroup = z.object({
   name: z.string().trim().min(1).max(40),
   threadIds: z.array(z.string().startsWith("thr_")).max(2_000),
 });
+const threadGroupDisclosures = z.record(z.string(), z.boolean()).refine(
+  (disclosures) => Object.keys(disclosures).length <= 15,
+  "At most 15 thread-group disclosure settings are supported.",
+);
 
 const archivedThread = z.object({
   id: z.string().startsWith("thr_"),
@@ -70,6 +74,7 @@ export const threadPreferenceSchemas = {
       .object({
         groups: z.array(sidebarThreadGroup).max(12),
         activeGroupPosition: z.number().int().min(0).max(12).optional(),
+        disclosures: threadGroupDisclosures.optional(),
       })
       .strict(),
   },
@@ -78,12 +83,14 @@ export const threadPreferenceSchemas = {
       .object({
         groups: z.array(sidebarThreadGroup).max(12),
         activeGroupPosition: z.number().int().min(0).max(12).optional(),
+        disclosures: threadGroupDisclosures.optional(),
       })
       .strict(),
     output: z
       .object({
         groups: z.array(sidebarThreadGroup).max(12),
         activeGroupPosition: z.number().int().min(0).max(12).optional(),
+        disclosures: threadGroupDisclosures.optional(),
       })
       .strict(),
   },

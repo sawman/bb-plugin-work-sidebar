@@ -17,6 +17,9 @@ type SidebarWorkViewProps = {
   emptyMessage: string;
   recycleBinEntries: readonly RecycleBinEntry[];
   allThreads: readonly PluginSidebarThread[];
+  disclosures: Readonly<Record<string, boolean>>;
+  onDisclosureChange(id: string, open: boolean): void;
+  disclosuresReady: boolean;
 };
 
 export function SidebarWorkView({
@@ -31,6 +34,9 @@ export function SidebarWorkView({
   emptyMessage,
   recycleBinEntries,
   allThreads,
+  disclosures,
+  onDisclosureChange,
+  disclosuresReady,
 }: SidebarWorkViewProps) {
   return (
     <>
@@ -47,6 +53,9 @@ export function SidebarWorkView({
           emptyMessage={emptyMessage}
           recycleBinEntries={recycleBinEntries}
           allThreads={allThreads}
+          disclosures={disclosures}
+          onDisclosureChange={onDisclosureChange}
+          disclosuresReady={disclosuresReady}
         />
       </div>
     </>

@@ -1,4 +1,4 @@
-import { useState, type DragEvent } from "react";
+import type { DragEvent } from "react";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { ArchivedThreads } from "./archived-threads";
 import type { SidebarThreadOrganization } from "./sidebar-organization";
@@ -19,6 +19,7 @@ type SidebarGroupTreeProps = {
   emptyMessage: string;
   recycleBinEntries: readonly RecycleBinEntry[];
   allThreads: readonly PluginSidebarThread[];
+  disclosures: Readonly<Record<string, boolean>>; onDisclosureChange(id: string, open: boolean): void; disclosuresReady: boolean;
 };
 
 type ThreadTreeProps = Pick<SidebarGroupTreeProps, "activeThreadId" | "providersById" | "onNavigate" | "subtextRefreshKey" | "staleWorkingMinutes"> & {
@@ -88,8 +89,8 @@ export function SidebarThreadGroups({
   emptyMessage,
   recycleBinEntries,
   allThreads,
+  disclosures, onDisclosureChange, disclosuresReady,
 }: SidebarGroupTreeProps) {
-  const [activeOpen, setActiveOpen] = useState(true);
   const dropTargetId =
     organization.dropTarget?.kind === "reorder"
       ? organization.dropTarget.threadId
@@ -136,10 +137,8 @@ export function SidebarThreadGroups({
                 className="ws-thread-group ws-active-threads"
                 data-ws-thread-drop-zone="active"
                 data-drop-target={dropTargetId === "active" || undefined}
-                open={searching || activeOpen}
-                onToggle={(event) => {
-                  if (!searching) setActiveOpen(event.currentTarget.open);
-                }}
+                open={searching || disclosures.active !== false}
+                onToggle={(event) => { if (!searching && disclosuresReady) onDisclosureChange("active", event.currentTarget.open); }}
                 onDragOver={(event) => {
                   if (allowActiveDrop(event)) setReorderTarget("active");
                 }}
@@ -174,7 +173,8 @@ export function SidebarThreadGroups({
               className="ws-thread-group"
               data-ws-thread-drop-zone={group.id}
               data-drop-target={dropTargetId === group.id || undefined}
-              open
+              open={searching || disclosures[group.id] !== false}
+              onToggle={(event) => { if (!searching && disclosuresReady) onDisclosureChange(group.id, event.currentTarget.open); }}
               onDragOver={(event) => {
                 if (allowGroupDrop(event, group.id)) setReorderTarget(group.id);
               }}
@@ -217,6 +217,8 @@ export function SidebarThreadGroups({
           providersById={providersById}
           onRestore={(threadId) => organization.restoreFromRecycleBin(threadId)}
           searchQuery={searchQuery}
+          open={disclosures["recycle-bin"] === true}
+          onOpenChange={(open) => { if (disclosuresReady) onDisclosureChange("recycle-bin", open); }}
         />
         <ArchivedThreads
           threads={organization.threads}
@@ -224,6 +226,8 @@ export function SidebarThreadGroups({
           providersById={providersById}
           onNavigate={onNavigate}
           searchQuery={searchQuery}
+          open={disclosures.archive === true}
+          onOpenChange={(open) => { if (disclosuresReady) onDisclosureChange("archive", open); }}
         />
       </section>
       {!searching && organization.filtered.length === 0 && (

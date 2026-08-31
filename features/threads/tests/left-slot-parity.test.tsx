@@ -978,6 +978,50 @@ describe("R18 registered left sidebar parity", () => {
     slot.lifecycle.unmount();
   });
 
+  it("persists group disclosures without treating search expansion as a preference", async () => {
+    let disclosures: Record<string, boolean> = {};
+    const groups = [
+      { id: "group_later", name: "Later", threadIds: ["thr_one"] },
+    ];
+    const saveGroups = vi.fn(
+      ({ groups: next, disclosures: nextDisclosures }: {
+        groups: typeof groups;
+        disclosures?: Record<string, boolean>;
+      }) => {
+        disclosures = nextDisclosures ?? disclosures;
+        return { groups: next, disclosures };
+      },
+    );
+    const getThreadGroups = () => ({ groups, disclosures });
+    const first = await leftSlot({
+      groups,
+      rpc: { getThreadGroups, saveThreadGroups: saveGroups },
+    });
+
+    const later = await first.findByText("Later");
+    fireEvent.click(later);
+    await waitFor(() =>
+      expect(saveGroups).toHaveBeenCalledWith(
+        expect.objectContaining({ disclosures: { group_later: false } }),
+      ),
+    );
+    first.lifecycle.unmount();
+
+    const restored = await leftSlot({
+      groups,
+      rpc: { getThreadGroups, saveThreadGroups: saveGroups },
+    });
+    await waitFor(() =>
+      expect(
+        restored
+          .container
+          .querySelector("details.ws-thread-group:not(.ws-active-threads)")
+          ?.getAttribute("open"),
+      ).toBeNull(),
+    );
+    restored.lifecycle.unmount();
+  });
+
   it("keeps the Later default editable only while empty and exposes a dismissible settings dialog", async () => {
     const saveGroups = vi.fn(({ groups }: { groups: unknown[] }) => ({
       groups,

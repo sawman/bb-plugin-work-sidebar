@@ -37,6 +37,7 @@ type ThreadHierarchyDependencies = Readonly<{
   saveGroups(
     groups: SidebarThreadGroupPreferences["groups"],
     activeGroupPosition: number,
+    disclosures?: SidebarThreadGroupPreferences["disclosures"],
   ): Promise<unknown>;
   publishWork(rootThreadId: string): void;
 }>;
@@ -117,10 +118,13 @@ export function createThreadHierarchyService(
       }));
       await dependencies.updateThread({ threadId, parentThreadId });
       try {
-        await dependencies.saveGroups(
-          groups,
-          preferences.activeGroupPosition,
-        );
+        if (preferences.disclosures)
+          await dependencies.saveGroups(
+            groups,
+            preferences.activeGroupPosition,
+            preferences.disclosures,
+          );
+        else await dependencies.saveGroups(groups, preferences.activeGroupPosition);
       } catch (error) {
         try {
           await dependencies.updateThread({

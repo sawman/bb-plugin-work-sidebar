@@ -47,6 +47,7 @@ import { ThreadListSettings } from "./sidebar-group-settings";
 import { ThreadHierarchyProvider } from "./thread-hierarchy-context";
 import { ThreadHierarchyPickerHost } from "./thread-hierarchy-picker-host";
 import { TextScaleProvider, textScaleStyle } from "../../shared/text-scale";
+import { useGroupDisclosurePreference } from "./use-group-disclosure-preference";
 
 const SIDEBAR_TABS: readonly { id: SidebarView; label: string }[] = (
   ["work", "queue", "prs"] as const
@@ -125,10 +126,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
         : EMPTY_PULL_REQUEST_THREADS,
     [liveThreads, providersById, view],
   );
-  const groupPreferences = threadPreferences.groups.data ?? {
-    groups: [],
-    activeGroupPosition: 0,
-  };
+  const groupPreferences = threadPreferences.groups.data ?? { groups: [], activeGroupPosition: 0, disclosures: {} };
   const threadCount = useMemo(
     () => threadCountPresentation(liveThreads),
     [liveThreads],
@@ -141,7 +139,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
       activeGroupPosition = groupPreferences.activeGroupPosition,
     ) => {
       void threadPreferences.saveGroups
-        .mutateAsync({ groups, activeGroupPosition })
+        .mutateAsync({ groups, activeGroupPosition, disclosures: groupPreferences.disclosures ?? {} })
         .catch((error: unknown) => {
           toast.error(
             error instanceof Error
@@ -166,6 +164,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     },
     [threadPreferences.saveOrder],
   );
+  const saveGroupDisclosure = useGroupDisclosurePreference(groupPreferences, threadPreferences.saveGroups);
   const effectiveThreadSearchQuery = threadSearchQuery || props.searchQuery;
   const organization = useSidebarThreadOrganization({
     active: view === "work",
@@ -335,9 +334,12 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
                   ? `No threads match “${effectiveThreadSearchQuery}”.`
                   : "No active threads."
               }
-              recycleBinEntries={recycleBin.bin.data ?? []}
-              allThreads={threads.filter((thread) => !thread.isArchived)}
-            />
+          recycleBinEntries={recycleBin.bin.data ?? []}
+          allThreads={threads.filter((thread) => !thread.isArchived)}
+          disclosures={groupPreferences.disclosures ?? {}}
+          onDisclosureChange={saveGroupDisclosure}
+          disclosuresReady={threadPreferences.groups.isSuccess}
+        />
             <ThreadHierarchyPickerHost />
           </ThreadHierarchyProvider>
         )}
