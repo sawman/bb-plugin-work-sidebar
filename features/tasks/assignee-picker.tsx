@@ -107,11 +107,9 @@ export function AssigneePicker({
         <span className="ws-assignee-toggle-track">
           <span className="ws-assignee-toggle-state">
             <Icon name="User" aria-hidden />
-            <span>Human</span>
           </span>
           <span className="ws-assignee-toggle-state">
             <Icon name="Bot" aria-hidden />
-            <span>Agent</span>
           </span>
         </span>
       </span>

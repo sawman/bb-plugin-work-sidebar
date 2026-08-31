@@ -16,7 +16,8 @@ describe("AssigneePicker", () => {
       name: "Human assigned to WORK-1",
     });
     expect(control.getAttribute("data-assignee")).toBe("human");
-    expect(control.textContent).toBe("HumanAgent");
+    expect(control.textContent).toBe("");
+    expect(control.querySelectorAll("svg")).toHaveLength(2);
 
     fireEvent.pointerDown(control, { clientX: 2, pointerId: 1 });
     fireEvent.pointerUp(control, { clientX: 30, pointerId: 1 });

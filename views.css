@@ -3713,8 +3713,8 @@ button.ws-provider-health:focus-visible {
   position: relative;
   display: inline-flex;
   align-items: center;
-  width: 3.75rem;
-  height: 1.2rem;
+  width: 2.1rem;
+  height: 1.55rem;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -3747,14 +3747,13 @@ button.ws-provider-health:focus-visible {
   flex: 0 0 50%;
   align-items: center;
   justify-content: center;
-  gap: 0.22rem;
   color: var(--foreground);
   font: var(--ws-text-label);
   line-height: 1;
 }
 .ws-assignee-toggle-state svg {
-  width: 0.62rem;
-  height: 0.62rem;
+  width: 0.9rem;
+  height: 0.9rem;
 }
 .ws-assignee-toggle[data-pending] .ws-assignee-toggle-track {
   opacity: 0.58;
