@@ -833,8 +833,8 @@ describe("registered Work context cards", () => {
       );
       expect(child.queryByText(/work tasks are bound/i)).toBeNull();
       expect(
-        child.getByRole("button", { name: "Open Sibling worker" }),
-      ).toBeTruthy();
+        child.queryByRole("button", { name: "Open Sibling worker" }),
+      ).toBeNull();
       const picker = child.getByRole("combobox", {
         name: "Add a task to Goals",
       });
@@ -1063,6 +1063,10 @@ describe("registered Work context cards", () => {
       goalRow.querySelector(".ws-task-workflow-copy.ws-work-item-reference"),
     ).toBeTruthy();
     expect(goalRow.querySelector(".ws-work-item-queue-action")).toBeNull();
+    expect(slot.getByRole("button", { name: "Move to tasks" })).toBeTruthy();
+    expect(
+      slot.getByRole("button", { name: "Copy current goal BB task WORK-1" }),
+    ).toBeTruthy();
     fireEvent.click(control);
     fireEvent.click(slot.getByRole("option", { name: "In Progress" }));
     await waitFor(() =>
@@ -1289,21 +1293,13 @@ describe("registered Work context cards", () => {
     ).toBe("Needs you2");
     expect(slot.getByText("Run the agent work")).toBeTruthy();
     expect(slot.queryByText("Stale duplicate")).toBeNull();
-    const openOwner = slot.getByRole("button", {
-      name: "Open Validation worker",
-    });
-    fireEvent.click(openOwner);
-    expect(slot.inspection.navigateCalls).toContainEqual({
-      method: "toThread",
-      threadId: "thr_owner",
-    });
-    expect(slot.getAllByRole("img", { name: /codex provider/ }).length).toBeGreaterThan(0);
     expect(slot.getByText("Prepare the follow-up")).toBeTruthy();
     expect(slot.getByText("Archived owner follow-up")).toBeTruthy();
-    expect(slot.getAllByText("You")).toHaveLength(2);
+    expect(slot.queryByText("You")).toBeNull();
     expect(
-      slot.queryByRole("button", { name: "Open Archived worker" }),
+      slot.queryByRole("button", { name: /Open (Validation|Archived) worker/ }),
     ).toBeNull();
+    expect(slot.container.querySelector(".ws-task-workflow-owner")).toBeNull();
     expect(
       slot
         .getByRole("button", { name: "Completed: 7 tasks" })
@@ -1465,6 +1461,11 @@ describe("registered Work context cards", () => {
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
     expect(slot.getByRole("combobox", { name: "Add a task to Goals" })).toBeTruthy();
+    expect(
+      slot.queryByText(
+        "Choose a BB task or linked Linear issue as the current goal.",
+      ),
+    ).toBeNull();
     expect(
       slot
         .getByText("Keep card content calm")

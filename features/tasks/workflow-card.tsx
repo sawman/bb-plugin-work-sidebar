@@ -1,7 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { Icon } from "../../components/ui/icon";
-import { ThreadProviderLogo } from "../../components/threads/thread-provider-logo";
 import { taskStatusPresentation } from "./model";
 import { TaskPriorityIcon } from "./priority";
 import type { SidebarTask } from "../../work-model";
@@ -165,18 +163,14 @@ function WorkflowRow({
   onDetach(taskId: string): void;
   onMakeGoal?(taskId: string): void;
 }) {
-  const navigate = useBbNavigate();
-  const { task, owner, ownerUnavailable } = item;
+  const { task } = item;
   const status = taskStatusPresentation(task.status);
-  const ownerLabel =
-    task.assignee === "human" ? "You" : (owner?.threadTitle ?? "Agent");
   const accessibleStatus =
     task.status === "canceled" ? "Canceled" : status.label;
   return (
     <article
       className="ws-task-workflow-row"
       data-state={task.status}
-      data-owner-unavailable={ownerUnavailable || undefined}
       aria-label={`${task.key}: ${task.title}. ${accessibleStatus}.`}
     >
       <span className="ws-task-workflow-copy">
@@ -184,29 +178,6 @@ function WorkflowRow({
           <TaskPriorityIcon priority={task.priority ?? "none"} />
           <span className="ws-task-workflow-key">{task.key}</span>
           <span className="ws-task-workflow-title">{task.title}</span>
-        </span>
-        <span className="ws-task-workflow-meta">
-          {owner?.threadId && !ownerUnavailable && task.assignee === "agent" ? (
-            <button
-              type="button"
-              className="ws-task-workflow-owner"
-              aria-label={`Open ${ownerLabel}`}
-              onClick={() => navigate.toThread(owner.threadId!)}
-            >
-              <ThreadProviderLogo
-                providerId={owner.providerId ?? "agent"}
-                statusLabel={owner.liveStatus}
-              />
-              {ownerLabel}
-            </button>
-          ) : (
-            <span
-              className="ws-task-workflow-owner"
-              data-state={ownerUnavailable ? "unavailable" : undefined}
-            >
-              {ownerLabel}
-            </span>
-          )}
         </span>
       </span>
       <span

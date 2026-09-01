@@ -38,6 +38,7 @@ type TasksRead = ReturnType<typeof useTasksRead>;
 type TasksMutations = ReturnType<typeof useTasksMutations>;
 type TrackerRead = ReturnType<typeof useTracker>;
 type TaskSummary = {
+  id: string;
   key: string;
   title: string;
   status: TaskStatus;
@@ -88,6 +89,7 @@ export function WorkItemCard({
   );
   const taskById = new Map<string, TaskSummary>(
     (tasks.data?.tasks ?? []).map((task) => [task.id, {
+      id: task.id,
       key: task.key,
       title: task.title,
       status: task.status,
@@ -95,6 +97,7 @@ export function WorkItemCard({
     }]),
   );
   if (outcome) taskById.set(outcome.id, {
+    id: outcome.id,
     key: outcome.key,
     title: outcome.title,
     status: outcome.status,
@@ -156,7 +159,7 @@ export function WorkItemCard({
     <CardState
       title="Work items"
       className={outcome ? "ws-outcome-card" : "ws-outcome-empty"}
-      trailing={<WorkItemSourceSummary queue={queue} />}
+      trailing={<WorkItemHeadingMeta queue={queue} taskById={taskById} />}
       pending={query.isPending}
       error={query.error}
       onRetry={() => void query.refetch()}
@@ -263,7 +266,6 @@ export function WorkItemCard({
       ) : null}
       {!outcome ? (
         <>
-          <p className="ws-card-note">No current Goal yet.</p>
           {legacy?.state === "adoptable" ? (
             <div className="ws-outcome-form">
               <p className="ws-card-note" role="status">{legacy.message ?? "One legacy outcome can be adopted."}</p>
@@ -366,16 +368,27 @@ export function WorkItemCard({
   );
 }
 
-function WorkItemSourceSummary({ queue }: { queue: WorkQueueValue }) {
-  const references = [queue.current, ...queue.backlog].filter((reference): reference is WorkItemReference => reference !== null);
-  const sources = [...new Set(references.map((reference) => reference.source))];
-  if (!sources.length) return null;
+function WorkItemHeadingMeta({
+  queue,
+  taskById,
+}: {
+  queue: WorkQueueValue;
+  taskById: ReadonlyMap<string, TaskSummary>;
+}) {
+  const current = queue.current;
+  if (!current) return null;
+  const label = current.source === "bb_task"
+    ? taskById.get(current.id)?.key ?? current.id
+    : current.id;
+  const source = current.source === "bb_task" ? "BB task" : "Linear issue";
   return (
-    <span className="ws-work-item-sources" role="group" aria-label="Connected work item sources">
-      {sources.map((source) => (
-        <span key={source}>{source === "bb_task" ? "BB" : "Linear"}</span>
-      ))}
-    </span>
+    <CopyBadge
+      value={`${source} ${label}`}
+      label="current goal"
+      className="ws-work-header-badge ws-work-item-current-goal-badge"
+    >
+      {label}
+    </CopyBadge>
   );
 }
 
@@ -468,21 +481,16 @@ function WorkQueue({
               reference={queue.current}
               label={labelForReference(queue.current)}
               task={taskById.get(queue.current.id)}
-              showStatus={queue.current.source === "bb_task"}
-              disabled={pending}
-              onStatus={onTaskStatus}
             />
             <WorkItemQueueActions
               disabled={pending}
+              task={taskById.get(queue.current.id)}
+              onStatus={onTaskStatus}
               onDefer={onDemote}
-              onStart={() => onMoveToExecution(queue.current!)}
+              onMoveToTasks={() => onMoveToExecution(queue.current!)}
             />
           </div>
-        ) : (
-          <p className="ws-card-note">
-            Choose a BB task or linked Linear issue as the current goal.
-          </p>
-        )}
+        ) : null}
         {queue.backlog.length ? (
           <div className="ws-work-item-backlog">
             <h3 className="ws-card-section-label">Backlog</h3>
@@ -501,14 +509,13 @@ function WorkQueue({
                     reference={reference}
                     label={labelForReference(reference)}
                     task={taskById.get(reference.id)}
-                    showStatus={reference.source === "bb_task"}
-                    disabled={pending}
-                    onStatus={onTaskStatus}
                   />
                   <WorkItemQueueActions
                     disabled={pending}
+                    task={taskById.get(reference.id)}
+                    onStatus={onTaskStatus}
                     onMakeCurrent={() => onPromote(reference)}
-                    onStart={() => onMoveToExecution(reference)}
+                    onMoveToTasks={() => onMoveToExecution(reference)}
                   />
                 </div>
               ))}
@@ -601,16 +608,10 @@ function QueueReference({
   reference,
   label,
   task,
-  showStatus,
-  disabled,
-  onStatus,
 }: {
   reference: WorkItemReference;
   label: string;
   task: TaskSummary | undefined;
-  showStatus: boolean;
-  disabled: boolean;
-  onStatus(taskId: string, status: TaskStatus): void;
 }) {
   return (
     <span className="ws-task-workflow-copy ws-work-item-reference">
@@ -639,33 +640,35 @@ function QueueReference({
           {task?.title ?? label}
         </span>
       </span>
-      {task && showStatus ? (
-        <span className="ws-work-item-reference-controls">
-          <TaskStatusControl
-            taskKey={task.key}
-            status={task.status}
-            busy={disabled}
-            onChange={(status) => onStatus(reference.id, status)}
-          />
-        </span>
-      ) : null}
     </span>
   );
 }
 
 function WorkItemQueueActions({
   disabled,
+  task,
+  onStatus,
   onDefer,
   onMakeCurrent,
-  onStart,
+  onMoveToTasks,
 }: {
   disabled: boolean;
+  task?: TaskSummary;
+  onStatus(taskId: string, status: TaskStatus): void;
   onDefer?: () => void;
   onMakeCurrent?: () => void;
-  onStart: () => void;
+  onMoveToTasks: () => void;
 }) {
   return (
     <span className="ws-task-workflow-actions" role="group" aria-label="Work item actions">
+      {task ? (
+        <TaskStatusControl
+          taskKey={task.key}
+          status={task.status}
+          busy={disabled}
+          onChange={(status) => onStatus(task.id, status)}
+        />
+      ) : null}
       {onDefer ? (
         <button type="button" className="ws-task-workflow-action" disabled={disabled} aria-label="Defer" title="Defer current goal" onClick={onDefer}>
           <Icon className="ws-task-workflow-icon" name="Clock" aria-hidden />
@@ -676,8 +679,8 @@ function WorkItemQueueActions({
           <Icon className="ws-task-workflow-icon" name="ArrowRight" aria-hidden />
         </button>
       ) : null}
-      <button type="button" className="ws-task-workflow-action" disabled={disabled} aria-label="Start task" title="Start as task" onClick={onStart}>
-        <Icon className="ws-task-workflow-icon" name="CircleHalf" aria-hidden />
+      <button type="button" className="ws-task-workflow-action" disabled={disabled} aria-label="Move to tasks" title="Move to tasks" onClick={onMoveToTasks}>
+        <Icon className="ws-task-workflow-icon" name="ArrowDown" aria-hidden />
       </button>
     </span>
   );

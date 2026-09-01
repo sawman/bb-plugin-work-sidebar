@@ -708,7 +708,7 @@
 .ws-task-priority-slot {
   display: grid;
   width: 1rem;
-  min-height: 0.8rem;
+  min-height: 0.84rem;
   place-items: center;
 }
 .ws-task-row-controls {
@@ -1947,7 +1947,7 @@ button.ws-change-file-row:hover {
   align-items: center;
   justify-content: space-between;
   /* Keep empty headings aligned without inflating every card to an icon hit target. */
-  min-height: 0.8rem;
+  min-height: 0.84rem;
   gap: 0.4rem;
   font: var(--ws-text-label);
   line-height: 1;
@@ -1963,7 +1963,7 @@ button.ws-change-file-row:hover {
   align-items: center;
 }
 .ws-card-heading-info {
-  min-height: 0.8rem;
+  min-height: 0.84rem;
   min-width: 0;
   justify-content: flex-end;
   color: var(--muted-foreground);
@@ -3647,33 +3647,6 @@ button.ws-provider-health:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ws-task-workflow-meta {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.18rem;
-  color: var(--muted-foreground);
-  font: var(--ws-text-metadata);
-  line-height: inherit;
-  white-space: nowrap;
-}
-.ws-task-workflow-owner {
-  display: inline-flex;
-  width: fit-content;
-  align-items: center;
-  gap: 0.2rem;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--muted-foreground);
-  font: var(--ws-text-metadata);
-  line-height: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.ws-task-workflow-owner[data-state="unavailable"] {
-  cursor: default;
-}
 .ws-task-workflow-actions {
   display: inline-flex;
   flex: 0 0 auto;
@@ -3812,9 +3785,7 @@ button.ws-provider-health:focus-visible {
 .ws-work-item-reference {
   min-width: 0;
 }
-.ws-work-item-reference-meta,
-.ws-work-item-reference-controls,
-.ws-work-item-sources {
+.ws-work-item-reference-meta {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
@@ -3823,26 +3794,11 @@ button.ws-provider-health:focus-visible {
 .ws-work-item-reference-meta {
   flex: 0 0 auto;
 }
-.ws-work-item-reference-controls {
-  flex: 0 0 auto;
-}
 .ws-work-item-goals-heading > .ws-task-workflow-disclosure {
   cursor: default;
 }
-.ws-work-item-sources {
-  justify-content: flex-end;
-  color: var(--muted-foreground);
-  font: var(--ws-text-metadata);
-  line-height: inherit;
-}
-.ws-work-item-sources > span {
-  display: inline-flex;
-  box-sizing: border-box;
-  align-items: center;
-  /* Card headings share Status's compact 0.8rem metadata rhythm. */
-  min-height: 0.8rem;
-  padding: 0 0.28rem;
-  border: 1px solid var(--border);
+.ws-work-item-current-goal-badge {
+  min-height: 0.84rem;
 }
 .ws-work-item-queue-add {
   display: grid;

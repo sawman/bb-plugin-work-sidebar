@@ -415,7 +415,7 @@ describe("registered tracker card", () => {
     const makeCurrent = await slot.findAllByRole("button", { name: "Make current" });
     expect(makeCurrent[0]?.closest(".ws-task-workflow-actions")).toBeTruthy();
     expect(
-      makeCurrent[0]?.parentElement?.querySelector('[aria-label="Start task"]'),
+      makeCurrent[0]?.parentElement?.querySelector('[aria-label="Move to tasks"]'),
     ).toBeTruthy();
     fireEvent.click(makeCurrent[0]!);
     await waitFor(() => expect(saveWorkItemQueue).toHaveBeenCalledWith({

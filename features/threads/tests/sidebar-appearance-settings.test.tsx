@@ -7,7 +7,7 @@ import {
 } from "@testing-library/react";
 import { configureAxe } from "vitest-axe";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getPluginQueryClient } from "../../../query-runtime";
 import {
   DEFAULT_TEXT_SCALE,
@@ -36,10 +36,15 @@ const sidebarAppearanceQueryKey = [
 ] as const;
 
 afterEach(() => {
+  vi.useRealTimers();
   cleanup();
   getPluginQueryClient().clear();
   toast.success.mockReset();
   toast.error.mockReset();
+});
+
+beforeEach(() => {
+  vi.useRealTimers();
 });
 
 describe("sidebar appearance settings", () => {
