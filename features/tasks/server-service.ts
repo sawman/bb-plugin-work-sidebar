@@ -58,7 +58,6 @@ type TaskHandlers = Pick<
   | "createExecutionTask"
   | "bindExecutionOwner"
   | "adoptLegacyOutcome"
-  | "updateWorkTask"
   | "updateTaskStatus"
   | "updateTaskAssignee"
   | "createSidebarTask"
@@ -146,7 +145,6 @@ export function createTasksService(
       publishWorkBindingReady(bb.realtime, root.id);
       return { task: await taskWithProject(task), binding: bindings.summarize(binding) };
     },
-    async updateWorkTask({ taskId, status }) { return adapter.update(taskId, status); },
     async updateTaskStatus({ taskId, status }) { return adapter.update(taskId, status); },
     async updateTaskAssignee({ taskId, assignee }) { return adapter.writeAssignee(taskId, assignee); },
     async createSidebarTask({ projectId, title, assignee }) { return adapter.createSidebar(projectId, title, assignee); },

@@ -7,7 +7,6 @@ import { BackgroundJobsCard } from "./background-jobs-view";
 import { GoalCard } from "./goal-card";
 import { PlanCard } from "./plan-card";
 import { StatusCard } from "./status-card";
-import { TasksCard } from "./tasks-card";
 import { WorkItemCard } from "./work-item-card";
 
 export function WorkContextCards({
@@ -24,7 +23,6 @@ export function WorkContextCards({
     <section className="ws-work-context-cards" aria-label="Work context">
       <StatusCard threadId={threadId} />
       <WorkItemCard threadId={threadId} tasks={tasks} taskMutations={taskMutations} tracker={tracker} />
-      <TasksCard threadId={threadId} tasks={tasks} mutations={taskMutations} />
       <GoalCard threadId={threadId} />
       <PlanCard threadId={threadId} />
       <BackgroundJobsCard threadId={threadId} />

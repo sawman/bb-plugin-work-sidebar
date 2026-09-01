@@ -194,9 +194,9 @@ queue**. A work-item reference is a small, plugin-owned classification record
 which points at exactly one source record; it never copies the source title,
 status, assignee, or description.
 
-- A root has zero or one **Current goal**. It can reference either a BB Task
-  or a Linear issue.
-- It may have an ordered **Backlog** of additional BB Task and Linear
+- The **Goals** section has zero or one current goal. It can reference either
+  a BB Task or a Linear issue.
+- Goals may have an ordered **Backlog** of additional BB Task and Linear
   references.
 - Everything else belongs to **Execution tasks**. Those retain the existing
   BB outcome/execution binding rules; a Linear record cannot silently become
@@ -225,10 +225,13 @@ storage only until the next successful queue mutation, which compacts them.
 Every queue mutation publishes the existing ordered Work then Tasks realtime
 signals for the root and all affected owner threads.
 
-The card renders Current goal first, then Backlog, then its add/search actions.
-The Tasks card renders execution and ordinary linked tasks only; it never
-duplicates a Current goal. This keeps one workflow without concealing that
-BB Tasks and Linear have different lifecycle APIs and permissions.
+The combined Work items card renders Goals first, then one **Add a task**
+search that can select either BB Tasks or Linear issues and explicitly choose
+Goals or Queue. Its Queue workflow renders execution and ordinary linked BB
+Tasks only; it never duplicates a Goal. A Queue BB Task can be promoted into
+Goals, and a Goal can be started as an execution task. This keeps one workflow
+without concealing that BB Tasks and Linear have different lifecycle APIs and
+permissions.
 
 ### Information architecture
 

@@ -4,7 +4,6 @@ import {
   useQueryClient,
   type QueryClient,
 } from "@tanstack/react-query";
-import type { TaskStatus } from "../tasks/model";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
 import type { rpcSchemas } from "../../contracts.schemas";
@@ -137,17 +136,6 @@ export function useWorkOutcomeMutation(threadId: string) {
       queryKey: queryKeys.work.outcome(threadId),
     });
   return {
-    update: useMutation({
-      mutationKey: [...queryKeys.work.outcome(threadId), "update"],
-      mutationFn: ({
-        taskId,
-        status,
-      }: {
-        taskId: string;
-        status: TaskStatus;
-      }) => rpc.call("updateWorkTask", { taskId, status }),
-      onSuccess: invalidate,
-    }),
     create: useMutation({
       mutationKey: [...queryKeys.work.outcome(threadId), "create"],
       mutationFn: ({ title, priority }: {

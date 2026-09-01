@@ -81,7 +81,6 @@ export default function plugin(
     createExecutionTask: tasks.createExecutionTask,
     bindExecutionOwner: tasks.bindExecutionOwner,
     adoptLegacyOutcome: tasks.adoptLegacyOutcome,
-    updateWorkTask: tasks.updateWorkTask,
     updateTaskStatus: tasks.updateTaskStatus,
     updateTaskAssignee: tasks.updateTaskAssignee,
     createSidebarTask: tasks.createSidebarTask,

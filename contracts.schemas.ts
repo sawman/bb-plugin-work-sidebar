@@ -166,10 +166,6 @@ export const rpcSchemas = {
     input: z.object({ rootThreadId: z.string(), taskId: z.string() }).strict(),
     output: z.object({ task: taskSummary, binding: workBindingSchema }),
   },
-  updateWorkTask: {
-    input: z.object({ taskId: z.string(), status: taskStatus }).strict(),
-    output: z.object({ task: taskSummary }),
-  },
   updateTaskStatus: {
     input: z.object({ taskId: z.string(), status: taskStatus }).strict(),
     output: z.object({ task: taskSummary }),

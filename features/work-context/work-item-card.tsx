@@ -6,21 +6,20 @@ import { Icon } from "../../components/ui/icon";
 import { Input } from "../../components/ui/input";
 import { SearchCombobox } from "../../components/ui/combobox";
 import { AssigneePicker } from "../tasks/assignee-picker";
-import { taskStatusPresentation, type TaskStatus } from "../tasks/model";
+import type { TaskStatus } from "../tasks/model";
 import { TaskPriorityIcon } from "../tasks/priority";
+import { TaskStatusControl } from "../tasks/workflow-card";
+import { TaskWorkflowContent } from "./tasks-card";
 import type { useTasksMutations } from "../tasks/mutations";
 import type { useTasksRead } from "../tasks/queries";
 import type { rpcContract } from "../../contracts";
-import {
-  nextOutcomeStatus,
-  previousOutcomeStatus,
-} from "./model";
 import {
   useMoveWorkItemToExecution,
   useWorkItemQueue,
   useWorkItemQueueMutation,
   useWorkOutcome,
   useWorkOutcomeMutation,
+  useWorkStatus,
 } from "./queries";
 import { CardState } from "./card-state";
 import { projectWorkItem, promoteWorkItem, demoteCurrentWorkItem, type WorkItemReference } from "./work-item-model";
@@ -63,6 +62,7 @@ export function WorkItemCard({
   tracker: TrackerRead;
 }) {
   const query = useWorkOutcome(threadId);
+  const workStatus = useWorkStatus(threadId);
   const mutation = useWorkOutcomeMutation(threadId);
   const queueQuery = useWorkItemQueue(threadId);
   const queueMutation = useWorkItemQueueMutation(threadId);
@@ -83,6 +83,11 @@ export function WorkItemCard({
   // durable Outcome/Linear primary visible through the one-time projection;
   // the first queue mutation writes the explicit representation.
   const queue = queueQuery.data?.configured ? persistedQueue! : workItem.queue;
+  const goalTaskIds = new Set(
+    [queue.current, ...queue.backlog].flatMap((reference) =>
+      reference?.source === "bb_task" ? [reference.id] : [],
+    ),
+  );
   const sidebarOutcome = tasks.data?.tasks.find((task) => task.id === outcome?.id);
   const taskById = new Map<string, TaskSummary>(
     (tasks.data?.tasks ?? []).map((task) => [task.id, {
@@ -119,10 +124,7 @@ export function WorkItemCard({
       description: reference.source === "linear" ? `Created from Linear ${reference.id}.` : `Created from BB Task ${reference.id}.`,
     };
   };
-  const currentOutcome = Boolean(outcome && queue.current?.source === "bb_task" && queue.current.id === outcome.id);
   const legacy = query.data?.legacy;
-  const previous = outcome ? previousOutcomeStatus(outcome.status) : null;
-  const next = outcome ? nextOutcomeStatus(outcome.status) : null;
   const [title, setTitle] = useState("");
   const [adoptionNotice, setAdoptionNotice] = useState<{ message: string; tone: "error" | "success" } | null>(null);
   const report = async (operation: Promise<unknown>, success: string, failure: string) => {
@@ -157,8 +159,8 @@ export function WorkItemCard({
   };
   return (
     <CardState
-      title="Work item"
-      className={currentOutcome ? "ws-outcome-card" : "ws-outcome-empty"}
+      title="Work items"
+      className={outcome ? "ws-outcome-card" : "ws-outcome-empty"}
       trailing={<WorkItemSourceSummary queue={queue} />}
       pending={query.isPending}
       error={query.error}
@@ -173,7 +175,22 @@ export function WorkItemCard({
         pending={queueQuery.isPending || queueMutation.isPending || executionMutation.isPending || trackerBusy}
         onPromote={(reference) => void saveQueue(promoteWorkItem(queue, reference))}
         onDemote={() => void saveQueue(demoteCurrentWorkItem(queue))}
-        onAddToBacklog={(reference) => void saveQueue({ ...queue, backlog: [...queue.backlog, reference] })}
+        onAddGoal={(reference) => {
+          const nextQueue = queue.current
+            ? { ...queue, backlog: [...queue.backlog, reference] }
+            : { ...queue, current: reference };
+          if (reference.source === "bb_task") {
+            void saveQueue(nextQueue);
+            return;
+          }
+          void report(
+            trackerMutations.link
+              .mutateAsync(reference.id)
+              .then(() => queueMutation.mutateAsync(nextQueue)),
+            "Linear issue added to Goals",
+            "Could not add Linear issue to Goals",
+          );
+        }}
         onMoveToExecution={(reference) => {
           void report(
             executionMutation.mutateAsync({
@@ -199,6 +216,36 @@ export function WorkItemCard({
             "Could not update task assignee",
           )
         }
+        onAddToQueue={(reference) => {
+          if (reference.source === "bb_task") {
+            void report(
+              taskMutations.attachment.mutateAsync({
+                taskId: reference.id,
+                threadId,
+                attached: true,
+              }),
+              "Task added to Queue",
+              "Could not add task to Queue",
+            );
+            return;
+          }
+          const item = linearByKey.get(reference.id.toUpperCase())?.item;
+          const nextQueue = queue.current
+            ? { ...queue, backlog: [...queue.backlog, reference] }
+            : { ...queue, current: reference };
+          void report(
+            trackerMutations.link
+              .mutateAsync(reference.id)
+              .then(() => queueMutation.mutateAsync(nextQueue))
+              .then(() => executionMutation.mutateAsync({
+                reference,
+                title: item?.title ?? reference.id,
+                description: `Created from Linear ${reference.id}.`,
+              })),
+            "Linear issue added to Queue",
+            "Could not add Linear issue to Queue",
+          );
+        }}
         linearSearch={tracker.data?.visible ? {
           query: trackerQuery,
           options: (trackerQuery.trim() ? trackerSearch.data?.items ?? [] : tracker.data.suggestions)
@@ -208,21 +255,6 @@ export function WorkItemCard({
           error: trackerSearch.error,
           onRetry: () => void trackerSearch.refetch(),
           onQueryChange: setTrackerQuery,
-          onAdd: (key) => {
-            setTrackerQuery("");
-            void report(
-              trackerMutations.link
-                .mutateAsync(key)
-                .then(() =>
-                  saveQueue({
-                    ...queue,
-                    backlog: [...queue.backlog, { source: "linear", id: key }],
-                  }),
-                ),
-              "Linear issue added to backlog",
-              "Could not add Linear issue",
-            );
-          },
         } : null}
         linearError={tracker.error instanceof Error ? tracker.error : null}
         onRetryLinear={() => void tracker.refetch()}
@@ -242,27 +274,9 @@ export function WorkItemCard({
           }
         />
       ) : null}
-      {currentOutcome && outcome ? (
+      {!outcome ? (
         <>
-          {outcome.dueDate ? <p className="ws-card-note">Due {outcome.dueDate}</p> : null}
-          <OutcomeStatusControls
-            title={outcome.title}
-            status={outcome.status}
-            previous={previous}
-            next={next}
-            updating={mutation.update.isPending}
-            onMove={(status) =>
-              void report(
-                mutation.update.mutateAsync({ taskId: outcome.id, status }),
-                "Outcome updated",
-                "Could not update outcome",
-              )
-            }
-          />
-        </>
-      ) : !outcome ? (
-        <>
-          <p className="ws-card-note">No current outcome.</p>
+          <p className="ws-card-note">No current Goal yet.</p>
           {legacy?.state === "adoptable" ? (
             <div className="ws-outcome-form">
               <p className="ws-card-note" role="status">{legacy.message ?? "One legacy outcome can be adopted."}</p>
@@ -279,8 +293,8 @@ export function WorkItemCard({
           ) : null}
           <div className="ws-outcome-form">
             <Input
-              aria-label="Outcome-oriented task title"
-              placeholder="Outcome-oriented task title"
+              aria-label="New BB task title"
+              placeholder="New BB task title"
               value={title}
               disabled={!query.data?.tasksAvailable || mutation.create.isPending || mutation.adopt.isPending}
               onChange={(event) => setTitle(event.target.value)}
@@ -289,7 +303,7 @@ export function WorkItemCard({
               type="button"
               className="ws-outcome-create-button"
               disabled={!title.trim() || !query.data?.tasksAvailable || mutation.create.isPending || mutation.adopt.isPending}
-              aria-label="Create and attach outcome task"
+              aria-label="Create BB task as Goal"
               onClick={() =>
                 void report(
                   mutation.create
@@ -301,12 +315,12 @@ export function WorkItemCard({
                       }),
                     )
                     .then(() => setTitle("")),
-                  "Outcome created and attached",
-                  "Could not create outcome",
+                  "BB task created as Goal",
+                  "Could not create BB task",
                 )
               }
             >
-              {mutation.create.isPending ? "Creating…" : "Create"}
+              {mutation.create.isPending ? "Creating…" : "Create BB task"}
             </button>
           </div>
           {workItem.createFromLinear ? (
@@ -326,12 +340,12 @@ export function WorkItemCard({
                         backlog: queue.backlog,
                       }),
                     ),
-                  "Outcome created from Linear",
-                  "Could not create outcome from Linear",
+                  "BB task created from Linear",
+                  "Could not create BB task from Linear",
                 )
               }
             >
-              {mutation.create.isPending ? "Creating outcome…" : `Create outcome from ${workItem.createFromLinear.key}`}
+              {mutation.create.isPending ? "Creating BB task…" : `Create BB task from ${workItem.createFromLinear.key}`}
             </button>
           ) : null}
         </>
@@ -341,6 +355,26 @@ export function WorkItemCard({
           {adoptionNotice.message}
         </p>
       ) : null}
+      {tasks.error ? (
+        <div className="ws-callout" role="alert">
+          {tasks.error.message}
+          <button type="button" onClick={() => void tasks.refetch()}>Try again</button>
+        </div>
+      ) : (
+        <TaskWorkflowContent
+          threadId={threadId}
+          tasks={tasks}
+          mutations={taskMutations}
+          outcome={query}
+          status={workStatus}
+          goalTaskIds={goalTaskIds}
+          onMakeGoal={(taskId) =>
+            void saveQueue(
+              promoteWorkItem(queue, { source: "bb_task", id: taskId }),
+            )
+          }
+        />
+      )}
     </CardState>
   );
 }
@@ -365,7 +399,6 @@ type LinearSearch = {
   error: Error | null;
   onQueryChange(value: string): void;
   onRetry(): void;
-  onAdd(key: string): void;
 };
 
 function WorkQueue({
@@ -380,7 +413,8 @@ function WorkQueue({
   pending,
   onPromote,
   onDemote,
-  onAddToBacklog,
+  onAddGoal,
+  onAddToQueue,
   onMoveToExecution,
   onTaskStatus,
   updatingAssignee,
@@ -397,31 +431,54 @@ function WorkQueue({
   pending: boolean;
   onPromote(reference: WorkItemReference): void;
   onDemote(): void;
-  onAddToBacklog(reference: WorkItemReference): void;
+  onAddGoal(reference: WorkItemReference): void;
+  onAddToQueue(reference: WorkItemReference): void;
   onMoveToExecution(reference: WorkItemReference): void;
   onTaskStatus(taskId: string, status: TaskStatus): void;
   updatingAssignee: boolean;
   onUpdateAssignee(taskId: string, assignee: "agent" | "human"): void;
 }) {
-  const [adding, setAdding] = useState<"bb" | "linear" | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [destination, setDestination] = useState<"goal" | "queue">("goal");
   const [selection, setSelection] = useState("");
+  const [search, setSearch] = useState("");
   const referenced = (reference: WorkItemReference) =>
     (queue.current?.source === reference.source && queue.current.id === reference.id) ||
     queue.backlog.some((item) => item.source === reference.source && item.id === reference.id);
-  const options = bbTaskOptions
+  const bbOptions = bbTaskOptions
     .filter((task) => !referenced({ source: "bb_task", id: task.id }))
-    .map((task) => ({ value: task.id, label: task.label }));
-  const close = () => { setSelection(""); setAdding(null); };
+    .map((task) => ({ value: `bb_task:${task.id}`, label: task.label, detail: "BB task" }));
+  const linearOptions = (linearSearch?.options ?? [])
+    .filter((item) => !referenced({ source: "linear", id: item.value }))
+    .map((item) => ({ value: `linear:${item.value}`, label: item.label, detail: item.detail }));
+  const options = [...bbOptions, ...linearOptions];
+  const close = () => {
+    setSelection("");
+    setSearch("");
+    setDestination("goal");
+    linearSearch?.onQueryChange("");
+    setAdding(false);
+  };
+  const selectReference = (value: string) => {
+    const separator = value.indexOf(":");
+    if (separator <= 0) return;
+    const source = value.slice(0, separator) as WorkItemReference["source"];
+    const id = value.slice(separator + 1);
+    const reference = { source, id } as WorkItemReference;
+    if (destination === "goal") onAddGoal(reference);
+    else onAddToQueue(reference);
+    close();
+  };
   return (
     <section className="ws-work-item-queue" aria-label="Work queue">
-      <div className="ws-work-item-queue-heading"><h3 className="ws-card-section-label">Current goal</h3></div>
+      <div className="ws-work-item-queue-heading"><h3 className="ws-card-section-label">Goals</h3></div>
       {queue.current ? (
         <div className="ws-work-item-queue-current">
           <QueueReference
             reference={queue.current}
             label={labelForReference(queue.current)}
             task={taskById.get(queue.current.id)}
-            showStatus={queue.current.source === "bb_task" && queue.current.id !== outcomeTaskId}
+            showStatus={queue.current.source === "bb_task"}
             disabled={pending}
             onStatus={onTaskStatus}
             updatingAssignee={updatingAssignee}
@@ -457,66 +514,45 @@ function WorkQueue({
         </div>
       ) : null}
       <div className="ws-work-item-queue-add">
-        <button type="button" className="ws-text-button" disabled={pending} onClick={() => setAdding("bb")}>Add BB task</button>
-        {linearSearch ? (
-          <button type="button" className="ws-text-button" disabled={pending} onClick={() => setAdding("linear")}>
-            Add Linear issue
-          </button>
-        ) : null}
-        {adding === "bb" ? (
+        {!adding ? (
+          <button type="button" className="ws-text-button" disabled={pending} onClick={() => setAdding(true)}>Add a task</button>
+        ) : (
+          <>
+            <label className="ws-work-item-destination">
+              <span>Add to</span>
+              <select
+                aria-label="Task destination"
+                disabled={pending}
+                value={destination}
+                onChange={(event) => setDestination(event.target.value as "goal" | "queue")}
+              >
+                <option value="goal">Goals</option>
+                <option value="queue">Queue</option>
+              </select>
+            </label>
           <SearchCombobox
-            ariaLabel="Add BB task to work backlog"
-            emptyMessage="No available BB tasks."
-            emptyOption
-            listboxLabel="Available BB tasks"
+            ariaLabel={`Add a task to ${destination === "goal" ? "Goals" : "Queue"}`}
+            busy={linearSearch?.searching ?? false}
+            error={linearSearch?.error ?? null}
+            emptyMessage="No matching BB or Linear tasks."
+            listboxLabel="Available BB and Linear tasks"
             onDismiss={close}
             onOpenChange={(open) => { if (!open) close(); }}
-            onSelectionChange={(values) => {
-              const id = values[0];
-              if (id) {
-                onAddToBacklog({ source: "bb_task", id });
-                close();
-              }
+            onQueryChange={(value) => {
+              setSearch(value);
+              linearSearch?.onQueryChange(value);
             }}
+            onRetry={() => void linearSearch?.onRetry()}
+            onSelectionChange={(values) => { const value = values[0]; if (value) selectReference(value); }}
             open
             options={options}
-            placeholder="Search BB tasks…"
+            placeholder="Search BB or Linear tasks…"
             portal
+            query={search}
             selectedValues={selection ? [selection] : []}
           />
-        ) : null}
-        {adding === "linear" && linearSearch ? (
-          <SearchCombobox
-            ariaLabel="Add Linear issue to work backlog"
-            busy={linearSearch.searching}
-            error={linearSearch.error}
-            emptyMessage="No matching Linear issues."
-            emptyOption
-            listboxLabel="Available Linear issues"
-            onDismiss={() => { close(); linearSearch.onQueryChange(""); }}
-            onOpenChange={(open) => {
-              if (!open) {
-                close();
-                linearSearch.onQueryChange("");
-              }
-            }}
-            onQueryChange={linearSearch.onQueryChange}
-            onRetry={linearSearch.onRetry}
-            onSelectionChange={(values) => {
-              const key = values[0];
-              if (key) {
-                linearSearch.onAdd(key);
-                close();
-              }
-            }}
-            open
-            options={linearSearch.options}
-            placeholder="Search Linear issues…"
-            portal
-            query={linearSearch.query}
-            selectedValues={selection ? [selection] : []}
-          />
-        ) : null}
+          </>
+        )}
       </div>
       {linearError ? (
         <div className="ws-callout" role="alert">
@@ -588,16 +624,12 @@ function QueueReference({
           />
         ) : null}
         {showStatus ? (
-          <select
-            aria-label={`${task.key} status`}
-            disabled={disabled}
-            value={task.status}
-            onChange={(event) => onStatus(reference.id, event.target.value as TaskStatus)}
-          >
-            {(["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const).map((status) => (
-              <option key={status} value={status}>{taskStatusPresentation(status).label}</option>
-            ))}
-          </select>
+          <TaskStatusControl
+            taskKey={task.key}
+            status={task.status}
+            busy={disabled}
+            onChange={(status) => onStatus(reference.id, status)}
+          />
         ) : null}
       </span> : null}
     </span>
@@ -631,62 +663,5 @@ function WorkItemQueueActions({
         <Icon name="CircleHalf" aria-hidden />
       </button>
     </span>
-  );
-}
-
-function OutcomeStatusControls({
-  title,
-  status,
-  previous,
-  next,
-  updating,
-  onMove,
-}: {
-  title: string;
-  status: TaskStatus;
-  previous: TaskStatus | null;
-  next: TaskStatus | null;
-  updating: boolean;
-  onMove(status: TaskStatus): void;
-}) {
-  const current = taskStatusPresentation(status);
-  const previousLabel = previous
-    ? `Move ${title} back to ${taskStatusPresentation(previous).label}`
-    : `No previous outcome status for ${title}`;
-  const nextLabel = next
-    ? `Move ${title} forward to ${taskStatusPresentation(next).label}`
-    : `No next outcome status for ${title}`;
-  return (
-    <div className="ws-outcome-status-controls" role="group" aria-label={`Outcome status: ${current.label}`}>
-      <button
-        type="button"
-        className="ws-outcome-status-step"
-        disabled={!previous || updating}
-        aria-label={previousLabel}
-        title={previousLabel}
-        onClick={() => { if (previous) onMove(previous); }}
-      >
-        <Icon name="ArrowLeft" aria-hidden />
-      </button>
-      <span
-        className={`ws-outcome-status-current ws-outcome-status-${status}${updating ? " ws-outcome-status-updating" : ""}`}
-        role="img"
-        aria-label={`Current outcome status: ${current.label}`}
-        title={current.label}
-      >
-        <Icon name={current.icon} aria-hidden />
-        <span aria-hidden>{current.label}</span>
-      </span>
-      <button
-        type="button"
-        className="ws-outcome-status-step"
-        disabled={!next || updating}
-        aria-label={nextLabel}
-        title={nextLabel}
-        onClick={() => { if (next) onMove(next); }}
-      >
-        <Icon name="ArrowRight" aria-hidden />
-      </button>
-    </div>
   );
 }

@@ -176,8 +176,8 @@ async function expectNoAriaViolations(container: HTMLElement) {
   expect(results.incomplete).toEqual([]);
 }
 async function openLinearSearch(slot: ReturnType<typeof renderSlot>) {
-  fireEvent.click(await slot.findByRole("button", { name: "Add Linear issue" }));
-  return slot.findByLabelText("Add Linear issue to work backlog");
+  fireEvent.click(await slot.findByRole("button", { name: "Add a task" }));
+  return slot.findByLabelText("Add a task to Goals");
 }
 afterEach(() => {
   cleanup();
@@ -199,7 +199,7 @@ describe("registered tracker card", () => {
       },
     );
 
-    expect(await slot.findByRole("button", { name: "Add Linear issue" })).toBeTruthy();
+    expect(await slot.findByRole("button", { name: "Add a task" })).toBeTruthy();
     const workQueue = slot.getByRole("region", { name: "Work queue" });
     expect(within(workQueue).getByText(/Suggested/)).toBeTruthy();
     expect(within(workQueue).getByText(/Second linked issue/)).toBeTruthy();
@@ -216,7 +216,7 @@ describe("registered tracker card", () => {
       { rpc: fixture() },
     );
     fireEvent.focus(await openLinearSearch(slot));
-    const option = await slot.findByRole("option");
+    const option = await slot.findByRole("option", { name: /LIN-1/ });
     expect(option.textContent).toContain("LIN-1");
     expect(option.getAttribute("aria-selected")).toBe("false");
     await expectNoAriaViolations(slot.container);
@@ -231,9 +231,9 @@ describe("registered tracker card", () => {
       { rpc: fixture({ getWorkTracker: () => ({ ...unlinked, suggestions: [] }) }) },
     );
     fireEvent.focus(await openLinearSearch(slot));
-    await waitFor(() => expect(slot.getByText("No matching Linear issues.")).toBeTruthy());
+    await waitFor(() => expect(slot.getByText("No matching BB or Linear tasks.")).toBeTruthy());
     await expectNoAriaViolations(slot.container);
-    expect(slot.queryByRole("listbox", { name: "Suggested Linear issues" })).toBeNull();
+    expect(slot.queryByRole("listbox", { name: "Available BB and Linear tasks" })).toBeNull();
     slot.lifecycle.unmount();
   });
 
@@ -248,8 +248,7 @@ describe("registered tracker card", () => {
     );
     await waitFor(() => expect(getWorkTracker).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(getWorkTracker).toHaveBeenCalledTimes(1));
-    fireEvent.click(slot.getByRole("button", { name: "Add Linear issue" }));
-    fireEvent.change(slot.getByLabelText("Add Linear issue to work backlog"), {
+    fireEvent.change(await openLinearSearch(slot), {
       target: { value: "LIN" },
     });
     await waitFor(
@@ -281,8 +280,7 @@ describe("registered tracker card", () => {
         { rpc: fixture({ getWorkTracker: () => result as never }) },
       );
       await waitFor(() => expect(slot.getByText("Status")).toBeTruthy());
-      expect(slot.getByText("Tasks")).toBeTruthy();
-      expect(slot.getByText("Work item")).toBeTruthy();
+      expect(slot.getByText("Work items")).toBeTruthy();
       slot.lifecycle.unmount();
     }
   });
@@ -346,18 +344,16 @@ describe("registered tracker card", () => {
       slot.inspection.rpcCalls.find((call) => call.method === "linkLinearIssue")
         ?.input,
     ).toEqual({ threadId: "thr_mutate", key: "LIN-1" });
-    expect((slot.getByRole("button", { name: "Add Linear issue" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(slot.queryByRole("combobox", { name: "Add a task to Goals" })).toBeNull();
     link.reject(new Error("link failed"));
     await waitFor(() =>
-      expect((slot.getByRole("button", { name: "Add Linear issue" }) as HTMLButtonElement).disabled).toBe(
-        false,
-      ),
+      expect(slot.getByRole("button", { name: "Add a task" })).toBeTruthy(),
     );
     expect(toast.error).toHaveBeenCalledWith("link failed");
     slot.lifecycle.unmount();
   });
 
-  it("reports Linear backlog success before queue persistence feedback without hiding queue failures", async () => {
+  it("does not claim a Linear Goal was saved when queue persistence fails", async () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const link = deferred<{ key: string; title: string }>();
     const queue = deferred<{
@@ -383,12 +379,7 @@ describe("registered tracker card", () => {
     await waitFor(() => expect(saveWorkItemQueue).toHaveBeenCalledOnce());
     queue.reject(new Error("queue failed"));
 
-    await waitFor(() =>
-      expect(events).toEqual([
-        "success:Linear issue added to backlog",
-        "error:queue failed",
-      ]),
-    );
+    await waitFor(() => expect(events).toEqual(["error:queue failed"]));
     slot.lifecycle.unmount();
   });
 
@@ -401,8 +392,8 @@ describe("registered tracker card", () => {
         createWorkTask,
       }),
     });
-    await waitFor(() => expect(slot.getByRole("button", { name: "Create outcome from LIN-1" })).toBeTruthy());
-    fireEvent.click(slot.getByRole("button", { name: "Create outcome from LIN-1" }));
+    await waitFor(() => expect(slot.getByRole("button", { name: "Create BB task from LIN-1" })).toBeTruthy());
+    fireEvent.click(slot.getByRole("button", { name: "Create BB task from LIN-1" }));
     await waitFor(() => expect(createWorkTask).toHaveBeenCalledWith({
       threadId: "thr_linear_only", title: "Suggested", priority: "high",
       description: "Created from the Work sidebar.", parentTaskId: null,

@@ -21,6 +21,7 @@ export function TaskWorkflowCard({
   onStatusChange,
   detachableTaskIds,
   onDetach,
+  onMakeGoal,
 }: {
   sections: WorkflowSections;
   busy: boolean;
@@ -28,6 +29,7 @@ export function TaskWorkflowCard({
   onStatusChange(taskId: string, status: SidebarTask["status"]): void;
   detachableTaskIds: ReadonlySet<string>;
   onDetach(taskId: string): void;
+  onMakeGoal?(taskId: string): void;
 }) {
   const idPrefix = useId();
   return (
@@ -43,6 +45,7 @@ export function TaskWorkflowCard({
         onStatusChange={onStatusChange}
         detachableTaskIds={detachableTaskIds}
         onDetach={onDetach}
+        onMakeGoal={onMakeGoal}
       />
       <WorkflowSection
         id={`${idPrefix}-queue`}
@@ -54,6 +57,7 @@ export function TaskWorkflowCard({
         onStatusChange={onStatusChange}
         detachableTaskIds={detachableTaskIds}
         onDetach={onDetach}
+        onMakeGoal={onMakeGoal}
       />
       <WorkflowSection
         id={`${idPrefix}-completed`}
@@ -66,6 +70,7 @@ export function TaskWorkflowCard({
         onStatusChange={onStatusChange}
         detachableTaskIds={detachableTaskIds}
         onDetach={onDetach}
+        onMakeGoal={onMakeGoal}
       />
       {!sections.needsYou.length &&
       !sections.queue.length &&
@@ -89,6 +94,7 @@ function WorkflowSection({
   onStatusChange,
   detachableTaskIds,
   onDetach,
+  onMakeGoal,
 }: {
   id: string;
   title: "Needs you" | "Queue" | "Completed";
@@ -102,6 +108,7 @@ function WorkflowSection({
   onStatusChange(taskId: string, status: SidebarTask["status"]): void;
   detachableTaskIds: ReadonlySet<string>;
   onDetach(taskId: string): void;
+  onMakeGoal?(taskId: string): void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const visibleItems = items.slice(0, itemLimit);
@@ -143,6 +150,7 @@ function WorkflowSection({
               onStatusChange={onStatusChange}
               detachable={detachableTaskIds.has(item.task.id)}
               onDetach={onDetach}
+              onMakeGoal={onMakeGoal}
             />
           ))}
         </div>
@@ -158,6 +166,7 @@ function WorkflowRow({
   onStatusChange,
   detachable,
   onDetach,
+  onMakeGoal,
 }: {
   item: TaskWorkflowItem;
   busy: boolean;
@@ -165,6 +174,7 @@ function WorkflowRow({
   onStatusChange(taskId: string, status: SidebarTask["status"]): void;
   detachable: boolean;
   onDetach(taskId: string): void;
+  onMakeGoal?(taskId: string): void;
 }) {
   const navigate = useBbNavigate();
   const { task, owner, ownerUnavailable } = item;
@@ -227,6 +237,18 @@ function WorkflowRow({
           busy={busy}
           onChange={(next) => onStatusChange(task.id, next)}
         />
+        {detachable && onMakeGoal ? (
+          <button
+            type="button"
+            className="ws-task-workflow-action"
+            disabled={busy}
+            aria-label={`Make ${task.key} a goal`}
+            title="Move to Goals"
+            onClick={() => onMakeGoal(task.id)}
+          >
+            <Icon className="ws-task-workflow-icon" name="ArrowUp" aria-hidden />
+          </button>
+        ) : null}
         {detachable ? (
           <button
             type="button"
@@ -253,7 +275,7 @@ const taskStatuses: readonly SidebarTask["status"][] = [
   "canceled",
 ];
 
-function TaskStatusControl({
+export function TaskStatusControl({
   taskKey,
   status,
   busy,

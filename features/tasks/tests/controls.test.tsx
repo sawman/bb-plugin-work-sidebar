@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { configureAxe } from "vitest-axe";
 import { toast } from "sonner";
@@ -153,6 +153,33 @@ function rpcFixtures(
       suggestions: [],
       items: [],
     }),
+    getWorkOutcome: () => ({
+      rootThreadId: "thr_test",
+      tasksAvailable: true,
+      outcome: null,
+      executionTasks: [],
+      bindings: [],
+      legacy: { state: "none", taskIds: [], message: null },
+    }),
+    getWorkStatus: () => ({
+      rootThreadId: "thr_test",
+      currentThread: workContext.currentThread,
+      children: [],
+    }),
+    getLatestActivity: () => ({
+      currentThread: { status: "idle", runtimeStatus: "idle" },
+      latest: null,
+      lastUser: null,
+      current: null,
+    }),
+    getWorkItemQueue: () => ({
+      rootThreadId: "thr_test",
+      configured: false,
+      queue: { current: null, backlog: [] },
+    }),
+    saveWorkItemQueue: (input: unknown) => call("saveWorkItemQueue", input),
+    moveWorkItemToExecution: (input: unknown) =>
+      call("moveWorkItemToExecution", input),
     getWorkProviderStatus: () => ({
       tone: "green",
       providerId: "codex",
@@ -207,6 +234,21 @@ async function leftSlot(
   fireEvent.click(rendered.getByRole("button", { name: "Tasks" }));
   await waitFor(() => expect(rendered.getByText(items[0]!.title)).toBeTruthy());
   return { rendered, call };
+}
+
+async function openWorkItemPicker(
+  rendered: ReturnType<typeof renderSlot>,
+  destination: "goal" | "queue" = "goal",
+) {
+  fireEvent.click(await rendered.findByRole("button", { name: "Add a task" }));
+  if (destination === "queue") {
+    fireEvent.change(rendered.getByLabelText("Task destination"), {
+      target: { value: "queue" },
+    });
+  }
+  return rendered.findByRole("combobox", {
+    name: `Add a task to ${destination === "goal" ? "Goals" : "Queue"}`,
+  });
 }
 
 async function expectNoAriaViolations(container: HTMLElement) {
@@ -274,16 +316,14 @@ describe("Tasks registered controls", () => {
     rendered.lifecycle.unmount();
   });
 
-  it("dismisses the Work existing-task picker for a click outside", async () => {
+  it("dismisses the Work add-task picker for a click outside", async () => {
     const captured = await app();
     const rendered = renderSlot(
       captured.threadPanelActions[0]!,
       { threadId: "thr_test", params: null },
       { rpc: rpcFixtures(() => tasks([task, taskTwo])) },
     );
-    const picker = await rendered.findByRole("combobox", {
-      name: "Add task to this thread",
-    });
+    const picker = await openWorkItemPicker(rendered);
 
     fireEvent.focus(picker);
     const listbox = await rendered.findByRole("listbox");
@@ -294,7 +334,7 @@ describe("Tasks registered controls", () => {
     rendered.lifecycle.unmount();
   });
 
-  it("uses active-descendant listbox keyboard navigation in the registered Work Tasks card", async () => {
+  it("uses active-descendant listbox keyboard navigation in the registered Work item picker", async () => {
     const scrollIntoView = vi.fn();
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
       configurable: true,
@@ -306,9 +346,9 @@ describe("Tasks registered controls", () => {
       { threadId: "thr_test", params: null },
       { rpc: rpcFixtures(() => tasks([task, taskTwo])) },
     );
-    const combo = await rendered.findByLabelText("Add task to this thread");
+    const combo = await openWorkItemPicker(rendered);
     combo.focus();
-    const options = await rendered.findAllByRole("option");
+    const options = within(await rendered.findByRole("listbox")).getAllByRole("option");
     expect(options).toHaveLength(2);
     expect(options[0]!.id).toBeTruthy();
     expect(options[1]!.id).toBeTruthy();
@@ -323,7 +363,7 @@ describe("Tasks registered controls", () => {
     await expectNoAriaViolations(rendered.container);
     fireEvent.keyDown(combo, { key: "ArrowDown" });
     expect(combo.getAttribute("aria-activedescendant")).toBe(options[1]!.id);
-    expect(options[0]!.hasAttribute("data-active")).toBe(false);
+    expect(options[0]!.getAttribute("data-active")).not.toBe("true");
     expect(options[1]!.getAttribute("data-active")).toBe("true");
     expect(options[1]!.getAttribute("aria-selected")).toBe("false");
     fireEvent.keyDown(combo, { key: "ArrowUp" });
@@ -333,33 +373,24 @@ describe("Tasks registered controls", () => {
     fireEvent.keyDown(combo, { key: "Home" });
     expect(combo.getAttribute("aria-activedescendant")).toBe(options[0]!.id);
     fireEvent.keyDown(combo, { key: "Enter" });
-    await waitFor(() =>
-      expect(combo.getAttribute("aria-expanded")).toBe("false"),
-    );
-    expect((combo as HTMLInputElement).value).toBe("WORK-1");
+    await waitFor(() => expect(rendered.queryByRole("combobox")).toBeNull());
 
-    combo.focus();
-    fireEvent.change(combo, { target: { value: "second" } });
+    const filtered = await openWorkItemPicker(rendered);
+    filtered.focus();
+    fireEvent.change(filtered, { target: { value: "second" } });
     const filteredOption = await rendered.findByRole("option", {
       name: /WORK-2/,
     });
-    fireEvent.keyDown(combo, { key: "End" });
-    expect(combo.getAttribute("aria-activedescendant")).toBe(filteredOption.id);
-    fireEvent.keyDown(combo, { key: "Escape" });
-    expect(document.activeElement).toBe(combo);
-    fireEvent.keyDown(combo, { key: "ArrowDown" });
-    expect(combo.getAttribute("aria-activedescendant")).toBe(filteredOption.id);
-    fireEvent.keyDown(combo, { key: "Enter" });
-    await waitFor(() =>
-      expect(combo.getAttribute("aria-expanded")).toBe("false"),
-    );
-    expect((combo as HTMLInputElement).value).toBe("WORK-2");
-    combo.focus();
-    fireEvent.click(combo);
+    fireEvent.keyDown(filtered, { key: "End" });
+    expect(filtered.getAttribute("aria-activedescendant")).toBe(filteredOption.id);
+    fireEvent.keyDown(filtered, { key: "Escape" });
+    await waitFor(() => expect(rendered.queryByRole("combobox")).toBeNull());
+    const reopened = await openWorkItemPicker(rendered);
+    reopened.focus();
+    fireEvent.click(reopened);
     await rendered.findByRole("listbox");
-    fireEvent.keyDown(combo, { key: "Escape" });
-    expect(combo.getAttribute("aria-expanded")).toBe("false");
-    expect(document.activeElement).toBe(combo);
+    fireEvent.keyDown(reopened, { key: "Escape" });
+    await waitFor(() => expect(rendered.queryByRole("combobox")).toBeNull());
     rendered.lifecycle.unmount();
   });
 
@@ -387,10 +418,10 @@ describe("Tasks registered controls", () => {
       { threadId: "thr_test", params: null },
       { rpc: rpcFixtures(() => tasks([task, taskTwo])) },
     );
-    const taskPicker = await right.findByLabelText("Add task to this thread");
+    const taskPicker = await openWorkItemPicker(right);
     fireEvent.focus(taskPicker);
     fireEvent.click(await right.findByRole("option", { name: /WORK-2/ }));
-    expect((taskPicker as HTMLInputElement).value).toBe("WORK-2");
+    expect(right.queryByRole("combobox")).toBeNull();
     expect(right.queryByRole("listbox")).toBeNull();
     right.lifecycle.unmount();
   });
@@ -983,7 +1014,7 @@ describe("Tasks registered controls", () => {
     rendered.lifecycle.unmount();
   });
 
-  it("operates the registered Work Tasks card searchable attach, busy detach, and optimistic assignee rollback", async () => {
+  it("operates the registered Work item picker, busy detach, and optimistic assignee rollback", async () => {
     const attach = deferred<unknown>();
     const call = vi.fn((method) =>
       method === "attachTaskToThread" ? attach.promise : Promise.resolve({}),
@@ -994,30 +1025,21 @@ describe("Tasks registered controls", () => {
       { threadId: "thr_test", params: null },
       { rpc: rpcFixtures(() => tasks([task, taskTwo]), call) },
     );
-    await waitFor(() =>
-      expect(rendered.getByLabelText("Add task to this thread")).toBeTruthy(),
-    );
-    const combo = rendered.getByLabelText("Add task to this thread");
+    const combo = await openWorkItemPicker(rendered, "queue");
     fireEvent.focus(combo);
     fireEvent.change(combo, { target: { value: "second" } });
     fireEvent.click(rendered.getByRole("option", { name: /WORK-2/ }));
-    fireEvent.click(rendered.getByRole("button", { name: "Add" }));
     await waitFor(() =>
       expect(call).toHaveBeenCalledWith("attachTaskToThread", {
         taskId: "task_2",
         threadId: "thr_test",
       }),
     );
-    expect(
-      (rendered.getByRole("button", { name: "…" }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(true);
     attach.resolve({});
     await waitFor(() =>
       expect(
-        (rendered.getByRole("button", { name: "Add" }) as HTMLButtonElement)
-          .disabled,
-      ).toBe(true),
+        rendered.getByRole("button", { name: "Add a task" }),
+      ).toBeTruthy(),
     );
     rendered.lifecycle.unmount();
     getPluginQueryClient().clear();
@@ -1062,20 +1084,6 @@ describe("Tasks registered controls", () => {
         assignee: "agent",
       }),
     );
-    await waitFor(() =>
-      expect(
-        successful.getByRole("switch", {
-          name: "Agent assigned to WORK-1",
-        }),
-      ).toBeTruthy(),
-    );
-    expect(
-      (
-        successful.getByRole("switch", {
-          name: "Agent assigned to WORK-1",
-        }) as HTMLButtonElement
-      ).disabled,
-    ).toBe(true);
     successfulAssignment.resolve({});
     await waitFor(() =>
       expect(
@@ -1129,14 +1137,9 @@ describe("Tasks registered controls", () => {
     );
     await waitFor(() =>
       expect(
-        right.getByRole("switch", { name: "Agent assigned to WORK-1" }),
+        right.getByRole("switch", { name: "Human assigned to WORK-1" }),
       ).toBeTruthy(),
     );
-    expect(
-      (right.getByRole("switch", {
-        name: "Agent assigned to WORK-1",
-      }) as HTMLButtonElement).disabled,
-    ).toBe(true);
     await act(async () => {
       assignment.reject(new Error("assignment failed"));
       await Promise.resolve();

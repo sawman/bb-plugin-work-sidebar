@@ -249,7 +249,6 @@ describe("R2 server registration and disposal", () => {
       "createExecutionTask",
       "bindExecutionOwner",
       "adoptLegacyOutcome",
-      "updateWorkTask",
       "updateTaskStatus",
       "updateTaskAssignee",
       "createSidebarTask",

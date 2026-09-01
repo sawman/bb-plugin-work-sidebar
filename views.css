@@ -3363,9 +3363,6 @@ button.ws-provider-health:focus-visible {
 .ws-task-priority-low {
   color: var(--muted-foreground);
 }
-.ws-thread-task-card .ws-work-card-row {
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-}
 .ws-assignee-picker {
   position: relative;
   display: inline-flex;
@@ -3876,6 +3873,22 @@ button.ws-provider-health:focus-visible {
   margin-top: 0.18rem;
   border-top: 1px solid var(--border);
   padding-top: 0.42rem;
+}
+.ws-work-item-destination {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  color: var(--muted-foreground);
+  font: var(--ws-text-metadata);
+  line-height: inherit;
+}
+.ws-work-item-destination select {
+  border: 1px solid var(--border);
+  padding: 0.12rem 0.24rem;
+  background: var(--background);
+  color: var(--foreground);
+  font: inherit;
+  line-height: inherit;
 }
 .ws-work-item-queue-actions {
   display: inline-flex;

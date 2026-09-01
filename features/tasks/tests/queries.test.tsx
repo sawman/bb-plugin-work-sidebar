@@ -294,7 +294,7 @@ describe("Tasks read slots", () => {
       { timeout: 2_000 },
     );
     expect(retry.getByText("Status")).toBeTruthy();
-    expect(retry.getByText("Work item")).toBeTruthy();
+    expect(retry.getByText("Work items")).toBeTruthy();
     expect(retry.getByText("Goal")).toBeTruthy();
     expect(retry.getByLabelText(/Codex provider status: Ready/)).toBeTruthy();
     expect(

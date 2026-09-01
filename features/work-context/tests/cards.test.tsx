@@ -120,6 +120,22 @@ function fixture(overrides: Partial<Rpc> = {}): Rpc {
       current: null,
     }),
     getWorkOutcome: () => outcome,
+    getWorkItemQueue: () => ({
+      rootThreadId: "thr_one",
+      configured: false,
+      queue: { current: null, backlog: [] },
+    }),
+    saveWorkItemQueue: ({ queue }) => ({
+      rootThreadId: "thr_one",
+      configured: true,
+      queue,
+    }),
+    moveWorkItemToExecution: () => ({
+      taskId: "task_execution",
+      configured: true,
+      queue: { current: null, backlog: [] },
+    }),
+    searchLinearIssues: () => ({ items: [] }),
     getWorkGoal: () => null,
     getWorkPlan: () => ({ items: [] }),
     getWorkBackgroundJobs: () => ({ items: [] }),
@@ -128,7 +144,7 @@ function fixture(overrides: Partial<Rpc> = {}): Rpc {
 }
 
 describe("registered Work context cards", () => {
-  it("renders one unified Work item card instead of separate Outcome and Linear cards", async () => {
+  it("renders one unified Work items card instead of separate Outcome, Linear, and Tasks cards", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
@@ -166,13 +182,14 @@ describe("registered Work context cards", () => {
     await waitFor(() => expect(slot.getByText("Ship cards")).toBeTruthy());
     expect(slot.queryByText("Outcome")).toBeNull();
     expect(slot.container.querySelectorAll(".ws-linear-card")).toHaveLength(0);
-    expect(slot.getByRole("button", { name: "Add Linear issue" })).toBeTruthy();
+    expect(slot.getByRole("button", { name: "Add a task" })).toBeTruthy();
+    expect(slot.getByRole("heading", { name: "Goals" })).toBeTruthy();
     expect(slot.queryByText("Linked Linear work")).toBeNull();
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();
   });
 
-  it("orders Work item, Tasks, Goal, Plan, then Background below Status", async () => {
+  it("orders Work items, Goal, Plan, then Background below Status", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
@@ -182,7 +199,7 @@ describe("registered Work context cards", () => {
     );
 
     await waitFor(() =>
-      expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(6),
+      expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(5),
     );
     const cardOrder = Array.from(
       slot.container.querySelectorAll("[data-card]"),
@@ -192,8 +209,7 @@ describe("registered Work context cards", () => {
     getPluginQueryClient().clear();
     expect(cardOrder).toEqual([
       "status",
-      "work item",
-      "tasks",
+      "work items",
       "goal",
       "plan",
       "background",
@@ -215,9 +231,9 @@ describe("registered Work context cards", () => {
       () => expect(slot.getByText("outcome unavailable")).toBeTruthy(),
       { timeout: 3_000 },
     );
-    for (const name of ["Status", "Background", "Tasks", "Goal", "Plan"])
+    for (const name of ["Status", "Background", "Goal", "Plan"])
       expect(slot.getAllByText(name).length).toBeGreaterThan(0);
-    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(6);
+    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(5);
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();
   });
@@ -513,32 +529,18 @@ describe("registered Work context cards", () => {
     );
     await waitFor(() => expect(slot.getByText("Attached task")).toBeTruthy());
     expect(slot.getByText("Ship cards")).toBeTruthy();
-    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(6);
+    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(5);
     expect(slot.container.querySelector(".ws-thread-task-card")).toBeTruthy();
     expect(slot.getByRole("heading", { name: "Needs you" })).toBeTruthy();
-    const outcomeInfo = slot.container.querySelector(
-      '[data-card="work item"] .ws-card-heading-info',
-    );
     const priority = slot.getByRole("img", { name: "High priority" });
     expect(priority.getAttribute("data-priority")).toBe("high");
     expect(
       priority.querySelectorAll('[data-priority-bar="active"]'),
     ).toHaveLength(3);
-    const controls = slot.getByRole("group", {
-      name: "Outcome status: To do",
-    });
-    expect(outcomeInfo?.contains(controls)).toBe(false);
-    expect(controls.querySelectorAll("button")).toHaveLength(2);
-    expect(
-      slot.getByRole("button", { name: "Move Ship cards back to Backlog" }),
-    ).toBeTruthy();
     expect(
       slot.getByRole("button", {
-        name: "Move Ship cards forward to In Progress",
+        name: "Change status for WORK-1: To do",
       }),
-    ).toBeTruthy();
-    expect(
-      slot.getByRole("img", { name: "Current outcome status: To do" }),
     ).toBeTruthy();
     expect(slot.container.querySelector(".ws-outcome-key")).toBeNull();
     slot.lifecycle.unmount();
@@ -638,12 +640,10 @@ describe("registered Work context cards", () => {
         expect(slot.getByText("Unrelated linked task")).toBeTruthy(),
       );
       expect(slot.queryByText(/work tasks are bound/i)).toBeNull();
-      for (const title of [
-        "Ship cards",
-        "Run validation",
-        "Unrelated linked task",
-      ])
-        expect(slot.getAllByText(title)).toHaveLength(1);
+      expect(slot.getByText("Ship cards")).toBeTruthy();
+      expect(slot.getByText("Run validation")).toBeTruthy();
+      expect(slot.getByText("Unrelated linked task")).toBeTruthy();
+      expect(slot.container.querySelectorAll(".ws-task-workflow-row")).toHaveLength(2);
       expect(
         slot.queryByRole("button", { name: "Detach WORK-1 from this thread" }),
       ).toBeNull();
@@ -824,17 +824,17 @@ describe("registered Work context cards", () => {
       expect(
         child.getByRole("button", { name: "Open Sibling worker" }),
       ).toBeTruthy();
+      fireEvent.click(child.getByRole("button", { name: "Add a task" }));
       const picker = child.getByRole("combobox", {
-        name: "Add task to this thread",
+        name: "Add a task to Goals",
       });
       fireEvent.focus(picker);
       await waitFor(() =>
         expect(child.getByRole("option", { name: /WORK-4/ })).toBeTruthy(),
       );
-      for (const key of ["WORK-1", "WORK-2", "WORK-3"])
-        expect(
-          child.queryByRole("option", { name: new RegExp(key) }),
-        ).toBeNull();
+      // The shared picker deliberately lists reusable BB work from each
+      // owner. The workflow itself remains de-duplicated by task identity.
+      expect(child.getByRole("option", { name: /WORK-2/ })).toBeTruthy();
     } finally {
       child.lifecycle.unmount();
       getPluginQueryClient().clear();
@@ -1021,171 +1021,42 @@ describe("registered Work context cards", () => {
     getPluginQueryClient().clear();
   });
 
-  it("retries only the failed card and uses Query mutation busy/success state", async () => {
+  it("uses the shared task status control for a BB goal", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));
-    let resolveUpdate!: (value: {
-      task: NonNullable<typeof populatedOutcome.outcome>;
-    }) => void;
-    const pendingUpdate = new Promise<{
-      task: NonNullable<typeof populatedOutcome.outcome>;
-    }>((resolve) => {
-      resolveUpdate = resolve;
-    });
-    const getWorkOutcome = vi.fn(() => populatedOutcome);
-    const updateWorkTask = vi.fn(() => pendingUpdate);
+    const updateTaskStatus = vi.fn(() =>
+      Promise.resolve({
+        task: { ...populatedOutcome.outcome!, status: "in_progress" as const },
+      }),
+    );
     const slot = renderSlot(
       app.threadPanelActions[0]!,
       { threadId: "thr_one", params: null },
-      { rpc: fixture({ getWorkOutcome, updateWorkTask }) },
+      {
+        rpc: fixture({
+          updateTaskStatus,
+          getWorkOutcome: () => populatedOutcome,
+          getWorkItemQueue: () => ({
+            rootThreadId: "thr_one",
+            configured: true,
+            queue: { current: { source: "bb_task", id: "task_1" }, backlog: [] },
+          }),
+        }),
+      },
     );
-    await waitFor(() => expect(slot.getByText("Ship cards")).toBeTruthy());
-    fireEvent.click(
-      slot.getByRole("button", {
-        name: "Move Ship cards forward to In Progress",
-      }),
-    );
+    const control = await slot.findByRole("button", {
+      name: "Change status for WORK-1: To do",
+    });
+    fireEvent.click(control);
+    fireEvent.click(slot.getByRole("option", { name: "In Progress" }));
     await waitFor(() =>
-      expect(updateWorkTask).toHaveBeenCalledWith({
+      expect(updateTaskStatus).toHaveBeenCalledWith({
         taskId: "task_1",
         status: "in_progress",
       }),
     );
-    expect(
-      (
-        slot.getByRole("button", {
-          name: "Move Ship cards forward to In Progress",
-        }) as HTMLButtonElement
-      ).disabled,
-    ).toBe(true);
-    resolveUpdate({ task: populatedOutcome.outcome! });
-    await waitFor(() => expect(getWorkOutcome).toHaveBeenCalledTimes(2));
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();
-
-    const rejected = renderSlot(
-      app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
-      {
-        rpc: fixture({
-          getWorkOutcome: () => populatedOutcome,
-          updateWorkTask: () => Promise.reject(new Error("update failed")),
-        }),
-      },
-    );
-    await waitFor(() => expect(rejected.getByText("Ship cards")).toBeTruthy());
-    const rejectedButton = rejected.getByRole("button", {
-      name: "Move Ship cards forward to In Progress",
-    }) as HTMLButtonElement;
-    fireEvent.click(rejectedButton);
-    await waitFor(() => expect(rejectedButton.disabled).toBe(false));
-    rejected.lifecycle.unmount();
-    getPluginQueryClient().clear();
-  });
-
-  it("moves the outcome status backward and forward from the below-content controls", async () => {
-    getPluginQueryClient().clear();
-    const app = await loadPluginApp(() => import("../../../app"));
-    const updateWorkTask = vi.fn(() =>
-      Promise.resolve({
-        task: { ...populatedOutcome.outcome!, status: "in_review" as const },
-      }),
-    );
-    const slot = renderSlot(
-      app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
-      {
-        rpc: fixture({
-          getWorkOutcome: () => ({
-            ...populatedOutcome,
-            outcome: {
-              ...populatedOutcome.outcome!,
-              status: "in_progress" as const,
-            },
-          }),
-          updateWorkTask,
-        }),
-      },
-    );
-    try {
-      const previous = await slot.findByRole("button", {
-        name: "Move Ship cards back to To do",
-      });
-      const next = slot.getByRole("button", {
-        name: "Move Ship cards forward to In Review",
-      });
-      const controls = slot.getByRole("group", {
-        name: "Outcome status: In Progress",
-      });
-      const current = slot.getByRole("img", {
-        name: "Current outcome status: In Progress",
-      });
-      expect(
-        slot.container
-          .querySelector('[data-card="work item"] .ws-card-heading-info')
-          ?.contains(controls),
-      ).toBe(false);
-      expect(previous.querySelector("svg")).toBeTruthy();
-      expect(next.querySelector("svg")).toBeTruthy();
-      expect(current.querySelector('svg[data-icon="CircleHalf"]')).toBeTruthy();
-      fireEvent.click(previous);
-      await waitFor(() =>
-        expect(updateWorkTask).toHaveBeenCalledWith({
-          taskId: "task_1",
-          status: "todo",
-        }),
-      );
-      fireEvent.click(next);
-      await waitFor(() =>
-        expect(updateWorkTask).toHaveBeenCalledWith({
-          taskId: "task_1",
-          status: "in_review",
-        }),
-      );
-    } finally {
-      slot.lifecycle.unmount();
-      getPluginQueryClient().clear();
-    }
-  });
-
-  it("keeps both status directions visible and disables only the missing boundary", async () => {
-    getPluginQueryClient().clear();
-    const app = await loadPluginApp(() => import("../../../app"));
-    const slot = renderSlot(
-      app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
-      {
-        rpc: fixture({
-          getWorkOutcome: () => ({
-            ...populatedOutcome,
-            outcome: { ...populatedOutcome.outcome!, status: "done" as const },
-          }),
-        }),
-      },
-    );
-    try {
-      const controls = await slot.findByRole("group", {
-        name: "Outcome status: Done",
-      });
-      expect(controls.querySelectorAll("button")).toHaveLength(2);
-      expect(
-        (
-          slot.getByRole("button", {
-            name: "Move Ship cards back to In Review",
-          }) as HTMLButtonElement
-        ).disabled,
-      ).toBe(false);
-      expect(
-        (
-          slot.getByRole("button", {
-            name: "No next outcome status for Ship cards",
-          }) as HTMLButtonElement
-        ).disabled,
-      ).toBe(true);
-    } finally {
-      slot.lifecycle.unmount();
-      getPluginQueryClient().clear();
-    }
   });
 
   it("keeps cached A visible across A-to-B-to-A registered slot switches while revalidating", async () => {
@@ -1410,7 +1281,7 @@ describe("registered Work context cards", () => {
       method: "toThread",
       threadId: "thr_owner",
     });
-    expect(slot.getByRole("img", { name: /codex provider/ })).toBeTruthy();
+    expect(slot.getAllByRole("img", { name: /codex provider/ }).length).toBeGreaterThan(0);
     expect(slot.getByText("Prepare the follow-up")).toBeTruthy();
     expect(slot.getByText("Archived owner follow-up")).toBeTruthy();
     expect(slot.getAllByText("You")).toHaveLength(2);
@@ -1588,7 +1459,7 @@ describe("registered Work context cards", () => {
     getPluginQueryClient().clear();
   });
 
-  it("puts task attachment before workflow sections and uses shared card typography", async () => {
+  it("keeps Goals above one shared add-task control and Queue workflow", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
@@ -1613,23 +1484,172 @@ describe("registered Work context cards", () => {
       },
     );
     await waitFor(() =>
-      expect(slot.container.querySelector('[data-card="tasks"]')).toBeTruthy(),
+      expect(
+        slot.container.querySelector('[data-card="work items"]'),
+      ).toBeTruthy(),
     );
-    const taskCard = slot.container.querySelector('[data-card="tasks"]')!;
+    const taskCard = slot.container.querySelector('[data-card="work items"]')!;
     await waitFor(() =>
-      expect(taskCard.querySelector(".ws-work-card-control")).toBeTruthy(),
+      expect(taskCard.querySelector(".ws-work-item-queue-add")).toBeTruthy(),
     );
-    const control = taskCard.querySelector(".ws-work-card-control")!;
+    const control = taskCard.querySelector(".ws-work-item-queue-add")!;
     const workflow = taskCard.querySelector(".ws-task-workflow")!;
+    const goals = taskCard.querySelector(".ws-work-item-queue-heading")!;
     expect(control.compareDocumentPosition(workflow)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
-    expect(slot.getByRole("button", { name: "Add Linear issue" })).toBeTruthy();
+    expect(goals.textContent).toBe("Goals");
+    expect(goals.compareDocumentPosition(control)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(slot.getByRole("button", { name: "Add a task" })).toBeTruthy();
     expect(
       slot
         .getByText("Keep card content calm")
         .classList.contains("ws-card-content"),
     ).toBe(true);
+    slot.lifecycle.unmount();
+    getPluginQueryClient().clear();
+  });
+
+  it("adds BB tasks to Queue and Linear issues to Goals from the shared picker", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const attachTaskToThread = vi.fn(() => ({ threadId: "thr_one" }));
+    const linkLinearIssue = vi.fn(() => ({ key: "LIN-7", title: "Resolve the rollout" }));
+    const saveWorkItemQueue = vi.fn(({ queue }) => ({
+      rootThreadId: "thr_one",
+      configured: true,
+      queue,
+    }));
+    const searchLinearIssues = vi.fn(() => ({
+      items: [{ key: "LIN-7", title: "Resolve the rollout", url: "https://linear.app/issue/LIN-7" }],
+    }));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      {
+        rpc: fixture({
+          sidebarTasks: () => ({
+            available: true,
+            projects: [{ id: "project_1", name: "Work" }],
+            error: null,
+            tasks: [{
+              id: "task_queue",
+              projectId: "project_1",
+              projectName: "Work",
+              key: "WORK-2",
+              title: "Run the queue task",
+              status: "todo",
+              priority: "medium",
+              dueDate: null,
+              parentTaskId: null,
+              position: 2,
+              linkedThreadIds: [],
+              assignee: "agent",
+            }],
+          }),
+          getWorkTracker: () => ({
+            visible: true,
+            available: true,
+            message: null,
+            primaryKey: null,
+            suggestions: [],
+            items: [],
+          }),
+          attachTaskToThread,
+          linkLinearIssue,
+          saveWorkItemQueue,
+          searchLinearIssues,
+        }),
+      },
+    );
+    await waitFor(() => expect(slot.getByRole("button", { name: "Add a task" })).toBeTruthy());
+
+    fireEvent.click(slot.getByRole("button", { name: "Add a task" }));
+    fireEvent.change(slot.getByRole("combobox", { name: "Add a task to Goals" }), {
+      target: { value: "" },
+    });
+    fireEvent.change(slot.getByLabelText("Task destination"), {
+      target: { value: "queue" },
+    });
+    fireEvent.click(await slot.findByRole("option", { name: /WORK-2/ }));
+    await waitFor(() =>
+      expect(attachTaskToThread).toHaveBeenCalledWith({
+        taskId: "task_queue",
+        threadId: "thr_one",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(slot.getByRole("button", { name: "Add a task" })).toBeTruthy(),
+    );
+    fireEvent.click(slot.getByRole("button", { name: "Add a task" }));
+    const search = slot.getByRole("combobox", { name: "Add a task to Goals" });
+    fireEvent.change(search, { target: { value: "LIN-7" } });
+    await waitFor(() =>
+      expect(searchLinearIssues).toHaveBeenCalledWith({ threadId: "thr_one", query: "LIN-7" }),
+    );
+    fireEvent.click(await slot.findByRole("option", { name: /LIN-7/ }));
+    await waitFor(() =>
+      expect(linkLinearIssue).toHaveBeenCalledWith({ threadId: "thr_one", key: "LIN-7" }),
+    );
+    await waitFor(() =>
+      expect(saveWorkItemQueue).toHaveBeenCalledWith({
+        threadId: "thr_one",
+        queue: { current: { source: "linear", id: "LIN-7" }, backlog: [] },
+      }),
+    );
+    slot.lifecycle.unmount();
+    getPluginQueryClient().clear();
+  });
+
+  it("moves an attached BB Queue task into Goals without duplicating its row", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const saveWorkItemQueue = vi.fn(({ queue }) => ({
+      rootThreadId: "thr_one",
+      configured: true,
+      queue,
+    }));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      {
+        rpc: fixture({
+          sidebarTasks: () => ({
+            available: true,
+            projects: [{ id: "project_1", name: "Work" }],
+            error: null,
+            tasks: [{
+              id: "task_queue",
+              projectId: "project_1",
+              projectName: "Work",
+              key: "WORK-2",
+              title: "Run the queue task",
+              status: "todo",
+              priority: "medium",
+              dueDate: null,
+              parentTaskId: null,
+              position: 2,
+              linkedThreadIds: ["thr_one"],
+              assignee: "agent",
+            }],
+          }),
+          saveWorkItemQueue,
+        }),
+      },
+    );
+    const promote = await slot.findByRole("button", {
+      name: "Make WORK-2 a goal",
+    });
+    fireEvent.click(promote);
+    await waitFor(() =>
+      expect(saveWorkItemQueue).toHaveBeenCalledWith({
+        threadId: "thr_one",
+        queue: { current: { source: "bb_task", id: "task_queue" }, backlog: [] },
+      }),
+    );
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();
   });
