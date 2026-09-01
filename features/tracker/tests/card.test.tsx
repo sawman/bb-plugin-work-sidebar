@@ -176,7 +176,6 @@ async function expectNoAriaViolations(container: HTMLElement) {
   expect(results.incomplete).toEqual([]);
 }
 async function openLinearSearch(slot: ReturnType<typeof renderSlot>) {
-  fireEvent.click(await slot.findByRole("button", { name: "Add a task" }));
   return slot.findByLabelText("Add a task to Goals");
 }
 afterEach(() => {
@@ -199,7 +198,7 @@ describe("registered tracker card", () => {
       },
     );
 
-    expect(await slot.findByRole("button", { name: "Add a task" })).toBeTruthy();
+    expect(await slot.findByRole("combobox", { name: "Add a task to Goals" })).toBeTruthy();
     const workQueue = slot.getByRole("region", { name: "Work queue" });
     expect(within(workQueue).getByText(/Suggested/)).toBeTruthy();
     expect(within(workQueue).getByText(/Second linked issue/)).toBeTruthy();
@@ -344,10 +343,11 @@ describe("registered tracker card", () => {
       slot.inspection.rpcCalls.find((call) => call.method === "linkLinearIssue")
         ?.input,
     ).toEqual({ threadId: "thr_mutate", key: "LIN-1" });
-    expect(slot.queryByRole("combobox", { name: "Add a task to Goals" })).toBeNull();
+    expect(slot.getByRole("combobox", { name: "Add a task to Goals" })).toBeTruthy();
+    expect(slot.queryByRole("listbox", { name: "Available BB and Linear tasks" })).toBeNull();
     link.reject(new Error("link failed"));
     await waitFor(() =>
-      expect(slot.getByRole("button", { name: "Add a task" })).toBeTruthy(),
+      expect(slot.getByRole("combobox", { name: "Add a task to Goals" })).toBeTruthy(),
     );
     expect(toast.error).toHaveBeenCalledWith("link failed");
     slot.lifecycle.unmount();

@@ -182,7 +182,7 @@ describe("registered Work context cards", () => {
     await waitFor(() => expect(slot.getByText("Ship cards")).toBeTruthy());
     expect(slot.queryByText("Outcome")).toBeNull();
     expect(slot.container.querySelectorAll(".ws-linear-card")).toHaveLength(0);
-    expect(slot.getByRole("button", { name: "Add a task" })).toBeTruthy();
+    expect(slot.getByRole("combobox", { name: "Add a task to Goals" })).toBeTruthy();
     expect(slot.getByRole("heading", { name: "Goals" })).toBeTruthy();
     expect(slot.queryByText("Linked Linear work")).toBeNull();
     slot.lifecycle.unmount();
@@ -824,7 +824,6 @@ describe("registered Work context cards", () => {
       expect(
         child.getByRole("button", { name: "Open Sibling worker" }),
       ).toBeTruthy();
-      fireEvent.click(child.getByRole("button", { name: "Add a task" }));
       const picker = child.getByRole("combobox", {
         name: "Add a task to Goals",
       });
@@ -1494,7 +1493,7 @@ describe("registered Work context cards", () => {
     );
     const control = taskCard.querySelector(".ws-work-item-queue-add")!;
     const workflow = taskCard.querySelector(".ws-task-workflow")!;
-    const goals = taskCard.querySelector(".ws-work-item-queue-heading")!;
+    const goals = taskCard.querySelector(".ws-work-item-goals > h3")!;
     expect(control.compareDocumentPosition(workflow)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
@@ -1502,7 +1501,7 @@ describe("registered Work context cards", () => {
     expect(goals.compareDocumentPosition(control)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
-    expect(slot.getByRole("button", { name: "Add a task" })).toBeTruthy();
+    expect(slot.getByRole("combobox", { name: "Add a task to Goals" })).toBeTruthy();
     expect(
       slot
         .getByText("Keep card content calm")
@@ -1564,15 +1563,22 @@ describe("registered Work context cards", () => {
         }),
       },
     );
-    await waitFor(() => expect(slot.getByRole("button", { name: "Add a task" })).toBeTruthy());
-
-    fireEvent.click(slot.getByRole("button", { name: "Add a task" }));
-    fireEvent.change(slot.getByRole("combobox", { name: "Add a task to Goals" }), {
+    await waitFor(() => expect(slot.getByRole("combobox", { name: "Add a task to Goals" })).toBeTruthy());
+    const queuePicker = slot.getByRole("combobox", { name: "Add a task to Goals" });
+    fireEvent.focus(queuePicker);
+    fireEvent.change(queuePicker, {
       target: { value: "" },
     });
-    fireEvent.change(slot.getByLabelText("Task destination"), {
-      target: { value: "queue" },
-    });
+    const destinationQueue = within(
+      await slot.findByRole("group", { name: "Task destination" }),
+    ).getByRole(
+        "button",
+        { name: "Queue" },
+    );
+    fireEvent.mouseDown(destinationQueue);
+    fireEvent.click(destinationQueue);
+    await waitFor(() => expect(slot.getByRole("combobox", { name: "Add a task to Queue" })).toBeTruthy());
+    fireEvent.focus(slot.getByRole("combobox", { name: "Add a task to Queue" }));
     fireEvent.click(await slot.findByRole("option", { name: /WORK-2/ }));
     await waitFor(() =>
       expect(attachTaskToThread).toHaveBeenCalledWith({
@@ -1582,9 +1588,8 @@ describe("registered Work context cards", () => {
     );
 
     await waitFor(() =>
-      expect(slot.getByRole("button", { name: "Add a task" })).toBeTruthy(),
+      expect(slot.getByRole("combobox", { name: "Add a task to Goals" })).toBeTruthy(),
     );
-    fireEvent.click(slot.getByRole("button", { name: "Add a task" }));
     const search = slot.getByRole("combobox", { name: "Add a task to Goals" });
     fireEvent.change(search, { target: { value: "LIN-7" } });
     await waitFor(() =>

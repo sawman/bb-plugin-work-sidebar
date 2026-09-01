@@ -240,15 +240,19 @@ async function openWorkItemPicker(
   rendered: ReturnType<typeof renderSlot>,
   destination: "goal" | "queue" = "goal",
 ) {
-  fireEvent.click(await rendered.findByRole("button", { name: "Add a task" }));
-  if (destination === "queue") {
-    fireEvent.change(rendered.getByLabelText("Task destination"), {
-      target: { value: "queue" },
-    });
-  }
-  return rendered.findByRole("combobox", {
-    name: `Add a task to ${destination === "goal" ? "Goals" : "Queue"}`,
+  const picker = await rendered.findByRole("combobox", {
+    name: "Add a task to Goals",
   });
+  if (destination === "queue") {
+    fireEvent.click(
+      within(await rendered.findByRole("group", { name: "Task destination" })).getByRole(
+        "button",
+        { name: "Queue" },
+      ),
+    );
+    return rendered.findByRole("combobox", { name: "Add a task to Queue" });
+  }
+  return picker;
 }
 
 async function expectNoAriaViolations(container: HTMLElement) {
@@ -373,7 +377,7 @@ describe("Tasks registered controls", () => {
     fireEvent.keyDown(combo, { key: "Home" });
     expect(combo.getAttribute("aria-activedescendant")).toBe(options[0]!.id);
     fireEvent.keyDown(combo, { key: "Enter" });
-    await waitFor(() => expect(rendered.queryByRole("combobox")).toBeNull());
+    await waitFor(() => expect(rendered.queryByRole("listbox")).toBeNull());
 
     const filtered = await openWorkItemPicker(rendered);
     filtered.focus();
@@ -384,13 +388,13 @@ describe("Tasks registered controls", () => {
     fireEvent.keyDown(filtered, { key: "End" });
     expect(filtered.getAttribute("aria-activedescendant")).toBe(filteredOption.id);
     fireEvent.keyDown(filtered, { key: "Escape" });
-    await waitFor(() => expect(rendered.queryByRole("combobox")).toBeNull());
+    await waitFor(() => expect(rendered.queryByRole("listbox")).toBeNull());
     const reopened = await openWorkItemPicker(rendered);
     reopened.focus();
     fireEvent.click(reopened);
     await rendered.findByRole("listbox");
     fireEvent.keyDown(reopened, { key: "Escape" });
-    await waitFor(() => expect(rendered.queryByRole("combobox")).toBeNull());
+    await waitFor(() => expect(rendered.queryByRole("listbox")).toBeNull());
     rendered.lifecycle.unmount();
   });
 
@@ -421,7 +425,7 @@ describe("Tasks registered controls", () => {
     const taskPicker = await openWorkItemPicker(right);
     fireEvent.focus(taskPicker);
     fireEvent.click(await right.findByRole("option", { name: /WORK-2/ }));
-    expect(right.queryByRole("combobox")).toBeNull();
+    expect(right.getByRole("combobox", { name: "Add a task to Goals" })).toBeTruthy();
     expect(right.queryByRole("listbox")).toBeNull();
     right.lifecycle.unmount();
   });
@@ -1038,7 +1042,7 @@ describe("Tasks registered controls", () => {
     attach.resolve({});
     await waitFor(() =>
       expect(
-        rendered.getByRole("button", { name: "Add a task" }),
+        rendered.getByRole("combobox", { name: "Add a task to Goals" }),
       ).toBeTruthy(),
     );
     rendered.lifecycle.unmount();

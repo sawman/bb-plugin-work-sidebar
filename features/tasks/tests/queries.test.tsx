@@ -295,7 +295,6 @@ describe("Tasks read slots", () => {
     );
     expect(retry.getByText("Status")).toBeTruthy();
     expect(retry.getByText("Work items")).toBeTruthy();
-    expect(retry.getByText("Goal")).toBeTruthy();
     expect(retry.getByLabelText(/Codex provider status: Ready/)).toBeTruthy();
     expect(
       retry.queryByText("No tasks are attached to this thread."),

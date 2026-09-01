@@ -438,9 +438,8 @@ function WorkQueue({
   updatingAssignee: boolean;
   onUpdateAssignee(taskId: string, assignee: "agent" | "human"): void;
 }) {
-  const [adding, setAdding] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [destination, setDestination] = useState<"goal" | "queue">("goal");
-  const [selection, setSelection] = useState("");
   const [search, setSearch] = useState("");
   const referenced = (reference: WorkItemReference) =>
     (queue.current?.source === reference.source && queue.current.id === reference.id) ||
@@ -453,11 +452,10 @@ function WorkQueue({
     .map((item) => ({ value: `linear:${item.value}`, label: item.label, detail: item.detail }));
   const options = [...bbOptions, ...linearOptions];
   const close = () => {
-    setSelection("");
     setSearch("");
     setDestination("goal");
     linearSearch?.onQueryChange("");
-    setAdding(false);
+    setPickerOpen(false);
   };
   const selectReference = (value: string) => {
     const separator = value.indexOf(":");
@@ -471,88 +469,112 @@ function WorkQueue({
   };
   return (
     <section className="ws-work-item-queue" aria-label="Work queue">
-      <div className="ws-work-item-queue-heading"><h3 className="ws-card-section-label">Goals</h3></div>
-      {queue.current ? (
-        <div className="ws-work-item-queue-current">
-          <QueueReference
-            reference={queue.current}
-            label={labelForReference(queue.current)}
-            task={taskById.get(queue.current.id)}
-            showStatus={queue.current.source === "bb_task"}
-            disabled={pending}
-            onStatus={onTaskStatus}
-            updatingAssignee={updatingAssignee}
-            onUpdateAssignee={onUpdateAssignee}
-          />
-          <WorkItemQueueActions disabled={pending} onDefer={onDemote} onStart={() => onMoveToExecution(queue.current!)} />
-        </div>
-      ) : <p className="ws-card-note">Choose a BB task or linked Linear issue as the current goal.</p>}
-      {queue.backlog.length ? (
-        <div className="ws-work-item-backlog">
-          <h3 className="ws-card-section-label">Backlog</h3>
-          <div role="list" aria-label="Goal backlog">
-            {queue.backlog.map((reference) => (
-              <div key={`${reference.source}:${reference.id}`} role="listitem" className="ws-work-item-backlog-row">
-                <QueueReference
-                  reference={reference}
-                  label={labelForReference(reference)}
-                  task={taskById.get(reference.id)}
-                  showStatus={reference.source === "bb_task"}
-                  disabled={pending}
-                  onStatus={onTaskStatus}
-                  updatingAssignee={updatingAssignee}
-                  onUpdateAssignee={onUpdateAssignee}
-                />
-                <WorkItemQueueActions
-                  disabled={pending}
-                  onMakeCurrent={() => onPromote(reference)}
-                  onStart={() => onMoveToExecution(reference)}
-                />
-              </div>
-            ))}
+      <div className="ws-task-workflow-section ws-work-item-goals">
+        <h3>Goals</h3>
+        {queue.current ? (
+          <div className="ws-work-item-queue-current">
+            <QueueReference
+              reference={queue.current}
+              label={labelForReference(queue.current)}
+              task={taskById.get(queue.current.id)}
+              showStatus={queue.current.source === "bb_task"}
+              disabled={pending}
+              onStatus={onTaskStatus}
+              updatingAssignee={updatingAssignee}
+              onUpdateAssignee={onUpdateAssignee}
+            />
+            <WorkItemQueueActions
+              disabled={pending}
+              onDefer={onDemote}
+              onStart={() => onMoveToExecution(queue.current!)}
+            />
           </div>
-        </div>
-      ) : null}
-      <div className="ws-work-item-queue-add">
-        {!adding ? (
-          <button type="button" className="ws-text-button" disabled={pending} onClick={() => setAdding(true)}>Add a task</button>
         ) : (
-          <>
-            <label className="ws-work-item-destination">
-              <span>Add to</span>
-              <select
-                aria-label="Task destination"
-                disabled={pending}
-                value={destination}
-                onChange={(event) => setDestination(event.target.value as "goal" | "queue")}
-              >
-                <option value="goal">Goals</option>
-                <option value="queue">Queue</option>
-              </select>
-            </label>
-          <SearchCombobox
-            ariaLabel={`Add a task to ${destination === "goal" ? "Goals" : "Queue"}`}
-            busy={linearSearch?.searching ?? false}
-            error={linearSearch?.error ?? null}
-            emptyMessage="No matching BB or Linear tasks."
-            listboxLabel="Available BB and Linear tasks"
-            onDismiss={close}
-            onOpenChange={(open) => { if (!open) close(); }}
-            onQueryChange={(value) => {
-              setSearch(value);
-              linearSearch?.onQueryChange(value);
-            }}
-            onRetry={() => void linearSearch?.onRetry()}
-            onSelectionChange={(values) => { const value = values[0]; if (value) selectReference(value); }}
-            open
-            options={options}
-            placeholder="Search BB or Linear tasks…"
-            portal
-            query={search}
-            selectedValues={selection ? [selection] : []}
-          />
-          </>
+          <p className="ws-card-note">
+            Choose a BB task or linked Linear issue as the current goal.
+          </p>
         )}
+        {queue.backlog.length ? (
+          <div className="ws-work-item-backlog">
+            <h3 className="ws-card-section-label">Backlog</h3>
+            <div role="list" aria-label="Goal backlog">
+              {queue.backlog.map((reference) => (
+                <div
+                  key={`${reference.source}:${reference.id}`}
+                  role="listitem"
+                  className="ws-work-item-backlog-row"
+                >
+                  <QueueReference
+                    reference={reference}
+                    label={labelForReference(reference)}
+                    task={taskById.get(reference.id)}
+                    showStatus={reference.source === "bb_task"}
+                    disabled={pending}
+                    onStatus={onTaskStatus}
+                    updatingAssignee={updatingAssignee}
+                    onUpdateAssignee={onUpdateAssignee}
+                  />
+                  <WorkItemQueueActions
+                    disabled={pending}
+                    onMakeCurrent={() => onPromote(reference)}
+                    onStart={() => onMoveToExecution(reference)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+      <div className="ws-work-item-queue-add">
+        <div
+          className="ws-work-item-destination"
+          role="group"
+          aria-label="Task destination"
+        >
+          <button
+            type="button"
+            aria-pressed={destination === "goal"}
+            disabled={pending}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => setDestination("goal")}
+          >
+            Goal
+          </button>
+          <button
+            type="button"
+            aria-pressed={destination === "queue"}
+            disabled={pending}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => setDestination("queue")}
+          >
+            Queue
+          </button>
+        </div>
+        <SearchCombobox
+          ariaLabel={`Add a task to ${destination === "goal" ? "Goals" : "Queue"}`}
+          busy={linearSearch?.searching ?? false}
+          disabled={pending}
+          error={linearSearch?.error ?? null}
+          emptyMessage="No matching BB or Linear tasks."
+          listboxLabel="Available BB and Linear tasks"
+          onDismiss={close}
+          onOpenChange={setPickerOpen}
+          onQueryChange={(value) => {
+            setSearch(value);
+            linearSearch?.onQueryChange(value);
+          }}
+          onRetry={() => void linearSearch?.onRetry()}
+          onSelectionChange={(values) => {
+            const value = values[0];
+            if (value) selectReference(value);
+          }}
+          open={pickerOpen}
+          options={options}
+          placeholder="Add BB or Linear task…"
+          portal
+          query={search}
+          selectedValues={[]}
+        />
       </div>
       {linearError ? (
         <div className="ws-callout" role="alert">

@@ -3809,7 +3809,6 @@ button.ws-provider-health:focus-visible {
   padding-bottom: 0.45rem;
   border-bottom: 1px solid var(--border);
 }
-.ws-work-item-queue-heading,
 .ws-work-item-queue-current,
 .ws-work-item-backlog-row {
   display: flex;
@@ -3866,10 +3865,11 @@ button.ws-provider-health:focus-visible {
   border: 1px solid var(--border);
 }
 .ws-work-item-queue-add {
-  display: inline-flex;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  gap: 0.3rem;
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.38rem;
   margin-top: 0.18rem;
   border-top: 1px solid var(--border);
   padding-top: 0.42rem;
@@ -3877,18 +3877,42 @@ button.ws-provider-health:focus-visible {
 .ws-work-item-destination {
   display: inline-flex;
   align-items: center;
-  gap: 0.28rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 3px);
   color: var(--muted-foreground);
-  font: var(--ws-text-metadata);
+  font: var(--ws-text-subtext);
   line-height: inherit;
 }
-.ws-work-item-destination select {
-  border: 1px solid var(--border);
-  padding: 0.12rem 0.24rem;
-  background: var(--background);
-  color: var(--foreground);
+.ws-work-item-destination button {
+  min-height: 1.5rem;
+  border: 0;
+  border-right: 1px solid var(--border);
+  padding: 0 0.38rem;
+  background: transparent;
+  color: inherit;
   font: inherit;
   line-height: inherit;
+  cursor: pointer;
+}
+.ws-work-item-destination button:last-child {
+  border-right: 0;
+}
+.ws-work-item-destination button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--foreground);
+}
+.ws-work-item-destination button:focus-visible {
+  position: relative;
+  outline: 1px solid var(--ring);
+  outline-offset: -1px;
+}
+.ws-work-item-destination button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+.ws-work-item-queue-add > .ws-search-shell {
+  min-width: 0;
 }
 .ws-work-item-queue-actions {
   display: inline-flex;
