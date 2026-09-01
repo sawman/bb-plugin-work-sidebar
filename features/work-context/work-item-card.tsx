@@ -5,7 +5,6 @@ import { CopyBadge } from "../../components/ui/copy-badge";
 import { Icon } from "../../components/ui/icon";
 import { Input } from "../../components/ui/input";
 import { SearchCombobox } from "../../components/ui/combobox";
-import { AssigneePicker } from "../tasks/assignee-picker";
 import type { TaskStatus } from "../tasks/model";
 import { TaskPriorityIcon } from "../tasks/priority";
 import { TaskStatusControl } from "../tasks/workflow-card";
@@ -43,7 +42,6 @@ type TaskSummary = {
   title: string;
   status: TaskStatus;
   priority: "urgent" | "high" | "medium" | "low" | "none";
-  assignee?: "agent" | "human";
 };
 type WorkQueueValue = {
   current: WorkItemReference | null;
@@ -88,14 +86,12 @@ export function WorkItemCard({
       reference?.source === "bb_task" ? [reference.id] : [],
     ),
   );
-  const sidebarOutcome = tasks.data?.tasks.find((task) => task.id === outcome?.id);
   const taskById = new Map<string, TaskSummary>(
     (tasks.data?.tasks ?? []).map((task) => [task.id, {
       key: task.key,
       title: task.title,
       status: task.status,
       priority: task.priority,
-      assignee: task.assignee,
     }]),
   );
   if (outcome) taskById.set(outcome.id, {
@@ -103,7 +99,6 @@ export function WorkItemCard({
     title: outcome.title,
     status: outcome.status,
     priority: outcome.priority,
-    assignee: sidebarOutcome?.assignee,
   });
   const linearByKey = new Map(
     (tracker.data?.items ?? []).map((linked) => [linked.item.key.toUpperCase(), linked]),
@@ -206,14 +201,6 @@ export function WorkItemCard({
             taskMutations.status.mutateAsync({ taskId, status }),
             "BB task updated",
             "Could not update BB task",
-          )
-        }
-        updatingAssignee={taskMutations.assignment.isPending}
-        onUpdateAssignee={(taskId, assignee) =>
-          void report(
-            taskMutations.assignment.mutateAsync({ taskId, assignee }),
-            "Task assignee updated",
-            "Could not update task assignee",
           )
         }
         onAddToQueue={(reference) => {
@@ -417,8 +404,6 @@ function WorkQueue({
   onAddToQueue,
   onMoveToExecution,
   onTaskStatus,
-  updatingAssignee,
-  onUpdateAssignee,
 }: {
   queue: WorkQueueValue;
   labelForReference(reference: WorkItemReference): string;
@@ -435,8 +420,6 @@ function WorkQueue({
   onAddToQueue(reference: WorkItemReference): void;
   onMoveToExecution(reference: WorkItemReference): void;
   onTaskStatus(taskId: string, status: TaskStatus): void;
-  updatingAssignee: boolean;
-  onUpdateAssignee(taskId: string, assignee: "agent" | "human"): void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [destination, setDestination] = useState<"goal" | "queue">("goal");
@@ -480,8 +463,6 @@ function WorkQueue({
               showStatus={queue.current.source === "bb_task"}
               disabled={pending}
               onStatus={onTaskStatus}
-              updatingAssignee={updatingAssignee}
-              onUpdateAssignee={onUpdateAssignee}
             />
             <WorkItemQueueActions
               disabled={pending}
@@ -511,8 +492,6 @@ function WorkQueue({
                     showStatus={reference.source === "bb_task"}
                     disabled={pending}
                     onStatus={onTaskStatus}
-                    updatingAssignee={updatingAssignee}
-                    onUpdateAssignee={onUpdateAssignee}
                   />
                   <WorkItemQueueActions
                     disabled={pending}
@@ -613,8 +592,6 @@ function QueueReference({
   showStatus,
   disabled,
   onStatus,
-  updatingAssignee,
-  onUpdateAssignee,
 }: {
   reference: WorkItemReference;
   label: string;
@@ -622,8 +599,6 @@ function QueueReference({
   showStatus: boolean;
   disabled: boolean;
   onStatus(taskId: string, status: TaskStatus): void;
-  updatingAssignee: boolean;
-  onUpdateAssignee(taskId: string, assignee: "agent" | "human"): void;
 }) {
   return (
     <span className="ws-work-item-reference">
@@ -637,14 +612,6 @@ function QueueReference({
       )}
       <span className="ws-work-item-reference-title">{task?.title ?? label}</span>
       {task ? <span className="ws-work-item-reference-controls">
-        {task.assignee ? (
-          <AssigneePicker
-            value={task.assignee}
-            taskKey={task.key}
-            disabled={disabled || updatingAssignee}
-            onChange={(assignee) => onUpdateAssignee(reference.id, assignee)}
-          />
-        ) : null}
         {showStatus ? (
           <TaskStatusControl
             taskKey={task.key}

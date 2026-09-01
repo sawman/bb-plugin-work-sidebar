@@ -88,7 +88,7 @@ export function TaskWorkflowContent({
     owners: [...bindingOwners, ...linkedOwners],
   });
   const detachableTaskIds = new Set(genericTasks.filter((task) => !executionTaskIds.has(task.id)).map((task) => task.id));
-  const busy = mutations.attachment.isPending || mutations.assignment.isPending || mutations.status.isPending;
+  const busy = mutations.attachment.isPending || mutations.status.isPending;
   const report = (operation: Promise<unknown>, fallback: string) =>
     void operation.catch((error) => toast.error(error instanceof Error ? error.message : fallback));
   if (tasks.isPending) {
@@ -99,12 +99,6 @@ export function TaskWorkflowContent({
       sections={workflow}
       busy={busy}
       detachableTaskIds={detachableTaskIds}
-      onAssigneeChange={(taskId, assignee) =>
-        report(
-          mutations.assignment.mutateAsync({ taskId, assignee }),
-          "Could not update task assignee",
-        )
-      }
       onStatusChange={(taskId, taskStatus) =>
         report(
           mutations.status.mutateAsync({ taskId, status: taskStatus }),

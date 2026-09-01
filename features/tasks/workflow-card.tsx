@@ -4,7 +4,6 @@ import { Icon } from "../../components/ui/icon";
 import { ThreadProviderLogo } from "../../components/threads/thread-provider-logo";
 import { taskStatusPresentation } from "./model";
 import { TaskPriorityIcon } from "./priority";
-import { AssigneePicker } from "./assignee-picker";
 import type { SidebarTask } from "../../work-model";
 import {
   MAX_COMPLETED_TASK_PREVIEW,
@@ -17,7 +16,6 @@ type WorkflowSections = ReturnType<typeof projectTaskWorkflow>;
 export function TaskWorkflowCard({
   sections,
   busy,
-  onAssigneeChange,
   onStatusChange,
   detachableTaskIds,
   onDetach,
@@ -25,7 +23,6 @@ export function TaskWorkflowCard({
 }: {
   sections: WorkflowSections;
   busy: boolean;
-  onAssigneeChange(taskId: string, assignee: "agent" | "human"): void;
   onStatusChange(taskId: string, status: SidebarTask["status"]): void;
   detachableTaskIds: ReadonlySet<string>;
   onDetach(taskId: string): void;
@@ -41,7 +38,6 @@ export function TaskWorkflowCard({
         items={sections.needsYou}
         defaultOpen
         busy={busy}
-        onAssigneeChange={onAssigneeChange}
         onStatusChange={onStatusChange}
         detachableTaskIds={detachableTaskIds}
         onDetach={onDetach}
@@ -53,7 +49,6 @@ export function TaskWorkflowCard({
         items={sections.queue}
         defaultOpen
         busy={busy}
-        onAssigneeChange={onAssigneeChange}
         onStatusChange={onStatusChange}
         detachableTaskIds={detachableTaskIds}
         onDetach={onDetach}
@@ -66,7 +61,6 @@ export function TaskWorkflowCard({
         total={sections.completedTotal}
         itemLimit={MAX_COMPLETED_TASK_PREVIEW}
         busy={busy}
-        onAssigneeChange={onAssigneeChange}
         onStatusChange={onStatusChange}
         detachableTaskIds={detachableTaskIds}
         onDetach={onDetach}
@@ -90,7 +84,6 @@ function WorkflowSection({
   itemLimit,
   defaultOpen = false,
   busy,
-  onAssigneeChange,
   onStatusChange,
   detachableTaskIds,
   onDetach,
@@ -104,7 +97,6 @@ function WorkflowSection({
   itemLimit?: number;
   defaultOpen?: boolean;
   busy: boolean;
-  onAssigneeChange(taskId: string, assignee: "agent" | "human"): void;
   onStatusChange(taskId: string, status: SidebarTask["status"]): void;
   detachableTaskIds: ReadonlySet<string>;
   onDetach(taskId: string): void;
@@ -146,7 +138,6 @@ function WorkflowSection({
               key={item.task.id}
               item={item}
               busy={busy}
-              onAssigneeChange={onAssigneeChange}
               onStatusChange={onStatusChange}
               detachable={detachableTaskIds.has(item.task.id)}
               onDetach={onDetach}
@@ -162,7 +153,6 @@ function WorkflowSection({
 function WorkflowRow({
   item,
   busy,
-  onAssigneeChange,
   onStatusChange,
   detachable,
   onDetach,
@@ -170,7 +160,6 @@ function WorkflowRow({
 }: {
   item: TaskWorkflowItem;
   busy: boolean;
-  onAssigneeChange(taskId: string, assignee: "agent" | "human"): void;
   onStatusChange(taskId: string, status: SidebarTask["status"]): void;
   detachable: boolean;
   onDetach(taskId: string): void;
@@ -225,12 +214,6 @@ function WorkflowRow({
         role="group"
         aria-label={`Actions for ${task.key}`}
       >
-        <AssigneePicker
-          value={task.assignee}
-          taskKey={task.key}
-          disabled={busy}
-          onChange={(assignee) => onAssigneeChange(task.id, assignee)}
-        />
         <TaskStatusControl
           taskKey={task.key}
           status={task.status}

@@ -653,13 +653,20 @@ describe("registered Work context cards", () => {
       expect(
         slot.getByRole("button", { name: "Detach WORK-3 from this thread" }),
       ).toBeTruthy();
-      const outcomeAssignee = slot.getByRole("switch", {
-        name: "Human assigned to WORK-1",
-      });
+      const workItemsCard = slot.container.querySelector<HTMLElement>(
+        '[data-card="work items"]',
+      );
+      expect(workItemsCard).toBeTruthy();
       expect(
-        slot.getByRole("switch", { name: "Agent assigned to WORK-2" }),
-      ).toBeTruthy();
-      expect(outcomeAssignee.getAttribute("aria-checked")).toBe("false");
+        within(workItemsCard!).queryByRole("switch", {
+          name: "Human assigned to WORK-1",
+        }),
+      ).toBeNull();
+      expect(
+        within(workItemsCard!).queryByRole("switch", {
+          name: "Agent assigned to WORK-2",
+        }),
+      ).toBeNull();
     } finally {
       slot.lifecycle.unmount();
       getPluginQueryClient().clear();
@@ -1310,21 +1317,11 @@ describe("registered Work context cards", () => {
     getPluginQueryClient().clear();
   });
 
-  it("keeps execution-task ownership visible while assignment is pending and lets Human work be completed", async () => {
+  it("keeps task status actionable without assignee controls in Work items", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));
-    let assignee: "human" | "agent" = "human";
     let statusValue: import("../../../work-model").SidebarTask["status"] =
       "todo";
-    let resolveAssignment!: () => void;
-    const assignment = new Promise<void>((resolve) => {
-      resolveAssignment = resolve;
-    });
-    const updateTaskAssignee = vi.fn(async () => {
-      await assignment;
-      assignee = "agent";
-      return { taskId: "task_execution", assignee };
-    });
     const updateTaskStatus = vi.fn(
       async (input: {
         taskId: string;
@@ -1354,7 +1351,7 @@ describe("registered Work context cards", () => {
       dueDate: null,
       parentTaskId: "task_outcome",
       updatedAt: "2026-08-29T01:00:00.000Z",
-      assignee,
+      assignee: "human" as const,
     });
     const slot = renderSlot(
       app.threadPanelActions[0]!,
@@ -1381,70 +1378,20 @@ describe("registered Work context cards", () => {
             ...outcome,
             executionTasks: [taskRecord()],
           }),
-          updateTaskAssignee,
           updateTaskStatus,
         }),
       },
     );
 
-    await waitFor(() =>
-      expect(slot.getByLabelText("Human assigned to WORK-2")).toBeTruthy(),
-    );
-    const assignmentSwitch = slot.getByRole("switch", {
-      name: "Human assigned to WORK-2",
-    });
-    fireEvent.pointerDown(assignmentSwitch, { clientX: 2, pointerId: 1 });
-    fireEvent.pointerUp(assignmentSwitch, { clientX: 28, pointerId: 1 });
-    expect(updateTaskAssignee).not.toHaveBeenCalled();
-    await new Promise((resolve) => window.setTimeout(resolve, 2_020));
-    await waitFor(() =>
-      expect(updateTaskAssignee).toHaveBeenCalledWith({
-        taskId: "task_execution",
-        assignee: "agent",
-      }),
-    );
-    expect(
-      slot.getByRole("switch", { name: "Agent assigned to WORK-2" }),
-    ).toBeTruthy();
-    resolveAssignment();
-    await updateTaskAssignee.mock.results[0]!.value;
-    slot.lifecycle.unmount();
-    getPluginQueryClient().clear();
-
-    const completionSlot = renderSlot(
-      app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
-      {
-        rpc: fixture({
-          sidebarTasks: () => ({
-            available: true,
-            projects: [{ id: "project_1", name: "Work" }],
-            error: null,
-            tasks: [
-              {
-                ...taskRecord(),
-                id: "task_human",
-                key: "WORK-3",
-                title: "Confirm the release",
-                status: statusValue,
-                linkedThreadIds: ["thr_one"],
-                assignee: "human" as const,
-              },
-            ],
-          }),
-          updateTaskStatus,
-        }),
-      },
-    );
-    const statusControl = await completionSlot.findByRole("button", {
+    const statusControl = await slot.findByRole("button", {
       name: "Change status for WORK-3: To do",
     });
     const taskRow = statusControl.closest(".ws-task-workflow-row")!;
     const actions = taskRow.querySelector(".ws-task-workflow-actions")!;
     expect(actions.contains(statusControl)).toBe(true);
-    expect(actions.querySelector('[role="switch"]')).toBeTruthy();
+    expect(actions.querySelector('[role="switch"]')).toBeNull();
     fireEvent.click(statusControl);
-    fireEvent.click(completionSlot.getByRole("option", { name: "In Review" }));
+    fireEvent.click(slot.getByRole("option", { name: "In Review" }));
     await waitFor(() =>
       expect(updateTaskStatus).toHaveBeenCalledWith({
         taskId: "task_human",
@@ -1452,9 +1399,9 @@ describe("registered Work context cards", () => {
       }),
     );
     await waitFor(() =>
-      expect(completionSlot.getByText("Confirm the release")).toBeTruthy(),
+      expect(slot.getByText("Confirm the release")).toBeTruthy(),
     );
-    completionSlot.lifecycle.unmount();
+    slot.lifecycle.unmount();
     getPluginQueryClient().clear();
   });
 

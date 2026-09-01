@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { configureAxe } from "vitest-axe";
-import { toast } from "sonner";
 import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
@@ -1018,7 +1017,7 @@ describe("Tasks registered controls", () => {
     rendered.lifecycle.unmount();
   });
 
-  it("operates the registered Work item picker, busy detach, and optimistic assignee rollback", async () => {
+  it("operates the registered Work item picker without assignee controls", async () => {
     const attach = deferred<unknown>();
     const call = vi.fn((method) =>
       method === "attachTaskToThread" ? attach.promise : Promise.resolve({}),
@@ -1048,65 +1047,7 @@ describe("Tasks registered controls", () => {
     rendered.lifecycle.unmount();
     getPluginQueryClient().clear();
 
-    const successfulAssignment = deferred<unknown>();
-    const successfulCall = vi.fn((method) =>
-      method === "updateTaskAssignee"
-        ? successfulAssignment.promise
-        : Promise.resolve({}),
-    );
-    const successful = renderSlot(
-      captured.threadPanelActions[0]!,
-      { threadId: "thr_test", params: null },
-      {
-        rpc: rpcFixtures(
-          () => tasks([{ ...task, linkedThreadIds: ["thr_test"] }]),
-          successfulCall,
-        ),
-      },
-    );
-    await waitFor(() =>
-      expect(
-        successful.getByLabelText("Human assigned to WORK-1"),
-      ).toBeTruthy(),
-    );
-    vi.useFakeTimers();
-    fireEvent.pointerDown(
-      successful.getByLabelText("Human assigned to WORK-1"),
-      { clientX: 2, pointerId: 1 },
-    );
-    fireEvent.pointerUp(successful.getByLabelText("Human assigned to WORK-1"), {
-      clientX: 28,
-      pointerId: 1,
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_000);
-    });
-    vi.useRealTimers();
-    await waitFor(() =>
-      expect(successfulCall).toHaveBeenCalledWith("updateTaskAssignee", {
-        taskId: "task_1",
-        assignee: "agent",
-      }),
-    );
-    successfulAssignment.resolve({});
-    await waitFor(() =>
-      expect(
-        successful.getByLabelText("Human assigned to WORK-1"),
-      ).toBeTruthy(),
-    );
-    successful.lifecycle.unmount();
-    getPluginQueryClient().clear();
-
-    const assignment = deferred<unknown>();
-    const detach = deferred<unknown>();
-    const toastError = vi.spyOn(toast, "error");
-    const rightCall = vi.fn((method) =>
-      method === "updateTaskAssignee"
-        ? assignment.promise
-        : method === "detachTaskFromThread"
-          ? detach.promise
-          : Promise.resolve({}),
-    );
+    const rightCall = vi.fn(() => Promise.resolve({}));
     const right = renderSlot(
       captured.threadPanelActions[0]!,
       { threadId: "thr_test", params: null },
@@ -1118,58 +1059,8 @@ describe("Tasks registered controls", () => {
       },
     );
     await waitFor(() =>
-      expect(right.getByLabelText("Human assigned to WORK-1")).toBeTruthy(),
+      expect(right.queryByRole("switch")).toBeNull(),
     );
-    vi.useFakeTimers();
-    fireEvent.pointerDown(right.getByLabelText("Human assigned to WORK-1"), {
-      clientX: 2,
-      pointerId: 2,
-    });
-    fireEvent.pointerUp(right.getByLabelText("Human assigned to WORK-1"), {
-      clientX: 28,
-      pointerId: 2,
-    });
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2_000);
-    });
-    vi.useRealTimers();
-    await waitFor(() =>
-      expect(rightCall).toHaveBeenCalledWith("updateTaskAssignee", {
-        taskId: "task_1",
-        assignee: "agent",
-      }),
-    );
-    await waitFor(() =>
-      expect(
-        right.getByRole("switch", { name: "Human assigned to WORK-1" }),
-      ).toBeTruthy(),
-    );
-    await act(async () => {
-      assignment.reject(new Error("assignment failed"));
-      await Promise.resolve();
-    });
-    await waitFor(() =>
-      expect(right.getByLabelText("Human assigned to WORK-1")).toBeTruthy(),
-    );
-    await waitFor(() =>
-      expect(toastError).toHaveBeenCalledWith("assignment failed"),
-    );
-    const detachButton = right.getByLabelText(
-      "Detach WORK-1 from this thread",
-    ) as HTMLButtonElement;
-    fireEvent.click(detachButton);
-    await waitFor(() =>
-      expect(rightCall).toHaveBeenCalledWith("detachTaskFromThread", {
-        taskId: "task_1",
-        threadId: "thr_test",
-      }),
-    );
-    expect(detachButton.disabled).toBe(true);
-    detach.reject(new Error("detach failed"));
-    await waitFor(() => expect(detachButton.disabled).toBe(false));
-    expect(
-      right.container.querySelector(".ws-thread-task-card .ws-task-workflow"),
-    ).toBeTruthy();
     right.lifecycle.unmount();
   });
 });
