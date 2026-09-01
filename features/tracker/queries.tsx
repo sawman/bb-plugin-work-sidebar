@@ -7,7 +7,16 @@ type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
 export function useTracker(threadId: string) {
   const rpc = useRpc<typeof rpcContract>();
-  return useQuery({ queryKey: trackerKeys.context(threadId), queryFn: () => rpc.call("getWorkTracker", { threadId }), enabled: Boolean(threadId), ...trackerPolicy });
+  return useQuery({
+    queryKey: trackerKeys.context(threadId),
+    queryFn: () => rpc.call("getWorkTracker", { threadId }),
+    enabled: Boolean(threadId),
+    ...trackerPolicy,
+    // This hook is mounted only by WorkTabContent. Keep linked Linear goals
+    // fresh while that tab is open, with no inactive-tab background polling.
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+  });
 }
 
 export function useTrackerSearch(threadId: string, query: string) {

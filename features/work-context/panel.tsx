@@ -61,7 +61,14 @@ function queueRootEvent(scope: WorkPanelScope, rootThreadId: string) {
 export function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const queryClient = useQueryClient();
   const appearance = useSidebarAppearancePreferences();
-  const status = useWorkStatus(threadId);
+  const tab = useStore(
+    threadInteractionStore,
+    (state) => state.workTabsByThread.get(threadId) ?? "work",
+  );
+  // The status query powers the header and root-scoped realtime matching.
+  // Poll it only while the Work tab is visible; the other tab panels keep the
+  // warm cache and still receive targeted realtime invalidation.
+  const status = useWorkStatus(threadId, { poll: tab === "work" });
   const workScopeRef = useRef<WorkPanelScope>({
     threadId,
     rootThreadId: null,
@@ -75,10 +82,6 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
     };
   if (status.data?.rootThreadId)
     workScopeRef.current.rootThreadId = status.data.rootThreadId;
-  const tab = useStore(
-    threadInteractionStore,
-    (state) => state.workTabsByThread.get(threadId) ?? "work",
-  );
   useEffect(() => {
     threadInteractionStore.getState().touchWorkTab(threadId);
     return () => changesInteractionStore.getState().selectFile(threadId, null);

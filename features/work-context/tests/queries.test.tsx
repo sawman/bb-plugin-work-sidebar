@@ -4,9 +4,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type PropsWithChildren } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  WORK_CARD_REFRESH_MS,
   useWorkItemQueue,
   useWorkOutcomeMutation,
+  useWorkPlan,
   useWorkProviderHealth,
+  useWorkStatus,
 } from "../queries";
 
 const { rpcClient } = vi.hoisted(() => ({
@@ -105,6 +108,56 @@ describe("work item queue query", () => {
       await vi.advanceTimersByTimeAsync(30_000);
     });
     expect(rpcClient.call).toHaveBeenCalledTimes(2);
+    client.clear();
+  });
+});
+
+describe("visible Work-card query cadence", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("refreshes durable cards on the shared cadence and stops after unmount", async () => {
+    vi.useFakeTimers();
+    rpcClient.call.mockReset();
+    const plan = vi.fn(() => ({ items: [] }));
+    const status = vi.fn(() => ({
+      rootThreadId: "thr_work_cards",
+      currentThread: { id: "thr_work_cards", title: "Work cards", status: "idle" },
+      children: [],
+    }));
+    rpcClient.call.mockImplementation((method) => {
+      if (method === "getWorkPlan") return Promise.resolve(plan());
+      if (method === "getWorkStatus") return Promise.resolve(status());
+      throw new Error(`Unexpected RPC ${method}`);
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const view = renderHook(
+      () => ({
+        plan: useWorkPlan("thr_work_cards"),
+        status: useWorkStatus("thr_work_cards", { poll: true }),
+      }),
+      { wrapper: wrapper(client) },
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(plan).toHaveBeenCalledTimes(1);
+    expect(status).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(WORK_CARD_REFRESH_MS);
+    });
+    expect(plan).toHaveBeenCalledTimes(2);
+    expect(status).toHaveBeenCalledTimes(2);
+
+    view.unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(WORK_CARD_REFRESH_MS);
+    });
+    expect(plan).toHaveBeenCalledTimes(2);
+    expect(status).toHaveBeenCalledTimes(2);
     client.clear();
   });
 });

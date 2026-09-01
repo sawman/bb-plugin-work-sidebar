@@ -22,6 +22,9 @@ type WorkBackgroundJobs = z.infer<
 
 type WorkQueryKey = "status" | "outcome" | "goal" | "plan";
 
+/** Shared cadence for durable Work-card data while the Work tab is visible. */
+export const WORK_CARD_REFRESH_MS = 30_000;
+
 function useWorkContextCard<T>(
   threadId: string,
   key: WorkQueryKey,
@@ -33,10 +36,15 @@ function useWorkContextCard<T>(
     queryFn: () => rpc.call(method, { threadId }) as Promise<T>,
     ...queryPolicies.workContext,
     refetchOnMount: "always",
+    refetchInterval: WORK_CARD_REFRESH_MS,
+    refetchIntervalInBackground: false,
   });
 }
 
-export function useWorkStatus(threadId: string) {
+export function useWorkStatus(
+  threadId: string,
+  { poll = false }: { poll?: boolean } = {},
+) {
   const rpc = useRpc<typeof rpcContract>();
   return useQuery({
     queryKey: queryKeys.work.status(threadId),
@@ -44,6 +52,8 @@ export function useWorkStatus(threadId: string) {
       rpc.call("getWorkStatus", { threadId }) as Promise<WorkStatus>,
     ...queryPolicies.workContext,
     refetchOnMount: "always",
+    refetchInterval: poll ? WORK_CARD_REFRESH_MS : false,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -78,7 +88,7 @@ export function useWorkItemQueue(threadId: string) {
     // The Work tab is conditionally mounted, so this only keeps an actively
     // viewed Work-items card current. Do not spend background refreshes on a
     // hidden panel.
-    refetchInterval: 30_000,
+    refetchInterval: WORK_CARD_REFRESH_MS,
     refetchIntervalInBackground: false,
   });
 }

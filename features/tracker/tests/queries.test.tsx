@@ -31,7 +31,7 @@ describe("tracker Query mutations", () => {
 });
 
 describe("tracker Query observer lifecycle", () => {
-  it("does not fan out a fresh cache on Work-tab remount, but refetches a stale observer exactly once", async () => {
+  it("keeps a fresh cache quiet, then refreshes an active stale Work observer and stops after unmount", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-01T00:00:00Z"));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -48,9 +48,14 @@ describe("tracker Query observer lifecycle", () => {
 
     vi.advanceTimersByTime(5_001);
     const stale = renderHook(() => useTracker("thr_1"), { wrapper });
-    await vi.runAllTimersAsync();
+    await vi.advanceTimersByTimeAsync(0);
     expect(trackerRpc).toHaveBeenCalledTimes(1);
     expect(trackerRpc).toHaveBeenLastCalledWith("getWorkTracker", { threadId: "thr_1" });
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(trackerRpc).toHaveBeenCalledTimes(2);
     stale.unmount();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(trackerRpc).toHaveBeenCalledTimes(2);
   });
 });
