@@ -142,6 +142,33 @@ describe("registered Status activity lifecycle", () => {
     slot.lifecycle.unmount();
   });
 
+  it("explains the blocked runtime indicator on hover", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_blocked", params: null },
+      {
+        rpc: fixture({
+          getWorkStatus: () => ({
+            ...baseStatus(),
+            currentThread: {
+              title: "Thread",
+              status: "error",
+              runtimeStatus: "failed",
+              providerId: "codex",
+            },
+          }),
+        }),
+      },
+    );
+    const indicator = await slot.findByRole("img", { name: "Blocked" });
+    expect(indicator.closest(".ws-runtime-state")?.getAttribute("title")).toBe(
+      "Blocked — BB reports this thread as blocked, failed, or errored. Open the thread for details.",
+    );
+    slot.lifecycle.unmount();
+  });
+
   it("polls the exact latest-activity RPC every 2s only for an active selected thread and stops when idle", async () => {
     vi.useFakeTimers();
     getPluginQueryClient().clear();
