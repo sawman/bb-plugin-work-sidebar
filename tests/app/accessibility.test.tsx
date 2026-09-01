@@ -303,6 +303,13 @@ describe("R19D registered slot accessibility", () => {
         slot.getByRole("dialog", { name: "Thread list settings" }),
       ).toBeTruthy(),
     );
+    const appearance = slot.container.querySelector(
+      ".ws-thread-appearance-settings",
+    );
+    expect(
+      appearance?.querySelectorAll(".ws-thread-appearance-entry"),
+    ).toHaveLength(3);
+    expect(appearance?.querySelectorAll("strong, b")).toHaveLength(0);
     await expectNoAriaViolations(slot.container);
     fireEvent.click(slot.getByRole("button", { name: "Tasks" }));
     await waitFor(() => expect(slot.getByText("Accessible task")).toBeTruthy());

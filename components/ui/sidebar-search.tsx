@@ -20,7 +20,7 @@ export function SidebarSearch({
     setOpen(false);
   };
   return (
-    <>
+    <div className="ws-sidebar-search">
       <SidebarListIconButton
         ref={triggerRef}
         title={`Search ${label}`}
@@ -52,6 +52,6 @@ export function SidebarSearch({
         searchOnly
         selectedValues={[]}
       />
-    </>
+    </div>
   );
 }

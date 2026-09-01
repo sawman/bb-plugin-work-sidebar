@@ -1045,7 +1045,7 @@
 .ws-work-toolbar-actions {
   display: flex;
   min-width: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;
   gap: 0.25rem;
@@ -2700,6 +2700,12 @@ button.ws-provider-health:focus-visible {
 .ws-work-toolbar-actions {
   min-height: 1.6rem;
 }
+.ws-sidebar-search {
+  display: inline-flex;
+  flex: none;
+  min-width: 0;
+  align-items: center;
+}
 .ws-sidebar-search-popover {
   width: min(14rem, calc(100vw - 1rem));
 }
@@ -3277,31 +3283,28 @@ button.ws-provider-health:focus-visible {
   padding: 0.25rem 0.45rem;
 }
 .ws-thread-appearance-settings .ws-thread-appearance-entry {
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4.2rem;
   align-items: center;
   gap: 0.35rem;
   min-height: 2rem;
   padding: 0.32rem 0;
-  border-top: 1px solid var(--border);
-}
-.ws-thread-appearance-settings .ws-thread-appearance-entry:first-child {
   border-top: 0;
+  font: var(--ws-text-subtext);
+  line-height: inherit;
 }
-.ws-thread-appearance-settings .ws-sidebar-text-scale-editor {
-  display: grid;
+.ws-thread-appearance-settings .ws-thread-appearance-entry > label {
+  font: inherit;
+  line-height: inherit;
 }
 .ws-thread-appearance-settings .ws-settings-input-row {
-  grid-template-columns: 2.8rem auto;
-  gap: 0.2rem;
-}
-.ws-thread-appearance-settings
-  .ws-sidebar-text-scale-editor
-  .ws-settings-input-row {
-  grid-template-columns: 2.8rem auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  width: 100%;
   gap: 0.2rem;
 }
 .ws-thread-appearance-settings .ws-settings-input-row input {
-  width: 2.8rem;
+  box-sizing: border-box;
+  width: 100%;
   padding-inline: 0.28rem;
 }
 .ws-thread-appearance-settings .ws-settings-error {

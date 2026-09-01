@@ -153,4 +153,31 @@ describe("stylesheet policy", () => {
     expect(animation).not.toMatch(/\b(?:filter|opacity)\s*:/);
     expect(source).toContain("@media (prefers-reduced-motion: reduce)");
   });
+
+  test("keeps compact thread settings rows plain, centered, aligned, and singly separated", () => {
+    const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    const rows = source.match(
+      /\.ws-thread-appearance-settings \.ws-thread-appearance-entry\s*\{([\s\S]*?)\}/,
+    )?.[1];
+    const groups = source.match(
+      /\.ws-thread-group-settings\s*\{([\s\S]*?)\}/,
+    )?.[1];
+    const toolbar = source.match(
+      /\.ws-work-toolbar-actions\s*\{([\s\S]*?)\}/,
+    )?.[1];
+    const search = source.match(/\.ws-sidebar-search\s*\{([\s\S]*?)\}/)?.[1];
+
+    expect(rows).toContain("display: grid");
+    expect(rows).toContain("align-items: center");
+    expect(rows).toContain("grid-template-columns: minmax(0, 1fr) 4.2rem");
+    expect(rows).toContain("font: var(--ws-text-subtext)");
+    expect(rows).toContain("border-top: 0");
+    expect(source).not.toMatch(
+      /\.ws-thread-appearance-settings \.ws-thread-appearance-entry:first-child\s*\{/,
+    );
+    expect(groups).toContain("border-top: 1px solid var(--border)");
+    expect(toolbar).toContain("flex-wrap: nowrap");
+    expect(search).toContain("display: inline-flex");
+    expect(search).toContain("flex: none");
+  });
 });

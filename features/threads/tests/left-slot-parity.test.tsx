@@ -311,6 +311,33 @@ describe("R18 registered left sidebar parity", () => {
     ).toContain("ws-refresh-button");
   });
 
+  it("keeps the left toolbar action layout stable while search opens", async () => {
+    const slot = await leftSlot({ activeProjectId: project.id });
+    const toolbar = slot.container.querySelector(
+      ".ws-work-toolbar-actions",
+    )!;
+    const actionChildrenBefore = [...toolbar.children].map(
+      (child) => child.className,
+    );
+    const searchTrigger = slot.getByRole("button", {
+      name: "Search threads",
+    });
+
+    expect(searchTrigger.querySelector('[data-icon="Search"] path')).toBeTruthy();
+    fireEvent.click(searchTrigger);
+
+    expect(
+      [...toolbar.children].map((child) => child.className),
+    ).toEqual(actionChildrenBefore);
+    expect(toolbar.querySelector(".ws-sidebar-search")).toBeTruthy();
+    expect(
+      slot.getByRole("searchbox", { name: "Search threads" })
+        .closest("[data-portalled=true]")
+        ?.parentElement,
+    ).toBe(document.body);
+    expect(searchTrigger.getAttribute("aria-expanded")).toBe("true");
+  });
+
   it("searches each left tab and includes custom and archived thread groups", async () => {
     const slot = await leftSlot({
       threads: [
@@ -1145,6 +1172,7 @@ describe("R18 registered left sidebar parity", () => {
     expect(
       appearance?.querySelectorAll(".ws-thread-appearance-entry"),
     ).toHaveLength(3);
+    expect(appearance?.querySelectorAll("strong, b")).toHaveLength(0);
     expect(rowHeight.closest(".ws-thread-appearance-entry")).toBeTruthy();
     expect(textScale.closest(".ws-thread-appearance-entry")).toBeTruthy();
     expect(
