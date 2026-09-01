@@ -33,6 +33,22 @@ decision appear different.
   `in_review` only while a named reviewer or concrete acceptance gate is
   actually pending; do not leave completed slices parked there by convention.
 
+### Child-thread lifecycle
+
+- Archive a completed child thread once its result is integrated or otherwise
+  no longer needed. Completed implementation, review, and research workers
+  should not remain in the active thread list merely as a historical record.
+- Keep a child active only while its task is incomplete, it is blocked on a
+  real follow-up, or its provider session/environment is deliberately being
+  retained for continued, focused work by a long-lived worker.
+- Do not archive a child just because its current turn is idle: first decide
+  whether the same worker state is the expedient way to continue its assigned
+  task. If it is not, archive it with `bb thread archive <id>` after recording
+  the result and completing its BB Task lifecycle.
+- Archive, rather than delete, finished workers. Archiving preserves the
+  thread's evidence and permits recovery; deletion is reserved for work the
+  user explicitly wants permanently removed.
+
 ## Architecture boundaries
 
 - Organize product code as vertical feature slices. A slice may own app code,
