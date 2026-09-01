@@ -163,9 +163,7 @@ describe("registered Status activity lifecycle", () => {
       },
     );
     const indicator = await slot.findByRole("img", { name: "Blocked" });
-    expect(indicator.closest(".ws-runtime-state")?.getAttribute("title")).toBe(
-      "Blocked — BB reports this thread as blocked, failed, or errored. Open the thread for details.",
-    );
+    expect(indicator.closest(".ws-runtime-state")?.getAttribute("title")).toBe("Blocked");
     slot.lifecycle.unmount();
   });
 

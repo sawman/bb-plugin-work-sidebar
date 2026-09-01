@@ -18,15 +18,6 @@ function countLabel(count: number, description: string) {
   return `${count} ${description}${count === 1 ? "" : "s"}`;
 }
 
-function runtimeTooltip(
-  runtime: ReturnType<typeof runtimeStatusPresentation>,
-): string {
-  if (runtime.tone === "blocked") {
-    return "Blocked — BB reports this thread as blocked, failed, or errored. Open the thread for details.";
-  }
-  return runtime.label;
-}
-
 export function StatusCard({ threadId }: { threadId: string }) {
   const query = useWorkStatus(threadId);
   const latestActivity = useLatestActivity(threadId, query.data?.currentThread.status);
@@ -107,7 +98,7 @@ function StatusHeading({
     <span className="ws-status-heading-meta">
       <span
         className={`ws-runtime-state ws-runtime-state-${runtime.tone}`}
-        title={runtimeTooltip(runtime)}
+        title={runtime.label}
       >
         <Icon name={runtimeIcons[runtime.tone]} aria-label={runtime.label} />
       </span>
