@@ -78,7 +78,11 @@ export function WorkItemCard({
     primaryLinearKey: tracker.data?.primaryKey ?? null,
     legacyState: query.data?.legacy.state ?? "none",
   });
-  const queue = queueQuery.data?.configured ? queueQuery.data.queue : workItem.queue;
+  const persistedQueue = queueQuery.data?.queue;
+  // Existing roots have no queue row until their first transition. Keep their
+  // durable Outcome/Linear primary visible through the one-time projection;
+  // the first queue mutation writes the explicit representation.
+  const queue = queueQuery.data?.configured ? persistedQueue! : workItem.queue;
   const sidebarOutcome = tasks.data?.tasks.find((task) => task.id === outcome?.id);
   const taskById = new Map<string, TaskSummary>(
     (tasks.data?.tasks ?? []).map((task) => [task.id, {
@@ -130,12 +134,13 @@ export function WorkItemCard({
     }
   };
   const trackerBusy = trackerMutations.link.isPending || trackerMutations.unlink.isPending || trackerMutations.status.isPending;
-  const saveQueue = (nextQueue: WorkQueueValue) =>
-    report(
+  const saveQueue = (nextQueue: WorkQueueValue) => {
+    void report(
       queueMutation.mutateAsync(nextQueue),
       "Work queue updated",
       "Could not update work queue",
     );
+  };
   const adoptLegacy = async () => {
     const taskId = legacy?.state === "adoptable" ? legacy.taskIds[0] : null;
     if (!taskId) return;

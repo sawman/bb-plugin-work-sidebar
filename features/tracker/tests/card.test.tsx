@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { configureAxe } from "vitest-axe";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
@@ -187,7 +187,7 @@ afterEach(() => {
 });
 
 describe("registered tracker card", () => {
-  it("keeps linked Linear goals in the shared queue and offers an adjacent add control", async () => {
+  it("projects an unconfigured root's linked Linear goals and offers an adjacent add control", async () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
@@ -200,6 +200,9 @@ describe("registered tracker card", () => {
     );
 
     expect(await slot.findByRole("button", { name: "Add Linear issue" })).toBeTruthy();
+    const workQueue = slot.getByRole("region", { name: "Work queue" });
+    expect(within(workQueue).getByText(/Suggested/)).toBeTruthy();
+    expect(within(workQueue).getByText(/Second linked issue/)).toBeTruthy();
     expect(slot.queryByRole("button", { name: /Unlink/ })).toBeNull();
     await expectNoAriaViolations(slot.container);
     slot.lifecycle.unmount();
@@ -351,6 +354,41 @@ describe("registered tracker card", () => {
       ),
     );
     expect(toast.error).toHaveBeenCalledWith("link failed");
+    slot.lifecycle.unmount();
+  });
+
+  it("reports Linear backlog success before queue persistence feedback without hiding queue failures", async () => {
+    const app = await loadPluginApp(() => import("../../../app"));
+    const link = deferred<{ key: string; title: string }>();
+    const queue = deferred<{
+      rootThreadId: string;
+      configured: boolean;
+      queue: { current: null; backlog: [] };
+    }>();
+    const linkLinearIssue = vi.fn(() => link.promise);
+    const saveWorkItemQueue = vi.fn(() => queue.promise);
+    const events: string[] = [];
+    toast.success.mockImplementation((message: string) => events.push(`success:${message}`));
+    toast.error.mockImplementation((message: string) => events.push(`error:${message}`));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_linear_backlog_toasts", params: null },
+      { rpc: fixture({ linkLinearIssue, saveWorkItemQueue }) },
+    );
+
+    fireEvent.focus(await openLinearSearch(slot));
+    await waitFor(() => expect(slot.getByText("Suggested")).toBeTruthy());
+    fireEvent.click(slot.getByText("Suggested"));
+    link.resolve({ key: "LIN-1", title: "Suggested" });
+    await waitFor(() => expect(saveWorkItemQueue).toHaveBeenCalledOnce());
+    queue.reject(new Error("queue failed"));
+
+    await waitFor(() =>
+      expect(events).toEqual([
+        "success:Linear issue added to backlog",
+        "error:queue failed",
+      ]),
+    );
     slot.lifecycle.unmount();
   });
 
