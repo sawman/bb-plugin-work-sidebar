@@ -5,6 +5,7 @@ import type { rpcContract } from "../../contracts";
 import { CopyBadge } from "../../components/ui/copy-badge";
 import { Icon } from "../../components/ui/icon";
 import { useGitHubApiHealth } from "../pull-requests/queries";
+import { githubHealthPresentation } from "../pull-requests/presentation";
 import { StackNumberBadge } from "../pull-requests/stack-number";
 import { changesHeaderLabel, mergeStackBranchSignals } from "./model";
 import {
@@ -76,10 +77,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
     : githubStack?.branches.find(
         (branch) => branch.pr?.number === currentPullRequestNumber,
       ) ?? null;
-  const healthClass =
-    githubApiHealth.state === "rate_limited"
-      ? "ws-github-api-rate_limited"
-      : "ws-github-api-unavailable";
+  const githubHealth = githubHealthPresentation(githubApiHealth);
   return (
     <div className="ws-section-stack">
       <header>
@@ -87,15 +85,13 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
           <h2>Changes</h2>
         </div>
         <span className="ws-section-count ws-changes-header-meta">
-          {githubApiHealth.state !== "available" && (
+          {githubHealth && (
             <span
-              className={`ws-github-api-indicator ${healthClass}`}
-              title={githubApiHealth.message ?? "GitHub API is unavailable."}
+              className={`ws-github-api-indicator ws-github-api-${githubHealth.tone}`}
+              title={githubHealth.detail}
             >
-              <Icon name="AlertCircle" aria-hidden />
-              {githubApiHealth.scope === "graphql"
-                ? "GraphQL limited"
-                : "GitHub unavailable"}
+              <Icon name={githubHealth.icon} aria-hidden />
+              {githubHealth.label}
             </span>
           )}
           {currentPullRequestNumber != null ? (

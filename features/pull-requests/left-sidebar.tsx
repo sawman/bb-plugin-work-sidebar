@@ -157,7 +157,7 @@ export function PullRequestsLeftSidebar({
             health ? (
               <span
                 className={`ws-github-api-indicator ws-github-api-${health.tone}`}
-                title={healthState.message ?? health.label}
+                title={health.detail}
               >
                 <Icon name={health.icon} aria-hidden />
                 {health.label}

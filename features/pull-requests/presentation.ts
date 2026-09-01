@@ -181,14 +181,41 @@ export function githubHealthPresentation(health: {
   scope: "graphql" | "rest" | "unknown";
   message: string | null;
   retryAt: number | null;
-}): StatusPresentation | null {
+  limits?: {
+    graphql: { limit: number; remaining: number; resetAt: number | null } | null;
+    rest: { limit: number; remaining: number; resetAt: number | null } | null;
+  };
+}): (StatusPresentation & { detail: string }) | null {
   if (health.state === "available") return null;
+  const quota = (name: string, value: { limit: number; remaining: number } | null) =>
+    value ? `${name} ${value.remaining.toLocaleString()}/${value.limit.toLocaleString()}` : null;
+  const quotas = [
+    quota("GraphQL", health.limits?.graphql ?? null),
+    quota("REST", health.limits?.rest ?? null),
+  ].filter((value): value is string => value !== null);
+  const compactQuotas = [
+    quota("GQL", health.limits?.graphql ?? null),
+    quota("REST", health.limits?.rest ?? null),
+  ].filter((value): value is string => value !== null);
+  const resetAt =
+    health.scope === "graphql"
+      ? health.limits?.graphql?.resetAt
+      : health.limits?.rest?.resetAt;
+  const reset =
+    resetAt != null
+      ? ` Resets at ${new Date(resetAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.`
+      : "";
   return health.state === "rate_limited"
     ? {
         icon: "AlertCircle",
-        label:
-          health.scope === "graphql" ? "GraphQL limited" : "GitHub limited",
+        label: `${health.scope === "graphql" ? "GraphQL limited" : "GitHub limited"}${compactQuotas.length ? ` · ${compactQuotas.join(" · ")}` : ""}`,
         tone: "warning",
+        detail: `${health.message ?? "GitHub API is rate limited."}${quotas.length ? ` ${quotas.join(" · ")} remaining.` : ""}${reset}`,
       }
-    : { icon: "AlertCircle", label: "GitHub unavailable", tone: "destructive" };
+    : {
+        icon: "AlertCircle",
+        label: "GitHub unavailable",
+        tone: "destructive",
+        detail: health.message ?? "GitHub API is unavailable.",
+      };
 }

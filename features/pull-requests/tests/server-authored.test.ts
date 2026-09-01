@@ -5,6 +5,43 @@ import { createAuthoredPullRequestService } from "../server-authored";
 import type { GitHubCommandService } from "../server-github-read";
 
 describe("authored pull-request stack wire projection", () => {
+  it("reports cached GraphQL and REST budgets with the shared health state", async () => {
+    const host = createFakePluginHost();
+    const lifecycle = createServerLifecycle();
+    lifecycle.githubGraphqlHealth = {
+      state: "rate_limited",
+      scope: "graphql",
+      message: "GitHub GraphQL is rate limited; using REST where possible.",
+      retryAt: 123,
+    };
+    const read = vi.fn(async () =>
+      JSON.stringify({
+        resources: {
+          graphql: { limit: 5_000, remaining: 0, reset: 123 },
+          core: { limit: 5_000, remaining: 4_812, reset: 456 },
+        },
+      }),
+    );
+    const handlers = createAuthoredPullRequestService(
+      host.bb,
+      lifecycle,
+      { read, execute: vi.fn() } as unknown as GitHubCommandService,
+    );
+
+    await expect(handlers.getGitHubApiHealth(null)).resolves.toEqual({
+      state: "rate_limited",
+      scope: "graphql",
+      message: "GitHub GraphQL is rate limited; using REST where possible.",
+      retryAt: 123,
+      limits: {
+        graphql: { limit: 5_000, remaining: 0, resetAt: 123_000 },
+        rest: { limit: 5_000, remaining: 4_812, resetAt: 456_000 },
+      },
+    });
+    expect(read).toHaveBeenCalledWith(["api", "rate_limit"], 1_000_000, 30_000);
+    await host.harness.lifecycle.dispose();
+  });
+
   it("loads all stacks once per repository instead of probing every authored PR", async () => {
     const host = createFakePluginHost();
     const lifecycle = createServerLifecycle();

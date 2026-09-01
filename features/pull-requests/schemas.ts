@@ -108,6 +108,27 @@ export const pullRequestReviewer = z
   })
   .strict();
 
+const githubApiLimit = z
+  .object({
+    limit: z.number().int().nonnegative(),
+    remaining: z.number().int().nonnegative(),
+    resetAt: z.number().int().nullable(),
+  })
+  .strict();
+
+export const githubApiHealth = z
+  .object({
+    state: z.enum(["available", "rate_limited", "unavailable"]),
+    scope: z.enum(["graphql", "rest", "unknown"]),
+    message: z.string().nullable(),
+    retryAt: z.number().nullable(),
+    limits: z
+      .object({ graphql: githubApiLimit.nullable(), rest: githubApiLimit.nullable() })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 const repositoryName = z
   .string()
   .regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/);

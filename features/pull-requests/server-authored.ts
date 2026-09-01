@@ -28,6 +28,44 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+type GitHubApiLimit = {
+  limit: number;
+  remaining: number;
+  resetAt: number | null;
+};
+
+function parseApiLimit(value: unknown): GitHubApiLimit | null {
+  if (!isRecord(value)) return null;
+  const { limit, remaining, reset } = value;
+  if (
+    typeof limit !== "number" ||
+    !Number.isInteger(limit) ||
+    limit < 0 ||
+    typeof remaining !== "number" ||
+    !Number.isInteger(remaining) ||
+    remaining < 0
+  )
+    return null;
+  return {
+    limit,
+    remaining,
+    resetAt:
+      typeof reset === "number" && Number.isFinite(reset) && reset >= 0
+        ? Math.round(reset * 1_000)
+        : null,
+  };
+}
+
+function parseGitHubApiLimits(value: unknown): {
+  graphql: GitHubApiLimit | null;
+  rest: GitHubApiLimit | null;
+} | null {
+  if (!isRecord(value) || !isRecord(value.resources)) return null;
+  const graphql = parseApiLimit(value.resources.graphql);
+  const rest = parseApiLimit(value.resources.core);
+  return graphql || rest ? { graphql, rest } : null;
+}
+
 function createArchiveLookup(read: GitHubReadRunner) {
   return async (repositories: readonly string[]) => {
     const unique = [...new Set(repositories)].filter((repository) => /^[^/]+\/[^/]+$/.test(repository));
@@ -183,7 +221,19 @@ export function createAuthoredPullRequestService(
   );
   bb.onDispose(() => authored.dispose());
   return {
-    async getGitHubApiHealth() { return githubReadHealth(lifecycle); },
+    async getGitHubApiHealth() {
+      let limits: ReturnType<typeof parseGitHubApiLimits> | undefined;
+      try {
+        limits = parseGitHubApiLimits(
+          JSON.parse(
+            await commands.read(["api", "rate_limit"], 1_000_000, 30_000),
+          ) as unknown,
+        );
+      } catch {
+        // Health remains useful even when GitHub will not provide a quota read.
+      }
+      return { ...githubReadHealth(lifecycle), ...(limits ? { limits } : {}) };
+    },
     async sidebarAuthoredPullRequests({ force }) {
       try {
         if (force) { authored.clear(); clearGitHubReadCache(lifecycle); }

@@ -557,7 +557,16 @@ describe("R13 registered Changes Work slot", () => {
     );
     const slot = await changesSlot({
       getChanges,
-      githubHealth: "rate_limited",
+      getGitHubApiHealth: () => ({
+        state: "rate_limited",
+        scope: "graphql",
+        message: "GitHub GraphQL is rate limited; using REST where possible.",
+        retryAt: null,
+        limits: {
+          graphql: { limit: 5_000, remaining: 0, resetAt: null },
+          rest: { limit: 5_000, remaining: 4_812, resetAt: null },
+        },
+      }),
     });
     await waitFor(() => expect(slot.getByText("Changed")).toBeTruthy());
     fireEvent.click(
@@ -566,7 +575,10 @@ describe("R13 registered Changes Work slot", () => {
     expect(slot.getByText("renamed.ts")).toBeTruthy();
     expect(slot.getByText("new.ts")).toBeTruthy();
     expect(slot.getByText("old.ts")).toBeTruthy();
-    expect(slot.getByText("GitHub unavailable")).toBeTruthy();
+    expect(
+      slot.getByText("GraphQL limited · GQL 0/5,000 · REST 4,812/5,000"),
+    ).toBeTruthy();
+    expect(slot.getByTitle(/GraphQL 0\/5,000.*REST 4,812\/5,000/)).toBeTruthy();
     expect(getChanges).toHaveBeenCalledTimes(1);
     slot.lifecycle.unmount();
   });

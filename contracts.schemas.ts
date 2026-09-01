@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { agentRpcSchemas } from "./features/agents/schemas.js";
-import { authoredPullRequest, pullRequestReviewerRpcSchemas, sidebarStack, sidebarStackLayer } from "./features/pull-requests/schemas.js";
+import { authoredPullRequest, githubApiHealth, pullRequestReviewerRpcSchemas, sidebarStack, sidebarStackLayer } from "./features/pull-requests/schemas.js";
 import { executionTaskSummarySchema, sidebarTaskProjectSchema, sidebarTaskSchema, taskLinkSchema, taskPrioritySchema, taskStatusSchema, taskSummarySchema } from "./features/tasks/schemas.js";
 import { threadArchiveSchemas, threadHierarchySchemas, threadPreferenceSchemas } from "./features/threads/schemas.js";
 import { trackerRpcSchemas } from "./features/tracker/schemas.js";
@@ -99,7 +99,7 @@ export const rpcSchemas = {
   getGitHubPollingPolicy: { input: z.null(), output: z.object({ activePollMs: z.number().int().positive(), backgroundPollMs: z.number().int().positive(), maxRestPollsPerMinute: z.number().int().positive() }) },
   ...trackerRpcSchemas,
   getWorkProviderStatus: { input: z.object({ threadId: z.string() }).strict(), output: workProviderStatus },
-  getGitHubApiHealth: { input: z.null(), output: z.object({ state: z.enum(["available", "rate_limited", "unavailable"]), scope: z.enum(["graphql", "rest", "unknown"]), message: z.string().nullable(), retryAt: z.number().nullable() }) },
+  getGitHubApiHealth: { input: z.null(), output: githubApiHealth },
   getLatestActivity: {
     input: z.object({ threadId: z.string().startsWith("thr_") }).strict(),
     output: z.object({

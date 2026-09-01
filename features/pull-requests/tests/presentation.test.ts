@@ -156,6 +156,7 @@ describe("pull-request presentation semantics", () => {
       icon: "AlertCircle",
       label: "GraphQL limited",
       tone: "warning",
+      detail: "limited",
     });
     expect(
       githubHealthPresentation({
@@ -168,6 +169,28 @@ describe("pull-request presentation semantics", () => {
       icon: "AlertCircle",
       label: "GitHub unavailable",
       tone: "destructive",
+      detail: "offline",
+    });
+  });
+
+  it("makes both GitHub API budgets visible with a rate-limit warning", () => {
+    expect(
+      githubHealthPresentation({
+        state: "rate_limited",
+        scope: "graphql",
+        message: "GitHub GraphQL is rate limited; using REST where possible.",
+        retryAt: 1_000,
+        limits: {
+          graphql: { remaining: 0, limit: 5_000, resetAt: null },
+          rest: { remaining: 4_812, limit: 5_000, resetAt: null },
+        },
+      }),
+    ).toEqual({
+      icon: "AlertCircle",
+      label: "GraphQL limited · GQL 0/5,000 · REST 4,812/5,000",
+      tone: "warning",
+      detail:
+        "GitHub GraphQL is rate limited; using REST where possible. GraphQL 0/5,000 · REST 4,812/5,000 remaining.",
     });
   });
 

@@ -411,7 +411,7 @@ describe("R2 server registration and disposal", () => {
     });
     await expect(
       host.harness.behavior.callRpc("getGitHubApiHealth", null),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       state: "available",
       scope: "unknown",
       message: null,
@@ -430,7 +430,7 @@ describe("R2 server registration and disposal", () => {
     });
     await expect(
       finalGeneration.harness.behavior.callRpc("getGitHubApiHealth", null),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       state: "available",
       scope: "unknown",
       message: null,
