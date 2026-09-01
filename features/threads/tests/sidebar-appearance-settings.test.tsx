@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+  act,
   cleanup,
   fireEvent,
   waitFor,
@@ -26,6 +27,13 @@ vi.mock("sonner", () => ({ toast }));
 const axe = configureAxe({
   runOnly: { type: "tag", values: ["cat.aria", "cat.name-role-value"] },
 });
+
+const sidebarAppearanceQueryKey = [
+  "work-sidebar",
+  "sidebar",
+  "threads",
+  "appearance",
+] as const;
 
 afterEach(() => {
   cleanup();
@@ -96,6 +104,9 @@ describe("sidebar appearance settings", () => {
     expect(
       input.closest(".ws-settings-card")?.getAttribute("data-layout"),
     ).toBe("narrow");
+    expect(
+      input.closest(".ws-settings-row")?.getAttribute("data-layout"),
+    ).toBeNull();
     expect(input.getAttribute("min")).toBe("35");
     expect(input.getAttribute("max")).toBe("60");
     expect(input.getAttribute("step")).toBe("0.1");
@@ -207,6 +218,16 @@ describe("sidebar appearance settings", () => {
     );
     const style = await slot.findByRole("combobox", { name: "Style" });
     const speed = slot.getByRole("combobox", { name: "Speed" });
+    expect(
+      slot.getByText("Style", { selector: "label" }).classList.contains(
+        "ws-settings-label",
+      ),
+    ).toBe(true);
+    expect(
+      slot.getByText("Speed", { selector: "label" }).classList.contains(
+        "ws-settings-label",
+      ),
+    ).toBe(true);
     expect((style as HTMLSelectElement).value).toBe("spin");
     expect((speed as HTMLSelectElement).value).toBe("slow");
     expect([...style.querySelectorAll("option")].map((option) => option.value)).toEqual([
@@ -222,5 +243,52 @@ describe("sidebar appearance settings", () => {
         workingProviderAnimation: "slow-bounce",
       }),
     );
+  });
+
+  it("does not let a row-height update restart the text-scale debounce", async () => {
+    const save = vi.fn(async (update: { textScale?: number }) => ({
+      rowHeight: 47,
+      textScale: update.textScale ?? 1,
+    }));
+    const app = await loadPluginApp(() => import("../../../app"));
+    const section = app.settingsSections.find(
+      ({ id }) => id === "sidebar-appearance",
+    )!;
+    const slot = renderSlot(
+      section,
+      {},
+      {
+        rpc: {
+          getSidebarAppearance: () => ({ rowHeight: 40, textScale: 1 }),
+          saveSidebarAppearance: save,
+        } as never,
+      },
+    );
+    const textScale = (await slot.findByRole("spinbutton", {
+      name: "Text scale",
+    })) as HTMLInputElement;
+
+    vi.useFakeTimers();
+    fireEvent.change(textScale, { target: { value: "1.05" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+    await act(async () => {
+      getPluginQueryClient().setQueryData(sidebarAppearanceQueryKey, {
+        rowHeight: 47,
+        textScale: 1,
+      });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save).toHaveBeenCalledWith({ textScale: 1.05 });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(save).toHaveBeenCalledTimes(1);
+    slot.lifecycle.unmount();
   });
 });

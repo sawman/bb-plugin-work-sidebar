@@ -6,6 +6,7 @@ import {
   SidebarRowHeightEditor,
   SidebarTextScaleEditor,
 } from "./sidebar-appearance-settings";
+import { useFieldSavedVersion } from "./settings-editor";
 import {
   ThreadGroupOrderSettings,
   type ThreadGroupSettingsProps,
@@ -13,7 +14,6 @@ import {
 
 type ThreadListSettingsProps = {
   rowHeight: number | undefined;
-  appearanceVersion?: number;
   rowHeightPending: boolean;
   onSaveRowHeight(rowHeight: number): Promise<{ rowHeight: number }>;
   textScale: number | undefined;
@@ -24,7 +24,6 @@ type ThreadListSettingsProps = {
 
 export function ThreadListSettings({
   rowHeight,
-  appearanceVersion,
   rowHeightPending,
   onSaveRowHeight,
   textScale,
@@ -32,6 +31,8 @@ export function ThreadListSettings({
   onSaveTextScale,
   groups,
 }: ThreadListSettingsProps) {
+  const rowHeightVersion = useFieldSavedVersion(rowHeight);
+  const textScaleVersion = useFieldSavedVersion(textScale);
   const [open, setOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -86,21 +87,23 @@ export function ThreadListSettings({
           >
             <SidebarRowHeightEditor
               saved={rowHeight}
-              savedVersion={appearanceVersion}
+              savedVersion={rowHeightVersion}
               pending={rowHeightPending}
               onSave={onSaveRowHeight}
               compact
+              layout="thread-popup"
             />
             <SidebarTextScaleEditor
               saved={textScale}
-              savedVersion={appearanceVersion}
+              savedVersion={textScaleVersion}
               pending={textScalePending}
               onSave={onSaveTextScale}
               compact
+              layout="thread-popup"
             />
             <BbUrlLink
               className="ws-settings-row ws-thread-settings-link"
-              data-layout="compact"
+              data-layout="thread-popup"
               href="/settings/plugins/work-sidebar"
               aria-label="Open Work Sidebar settings"
               onClick={() => closeSettings({ restoreFocus: false })}

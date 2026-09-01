@@ -1155,11 +1155,11 @@ describe("R18 registered left sidebar parity", () => {
     expect(appearance?.contains(rowHeight)).toBe(true);
     expect(appearance?.contains(pluginSettings)).toBe(true);
     expect(
-      appearance?.querySelectorAll('.ws-settings-row[data-layout="compact"]'),
+      appearance?.querySelectorAll('.ws-settings-row[data-layout="thread-popup"]'),
     ).toHaveLength(3);
     expect(appearance?.querySelectorAll("strong, b")).toHaveLength(0);
-    expect(rowHeight.closest('.ws-settings-row[data-layout="compact"]')).toBeTruthy();
-    expect(textScale.closest('.ws-settings-row[data-layout="compact"]')).toBeTruthy();
+    expect(rowHeight.closest('.ws-settings-row[data-layout="thread-popup"]')).toBeTruthy();
+    expect(textScale.closest('.ws-settings-row[data-layout="thread-popup"]')).toBeTruthy();
     expect(
       pluginSettings.classList.contains("ws-settings-row"),
     ).toBe(true);

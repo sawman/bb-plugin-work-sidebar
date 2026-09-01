@@ -4,7 +4,10 @@ import { useSidebarAppearancePreferences } from "./queries";
 import {
   NumericAutosaveEditor,
   SettingsCard,
+  SettingsLabel,
+  useFieldSavedVersion,
   type NumericSettingDescriptor,
+  type SettingsRowLayout,
 } from "./settings-editor";
 import {
   DEFAULT_SIDEBAR_ROW_HEIGHT,
@@ -49,6 +52,7 @@ type SidebarRowHeightEditorProps = {
   savedVersion?: number;
   pending: boolean;
   compact?: boolean;
+  layout?: SettingsRowLayout;
   onSave(rowHeight: number): Promise<{ rowHeight: number }>;
 };
 
@@ -58,6 +62,7 @@ function SidebarNumericEditor({
   savedVersion,
   pending,
   compact,
+  layout,
   onSave,
   className,
   cardClassName,
@@ -68,6 +73,7 @@ function SidebarNumericEditor({
   savedVersion?: number;
   pending: boolean;
   compact: boolean;
+  layout?: SettingsRowLayout;
   onSave(value: number): Promise<number>;
   className: string;
   cardClassName: string;
@@ -79,7 +85,7 @@ function SidebarNumericEditor({
       saved={saved}
       savedVersion={savedVersion}
       pending={pending}
-      compact={compact}
+      layout={layout}
       className={className}
       onSave={onSave}
     />
@@ -98,6 +104,7 @@ export function SidebarRowHeightEditor({
   savedVersion,
   pending,
   compact = false,
+  layout,
   onSave,
 }: SidebarRowHeightEditorProps) {
   return (
@@ -107,6 +114,7 @@ export function SidebarRowHeightEditor({
       savedVersion={savedVersion}
       pending={pending}
       compact={compact}
+      layout={layout}
       onSave={async (value) => (await onSave(value)).rowHeight}
       className={compact ? "ws-sidebar-row-height-editor" : "ws-sidebar-appearance-field"}
       cardClassName="ws-sidebar-appearance-settings"
@@ -120,6 +128,7 @@ type SidebarTextScaleEditorProps = {
   savedVersion?: number;
   pending: boolean;
   compact?: boolean;
+  layout?: SettingsRowLayout;
   onSave(value: number): Promise<{ textScale: number }>;
 };
 
@@ -128,6 +137,7 @@ export function SidebarTextScaleEditor({
   savedVersion,
   pending,
   compact = false,
+  layout,
   onSave,
 }: SidebarTextScaleEditorProps) {
   return (
@@ -137,6 +147,7 @@ export function SidebarTextScaleEditor({
       savedVersion={savedVersion}
       pending={pending}
       compact={compact}
+      layout={layout}
       onSave={async (value) => (await onSave(value)).textScale}
       className={compact ? "ws-sidebar-text-scale-editor" : "ws-sidebar-appearance-field"}
       cardClassName="ws-sidebar-text-scale-editor"
@@ -146,18 +157,20 @@ export function SidebarTextScaleEditor({
 
 export function SidebarAppearanceSettings() {
   const preferences = useSidebarAppearancePreferences();
+  const rowHeightVersion = useFieldSavedVersion(preferences.appearance.data?.rowHeight);
+  const textScaleVersion = useFieldSavedVersion(preferences.appearance.data?.textScale);
   return (
     <SettingsCard className="ws-sidebar-appearance-settings" title="Sidebar appearance">
       <SidebarRowHeightEditor
         saved={preferences.appearance.data?.rowHeight}
-        savedVersion={preferences.appearance.dataUpdatedAt}
+        savedVersion={rowHeightVersion}
         pending={preferences.saveRowHeight.isPending}
         onSave={(rowHeight) => preferences.saveRowHeight.mutateAsync(rowHeight)}
         compact
       />
       <SidebarTextScaleEditor
         saved={preferences.appearance.data?.textScale}
-        savedVersion={preferences.appearance.dataUpdatedAt}
+        savedVersion={textScaleVersion}
         pending={preferences.saveTextScale.isPending}
         onSave={(textScale) => preferences.saveTextScale.mutateAsync(textScale)}
         compact
@@ -225,7 +238,7 @@ function WorkingProviderAnimationEditor({
     <fieldset className="ws-sidebar-appearance-field ws-working-animation-field">
       <legend>Working provider animation</legend>
       <div className="ws-working-animation-controls">
-        <label htmlFor={`${id}-style`}>Style</label>
+        <SettingsLabel htmlFor={`${id}-style`}>Style</SettingsLabel>
         <select
           id={`${id}-style`}
           value={style}
@@ -242,7 +255,7 @@ function WorkingProviderAnimationEditor({
             </option>
           ))}
         </select>
-        <label htmlFor={`${id}-speed`}>Speed</label>
+        <SettingsLabel htmlFor={`${id}-speed`}>Speed</SettingsLabel>
         <select
           id={`${id}-speed`}
           value={speed}

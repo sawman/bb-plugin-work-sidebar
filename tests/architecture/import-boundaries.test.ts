@@ -162,7 +162,6 @@ describe("R16 composition boundaries", () => {
     expect(physicalLines("server.ts")).toBeLessThanOrEqual(110);
     expect(longestPhysicalLine("server.ts")).toBeLessThanOrEqual(160);
     expect(physicalLines("contracts.ts")).toBeLessThanOrEqual(12);
-    expect(physicalLines("contracts.schemas.ts")).toBeLessThanOrEqual(250);
     expect(physicalLines("contracts.schemas.ts")).toBeLessThanOrEqual(210);
     // The R15 entrypoints had 37 app and 58 server top-level implementation
     // declarations. R16 composes explicit slice factories instead: a new

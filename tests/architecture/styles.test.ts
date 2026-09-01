@@ -154,10 +154,10 @@ describe("stylesheet policy", () => {
     expect(source).toContain("@media (prefers-reduced-motion: reduce)");
   });
 
-  test("keeps compact settings rows primitive-owned, centered, aligned, and singly separated", () => {
+  test("keeps explicit thread-popup settings rows primitive-owned, centered, aligned, and singly separated", () => {
     const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
     const rows = source.match(
-      /\.ws-settings-row\[data-layout="compact"\]\s*\{([\s\S]*?)\}/,
+      /\.ws-settings-row\[data-layout="thread-popup"\]\s*\{([\s\S]*?)\}/,
     )?.[1];
     const groups = source.match(
       /\.ws-thread-group-settings\s*\{([\s\S]*?)\}/,
@@ -174,6 +174,9 @@ describe("stylesheet policy", () => {
     expect(rows).toContain("border-top: 0");
     expect(source).not.toMatch(
       /\.ws-thread-appearance-settings\s+\.ws-settings-row/,
+    );
+    expect(source).toMatch(
+      /\.ws-settings-label\s*\{[\s\S]*?color: var\(--foreground\);[\s\S]*?font: var\(--ws-text-label\);/,
     );
     expect(groups).toContain("border-top: 1px solid var(--border)");
     expect(toolbar).toContain("flex-wrap: wrap");

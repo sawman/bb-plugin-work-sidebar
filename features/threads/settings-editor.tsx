@@ -12,6 +12,8 @@ export type NumericSettingDescriptor = Readonly<{
   initialValue: number;
 }>;
 
+export type SettingsRowLayout = "thread-popup";
+
 export function SettingsCard({
   title,
   className,
@@ -33,22 +35,43 @@ export function SettingsCard({
 }
 
 export function SettingsRow({
-  compact,
+  layout,
   className,
   children,
 }: {
-  compact: boolean;
+  layout?: SettingsRowLayout;
   className: string;
   children: ReactNode;
 }) {
   return (
     <div
       className={`ws-settings-row ${className}`.trim()}
-      data-layout={compact ? "compact" : undefined}
+      data-layout={layout}
     >
       {children}
     </div>
   );
+}
+
+export function SettingsLabel({
+  htmlFor,
+  children,
+}: {
+  htmlFor: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="ws-settings-label" htmlFor={htmlFor}>
+      {children}
+    </label>
+  );
+}
+
+export function useFieldSavedVersion<T>(saved: T) {
+  const field = useRef({ saved, version: 0 });
+  if (!Object.is(field.current.saved, saved))
+    field.current = { saved, version: field.current.version + 1 };
+  return field.current.version;
 }
 
 export function NumericAutosaveEditor({
@@ -56,7 +79,7 @@ export function NumericAutosaveEditor({
   saved,
   savedVersion,
   pending,
-  compact = false,
+  layout,
   className = "",
   onSave,
 }: {
@@ -64,7 +87,7 @@ export function NumericAutosaveEditor({
   saved: number | undefined;
   savedVersion?: number;
   pending: boolean;
-  compact?: boolean;
+  layout?: SettingsRowLayout;
   className?: string;
   onSave(value: number): Promise<number>;
 }) {
@@ -155,8 +178,8 @@ export function NumericAutosaveEditor({
   }, [changeVersion, dirty, draft, pending, saved, savedVersion, validation.value]);
 
   return (
-    <SettingsRow compact={compact} className={className}>
-      <label htmlFor={inputId}>{setting.label}</label>
+    <SettingsRow layout={layout} className={className}>
+      <SettingsLabel htmlFor={inputId}>{setting.label}</SettingsLabel>
       <div className="ws-settings-input-row">
         <input
           id={inputId}
