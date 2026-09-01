@@ -3,7 +3,11 @@ import { act, renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type PropsWithChildren } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useWorkOutcomeMutation, useWorkProviderHealth } from "../queries";
+import {
+  useWorkItemQueue,
+  useWorkOutcomeMutation,
+  useWorkProviderHealth,
+} from "../queries";
 
 const { rpcClient } = vi.hoisted(() => ({
   rpcClient: { call: vi.fn() },
@@ -62,6 +66,46 @@ describe("work-context provider health query", () => {
     client.clear();
     if (previousVisibility) Object.defineProperty(document, "visibilityState", previousVisibility);
     else delete (document as { visibilityState?: string }).visibilityState;
+  });
+});
+
+describe("work item queue query", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("refreshes every 30 seconds only while the Work tab observes it", async () => {
+    vi.useFakeTimers();
+    rpcClient.call.mockReset();
+    rpcClient.call.mockResolvedValue({
+      rootThreadId: "thr_work_items",
+      configured: true,
+      queue: { current: null, backlog: [] },
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const view = renderHook(() => useWorkItemQueue("thr_work_items"), {
+      wrapper: wrapper(client),
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(rpcClient.call).toHaveBeenCalledWith("getWorkItemQueue", {
+      threadId: "thr_work_items",
+    });
+    expect(rpcClient.call).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(rpcClient.call).toHaveBeenCalledTimes(2);
+
+    view.unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(rpcClient.call).toHaveBeenCalledTimes(2);
+    client.clear();
   });
 });
 

@@ -1,4 +1,10 @@
-import { useEffect, useId, useRef, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Icon } from "../../components/ui/icon";
 import { taskStatusPresentation } from "./model";
 import { TaskPriorityIcon } from "./priority";
@@ -100,9 +106,52 @@ function WorkflowSection({
   onDetach(taskId: string): void;
   onMakeGoal?(taskId: string): void;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
   const visibleItems = items.slice(0, itemLimit);
   const count = total ?? items.length;
+  return (
+    <TaskWorkflowSection
+      id={id}
+      title={title}
+      tone={tone}
+      count={count}
+      defaultOpen={defaultOpen}
+    >
+      {visibleItems.length ? (
+        <div className="ws-task-workflow-list">
+          {visibleItems.map((item) => (
+            <WorkflowRow
+              key={item.task.id}
+              item={item}
+              busy={busy}
+              onStatusChange={onStatusChange}
+              detachable={detachableTaskIds.has(item.task.id)}
+              onDetach={onDetach}
+              onMakeGoal={onMakeGoal}
+            />
+          ))}
+        </div>
+      ) : null}
+    </TaskWorkflowSection>
+  );
+}
+
+/** Shared collapsible section for every Work-items task grouping. */
+export function TaskWorkflowSection({
+  id,
+  title,
+  tone,
+  count,
+  defaultOpen = false,
+  children,
+}: {
+  id: string;
+  title: string;
+  tone?: "attention";
+  count: number;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   const label = `${title}: ${count} task${count === 1 ? "" : "s"}`;
   return (
     <section
@@ -129,21 +178,7 @@ function WorkflowSection({
           </span>
         </button>
       </h3>
-      {open && visibleItems.length ? (
-        <div className="ws-task-workflow-list">
-          {visibleItems.map((item) => (
-            <WorkflowRow
-              key={item.task.id}
-              item={item}
-              busy={busy}
-              onStatusChange={onStatusChange}
-              detachable={detachableTaskIds.has(item.task.id)}
-              onDetach={onDetach}
-              onMakeGoal={onMakeGoal}
-            />
-          ))}
-        </div>
-      ) : null}
+      {open ? children : null}
     </section>
   );
 }

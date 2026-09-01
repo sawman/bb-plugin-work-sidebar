@@ -344,7 +344,9 @@ describe("Tasks read slots", () => {
     expect(links).toHaveBeenCalledTimes(3);
     await vi.advanceTimersByTimeAsync(30_000);
     expect(links).toHaveBeenCalledTimes(4);
-    expect(tasks).toHaveBeenCalledTimes(2);
+    // The visible Work tab is the only Tasks-list polling owner. The left
+    // sidebar still owns the one realtime subscription above.
+    expect(tasks).toHaveBeenCalledTimes(3);
     right.lifecycle.unmount();
     left.lifecycle.unmount();
     expect(

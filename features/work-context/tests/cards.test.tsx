@@ -1310,9 +1310,10 @@ describe("registered Work context cards", () => {
     expect(slot.getByText("Completed 5")).toBeTruthy();
     expect(slot.getByRole("article", { name: /Canceled/ })).toBeTruthy();
     expect(
-      slot.container.querySelectorAll(
-        ".ws-task-workflow-section:last-of-type .ws-task-workflow-row",
-      ),
+      slot
+        .getByRole("button", { name: "Completed: 7 tasks" })
+        .closest(".ws-task-workflow-section")
+        ?.querySelectorAll(".ws-task-workflow-row"),
     ).toHaveLength(5);
     expect(
       slot.queryByText("Older completed tasks are available in BB Tasks."),
@@ -1440,21 +1441,26 @@ describe("registered Work context cards", () => {
         slot.container.querySelector('[data-card="work items"]'),
       ).toBeTruthy(),
     );
-    const taskCard = slot.container.querySelector('[data-card="work items"]')!;
+    const taskCard = slot.container.querySelector(
+      '[data-card="work items"]',
+    )! as HTMLElement;
     await waitFor(() =>
       expect(taskCard.querySelector(".ws-work-item-queue-add")).toBeTruthy(),
     );
     const control = taskCard.querySelector(".ws-work-item-queue-add")!;
     const workflow = taskCard.querySelector(".ws-task-workflow")!;
-    const goals = taskCard.querySelector(".ws-work-item-goals > h3")!;
+    const goalTrigger = within(taskCard).getByRole("button", {
+      name: "Goals: 0 tasks",
+    });
+    const goals = goalTrigger.closest("h3")!;
     expect(control.compareDocumentPosition(workflow)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
     expect(
-      goals.querySelector(".ws-task-workflow-disclosure > span")?.textContent,
+      goalTrigger.querySelector("span")?.textContent,
     ).toBe("Goals");
-    expect(goals.querySelector(".ws-task-workflow-disclosure")).toBeTruthy();
-    expect(goals.querySelector(".ws-task-workflow-count")?.textContent).toBe(
+    expect(goalTrigger.classList.contains("ws-task-workflow-disclosure")).toBe(true);
+    expect(goalTrigger.querySelector(".ws-task-workflow-count")?.textContent).toBe(
       "0",
     );
     expect(goals.compareDocumentPosition(control)).toBe(

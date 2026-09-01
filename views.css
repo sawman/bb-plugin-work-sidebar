@@ -3794,9 +3794,6 @@ button.ws-provider-health:focus-visible {
 .ws-work-item-reference-meta {
   flex: 0 0 auto;
 }
-.ws-work-item-goals-heading > .ws-task-workflow-disclosure {
-  cursor: default;
-}
 .ws-work-item-current-goal-badge {
   min-height: 0.84rem;
 }
@@ -3859,8 +3856,4 @@ button.ws-provider-health:focus-visible {
   color: var(--muted-foreground);
   font: var(--ws-text-subtext);
   line-height: inherit;
-}
-.ws-work-item-backlog {
-  display: grid;
-  gap: 0.24rem;
 }

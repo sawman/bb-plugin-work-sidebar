@@ -75,6 +75,11 @@ export function useWorkItemQueue(threadId: string) {
     queryFn: () => rpc.call("getWorkItemQueue", { threadId }),
     ...queryPolicies.workContext,
     refetchOnMount: "always",
+    // The Work tab is conditionally mounted, so this only keeps an actively
+    // viewed Work-items card current. Do not spend background refreshes on a
+    // hidden panel.
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
 }
 export const useWorkGoal = (threadId: string) =>

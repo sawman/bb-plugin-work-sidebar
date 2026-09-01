@@ -5,7 +5,7 @@ import { queryKeys, queryPolicies } from "../../query-runtime";
 import { invalidateTaskQueries } from "./mutations";
 import { parseWorkSidebarRealtimeEvent } from "../../shared/work-realtime";
 
-export function useTasksRead() {
+export function useTasksRead({ poll = false }: { poll?: boolean } = {}) {
   const rpc = useRpc<typeof rpcContract>();
   return useQuery({
     queryKey: queryKeys.sidebar.tasks.list(),
@@ -16,6 +16,8 @@ export function useTasksRead() {
       return result;
     },
     ...queryPolicies.sidebarTasksList,
+    refetchInterval: poll ? 30_000 : false,
+    refetchIntervalInBackground: false,
   });
 }
 

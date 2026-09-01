@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { CopyBadge } from "../../components/ui/copy-badge";
@@ -7,7 +7,10 @@ import { Input } from "../../components/ui/input";
 import { SearchCombobox } from "../../components/ui/combobox";
 import type { TaskStatus } from "../tasks/model";
 import { TaskPriorityIcon } from "../tasks/priority";
-import { TaskStatusControl } from "../tasks/workflow-card";
+import {
+  TaskStatusControl,
+  TaskWorkflowSection,
+} from "../tasks/workflow-card";
 import { TaskWorkflowContent } from "./tasks-card";
 import type { useTasksMutations } from "../tasks/mutations";
 import type { useTasksRead } from "../tasks/queries";
@@ -169,7 +172,6 @@ export function WorkItemCard({
         labelForReference={labelForReference}
         bbTaskOptions={(tasks.data?.tasks ?? []).map((task) => ({ id: task.id, label: `${task.key} · ${task.title}` }))}
         taskById={taskById}
-        outcomeTaskId={outcome?.id ?? null}
         pending={queueQuery.isPending || queueMutation.isPending || executionMutation.isPending || trackerBusy}
         onPromote={(reference) => void saveQueue(promoteWorkItem(queue, reference))}
         onDemote={() => void saveQueue(demoteCurrentWorkItem(queue))}
@@ -409,7 +411,6 @@ function WorkQueue({
   linearError,
   onRetryLinear,
   taskById,
-  outcomeTaskId,
   pending,
   onPromote,
   onDemote,
@@ -425,7 +426,6 @@ function WorkQueue({
   linearError: Error | null;
   onRetryLinear(): void;
   taskById: ReadonlyMap<string, TaskSummary>;
-  outcomeTaskId: string | null;
   pending: boolean;
   onPromote(reference: WorkItemReference): void;
   onDemote(): void;
@@ -434,6 +434,7 @@ function WorkQueue({
   onMoveToExecution(reference: WorkItemReference): void;
   onTaskStatus(taskId: string, status: TaskStatus): void;
 }) {
+  const idPrefix = useId();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [destination, setDestination] = useState<"goal" | "queue">("goal");
   const [search, setSearch] = useState("");
@@ -466,50 +467,37 @@ function WorkQueue({
   const goalCount = (queue.current ? 1 : 0) + queue.backlog.length;
   return (
     <section className="ws-work-item-queue" aria-label="Work queue">
-      <div className="ws-task-workflow-section ws-work-item-goals">
-        <h3 className="ws-work-item-goals-heading">
-          <span className="ws-task-workflow-disclosure">
-            <span>Goals</span>
-            <span className="ws-task-workflow-disclosure-meta" aria-hidden>
-              <span className="ws-task-workflow-count">{goalCount}</span>
-            </span>
-          </span>
-        </h3>
-        {queue.current ? (
-          <div className="ws-task-workflow-row ws-work-item-goal-row">
-            <QueueReference
-              reference={queue.current}
-              label={labelForReference(queue.current)}
-              task={taskById.get(queue.current.id)}
-            />
-            <WorkItemQueueActions
-              disabled={pending}
-              task={taskById.get(queue.current.id)}
-              onStatus={onTaskStatus}
-              onDefer={onDemote}
-              onMoveToTasks={() => onMoveToExecution(queue.current!)}
-            />
-          </div>
-        ) : null}
-        {queue.backlog.length ? (
-          <div className="ws-work-item-backlog">
-            <h3 className="ws-card-section-label">Backlog</h3>
-            <div
-              className="ws-task-workflow-list"
-              role="list"
-              aria-label="Goal backlog"
-            >
-              {queue.backlog.map((reference) => (
-                <div
-                  key={`${reference.source}:${reference.id}`}
-                  role="listitem"
-                  className="ws-task-workflow-row ws-work-item-goal-row"
-                >
-                  <QueueReference
-                    reference={reference}
-                    label={labelForReference(reference)}
-                    task={taskById.get(reference.id)}
+      <TaskWorkflowSection
+        id={`${idPrefix}-goals`}
+        title="Goals"
+        count={goalCount}
+        defaultOpen
+      >
+        {goalCount ? (
+          <div className="ws-task-workflow-list">
+            {queue.current ? (
+              <WorkItemGoalRow
+                reference={queue.current}
+                label={labelForReference(queue.current)}
+                task={taskById.get(queue.current.id)}
+                actions={
+                  <WorkItemQueueActions
+                    disabled={pending}
+                    task={taskById.get(queue.current.id)}
+                    onStatus={onTaskStatus}
+                    onDefer={onDemote}
+                    onMoveToTasks={() => onMoveToExecution(queue.current!)}
                   />
+                }
+              />
+            ) : null}
+            {queue.backlog.map((reference) => (
+              <WorkItemGoalRow
+                key={`${reference.source}:${reference.id}`}
+                reference={reference}
+                label={labelForReference(reference)}
+                task={taskById.get(reference.id)}
+                actions={
                   <WorkItemQueueActions
                     disabled={pending}
                     task={taskById.get(reference.id)}
@@ -517,12 +505,12 @@ function WorkQueue({
                     onMakeCurrent={() => onPromote(reference)}
                     onMoveToTasks={() => onMoveToExecution(reference)}
                   />
-                </div>
-              ))}
-            </div>
+                }
+              />
+            ))}
           </div>
         ) : null}
-      </div>
+      </TaskWorkflowSection>
       <div className="ws-work-item-queue-add">
         <div
           className="ws-work-item-destination"
@@ -604,43 +592,52 @@ function LinearStatusControl({
   );
 }
 
-function QueueReference({
+function WorkItemGoalRow({
   reference,
   label,
   task,
+  actions,
 }: {
   reference: WorkItemReference;
   label: string;
   task: TaskSummary | undefined;
+  actions: ReactNode;
 }) {
   return (
-    <span className="ws-task-workflow-copy ws-work-item-reference">
-      <span className="ws-task-workflow-title-line">
-        {task ? (
-          <span className="ws-work-item-reference-meta">
-            <TaskPriorityIcon priority={task.priority} />
+    <article
+      className="ws-task-workflow-row ws-work-item-goal-row"
+      data-state={task?.status}
+      aria-label={`${task?.key ?? reference.id}: ${task?.title ?? label}`}
+    >
+      <span className="ws-task-workflow-copy ws-work-item-reference">
+        <span className="ws-task-workflow-title-line">
+          {task ? (
+            <span className="ws-work-item-reference-meta">
+              <TaskPriorityIcon priority={task.priority} />
+              <CopyBadge
+                value={task.key}
+                label="task ID"
+                className="ws-work-header-badge"
+              >
+                {task.key}
+              </CopyBadge>
+            </span>
+          ) : (
             <CopyBadge
-              value={task.key}
-              label="task ID"
+              value={reference.id}
+              label="Linear issue"
               className="ws-work-header-badge"
             >
-              {task.key}
+              {reference.id}
             </CopyBadge>
+          )}
+          <span className="ws-task-workflow-title ws-work-item-reference-title">
+            {task?.title ?? label}
           </span>
-        ) : (
-          <CopyBadge
-            value={reference.id}
-            label="Linear issue"
-            className="ws-work-header-badge"
-          >
-            {reference.id}
-          </CopyBadge>
-        )}
-        <span className="ws-task-workflow-title ws-work-item-reference-title">
-          {task?.title ?? label}
         </span>
       </span>
-    </span>
+      {actions}
+    </article>
   );
 }
 

@@ -17,7 +17,9 @@ export function WorkContextCards({
   tracker: ReturnType<typeof useTracker>;
 }) {
   const rpc = useRpc<typeof rpcContract>();
-  const tasks = useTasksRead();
+  // Work items stay current while their tab is visible, without making the
+  // inactive left Tasks pane own an additional polling loop.
+  const tasks = useTasksRead({ poll: true });
   const taskMutations = useTasksMutations(rpc);
   return (
     <section className="ws-work-context-cards" aria-label="Work context">
