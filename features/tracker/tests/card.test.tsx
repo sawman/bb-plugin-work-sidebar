@@ -413,7 +413,7 @@ describe("registered tracker card", () => {
       rpc: fixture({ getWorkTracker: () => ({ ...multiLinked, primaryKey: "LIN-1" }), saveWorkItemQueue }),
     });
     const makeCurrent = await slot.findAllByRole("button", { name: "Make current" });
-    expect(makeCurrent[0]?.closest(".ws-work-item-queue-actions")).toBeTruthy();
+    expect(makeCurrent[0]?.closest(".ws-task-workflow-actions")).toBeTruthy();
     expect(
       makeCurrent[0]?.parentElement?.querySelector('[aria-label="Start task"]'),
     ).toBeTruthy();

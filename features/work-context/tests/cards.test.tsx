@@ -643,7 +643,11 @@ describe("registered Work context cards", () => {
       expect(slot.getByText("Ship cards")).toBeTruthy();
       expect(slot.getByText("Run validation")).toBeTruthy();
       expect(slot.getByText("Unrelated linked task")).toBeTruthy();
-      expect(slot.container.querySelectorAll(".ws-task-workflow-row")).toHaveLength(2);
+      expect(
+        slot.container.querySelectorAll(
+          ".ws-task-workflow-row:not(.ws-work-item-goal-row)",
+        ),
+      ).toHaveLength(2);
       expect(
         slot.queryByRole("button", { name: "Detach WORK-1 from this thread" }),
       ).toBeNull();
@@ -1053,6 +1057,12 @@ describe("registered Work context cards", () => {
     const control = await slot.findByRole("button", {
       name: "Change status for WORK-1: To do",
     });
+    const goalRow = control.closest(".ws-task-workflow-row")!;
+    expect(goalRow.classList.contains("ws-work-item-goal-row")).toBe(true);
+    expect(
+      goalRow.querySelector(".ws-task-workflow-copy.ws-work-item-reference"),
+    ).toBeTruthy();
+    expect(goalRow.querySelector(".ws-work-item-queue-action")).toBeNull();
     fireEvent.click(control);
     fireEvent.click(slot.getByRole("option", { name: "In Progress" }));
     await waitFor(() =>
@@ -1444,7 +1454,13 @@ describe("registered Work context cards", () => {
     expect(control.compareDocumentPosition(workflow)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
-    expect(goals.textContent).toBe("Goals");
+    expect(
+      goals.querySelector(".ws-task-workflow-disclosure > span")?.textContent,
+    ).toBe("Goals");
+    expect(goals.querySelector(".ws-task-workflow-disclosure")).toBeTruthy();
+    expect(goals.querySelector(".ws-task-workflow-count")?.textContent).toBe(
+      "0",
+    );
     expect(goals.compareDocumentPosition(control)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );

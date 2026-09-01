@@ -3809,31 +3809,8 @@ button.ws-provider-health:focus-visible {
   padding-bottom: 0.45rem;
   border-bottom: 1px solid var(--border);
 }
-.ws-work-item-queue-current,
-.ws-work-item-backlog-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.45rem;
-}
 .ws-work-item-reference {
-  display: inline-flex;
   min-width: 0;
-  flex: 1;
-  align-items: center;
-  gap: 0.35rem;
-  margin: 0;
-  overflow: hidden;
-  color: var(--foreground);
-  font: var(--ws-text-primary);
-  line-height: inherit;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ws-work-item-reference-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .ws-work-item-reference-meta,
 .ws-work-item-reference-controls,
@@ -3848,6 +3825,9 @@ button.ws-provider-health:focus-visible {
 }
 .ws-work-item-reference-controls {
   flex: 0 0 auto;
+}
+.ws-work-item-goals-heading > .ws-task-workflow-disclosure {
+  cursor: default;
 }
 .ws-work-item-sources {
   justify-content: flex-end;
@@ -3871,7 +3851,7 @@ button.ws-provider-health:focus-visible {
   align-items: center;
   gap: 0.38rem;
   margin-top: 0.18rem;
-  border-top: 1px solid var(--border);
+  border-top: 0;
   padding-top: 0.42rem;
 }
 .ws-work-item-destination {
@@ -3913,35 +3893,6 @@ button.ws-provider-health:focus-visible {
 }
 .ws-work-item-queue-add > .ws-search-shell {
   min-width: 0;
-}
-.ws-work-item-queue-actions {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 0.18rem;
-}
-.ws-work-item-queue-action {
-  display: grid;
-  width: 1.45rem;
-  height: 1.45rem;
-  place-items: center;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--muted-foreground);
-  cursor: pointer;
-}
-.ws-work-item-queue-action:hover:not(:disabled),
-.ws-work-item-queue-action:focus-visible {
-  color: var(--foreground);
-}
-.ws-work-item-queue-action:disabled {
-  cursor: wait;
-  opacity: 0.55;
-}
-.ws-work-item-queue-action svg {
-  width: 0.78rem;
-  height: 0.78rem;
 }
 .ws-work-item-linear-status {
   display: flex;

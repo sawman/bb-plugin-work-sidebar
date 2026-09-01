@@ -450,12 +450,20 @@ function WorkQueue({
     else onAddToQueue(reference);
     close();
   };
+  const goalCount = (queue.current ? 1 : 0) + queue.backlog.length;
   return (
     <section className="ws-work-item-queue" aria-label="Work queue">
       <div className="ws-task-workflow-section ws-work-item-goals">
-        <h3>Goals</h3>
+        <h3 className="ws-work-item-goals-heading">
+          <span className="ws-task-workflow-disclosure">
+            <span>Goals</span>
+            <span className="ws-task-workflow-disclosure-meta" aria-hidden>
+              <span className="ws-task-workflow-count">{goalCount}</span>
+            </span>
+          </span>
+        </h3>
         {queue.current ? (
-          <div className="ws-work-item-queue-current">
+          <div className="ws-task-workflow-row ws-work-item-goal-row">
             <QueueReference
               reference={queue.current}
               label={labelForReference(queue.current)}
@@ -478,12 +486,16 @@ function WorkQueue({
         {queue.backlog.length ? (
           <div className="ws-work-item-backlog">
             <h3 className="ws-card-section-label">Backlog</h3>
-            <div role="list" aria-label="Goal backlog">
+            <div
+              className="ws-task-workflow-list"
+              role="list"
+              aria-label="Goal backlog"
+            >
               {queue.backlog.map((reference) => (
                 <div
                   key={`${reference.source}:${reference.id}`}
                   role="listitem"
-                  className="ws-work-item-backlog-row"
+                  className="ws-task-workflow-row ws-work-item-goal-row"
                 >
                   <QueueReference
                     reference={reference}
@@ -601,26 +613,42 @@ function QueueReference({
   onStatus(taskId: string, status: TaskStatus): void;
 }) {
   return (
-    <span className="ws-work-item-reference">
-      {task ? (
-        <span className="ws-work-item-reference-meta">
-          <TaskPriorityIcon priority={task.priority} />
-          <CopyBadge value={task.key} label="task ID" className="ws-work-header-badge">{task.key}</CopyBadge>
+    <span className="ws-task-workflow-copy ws-work-item-reference">
+      <span className="ws-task-workflow-title-line">
+        {task ? (
+          <span className="ws-work-item-reference-meta">
+            <TaskPriorityIcon priority={task.priority} />
+            <CopyBadge
+              value={task.key}
+              label="task ID"
+              className="ws-work-header-badge"
+            >
+              {task.key}
+            </CopyBadge>
+          </span>
+        ) : (
+          <CopyBadge
+            value={reference.id}
+            label="Linear issue"
+            className="ws-work-header-badge"
+          >
+            {reference.id}
+          </CopyBadge>
+        )}
+        <span className="ws-task-workflow-title ws-work-item-reference-title">
+          {task?.title ?? label}
         </span>
-      ) : (
-        <CopyBadge value={reference.id} label="Linear issue" className="ws-work-header-badge">{reference.id}</CopyBadge>
-      )}
-      <span className="ws-work-item-reference-title">{task?.title ?? label}</span>
-      {task ? <span className="ws-work-item-reference-controls">
-        {showStatus ? (
+      </span>
+      {task && showStatus ? (
+        <span className="ws-work-item-reference-controls">
           <TaskStatusControl
             taskKey={task.key}
             status={task.status}
             busy={disabled}
             onChange={(status) => onStatus(reference.id, status)}
           />
-        ) : null}
-      </span> : null}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -637,19 +665,19 @@ function WorkItemQueueActions({
   onStart: () => void;
 }) {
   return (
-    <span className="ws-work-item-queue-actions" role="group" aria-label="Work item actions">
+    <span className="ws-task-workflow-actions" role="group" aria-label="Work item actions">
       {onDefer ? (
-        <button type="button" className="ws-work-item-queue-action" disabled={disabled} aria-label="Defer" title="Defer current goal" onClick={onDefer}>
-          <Icon name="Clock" aria-hidden />
+        <button type="button" className="ws-task-workflow-action" disabled={disabled} aria-label="Defer" title="Defer current goal" onClick={onDefer}>
+          <Icon className="ws-task-workflow-icon" name="Clock" aria-hidden />
         </button>
       ) : null}
       {onMakeCurrent ? (
-        <button type="button" className="ws-work-item-queue-action" disabled={disabled} aria-label="Make current" title="Make current goal" onClick={onMakeCurrent}>
-          <Icon name="ArrowRight" aria-hidden />
+        <button type="button" className="ws-task-workflow-action" disabled={disabled} aria-label="Make current" title="Make current goal" onClick={onMakeCurrent}>
+          <Icon className="ws-task-workflow-icon" name="ArrowRight" aria-hidden />
         </button>
       ) : null}
-      <button type="button" className="ws-work-item-queue-action" disabled={disabled} aria-label="Start task" title="Start as task" onClick={onStart}>
-        <Icon name="CircleHalf" aria-hidden />
+      <button type="button" className="ws-task-workflow-action" disabled={disabled} aria-label="Start task" title="Start as task" onClick={onStart}>
+        <Icon className="ws-task-workflow-icon" name="CircleHalf" aria-hidden />
       </button>
     </span>
   );
