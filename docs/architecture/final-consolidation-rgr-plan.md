@@ -200,4 +200,3 @@ state.
 - Merge the reviewed integrated branch to `main`.
 - Switch GitHub CLI to `sawman`, verify, push, then restore and verify
   `matthew-se` even if the push fails.
-
