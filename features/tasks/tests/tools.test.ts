@@ -251,6 +251,9 @@ describe("agent-facing Tasks workflow tools", () => {
       "bind_execution_owner",
     ]);
     expect(WORK_AGENT_INSTRUCTIONS).toContain("Pending/recovery dispatch states require explicit reconciliation");
+    expect(WORK_AGENT_INSTRUCTIONS).toContain("Builtin Tasks 0.1.2 cannot preserve root parenting");
+    expect(WORK_AGENT_INSTRUCTIONS).toContain("bb thread spawn --parent-self --new-environment worktree");
+    expect(WORK_AGENT_INSTRUCTIONS).toContain("environment managed-worktree");
   });
 
   it("reads one task with project, assignment, comments, and worker threads", async () => {

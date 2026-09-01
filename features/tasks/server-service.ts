@@ -41,6 +41,8 @@ export const WORK_AGENT_INSTRUCTIONS = [
   "It reads durable bindings; no automatic compaction hook exists.",
   "Keep one top-level outcome per root work item, with execution tasks as direct children only.",
   "Bind direct work to the root or delegated work to one spawned child.",
+  "Builtin Tasks 0.1.2 cannot preserve root parenting for durable delegation; use bind_execution_owner, or explicitly run bb thread spawn --parent-self --new-environment worktree and then bb tasks attach from the spawned child.",
+  "For delegated code edits, bind_execution_owner must explicitly select environment managed-worktree (with an optional baseBranch); choose reuse only when sharing the root checkout is intentional.",
   "Pending/recovery dispatch states require explicit reconciliation; never retry an uncertain spawn automatically.",
   "Task lifecycle is explicit: thread idle/completion never promotes a task.",
   "Move fully validated tasks directly from in_progress to done; use in_review only while a named reviewer or concrete acceptance gate is actually pending.",

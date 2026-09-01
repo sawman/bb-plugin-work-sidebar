@@ -621,7 +621,13 @@ export function createWorkBindingsService(
     prompt?: string;
     title?: string;
     visibility?: "visible" | "hidden";
+    environment?: "managed-worktree" | "reuse";
+    baseBranch?: string;
   }) => {
+    if (input.baseBranch && input.environment !== "managed-worktree")
+      throw new Error("baseBranch requires environment managed-worktree");
+    if (input.mode === "direct" && (input.environment || input.baseBranch))
+      throw new Error("Environment selection is only valid for delegated execution");
     const root = await rootThread(input.rootThreadId);
     const saved = await read();
     const index = saved.executions.findIndex(
@@ -695,6 +701,34 @@ export function createWorkBindingsService(
       });
     }
     if (!input.prompt) throw new Error("Delegated execution requires a prompt");
+    const environment = async () => {
+      if (input.environment === "reuse") {
+        if (!root.environmentId)
+          throw new Error("Reuse delegation requires the root thread environment");
+        return { type: "reuse" as const, environmentId: root.environmentId };
+      }
+      if (input.environment === "managed-worktree") {
+        if (!root.environmentId)
+          throw new Error("Managed-worktree delegation requires the root thread environment");
+        const rootEnvironment = await bb.sdk.environments.get({
+          environmentId: root.environmentId,
+        });
+        return {
+          type: "host" as const,
+          hostId: rootEnvironment.hostId,
+          workspace: {
+            type: "managed-worktree" as const,
+            baseBranch: input.baseBranch
+              ? { kind: "named" as const, name: input.baseBranch }
+              : { kind: "default" as const },
+          },
+        };
+      }
+      return root.environmentId
+        ? { type: "reuse" as const, environmentId: root.environmentId }
+        : { type: "project-default" as const };
+    };
+    const selectedEnvironment = await environment();
     const pendingSpawn = await save(
       bindExecutionOwner(current, "delegated", null, "pending_spawn", null),
     );
@@ -703,9 +737,7 @@ export function createWorkBindingsService(
       spawned = await bb.sdk.threads.spawn({
         projectId: root.projectId,
         parentThreadId: root.id,
-        environment: root.environmentId
-          ? { type: "reuse", environmentId: root.environmentId }
-          : { type: "project-default" },
+        environment: selectedEnvironment,
         prompt: input.prompt,
         title: input.title,
         visibility: input.visibility ?? "visible",

@@ -61,6 +61,8 @@ function createBindingsFixture(options: {
   taskThreadsAttach?: (taskId: string, threadId: string) => Promise<unknown>;
   taskThreadsDetach?: (taskId: string, threadId: string) => Promise<unknown>;
   failRootResolution?: boolean;
+  rootEnvironmentId?: string | null;
+  spawn?: (input: unknown) => Promise<{ id: string }>;
 } = {}) {
   const tasks = new Map([
     [OUTCOME_TASK_ID, task(OUTCOME_TASK_ID, "Durable outcome")],
@@ -70,6 +72,8 @@ function createBindingsFixture(options: {
   ]);
   const createdTaskIds = [CREATED_OUTCOME_TASK_ID, CREATED_EXECUTION_TASK_ID];
   const taskThreads = new Map<string, Set<string>>();
+  const spawnInputs: unknown[] = [];
+  const dispatchEvents: string[] = [];
   const host = createFakePluginHost({
     sdk: {
       threads: {
@@ -81,7 +85,7 @@ function createBindingsFixture(options: {
               id: CHILD_THREAD_ID,
               parentThreadId: ROOT_THREAD_ID,
               projectId: BB_PROJECT_ID,
-              environmentId: null,
+              environmentId: options.rootEnvironmentId ?? null,
               title: "Child",
               titleFallback: null,
               status: "idle",
@@ -93,7 +97,7 @@ function createBindingsFixture(options: {
               id: ROOT_THREAD_ID,
               parentThreadId: null,
               projectId: BB_PROJECT_ID,
-              environmentId: null,
+              environmentId: options.rootEnvironmentId ?? null,
               title: "Root",
               titleFallback: null,
               status: "idle",
@@ -103,8 +107,18 @@ function createBindingsFixture(options: {
             };
         },
         list: async () => [],
-        spawn: async () => ({ id: CHILD_THREAD_ID }),
+        spawn: async (input: unknown) => {
+          dispatchEvents.push("spawn");
+          spawnInputs.push(input);
+          return options.spawn?.(input) ?? { id: CHILD_THREAD_ID };
+        },
         timeline: async () => ({ goal: null, pendingTodos: { items: [] } }),
+      },
+      environments: {
+        get: async ({ environmentId }: { environmentId: string }) => ({
+          id: environmentId,
+          hostId: "host_root",
+        }),
       },
       plugins: {
         callRpc: async ({ method, input }) => {
@@ -155,6 +169,7 @@ function createBindingsFixture(options: {
             };
           }
           if (method === "taskThreadsAttach") {
+            dispatchEvents.push("attach");
             const taskId = taskInput?.taskId as string;
             const threadId = taskInput?.threadId as string;
             if (options.taskThreadsAttach)
@@ -175,7 +190,28 @@ function createBindingsFixture(options: {
       },
     },
   });
-  return { host, taskThreads, tasks };
+  return { dispatchEvents, host, spawnInputs, taskThreads, tasks };
+}
+
+async function createDelegatedExecution(
+  host: ReturnType<typeof createBindingsFixture>["host"],
+  idempotencyKey: string,
+) {
+  await host.harness.behavior.callAgentTool(
+    "create_work_task",
+    { title: "Durable outcome", description: "" },
+    { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
+  );
+  await host.harness.behavior.callAgentTool(
+    "create_execution_task",
+    {
+      title: "Delegated implementation",
+      description: "",
+      idempotencyKey,
+      assignee: "agent",
+    },
+    { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
+  );
 }
 
 describe("durable Work/Tasks binding parity", () => {
@@ -776,6 +812,137 @@ describe("durable Work/Tasks binding parity", () => {
       { channel: "work-sidebar:changed", payload: { family: "work", rootThreadId: ROOT_THREAD_ID } },
       { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: ROOT_THREAD_ID } },
     ]);
+  });
+
+  it("spawns delegated code edits in a managed worktree under the durable root before attaching the child", async () => {
+    const { dispatchEvents, host, spawnInputs, taskThreads } = createBindingsFixture({
+      rootEnvironmentId: "env_root",
+    });
+    await plugin(host.bb);
+    await createDelegatedExecution(host, "managed-code-edit");
+    dispatchEvents.length = 0;
+
+    await host.harness.behavior.callAgentTool(
+      "bind_execution_owner",
+      {
+        idempotencyKey: "managed-code-edit",
+        mode: "delegated",
+        environment: "managed-worktree",
+        baseBranch: "main",
+        prompt: "Implement the isolated code change.",
+        title: "Managed code edit",
+        visibility: "hidden",
+      },
+      { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
+    );
+
+    expect(spawnInputs).toEqual([{
+      projectId: BB_PROJECT_ID,
+      parentThreadId: ROOT_THREAD_ID,
+      environment: {
+        type: "host",
+        hostId: "host_root",
+        workspace: {
+          type: "managed-worktree",
+          baseBranch: { kind: "named", name: "main" },
+        },
+      },
+      prompt: "Implement the isolated code change.",
+      title: "Managed code edit",
+      visibility: "hidden",
+      origin: "plugin",
+      originPluginId: "test-plugin",
+    }]);
+    expect(dispatchEvents).toEqual(["spawn", "attach"]);
+    expect(taskThreads.get(CREATED_EXECUTION_TASK_ID)).toEqual(
+      new Set([CHILD_THREAD_ID]),
+    );
+  });
+
+  it("reuses the root environment only when delegated work explicitly requests reuse", async () => {
+    const { dispatchEvents, host, spawnInputs, taskThreads } = createBindingsFixture({
+      rootEnvironmentId: "env_root",
+    });
+    await plugin(host.bb);
+    await createDelegatedExecution(host, "explicit-reuse");
+    dispatchEvents.length = 0;
+
+    await host.harness.behavior.callAgentTool(
+      "bind_execution_owner",
+      {
+        idempotencyKey: "explicit-reuse",
+        mode: "delegated",
+        environment: "reuse",
+        prompt: "Inspect the existing checkout.",
+      },
+      { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
+    );
+
+    expect(spawnInputs).toEqual([expect.objectContaining({
+      projectId: BB_PROJECT_ID,
+      parentThreadId: ROOT_THREAD_ID,
+      environment: { type: "reuse", environmentId: "env_root" },
+    })]);
+    expect(dispatchEvents).toEqual(["spawn", "attach"]);
+    expect(taskThreads.get(CREATED_EXECUTION_TASK_ID)).toEqual(
+      new Set([CHILD_THREAD_ID]),
+    );
+  });
+
+  it("rejects invalid delegated environment selections before it can spawn or attach a child", async () => {
+    const { host, spawnInputs, taskThreads } = createBindingsFixture({
+      rootEnvironmentId: "env_root",
+    });
+    await plugin(host.bb);
+    await createDelegatedExecution(host, "invalid-environment");
+
+    await expect(
+      host.harness.behavior.callAgentTool(
+        "bind_execution_owner",
+        {
+          idempotencyKey: "invalid-environment",
+          mode: "delegated",
+          environment: "reuse",
+          baseBranch: "main",
+          prompt: "This must not spawn.",
+        },
+        { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
+      ),
+    ).rejects.toThrow("baseBranch requires environment managed-worktree");
+    expect(spawnInputs).toEqual([]);
+    expect(taskThreads.get(CREATED_EXECUTION_TASK_ID)).toBeUndefined();
+  });
+
+  it("requires a root environment before a managed-worktree delegation can become pending", async () => {
+    const { host, spawnInputs, taskThreads } = createBindingsFixture();
+    await plugin(host.bb);
+    await createDelegatedExecution(host, "missing-managed-root");
+
+    await expect(
+      host.harness.behavior.callAgentTool(
+        "bind_execution_owner",
+        {
+          idempotencyKey: "missing-managed-root",
+          mode: "delegated",
+          environment: "managed-worktree",
+          prompt: "This must not become a recovery case.",
+        },
+        { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
+      ),
+    ).rejects.toThrow("Managed-worktree delegation requires the root thread environment");
+    expect(spawnInputs).toEqual([]);
+    expect(taskThreads.get(CREATED_EXECUTION_TASK_ID)).toBeUndefined();
+    await expect(
+      host.harness.behavior.callAgentTool(
+        "bind_execution_owner",
+        { idempotencyKey: "missing-managed-root", mode: "delegated", prompt: "Retry safely." },
+        { threadId: ROOT_THREAD_ID, projectId: BB_PROJECT_ID },
+      ),
+    ).resolves.toBeDefined();
+    expect(spawnInputs).toEqual([expect.objectContaining({
+      parentThreadId: ROOT_THREAD_ID,
+      environment: { type: "project-default" },
+    })]);
   });
 
   it("reads and safely adopts the one legacy outcome candidate through the typed Work surface", async () => {

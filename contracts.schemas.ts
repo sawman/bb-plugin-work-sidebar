@@ -194,20 +194,21 @@ export const rpcSchemas = {
     output: z.object({ task: taskSummary, binding: binding }),
   },
   createExecutionTask: {
-    input: z.object({
-      rootThreadId: z.string(), title: z.string().trim().min(1), description: z.string().default(""),
-      idempotencyKey: z.string().trim().min(1).max(200),
-      assignee: z.enum(["agent", "human"]),
-    }).strict(),
-    output: z.object({ task: executionTaskSummary, binding: binding, reused: z.boolean() }),
+    input: z.object({ rootThreadId: z.string(), title: z.string().trim().min(1), description: z.string().default(""),
+      idempotencyKey: z.string().trim().min(1).max(200), assignee: z.enum(["agent", "human"]),
+    }).strict(), output: z.object({ task: executionTaskSummary, binding: binding, reused: z.boolean() }),
   },
-  bindExecutionOwner: {
-    input: z.object({
+  bindExecutionOwner: { input: z.object({
       rootThreadId: z.string(), idempotencyKey: z.string().trim().min(1).max(200),
       mode: z.enum(["direct", "delegated"]), prompt: z.string().trim().min(1).optional(),
-      title: z.string().trim().min(1).optional(), visibility: z.enum(["visible", "hidden"]).optional(),
-    }).strict(),
-    output: z.object({ binding: binding, spawnedThreadId: z.string().nullable() }),
+      title: z.string().trim().min(1).optional(), visibility: z.enum(["visible", "hidden"]).optional(), environment: z.enum(["managed-worktree", "reuse"]).optional(),
+      baseBranch: z.string().trim().min(1).optional(),
+    }).strict().superRefine((input, context) => {
+      if (input.baseBranch && input.environment !== "managed-worktree")
+        context.addIssue({ code: "custom", path: ["baseBranch"], message: "baseBranch requires environment managed-worktree" });
+      if (input.mode === "direct" && (input.environment || input.baseBranch))
+        context.addIssue({ code: "custom", path: ["environment"], message: "Environment selection is only valid for delegated execution" });
+    }), output: z.object({ binding: binding, spawnedThreadId: z.string().nullable() }),
   },
   adoptLegacyOutcome: {
     input: z.object({ rootThreadId: z.string(), taskId: z.string() }).strict(),

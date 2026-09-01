@@ -178,7 +178,7 @@ export function registerTasksTools(
   });
   bb.agents.registerTool({
     name: "bind_execution_owner",
-    description: "Bind a direct root owner or dispatch one delegated child owner for an execution task.",
+    description: "Bind a direct root owner or dispatch one delegated child owner for an execution task. Use managed-worktree for delegated code edits and reuse only when sharing the root checkout is intended.",
     parameters: z.object({
       rootThreadId: z.string().optional(),
       idempotencyKey: z.string().trim().min(1).max(200),
@@ -186,8 +186,28 @@ export function registerTasksTools(
       prompt: z.string().trim().min(1).optional(),
       title: z.string().trim().min(1).optional(),
       visibility: z.enum(["visible", "hidden"]).optional(),
-    }).strict(),
-    instructions: "Call get_work_context first. Delegated dispatch persists pending state before spawn; if recovery is required, do not retry automatically.",
+      environment: z.enum(["managed-worktree", "reuse"]).optional(),
+      baseBranch: z.string().trim().min(1).optional(),
+    }).strict().superRefine((input, context) => {
+      if (input.baseBranch && input.environment !== "managed-worktree")
+        context.addIssue({
+          code: "custom",
+          path: ["baseBranch"],
+          message: "baseBranch requires environment managed-worktree",
+        });
+      if (input.mode === "direct" && (input.environment || input.baseBranch))
+        context.addIssue({
+          code: "custom",
+          path: ["environment"],
+          message: "Environment selection is only valid for delegated execution",
+        });
+    }),
+    instructions: [
+      "Call get_work_context first.",
+      "For delegated code edits, explicitly select environment managed-worktree and an optional baseBranch; select reuse only when sharing the root checkout is intentional.",
+      "Delegated dispatch persists pending state before spawn; if recovery is required, do not retry automatically.",
+      "Builtin Tasks 0.1.2 cannot preserve root parenting for durable delegation: use this tool, or explicitly run bb thread spawn --parent-self --new-environment worktree and then bb tasks attach.",
+    ].join(" "),
     async execute(params, context) {
       const root = await bindings.rootThread(params.rootThreadId ?? context.threadId);
       const result = await bindings.owner({ ...params, rootThreadId: root.id });
