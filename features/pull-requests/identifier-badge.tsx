@@ -36,7 +36,7 @@ export function PullRequestIdentifierBadge(
       className="ws-pr-identifier-badge ws-pr-number-badge"
       title={`PR ${value}${stateLabel ? ` · ${stateLabel}` : ""}`}
       tone={identifier.presentation?.tone}
-      aria-haspopup="menu"
+      aria-haspopup={identifier.onContextMenu ? "menu" : undefined}
       onContextMenu={identifier.onContextMenu}
       onKeyDown={identifier.onKeyDown}
     >

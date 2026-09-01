@@ -203,6 +203,42 @@ describe("R21D ThreadRow characterization", () => {
     expect(view.onDragThreadChange).not.toHaveBeenCalled();
   });
 
+  it("keeps detached worktree identity and the shared PR badge presentation", async () => {
+    host.pullRequest = {
+      number: 42,
+      title: "Detached checkout PR",
+      url: "https://example.test/pull/42",
+      state: "open",
+      attention: "none",
+    };
+    const view = renderRow({
+      threadOverrides: {
+        environment: {
+          id: "env_detached",
+          name: null,
+          branchName: null,
+          workspaceDisplayKind: "managed-worktree",
+        },
+      },
+    });
+
+    const pullRequest = await view.findByRole("button", {
+      name: "Copy PR number #42",
+    });
+    expect(pullRequest.classList).toContain("ws-pr-number-badge");
+    expect(pullRequest.classList).not.toContain("ws-thread-pr-token");
+    expect(pullRequest.getAttribute("aria-haspopup")).toBeNull();
+    expect(pullRequest.getAttribute("title")).toBe(
+      "PR #42 · Review pending",
+    );
+    const location = view.container.querySelector<HTMLElement>(
+      '.ws-thread-location[data-location-kind="worktree"]',
+    );
+    expect(location?.textContent).toBe("Detached worktree");
+    expect(location?.querySelector("svg")?.dataset.icon).toBe("Columns2");
+    expect(location?.querySelector('[role="button"]')).toBeNull();
+  });
+
   it("bolds only attention states instead of generic unread updates", () => {
     const genericUnread = renderRow({
       threadOverrides: {

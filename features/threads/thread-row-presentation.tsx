@@ -4,13 +4,13 @@ import type {
   PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
-import { CopyBadge } from "@/components/ui/copy-badge";
 import { ThreadWorkspaceBadge } from "@/components/threads/thread-workspace-badge";
 import {
   ThreadProviderLogo,
   type ThreadProvider,
 } from "@/components/threads/thread-provider-logo";
 import { pullRequestPresentation } from "@/features/pull-requests/presentation";
+import { PullRequestIdentifierBadge } from "@/features/pull-requests/identifier-badge";
 import type { ThreadProject } from "./thread-row-types";
 import {
   threadProviderRuntimeState,
@@ -77,17 +77,11 @@ export function ThreadMetadata({
   return (
     <span className="ws-thread-meta ws-sidebar-row-meta">
       {pullRequest && pullRequestStatus && (
-        <CopyBadge
-          value={`#${pullRequest.number}`}
-          copyValue={`PR #${pullRequest.number}`}
-          label="PR number"
-          className="ws-pr-meta ws-thread-token ws-thread-pr-token"
-          tone={pullRequestStatus.tone}
-          title={`PR #${pullRequest.number} · ${pullRequestStatus.label}`}
-        >
-          <Icon name={pullRequestStatus.icon} aria-hidden />
-          <span>#{pullRequest.number}</span>
-        </CopyBadge>
+        <PullRequestIdentifierBadge
+          kind="pull-request"
+          number={pullRequest.number}
+          presentation={pullRequestStatus}
+        />
       )}
       {stackNumber}
       <ThreadWorkspaceBadge

@@ -49,7 +49,7 @@ describe("thread workspace metadata", () => {
       })),
     ).toEqual([
       { kind: "personal", icon: "Laptop", text: "Personal" },
-      { kind: "repository", icon: "FolderGit", text: "Work sidebar" },
+      { kind: "worktree", icon: "Columns2", text: "Detached worktree" },
       { kind: "worktree", icon: "Columns2", text: "R24 checkout" },
       { kind: "branch", icon: "GitBranch", text: "bb/r24-location" },
     ]);

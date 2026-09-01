@@ -32,13 +32,14 @@ function fallbackLocation({
   workspaceDisplayKind?: WorkspaceDisplayKind;
 }): ThreadLocation {
   const isWorktree = workspaceDisplayKind?.includes("worktree") ?? false;
-  if (workspace && isWorktree) {
+  if (isWorktree) {
+    const value = workspace ?? "Detached worktree";
     return {
-      copyLabel: "worktree name",
-      copyValue: `Worktree ${workspace}`,
+      copyLabel: workspace ? "worktree name" : null,
+      copyValue: workspace ? `Worktree ${workspace}` : null,
       icon: "Columns2",
       kind: "worktree",
-      value: workspace,
+      value,
     };
   }
   const isPersonal = project?.isPersonal ?? false;
