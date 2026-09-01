@@ -76,7 +76,7 @@ describe("pull-request presentation semantics", () => {
     ],
     [
       "review_required",
-      { icon: "Eye", label: "Review required", tone: "muted" },
+      { icon: "Eye", label: "Review required", tone: "warning" },
     ],
     [
       "none",
@@ -117,7 +117,7 @@ describe("pull-request presentation semantics", () => {
     ).toEqual({
       icon: "Eye",
       label: "Review required",
-      tone: "muted",
+      tone: "warning",
       count: 1,
     });
   });

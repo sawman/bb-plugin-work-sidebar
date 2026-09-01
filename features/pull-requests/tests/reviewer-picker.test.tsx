@@ -7,12 +7,15 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { createRef, type PropsWithChildren } from "react";
+import { createRef, useState, type PropsWithChildren } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { configureAxe } from "vitest-axe";
 import { PullRequestReviewerPicker } from "../reviewer-picker";
 import type { PullRequestRpc } from "../queries";
 import { AuthoredPullRequestRow } from "../authored-pull-requests";
+
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock("sonner", () => ({ toast }));
 
 const axe = configureAxe({
   runOnly: {
@@ -35,10 +38,20 @@ function wrapper(client: QueryClient) {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
+}
+
 describe("pull-request reviewer picker", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    toast.success.mockReset();
+    toast.error.mockReset();
   });
 
   it("searches a multi-select and applies both reviewer additions and removals", async () => {
@@ -116,8 +129,6 @@ describe("pull-request reviewer picker", () => {
     fireEvent.click(
       screen.getByRole("option", { name: /alice.*Alice Example/i }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Save reviewers" }));
-
     await waitFor(() =>
       expect(rpc.call).toHaveBeenCalledWith("updatePullRequestReviewers", {
         repository: "acme/sidebar",
@@ -125,7 +136,10 @@ describe("pull-request reviewer picker", () => {
         reviewers: ["bob"],
       }),
     );
-    await waitFor(() => expect(close).toHaveBeenCalledOnce());
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Reviewers saved"));
+    expect(screen.queryByRole("button", { name: "Save reviewers" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(close).toHaveBeenCalledOnce();
     unmount();
     client.clear();
   });
@@ -164,6 +178,56 @@ describe("pull-request reviewer picker", () => {
     expect(search.hasAttribute("aria-controls")).toBe(false);
     expect(screen.getByText("No matching reviewers.")).toBeTruthy();
     await expectNoAriaViolations();
+    client.clear();
+  });
+
+  it("continues an autosave after the picker closes", async () => {
+    const update = deferred<{ reviewers: string[] }>();
+    const rpc = {
+      call: vi.fn(async (method: string) => {
+        if (method === "getPullRequestReviewers")
+          return {
+            available: true,
+            reviewers: [{ login: "alice", name: null, avatarUrl: null }],
+            error: null,
+          };
+        if (method === "updatePullRequestReviewers") return update.promise;
+        throw new Error(`unexpected ${method}`);
+      }),
+    } as unknown as PullRequestRpc;
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    function Host() {
+      const [open, setOpen] = useState(true);
+      const anchorRef = createRef<HTMLButtonElement>();
+      return (
+        <>
+          <button ref={anchorRef}>Review status</button>
+          {open ? (
+            <PullRequestReviewerPicker
+              rpc={rpc}
+              repository="acme/sidebar"
+              number={42}
+              title="Reviewer interaction"
+              requestedReviewers={[]}
+              anchorRef={anchorRef}
+              onClose={() => setOpen(false)}
+            />
+          ) : null}
+        </>
+      );
+    }
+    render(<Host />, { wrapper: wrapper(client) });
+
+    fireEvent.click(await screen.findByRole("option", { name: "alice" }));
+    expect(await screen.findByText("Saving reviewers…")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("combobox", { name: "Search reviewers" })).toBeNull();
+    update.resolve({ reviewers: ["alice"] });
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith("Reviewers saved"),
+    );
     client.clear();
   });
 
@@ -213,10 +277,10 @@ describe("pull-request reviewer picker", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("option", { name: "alice" })).toBeTruthy();
     fireEvent.click(screen.getByRole("option", { name: "alice" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save reviewers" }));
     expect((await screen.findByRole("alert")).textContent).toContain(
       "GitHub refused reviewers",
     );
+    expect(toast.error).toHaveBeenCalledWith("GitHub refused reviewers");
     expect(close).not.toHaveBeenCalled();
     fireEvent.keyDown(screen.getByRole("combobox", { name: "Search reviewers" }), { key: "Escape" });
     expect(close).toHaveBeenCalledOnce();
@@ -272,7 +336,7 @@ describe("pull-request reviewer picker", () => {
     expect(await screen.findByRole("combobox", { name: "Search reviewers" })).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
     fireEvent.click(
-      screen.getByRole("button", { name: "Cancel" }),
+      screen.getByRole("button", { name: "Close" }),
     );
     await waitFor(() => expect(screen.queryByRole("combobox", { name: "Search reviewers" })).toBeNull());
 

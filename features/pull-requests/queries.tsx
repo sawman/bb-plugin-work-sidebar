@@ -269,7 +269,13 @@ export function usePullRequestReviewers(
   });
 }
 
-export function useUpdatePullRequestReviewers(rpc: PullRequestRpc) {
+export function useUpdatePullRequestReviewers(
+  rpc: PullRequestRpc,
+  callbacks: {
+    onSuccess?(): void;
+    onError?(error: Error): void;
+  } = {},
+) {
   const client = useQueryClient();
   return useMutation({
     scope: { id: "pull-request-reviewers" },
@@ -278,6 +284,8 @@ export function useUpdatePullRequestReviewers(rpc: PullRequestRpc) {
       number: number;
       reviewers: string[];
     }) => rpc.call("updatePullRequestReviewers", input),
+    onSuccess: () => callbacks.onSuccess?.(),
+    onError: (error) => callbacks.onError?.(error),
     onSettled: async () => {
       await Promise.all([
         client.invalidateQueries({ queryKey: pullRequestKeys.authored() }),

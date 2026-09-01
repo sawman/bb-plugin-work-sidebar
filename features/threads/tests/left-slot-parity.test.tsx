@@ -606,7 +606,6 @@ describe("R18 registered left sidebar parity", () => {
     ).toBeTruthy();
     expect(slot.queryByRole("dialog")).toBeNull();
     fireEvent.click(await slot.findByRole("option", { name: /bob.*Bob/i }));
-    fireEvent.click(slot.getByRole("button", { name: "Save reviewers" }));
     await waitFor(() =>
       expect(updateReviewers).toHaveBeenCalledWith({
         repository: "acme/repo",
@@ -614,6 +613,16 @@ describe("R18 registered left sidebar parity", () => {
         reviewers: ["alice", "bob"],
       }),
     );
+    expect(
+      slot
+        .getByRole("button", { name: "Manage reviewers: Review required" })
+        .querySelector(".ws-status")
+        ?.getAttribute("data-tone"),
+    ).toBe("warning");
+    expect(
+      slot.getByRole("combobox", { name: "Search reviewers" }),
+    ).toBeTruthy();
+    fireEvent.click(slot.getByRole("button", { name: "Close" }));
     await waitFor(() =>
       expect(
         slot.queryByRole("combobox", { name: "Search reviewers" }),

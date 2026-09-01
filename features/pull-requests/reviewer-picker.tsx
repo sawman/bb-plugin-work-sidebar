@@ -9,10 +9,6 @@ import {
 } from "./queries";
 import type { PullRequestReviewerContract } from "./schemas";
 
-function normalize(logins: readonly string[]): string[] {
-  return [...new Set(logins.map((login) => login.toLocaleLowerCase()))].sort();
-}
-
 export function PullRequestReviewerPicker({
   rpc,
   repository,
@@ -31,7 +27,10 @@ export function PullRequestReviewerPicker({
   onClose(): void;
 }) {
   const directory = usePullRequestReviewers(rpc, repository, true);
-  const update = useUpdatePullRequestReviewers(rpc);
+  const update = useUpdatePullRequestReviewers(rpc, {
+    onSuccess: () => toast.success("Reviewers saved"),
+    onError: (error) => toast.error(error.message),
+  });
   const [selected, setSelected] = useState<string[]>([...requestedReviewers]);
   const close = useCallback(() => {
     onClose();
@@ -55,26 +54,14 @@ export function PullRequestReviewerPicker({
         leading: <Icon name={selected.includes(reviewer.login) ? "Check" : "User"} />,
       }));
   }, [directory.data, requestedReviewers, selected]);
-  const dirty =
-    JSON.stringify(normalize(selected)) !==
-    JSON.stringify(normalize(requestedReviewers));
-  const save = async () => {
-    try {
-      await update.mutateAsync({
-        repository,
-        number,
-        reviewers: [...selected].sort((left, right) =>
-          left.localeCompare(right, undefined, { sensitivity: "base" }),
-        ),
-      });
-      toast.success("Reviewers updated");
-      close();
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Could not update reviewers",
-      );
-    }
-  };
+  const save = (reviewers: string[]) =>
+    update.mutate({
+      repository,
+      number,
+      reviewers: [...reviewers].sort((left, right) =>
+        left.localeCompare(right, undefined, { sensitivity: "base" }),
+      ),
+    });
 
   return (
     <SearchCombobox
@@ -88,14 +75,10 @@ export function PullRequestReviewerPicker({
       footer={
         <>
           {update.isError ? <div className="ws-search-shell-error" role="alert">{update.error.message}</div> : null}
-          <button type="button" onClick={close} disabled={update.isPending}>Cancel</button>
-          <button
-            type="button"
-            onClick={() => void save()}
-            disabled={!dirty || update.isPending || directory.isError}
-          >
-            {update.isPending ? "Saving…" : "Save reviewers"}
-          </button>
+          <span className="ws-search-shell-status" aria-live="polite">
+            {update.isPending ? "Saving reviewers…" : "Changes save automatically"}
+          </span>
+          <button type="button" onClick={close}>Close</button>
         </>
       }
       header={
@@ -113,6 +96,7 @@ export function PullRequestReviewerPicker({
       onSelectionChange={(values) => {
         update.reset();
         setSelected(values);
+        save(values);
       }}
       open
       options={options}

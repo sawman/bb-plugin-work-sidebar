@@ -118,7 +118,11 @@ export function pullRequestSignalPresentation(signal: PullRequestSignal): {
       label: "Review requested",
       tone: "warning",
     },
-    review_required: { icon: "Eye", label: "Review required", tone: "muted" },
+    review_required: {
+      icon: "Eye",
+      label: "Review required",
+      tone: "warning",
+    },
     none: { icon: "UserClock", label: "No reviewer requested", tone: "muted" },
   };
   return {
