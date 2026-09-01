@@ -1447,12 +1447,18 @@ describe("registered Work context cards", () => {
     await waitFor(() =>
       expect(taskCard.querySelector(".ws-work-item-queue-add")).toBeTruthy(),
     );
-    const control = taskCard.querySelector(".ws-work-item-queue-add")!;
-    const workflow = taskCard.querySelector(".ws-task-workflow")!;
+    const control = taskCard.querySelector(
+      ".ws-work-item-queue-add",
+    )! as HTMLElement;
+    const workflow = taskCard.querySelector(
+      ".ws-task-workflow",
+    )! as HTMLElement;
     const goalTrigger = within(taskCard).getByRole("button", {
       name: "Goals: 0 tasks",
     });
-    const goals = goalTrigger.closest("h3")!;
+    const goalsGroup = goalTrigger.closest(
+      ".ws-work-item-queue",
+    )! as HTMLElement;
     expect(control.compareDocumentPosition(workflow)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
@@ -1463,10 +1469,19 @@ describe("registered Work context cards", () => {
     expect(goalTrigger.querySelector(".ws-task-workflow-count")?.textContent).toBe(
       "0",
     );
-    expect(goals.compareDocumentPosition(control)).toBe(
+    expect(goalTrigger.compareDocumentPosition(control)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
-    expect(slot.getByRole("combobox", { name: "Add a task to Goals" })).toBeTruthy();
+    // Goals and the task workflow deliberately share the same inset wrapper;
+    // the Work-item section must not reach wider than Queue/Needs you rows.
+    expect(goalsGroup.classList.contains("ws-thread-task-card")).toBe(true);
+    expect(workflow.closest(".ws-thread-task-card")).toBeTruthy();
+    const addTask = slot.getByRole("combobox", { name: "Add a task to Goals" });
+    fireEvent.change(addTask, { target: { value: "Draft a work item" } });
+    expect(slot.getByRole("button", { name: "Create a BB task as Goal" })).toBeTruthy();
+    fireEvent.click(within(slot.getByRole("group", { name: "Task destination" })).getByRole("button", { name: "Queue" }));
+    expect(slot.getByRole("combobox", { name: "Add a task to Queue" })).toBeTruthy();
+    expect(slot.getByRole("button", { name: "Create a BB task as Queue" })).toBeTruthy();
     expect(
       slot.queryByText(
         "Choose a BB task or linked Linear issue as the current goal.",
@@ -1575,6 +1590,137 @@ describe("registered Work context cards", () => {
         queue: { current: { source: "linear", id: "LIN-7" }, backlog: [] },
       }),
     );
+    slot.lifecycle.unmount();
+    getPluginQueryClient().clear();
+  });
+
+  it("creates the typed BB task into the selected Goal or Queue destination", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const createSidebarTask = vi.fn((input: {
+      projectId: string;
+      title: string;
+      assignee: "agent" | "human";
+    }) => ({
+      task: {
+        id: input.title === "Goal from text" ? "goal_task" : "queue_task",
+        projectId: input.projectId,
+        projectName: "Work",
+        key: "WORK-9",
+        title: input.title,
+        status: "todo" as const,
+        priority: "none" as const,
+        dueDate: null,
+        parentTaskId: null,
+        position: 1,
+        linkedThreadIds: [],
+        assignee: input.assignee,
+      },
+    }));
+    const saveWorkItemQueue = vi.fn(({ queue }) => ({
+      rootThreadId: "thr_one",
+      configured: true,
+      queue,
+    }));
+    const attachTaskToThread = vi.fn(() => ({ threadId: "thr_one" }));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      {
+        rpc: fixture({
+          sidebarTasks: () => ({
+            available: true,
+            projects: [{ id: "project_1", name: "Work" }],
+            error: null,
+            tasks: [],
+          }),
+          getWorkOutcome: () => populatedOutcome,
+          createSidebarTask,
+          saveWorkItemQueue,
+          attachTaskToThread,
+        }),
+      },
+    );
+    await waitFor(() => expect(slot.getByRole("combobox", { name: "Add a task to Goals" })).toBeTruthy());
+    fireEvent.change(slot.getByRole("combobox", { name: "Add a task to Goals" }), {
+      target: { value: "Goal from text" },
+    });
+    await waitFor(() => expect((slot.getByRole("button", { name: "Create a BB task as Goal" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(slot.getByRole("button", { name: "Create a BB task as Goal" }));
+    await waitFor(() => expect(createSidebarTask).toHaveBeenCalledWith({
+      projectId: "project_1",
+      title: "Goal from text",
+      assignee: "agent",
+    }));
+    await waitFor(() => expect(saveWorkItemQueue).toHaveBeenCalledWith({
+      threadId: "thr_one",
+      queue: {
+        current: { source: "bb_task", id: "task_1" },
+        backlog: [{ source: "bb_task", id: "goal_task" }],
+      },
+    }));
+
+    const destination = slot.getByRole("group", { name: "Task destination" });
+    fireEvent.click(within(destination).getByRole("button", { name: "Queue" }));
+    const queueField = slot.getByRole("combobox", { name: "Add a task to Queue" });
+    fireEvent.change(queueField, { target: { value: "Queue from text" } });
+    fireEvent.click(slot.getByRole("button", { name: "Create a BB task as Queue" }));
+    await waitFor(() => expect(createSidebarTask).toHaveBeenCalledWith({
+      projectId: "project_1",
+      title: "Queue from text",
+      assignee: "agent",
+    }));
+    await waitFor(() => expect(attachTaskToThread).toHaveBeenCalledWith({
+      taskId: "queue_task",
+      threadId: "thr_one",
+    }));
+    slot.lifecycle.unmount();
+    getPluginQueryClient().clear();
+  });
+
+  it("creates the first typed Goal as the durable Work outcome", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const createWorkTask = vi.fn(() => ({
+      task: {
+        id: "task_goal",
+        projectId: "project_1",
+        projectName: "Work",
+        key: "WORK-10",
+        title: "First goal from text",
+        status: "todo" as const,
+        priority: "none" as const,
+        dueDate: null,
+        parentTaskId: null,
+      },
+    }));
+    const saveWorkItemQueue = vi.fn(({ queue }) => ({
+      rootThreadId: "thr_one",
+      configured: true,
+      queue,
+    }));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      {
+        rpc: fixture({ createWorkTask, saveWorkItemQueue }),
+      },
+    );
+    const field = await slot.findByRole("combobox", { name: "Add a task to Goals" });
+    fireEvent.change(field, { target: { value: "First goal from text" } });
+    const create = slot.getByRole("button", { name: "Create a BB task as Goal" });
+    await waitFor(() => expect((create as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(create);
+    await waitFor(() => expect(createWorkTask).toHaveBeenCalledWith({
+      threadId: "thr_one",
+      title: "First goal from text",
+      description: "Created from the Work sidebar.",
+      parentTaskId: null,
+    }));
+    await waitFor(() => expect(saveWorkItemQueue).toHaveBeenCalledWith({
+      threadId: "thr_one",
+      queue: { current: { source: "bb_task", id: "task_goal" }, backlog: [] },
+    }));
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();
   });

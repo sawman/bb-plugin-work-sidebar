@@ -3,7 +3,6 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { CopyBadge } from "../../components/ui/copy-badge";
 import { Icon } from "../../components/ui/icon";
-import { Input } from "../../components/ui/input";
 import { SearchCombobox } from "../../components/ui/combobox";
 import type { TaskStatus } from "../tasks/model";
 import { TaskPriorityIcon } from "../tasks/priority";
@@ -126,7 +125,6 @@ export function WorkItemCard({
     };
   };
   const legacy = query.data?.legacy;
-  const [title, setTitle] = useState("");
   const [adoptionNotice, setAdoptionNotice] = useState<{ message: string; tone: "error" | "success" } | null>(null);
   const report = async (operation: Promise<unknown>, success: string, failure: string) => {
     try {
@@ -137,6 +135,48 @@ export function WorkItemCard({
     }
   };
   const trackerBusy = trackerMutations.link.isPending || trackerMutations.unlink.isPending || trackerMutations.status.isPending;
+  const createBBTask = async (title: string, destination: "goal" | "queue") => {
+    if (!query.data?.tasksAvailable) {
+      throw new Error("Choose a BB Tasks project before creating a task.");
+    }
+    try {
+      if (destination === "goal" && !outcome) {
+        const result = await mutation.create.mutateAsync({ title });
+        await queueMutation.mutateAsync({
+          current: { source: "bb_task", id: result.task.id },
+          backlog: queue.backlog,
+        });
+      } else {
+        const projectId = tasks.data?.projects[0]?.id;
+        if (!projectId) {
+          throw new Error("Choose a BB Tasks project before creating a task.");
+        }
+        const { task } = await taskMutations.create.mutateAsync({
+          projectId,
+          title,
+          assignee: "agent",
+        });
+        if (destination === "goal") {
+          await queueMutation.mutateAsync({
+            current: queue.current ?? { source: "bb_task", id: task.id },
+            backlog: queue.current
+              ? [...queue.backlog, { source: "bb_task", id: task.id }]
+              : queue.backlog,
+          });
+        } else {
+          await taskMutations.attachment.mutateAsync({
+            taskId: task.id,
+            threadId,
+            attached: true,
+          });
+        }
+      }
+      toast.success(`BB task added to ${destination === "goal" ? "Goals" : "Queue"}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not create BB task");
+      throw error;
+    }
+  };
   const saveQueue = (nextQueue: WorkQueueValue) => {
     void report(
       queueMutation.mutateAsync(nextQueue),
@@ -172,7 +212,14 @@ export function WorkItemCard({
         labelForReference={labelForReference}
         bbTaskOptions={(tasks.data?.tasks ?? []).map((task) => ({ id: task.id, label: `${task.key} · ${task.title}` }))}
         taskById={taskById}
-        pending={queueQuery.isPending || queueMutation.isPending || executionMutation.isPending || trackerBusy}
+        pending={queueQuery.isPending || queueMutation.isPending || executionMutation.isPending || trackerBusy || mutation.create.isPending || mutation.adopt.isPending || taskMutations.create.isPending}
+        canCreateBBTask={(destination) =>
+          Boolean(
+            query.data?.tasksAvailable &&
+              (destination === "goal" && !outcome || tasks.data?.projects[0]?.id),
+          )
+        }
+        onCreateBBTask={createBBTask}
         onPromote={(reference) => void saveQueue(promoteWorkItem(queue, reference))}
         onDemote={() => void saveQueue(demoteCurrentWorkItem(queue))}
         onAddGoal={(reference) => {
@@ -282,38 +329,6 @@ export function WorkItemCard({
           ) : legacy && legacy.state !== "none" ? (
             <p className="ws-card-note" role="status">{legacy.message ?? "Legacy outcome adoption needs attention."}</p>
           ) : null}
-          <div className="ws-outcome-form">
-            <Input
-              aria-label="New BB task title"
-              placeholder="New BB task title"
-              value={title}
-              disabled={!query.data?.tasksAvailable || mutation.create.isPending || mutation.adopt.isPending}
-              onChange={(event) => setTitle(event.target.value)}
-            />
-            <button
-              type="button"
-              className="ws-outcome-create-button"
-              disabled={!title.trim() || !query.data?.tasksAvailable || mutation.create.isPending || mutation.adopt.isPending}
-              aria-label="Create BB task as Goal"
-              onClick={() =>
-                void report(
-                  mutation.create
-                    .mutateAsync({ title: title.trim() })
-                    .then((result) =>
-                      queueMutation.mutateAsync({
-                        current: { source: "bb_task", id: result.task.id },
-                        backlog: queue.backlog,
-                      }),
-                    )
-                    .then(() => setTitle("")),
-                  "BB task created as Goal",
-                  "Could not create BB task",
-                )
-              }
-            >
-              {mutation.create.isPending ? "Creating…" : "Create BB task"}
-            </button>
-          </div>
           {workItem.createFromLinear ? (
             <button
               type="button"
@@ -412,6 +427,8 @@ function WorkQueue({
   onRetryLinear,
   taskById,
   pending,
+  canCreateBBTask,
+  onCreateBBTask,
   onPromote,
   onDemote,
   onAddGoal,
@@ -427,6 +444,8 @@ function WorkQueue({
   onRetryLinear(): void;
   taskById: ReadonlyMap<string, TaskSummary>;
   pending: boolean;
+  canCreateBBTask(destination: "goal" | "queue"): boolean;
+  onCreateBBTask(title: string, destination: "goal" | "queue"): Promise<void>;
   onPromote(reference: WorkItemReference): void;
   onDemote(): void;
   onAddGoal(reference: WorkItemReference): void;
@@ -464,9 +483,20 @@ function WorkQueue({
     else onAddToQueue(reference);
     close();
   };
+  const createFromSearch = async () => {
+    const title = search.trim();
+    if (!title || pending || !canCreateBBTask(destination)) return;
+    try {
+      await onCreateBBTask(title, destination);
+      close();
+    } catch {
+      // The error toast is reported by the mutation owner. Keep this draft so
+      // it can be corrected or retried without reopening another control.
+    }
+  };
   const goalCount = (queue.current ? 1 : 0) + queue.backlog.length;
   return (
-    <section className="ws-work-item-queue" aria-label="Work queue">
+    <section className="ws-thread-task-card ws-work-item-queue" aria-label="Work queue">
       <TaskWorkflowSection
         id={`${idPrefix}-goals`}
         title="Goals"
@@ -561,6 +591,16 @@ function WorkQueue({
           query={search}
           selectedValues={[]}
         />
+        <button
+          type="button"
+          className="ws-task-workflow-action"
+          aria-label={`Create a BB task as ${destination === "goal" ? "Goal" : "Queue"}`}
+          title={`Create BB task as ${destination === "goal" ? "Goal" : "Queue"}`}
+          disabled={!search.trim() || pending || !canCreateBBTask(destination)}
+          onClick={() => void createFromSearch()}
+        >
+          <Icon className="ws-task-workflow-icon" name="Plus" aria-hidden />
+        </button>
       </div>
       {linearError ? (
         <div className="ws-callout" role="alert">

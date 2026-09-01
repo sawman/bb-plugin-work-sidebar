@@ -3581,6 +3581,7 @@ button.ws-provider-health:focus-visible {
 }
 .ws-task-workflow-disclosure {
   display: flex;
+  min-width: 0;
   width: 100%;
   align-items: center;
   justify-content: space-between;
@@ -3777,9 +3778,6 @@ button.ws-provider-health:focus-visible {
   opacity: 0.58;
 }
 .ws-work-item-queue {
-  display: grid;
-  gap: 0.42rem;
-  padding-bottom: 0.45rem;
   border-bottom: 1px solid var(--border);
 }
 .ws-work-item-reference {
@@ -3800,7 +3798,7 @@ button.ws-provider-health:focus-visible {
 .ws-work-item-queue-add {
   display: grid;
   min-width: 0;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.38rem;
   margin-top: 0.18rem;
