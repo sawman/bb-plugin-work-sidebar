@@ -1,4 +1,9 @@
 import { z } from "zod";
+import {
+  executionTaskSummarySchema,
+  taskStatusSchema,
+  taskSummarySchema,
+} from "../tasks/schemas.js";
 
 const workItemReferenceSchema = z
   .object({ source: z.enum(["bb_task", "linear"]), id: z.string().trim().min(1).max(160) })
@@ -38,6 +43,98 @@ const backgroundJobSchema = z
     model: z.string().nullable(),
   })
   .strict();
+
+export const workBindingOwnerSchema = z
+  .object({
+    threadId: z.string(),
+    title: z.string(),
+    providerId: z.string(),
+    liveStatus: z.enum(["starting", "working", "idle", "completed", "failed"]),
+    isArchived: z.boolean(),
+  })
+  .strict();
+export const workBindingSchema = z.object({
+  rootThreadId: z.string(),
+  outcomeTaskId: z.string(),
+  taskProjectId: z.string(),
+  executionTaskId: z.string().nullable(),
+  ownerThreadId: z.string().nullable(),
+  mode: z.enum(["direct", "delegated"]).nullable(),
+  idempotencyKey: z.string().nullable(),
+  dispatchState: z.enum(["ready", "pending_spawn", "pending_attachment", "recovery_required"]),
+  recoveryMessage: z.string().nullable(),
+  owner: workBindingOwnerSchema.nullable().optional(),
+});
+export const legacyWorkContextSchema = z.object({
+  state: z.enum(["none", "adoptable", "ambiguous", "project_mismatch"]),
+  taskIds: z.array(z.string()),
+  message: z.string().nullable(),
+});
+export const workCardInputSchema = z.object({ threadId: z.string() }).strict();
+export const workStatusSchema = z.object({
+  rootThreadId: z.string(),
+  currentThread: z.object({
+    title: z.string(),
+    status: z.enum(["active", "error", "idle", "starting", "stopping"]),
+    runtimeStatus: z.string(),
+    providerId: z.string(),
+  }),
+  children: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    depth: z.number().int().nonnegative(),
+    status: z.string(),
+    runtimeStatus: z.string(),
+    providerId: z.string(),
+    isArchived: z.boolean(),
+    task: z.object({
+      key: z.string(),
+      status: taskStatusSchema,
+      liveStatus: z.enum(["starting", "working", "idle", "completed", "failed"]),
+    }).nullable(),
+  })),
+});
+export const workOutcomeSchema = z.object({
+  rootThreadId: z.string(),
+  tasksAvailable: z.boolean(),
+  outcome: taskSummarySchema.nullable(),
+  executionTasks: z.array(executionTaskSummarySchema),
+  bindings: z.array(workBindingSchema),
+  legacy: legacyWorkContextSchema,
+});
+export const workGoalSchema = z.object({
+  objective: z.string(),
+  status: z.enum(["active", "budgetLimited", "complete", "paused"]),
+  tokensUsed: z.number(),
+  tokenBudget: z.number().nullable(),
+  timeUsedSeconds: z.number(),
+}).nullable();
+export const workPlanSchema = z.object({
+  items: z.array(z.object({
+    id: z.string(),
+    text: z.string(),
+    status: z.enum(["completed", "in_progress", "pending"]),
+  })),
+});
+export const workContextSchema = z.object({
+  rootThreadId: z.string(),
+  tasksAvailable: z.boolean(),
+  currentThread: z.object({
+    title: z.string(),
+    status: z.enum(["active", "error", "idle", "starting", "stopping"]),
+    runtimeStatus: z.string(),
+    providerId: z.string(),
+  }),
+  tasks: z.array(taskSummarySchema),
+  subtasks: z.array(taskSummarySchema),
+  outcome: taskSummarySchema.nullable(),
+  executionTasks: z.array(executionTaskSummarySchema),
+  bindings: z.array(workBindingSchema),
+  legacy: legacyWorkContextSchema,
+  goal: workGoalSchema,
+  todos: workPlanSchema.shape.items,
+  children: workStatusSchema.shape.children,
+});
 
 export const workContextRpcSchemas = {
   getWorkItemQueue: {

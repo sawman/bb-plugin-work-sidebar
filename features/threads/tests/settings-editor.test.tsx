@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NumericAutosaveEditor, type NumericSettingDescriptor } from "../settings-editor";
 
@@ -24,6 +24,7 @@ const textScale: NumericSettingDescriptor = {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   toast.success.mockReset();
   toast.error.mockReset();
 });
@@ -51,7 +52,7 @@ describe("numeric settings editor lifecycle", () => {
     fireEvent.change(input, { target: { value: "1.05" } });
     await waitFor(() => expect(save).toHaveBeenCalledWith(1.05));
     expect(toast.error).toHaveBeenCalledWith("Settings unavailable");
-    expect(input.value).toBe("1.05");
+    await waitFor(() => expect(input.value).toBe("1.05"));
     fireEvent.change(input, { target: { value: "1.04" } });
     fireEvent.change(input, { target: { value: "1.05" } });
     await waitFor(() => expect(save).toHaveBeenCalledTimes(2));
@@ -104,7 +105,7 @@ describe("numeric settings editor lifecycle", () => {
         onSave={save}
       />,
     );
-    await waitFor(() => expect(input.value).toBe("1.05"));
+    expect(input.value).toBe("1.05");
     expect(document.activeElement).toBe(input);
 
     fireEvent.change(input, { target: { value: "1.02" } });
@@ -136,5 +137,48 @@ describe("numeric settings editor lifecycle", () => {
 
     rerender(<NumericAutosaveEditor setting={textScale} saved={0.98} pending={false} onSave={save} />);
     await waitFor(() => expect(input.value).toBe("0.98"));
+  });
+
+  it("suppresses only the pre-save echo and adopts a later same-value external revert", async () => {
+    vi.useFakeTimers();
+    let resolveSave!: (value: number) => void;
+    const save = vi.fn(
+      () => new Promise<number>((resolve) => {
+        resolveSave = resolve;
+      }),
+    );
+    const { rerender } = render(
+      <NumericAutosaveEditor
+        setting={textScale}
+        saved={1}
+        savedVersion={1}
+        pending={false}
+        onSave={save}
+      />,
+    );
+    const input = screen.getByRole("spinbutton", { name: "Text scale" }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "1.05" } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(save).toHaveBeenCalledWith(1.05);
+
+    await act(async () => {
+      resolveSave(1.05);
+    });
+    expect(input.value).toBe("1.05");
+
+    // A source event after the local save can genuinely restore the old value.
+    // Its new version distinguishes it from the already-observed pre-save echo.
+    rerender(
+      <NumericAutosaveEditor
+        setting={textScale}
+        saved={1}
+        savedVersion={2}
+        pending={false}
+        onSave={save}
+      />,
+    );
+    expect(input.value).toBe("1");
   });
 });

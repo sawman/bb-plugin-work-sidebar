@@ -307,7 +307,7 @@ describe("R19D registered slot accessibility", () => {
       ".ws-thread-appearance-settings",
     );
     expect(
-      appearance?.querySelectorAll(".ws-thread-appearance-entry"),
+      appearance?.querySelectorAll('.ws-settings-row[data-layout="compact"]'),
     ).toHaveLength(3);
     expect(appearance?.querySelectorAll("strong, b")).toHaveLength(0);
     await expectNoAriaViolations(slot.container);

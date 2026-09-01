@@ -1155,13 +1155,13 @@ describe("R18 registered left sidebar parity", () => {
     expect(appearance?.contains(rowHeight)).toBe(true);
     expect(appearance?.contains(pluginSettings)).toBe(true);
     expect(
-      appearance?.querySelectorAll(".ws-thread-appearance-entry"),
+      appearance?.querySelectorAll('.ws-settings-row[data-layout="compact"]'),
     ).toHaveLength(3);
     expect(appearance?.querySelectorAll("strong, b")).toHaveLength(0);
-    expect(rowHeight.closest(".ws-thread-appearance-entry")).toBeTruthy();
-    expect(textScale.closest(".ws-thread-appearance-entry")).toBeTruthy();
+    expect(rowHeight.closest('.ws-settings-row[data-layout="compact"]')).toBeTruthy();
+    expect(textScale.closest('.ws-settings-row[data-layout="compact"]')).toBeTruthy();
     expect(
-      pluginSettings.classList.contains("ws-thread-appearance-entry"),
+      pluginSettings.classList.contains("ws-settings-row"),
     ).toBe(true);
     expect(
       slot.queryByText("Compact 0.90 · Default 1.00 · Comfortable 1.10"),

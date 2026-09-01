@@ -3215,8 +3215,11 @@ button.ws-provider-health:focus-visible {
   font: var(--ws-text-subtext);
   line-height: inherit;
 }
-.ws-sidebar-appearance-settings label,
-.ws-sidebar-row-height-editor label {
+.ws-settings-row {
+  display: grid;
+  gap: 0.24rem;
+}
+.ws-settings-row > label {
   color: var(--foreground);
   font: var(--ws-text-label);
   line-height: inherit;
@@ -3281,7 +3284,7 @@ button.ws-provider-health:focus-visible {
   display: grid;
   padding: 0.25rem 0.45rem;
 }
-.ws-thread-appearance-settings .ws-thread-appearance-entry {
+.ws-settings-row[data-layout="compact"] {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 4.2rem;
   align-items: center;
@@ -3292,21 +3295,21 @@ button.ws-provider-health:focus-visible {
   font: var(--ws-text-subtext);
   line-height: inherit;
 }
-.ws-thread-appearance-settings .ws-thread-appearance-entry > label {
+.ws-settings-row[data-layout="compact"] > label {
   font: inherit;
   line-height: inherit;
 }
-.ws-thread-appearance-settings .ws-settings-input-row {
+.ws-settings-row[data-layout="compact"] .ws-settings-input-row {
   grid-template-columns: minmax(0, 1fr) auto;
   width: 100%;
   gap: 0.2rem;
 }
-.ws-thread-appearance-settings .ws-settings-input-row input {
+.ws-settings-row[data-layout="compact"] .ws-settings-input-row input {
   box-sizing: border-box;
   width: 100%;
   padding-inline: 0.28rem;
 }
-.ws-thread-appearance-settings .ws-settings-error {
+.ws-settings-row[data-layout="compact"] .ws-settings-error {
   grid-column: 1 / -1;
 }
 .ws-sidebar-row-height-editor small {

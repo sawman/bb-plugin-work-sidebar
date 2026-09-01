@@ -235,6 +235,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   const settings = (
     <ThreadListSettings
       rowHeight={threadPreferences.appearance.data?.rowHeight}
+      appearanceVersion={threadPreferences.appearance.dataUpdatedAt}
       rowHeightPending={threadPreferences.saveRowHeight.isPending}
       onSaveRowHeight={(rowHeight) =>
         threadPreferences.saveRowHeight.mutateAsync(rowHeight)

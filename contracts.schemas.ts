@@ -5,23 +5,20 @@ import { executionTaskSummarySchema, sidebarTaskProjectSchema, sidebarTaskSchema
 import { threadArchiveSchemas, threadHierarchySchemas, threadPreferenceSchemas } from "./features/threads/schemas.js";
 import { trackerRpcSchemas } from "./features/tracker/schemas.js";
 import { changesRpcSchemas, githubStackBranchSchema } from "./features/changes/schemas.js";
-import { workContextRpcSchemas } from "./features/work-context/schemas.js";
+import {
+  workBindingSchema,
+  workCardInputSchema,
+  workContextSchema,
+  workContextRpcSchemas,
+  workGoalSchema,
+  workOutcomeSchema,
+  workPlanSchema,
+  workStatusSchema,
+} from "./features/work-context/schemas.js";
 const taskStatus = taskStatusSchema; const taskPriority = taskPrioritySchema;
 const taskSummary = taskSummarySchema; const sidebarTask = sidebarTaskSchema;
 const executionTaskSummary = executionTaskSummarySchema;
 const sidebarTaskProject = sidebarTaskProjectSchema; const taskLink = taskLinkSchema;
-const bindingOwner = z.object({ threadId: z.string(), title: z.string(), providerId: z.string(),
-  liveStatus: z.enum(["starting", "working", "idle", "completed", "failed"]), isArchived: z.boolean() }).strict();
-const binding = z.object({
-  rootThreadId: z.string(), outcomeTaskId: z.string(), taskProjectId: z.string(), executionTaskId: z.string().nullable(), ownerThreadId: z.string().nullable(),
-  mode: z.enum(["direct", "delegated"]).nullable(), idempotencyKey: z.string().nullable(), dispatchState: z.enum(["ready", "pending_spawn", "pending_attachment", "recovery_required"]),
-  recoveryMessage: z.string().nullable(), owner: bindingOwner.nullable().optional(),
-});
-const legacyContext = z.object({
-  state: z.enum(["none", "adoptable", "ambiguous", "project_mismatch"]),
-  taskIds: z.array(z.string()),
-  message: z.string().nullable(),
-});
 const sidebarThreadPullRequest = z.object({
   number: z.number(), title: z.string(), url: z.string().url(),
   state: z.enum(["closed", "draft", "merged", "open"]),
@@ -35,27 +32,6 @@ const workProviderStatus = z.object({
   status: z.enum(["ready", "not_installed", "unauthenticated", "expired", "unsupported_version", "unknown", "unavailable"]),
   message: z.string().nullable(),
 });
-const workCardInput = z.object({ threadId: z.string() }).strict();
-const workStatus = z.object({ rootThreadId: z.string(),
-  currentThread: z.object({ title: z.string(), status: z.enum(["active", "error", "idle", "starting", "stopping"]), runtimeStatus: z.string(), providerId: z.string() }),
-  children: z.array(z.object({
-    id: z.string(), title: z.string(), depth: z.number().int().nonnegative(),
-    status: z.string(), runtimeStatus: z.string(), providerId: z.string(),
-    isArchived: z.boolean(), task: z.object({
-      key: z.string(), status: taskStatus,
-      liveStatus: z.enum(["starting", "working", "idle", "completed", "failed"]),
-    }).nullable(),
-  })),
-});
-const workOutcome = z.object({ rootThreadId: z.string(),
-  tasksAvailable: z.boolean(),
-  outcome: taskSummary.nullable(),
-  executionTasks: z.array(executionTaskSummary),
-  bindings: z.array(binding),
-  legacy: legacyContext,
-});
-const workGoal = z.object({ objective: z.string(), status: z.enum(["active", "budgetLimited", "complete", "paused"]), tokensUsed: z.number(), tokenBudget: z.number().nullable(), timeUsedSeconds: z.number() }).nullable();
-const workPlan = z.object({ items: z.array(z.object({ id: z.string(), text: z.string(), status: z.enum(["completed", "in_progress", "pending"]) })) });
 export type GitHubStackBranch = z.infer<typeof githubStackBranchSchema>;
 export type GitHubStackSignal = z.infer<typeof sidebarStackLayer>;
 export const rpcSchemas = {
@@ -113,52 +89,12 @@ export const rpcSchemas = {
   ...pullRequestReviewerRpcSchemas, ...threadArchiveSchemas,
   getWorkContext: {
     input: z.object({ threadId: z.string() }).strict(),
-    output: z.object({ rootThreadId: z.string(),
-      tasksAvailable: z.boolean(),
-      currentThread: z.object({
-        title: z.string(),
-        status: z.enum(["active", "error", "idle", "starting", "stopping"]),
-        runtimeStatus: z.string(),
-        providerId: z.string(),
-      }),
-      tasks: z.array(taskSummary),
-      subtasks: z.array(taskSummary),
-      outcome: taskSummary.nullable(),
-      executionTasks: z.array(executionTaskSummary),
-      bindings: z.array(binding),
-      legacy: legacyContext,
-      goal: z.object({
-        objective: z.string(),
-        status: z.enum(["active", "budgetLimited", "complete", "paused"]),
-        tokensUsed: z.number(),
-        tokenBudget: z.number().nullable(),
-        timeUsedSeconds: z.number(),
-      }).nullable(),
-      todos: z.array(z.object({
-        id: z.string(),
-        text: z.string(),
-        status: z.enum(["completed", "in_progress", "pending"]),
-      })),
-      children: z.array(z.object({
-        id: z.string(),
-        title: z.string(),
-        depth: z.number().int().nonnegative(),
-        status: z.string(),
-        runtimeStatus: z.string(),
-        providerId: z.string(),
-        isArchived: z.boolean(),
-        task: z.object({
-          key: z.string(),
-          status: taskStatus,
-          liveStatus: z.enum(["starting", "working", "idle", "completed", "failed"]),
-        }).nullable(),
-      })),
-    }),
+    output: workContextSchema,
   },
-  getWorkStatus: { input: workCardInput, output: workStatus },
-  getWorkOutcome: { input: workCardInput, output: workOutcome },
-  getWorkGoal: { input: workCardInput, output: workGoal },
-  getWorkPlan: { input: workCardInput, output: workPlan },
+  getWorkStatus: { input: workCardInputSchema, output: workStatusSchema },
+  getWorkOutcome: { input: workCardInputSchema, output: workOutcomeSchema },
+  getWorkGoal: { input: workCardInputSchema, output: workGoalSchema },
+  getWorkPlan: { input: workCardInputSchema, output: workPlanSchema },
   ...workContextRpcSchemas,
   getGitHubPollingPolicy: { input: z.null(), output: z.object({ activePollMs: z.number().int().positive(), backgroundPollMs: z.number().int().positive(), maxRestPollsPerMinute: z.number().int().positive() }) },
   ...trackerRpcSchemas,
@@ -191,28 +127,44 @@ export const rpcSchemas = {
       rootThreadId: z.string(), title: z.string().trim().min(1), description: z.string().default(""),
       taskProjectId: z.string().nullable().optional(), priority: taskPriority.optional(),
     }).strict(),
-    output: z.object({ task: taskSummary, binding: binding }),
+    output: z.object({ task: taskSummary, binding: workBindingSchema }),
   },
   createExecutionTask: {
-    input: z.object({ rootThreadId: z.string(), title: z.string().trim().min(1), description: z.string().default(""),
-      idempotencyKey: z.string().trim().min(1).max(200), assignee: z.enum(["agent", "human"]),
-    }).strict(), output: z.object({ task: executionTaskSummary, binding: binding, reused: z.boolean() }),
+    input: z
+      .object({
+        rootThreadId: z.string(),
+        title: z.string().trim().min(1),
+        description: z.string().default(""),
+        idempotencyKey: z.string().trim().min(1).max(200),
+        assignee: z.enum(["agent", "human"]),
+      })
+      .strict(),
+    output: z.object({
+      task: executionTaskSummary,
+      binding: workBindingSchema,
+      reused: z.boolean(),
+    }),
   },
-  bindExecutionOwner: { input: z.object({
-      rootThreadId: z.string(), idempotencyKey: z.string().trim().min(1).max(200),
-      mode: z.enum(["direct", "delegated"]), prompt: z.string().trim().min(1).optional(),
-      title: z.string().trim().min(1).optional(), visibility: z.enum(["visible", "hidden"]).optional(), environment: z.enum(["managed-worktree", "reuse"]).optional(),
-      baseBranch: z.string().trim().min(1).optional(),
-    }).strict().superRefine((input, context) => {
-      if (input.baseBranch && input.environment !== "managed-worktree")
-        context.addIssue({ code: "custom", path: ["baseBranch"], message: "baseBranch requires environment managed-worktree" });
-      if (input.mode === "direct" && (input.environment || input.baseBranch))
-        context.addIssue({ code: "custom", path: ["environment"], message: "Environment selection is only valid for delegated execution" });
-    }), output: z.object({ binding: binding, spawnedThreadId: z.string().nullable() }),
+  bindExecutionOwner: {
+    input: z
+      .object({
+        rootThreadId: z.string(), idempotencyKey: z.string().trim().min(1).max(200),
+        mode: z.enum(["direct", "delegated"]), prompt: z.string().trim().min(1).optional(),
+        title: z.string().trim().min(1).optional(), visibility: z.enum(["visible", "hidden"]).optional(), environment: z.enum(["managed-worktree", "reuse"]).optional(),
+        baseBranch: z.string().trim().min(1).optional(),
+      })
+      .strict()
+      .superRefine((input, context) => {
+        if (input.baseBranch && input.environment !== "managed-worktree")
+          context.addIssue({ code: "custom", path: ["baseBranch"], message: "baseBranch requires environment managed-worktree" });
+        if (input.mode === "direct" && (input.environment || input.baseBranch))
+          context.addIssue({ code: "custom", path: ["environment"], message: "Environment selection is only valid for delegated execution" });
+      }),
+    output: z.object({ binding: workBindingSchema, spawnedThreadId: z.string().nullable() }),
   },
   adoptLegacyOutcome: {
     input: z.object({ rootThreadId: z.string(), taskId: z.string() }).strict(),
-    output: z.object({ task: taskSummary, binding: binding }),
+    output: z.object({ task: taskSummary, binding: workBindingSchema }),
   },
   updateWorkTask: {
     input: z.object({ taskId: z.string(), status: taskStatus }).strict(),

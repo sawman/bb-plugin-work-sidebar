@@ -46,6 +46,7 @@ const TEXT_SCALE_SETTING: NumericSettingDescriptor = {
 
 type SidebarRowHeightEditorProps = {
   saved: number | undefined;
+  savedVersion?: number;
   pending: boolean;
   compact?: boolean;
   onSave(rowHeight: number): Promise<{ rowHeight: number }>;
@@ -54,6 +55,7 @@ type SidebarRowHeightEditorProps = {
 function SidebarNumericEditor({
   setting,
   saved,
+  savedVersion,
   pending,
   compact,
   onSave,
@@ -63,6 +65,7 @@ function SidebarNumericEditor({
 }: {
   setting: NumericSettingDescriptor;
   saved: number | undefined;
+  savedVersion?: number;
   pending: boolean;
   compact: boolean;
   onSave(value: number): Promise<number>;
@@ -74,6 +77,7 @@ function SidebarNumericEditor({
     <NumericAutosaveEditor
       setting={setting}
       saved={saved}
+      savedVersion={savedVersion}
       pending={pending}
       compact={compact}
       className={className}
@@ -91,6 +95,7 @@ function SidebarNumericEditor({
 
 export function SidebarRowHeightEditor({
   saved,
+  savedVersion,
   pending,
   compact = false,
   onSave,
@@ -99,6 +104,7 @@ export function SidebarRowHeightEditor({
     <SidebarNumericEditor
       setting={ROW_HEIGHT_SETTING}
       saved={saved}
+      savedVersion={savedVersion}
       pending={pending}
       compact={compact}
       onSave={async (value) => (await onSave(value)).rowHeight}
@@ -111,6 +117,7 @@ export function SidebarRowHeightEditor({
 
 type SidebarTextScaleEditorProps = {
   saved: number | undefined;
+  savedVersion?: number;
   pending: boolean;
   compact?: boolean;
   onSave(value: number): Promise<{ textScale: number }>;
@@ -118,6 +125,7 @@ type SidebarTextScaleEditorProps = {
 
 export function SidebarTextScaleEditor({
   saved,
+  savedVersion,
   pending,
   compact = false,
   onSave,
@@ -126,6 +134,7 @@ export function SidebarTextScaleEditor({
     <SidebarNumericEditor
       setting={TEXT_SCALE_SETTING}
       saved={saved}
+      savedVersion={savedVersion}
       pending={pending}
       compact={compact}
       onSave={async (value) => (await onSave(value)).textScale}
@@ -141,12 +150,14 @@ export function SidebarAppearanceSettings() {
     <SettingsCard className="ws-sidebar-appearance-settings" title="Sidebar appearance">
       <SidebarRowHeightEditor
         saved={preferences.appearance.data?.rowHeight}
+        savedVersion={preferences.appearance.dataUpdatedAt}
         pending={preferences.saveRowHeight.isPending}
         onSave={(rowHeight) => preferences.saveRowHeight.mutateAsync(rowHeight)}
         compact
       />
       <SidebarTextScaleEditor
         saved={preferences.appearance.data?.textScale}
+        savedVersion={preferences.appearance.dataUpdatedAt}
         pending={preferences.saveTextScale.isPending}
         onSave={(textScale) => preferences.saveTextScale.mutateAsync(textScale)}
         compact

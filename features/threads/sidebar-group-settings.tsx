@@ -13,6 +13,7 @@ import {
 
 type ThreadListSettingsProps = {
   rowHeight: number | undefined;
+  appearanceVersion?: number;
   rowHeightPending: boolean;
   onSaveRowHeight(rowHeight: number): Promise<{ rowHeight: number }>;
   textScale: number | undefined;
@@ -23,6 +24,7 @@ type ThreadListSettingsProps = {
 
 export function ThreadListSettings({
   rowHeight,
+  appearanceVersion,
   rowHeightPending,
   onSaveRowHeight,
   textScale,
@@ -84,18 +86,21 @@ export function ThreadListSettings({
           >
             <SidebarRowHeightEditor
               saved={rowHeight}
+              savedVersion={appearanceVersion}
               pending={rowHeightPending}
               onSave={onSaveRowHeight}
               compact
             />
             <SidebarTextScaleEditor
               saved={textScale}
+              savedVersion={appearanceVersion}
               pending={textScalePending}
               onSave={onSaveTextScale}
               compact
             />
             <BbUrlLink
-              className="ws-thread-appearance-entry ws-thread-settings-link"
+              className="ws-settings-row ws-thread-settings-link"
+              data-layout="compact"
               href="/settings/plugins/work-sidebar"
               aria-label="Open Work Sidebar settings"
               onClick={() => closeSettings({ restoreFocus: false })}

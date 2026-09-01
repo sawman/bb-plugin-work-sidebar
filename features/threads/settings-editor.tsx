@@ -43,7 +43,8 @@ export function SettingsRow({
 }) {
   return (
     <div
-      className={`${compact ? "ws-thread-appearance-entry " : ""}${className}`.trim()}
+      className={`ws-settings-row ${className}`.trim()}
+      data-layout={compact ? "compact" : undefined}
     >
       {children}
     </div>
@@ -53,6 +54,7 @@ export function SettingsRow({
 export function NumericAutosaveEditor({
   setting,
   saved,
+  savedVersion,
   pending,
   compact = false,
   className = "",
@@ -60,6 +62,7 @@ export function NumericAutosaveEditor({
 }: {
   setting: NumericSettingDescriptor;
   saved: number | undefined;
+  savedVersion?: number;
   pending: boolean;
   compact?: boolean;
   className?: string;
@@ -79,7 +82,10 @@ export function NumericAutosaveEditor({
   // setQueryData publishes the saved value before the mutation resolves. Keep
   // just the stale pre-save echo from replacing the successful local value;
   // any later, genuinely different external value must still win.
-  const staleSavedAfterLocalSave = useRef<string | null>(null);
+  const staleSavedAfterLocalSave = useRef<{
+    value: string;
+    version: number | undefined;
+  } | null>(null);
   const validation = setting.validate(draft);
 
   useEffect(() => {
@@ -92,16 +98,24 @@ export function NumericAutosaveEditor({
     if (saved === undefined || dirty) return;
     const next = String(saved);
     if (locallySavedDraft.current !== null) {
-      if (locallySavedDraft.current === next) locallySavedDraft.current = null;
-      else if (staleSavedAfterLocalSave.current === next) {
+      if (locallySavedDraft.current === next) {
+        locallySavedDraft.current = null;
+        staleSavedAfterLocalSave.current = null;
+      } else if (
+        staleSavedAfterLocalSave.current?.value === next &&
+        staleSavedAfterLocalSave.current.version === savedVersion
+      ) {
         staleSavedAfterLocalSave.current = null;
         return;
-      } else locallySavedDraft.current = null;
+      } else {
+        locallySavedDraft.current = null;
+        staleSavedAfterLocalSave.current = null;
+      }
     }
     latestDraft.current = next;
     lastAttemptedDraft.current = null;
     setDraft(next);
-  }, [dirty, saved]);
+  }, [dirty, saved, savedVersion]);
 
   useEffect(() => {
     if (!dirty || pending || validation.value === null) return;
@@ -122,7 +136,9 @@ export function NumericAutosaveEditor({
           const next = String(savedValue);
           latestDraft.current = next;
           locallySavedDraft.current = next;
-          staleSavedAfterLocalSave.current = saved === undefined ? null : String(saved);
+          staleSavedAfterLocalSave.current = saved === undefined
+            ? null
+            : { value: String(saved), version: savedVersion };
           setDraft(next);
           setDirty(false);
           toast.success(successMessageRef.current(savedValue));
@@ -136,7 +152,7 @@ export function NumericAutosaveEditor({
         });
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [changeVersion, dirty, draft, pending, saved, validation.value]);
+  }, [changeVersion, dirty, draft, pending, saved, savedVersion, validation.value]);
 
   return (
     <SettingsRow compact={compact} className={className}>
