@@ -176,7 +176,7 @@ describe("stylesheet policy", () => {
       /\.ws-thread-appearance-settings \.ws-thread-appearance-entry:first-child\s*\{/,
     );
     expect(groups).toContain("border-top: 1px solid var(--border)");
-    expect(toolbar).toContain("flex-wrap: nowrap");
+    expect(toolbar).toContain("flex-wrap: wrap");
     expect(search).toContain("display: inline-flex");
     expect(search).toContain("flex: none");
   });

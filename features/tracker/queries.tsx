@@ -7,7 +7,7 @@ type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
 export function useTracker(threadId: string) {
   const rpc = useRpc<typeof rpcContract>();
-  return useQuery({ queryKey: trackerKeys.context(threadId), queryFn: () => rpc.call("getWorkTracker", { threadId }), enabled: Boolean(threadId), ...trackerPolicy, refetchOnMount: "always" });
+  return useQuery({ queryKey: trackerKeys.context(threadId), queryFn: () => rpc.call("getWorkTracker", { threadId }), enabled: Boolean(threadId), ...trackerPolicy });
 }
 
 export function useTrackerSearch(threadId: string, query: string) {

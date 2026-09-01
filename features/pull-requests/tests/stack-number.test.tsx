@@ -16,6 +16,7 @@ import { PullRequestIdentifierBadge } from "../identifier-badge";
 import { StackNumberBadge } from "../stack-number";
 import { linkedThreadForStack, uniqueThreadsByBranch } from "../thread-link";
 import type { SidebarStack } from "../../../work-model";
+import { dispatchHrefClickWithoutJsdomNavigation } from "../../../tests/utils/dispatch-href-click";
 
 const stack = {
   id: "github-stack:acme/repo:17",
@@ -39,23 +40,6 @@ const stack = {
 } satisfies SidebarStack;
 
 const clipboardWrite = vi.fn(() => Promise.resolve());
-
-function dispatchHrefClickWithoutJsdomNavigation(
-  link: HTMLElement,
-  event: MouseEvent,
-) {
-  let componentPrevented = false;
-  const stopJsdomNavigation = (dispatched: MouseEvent) => {
-    componentPrevented = dispatched.defaultPrevented;
-    dispatched.preventDefault();
-  };
-  // BB deliberately preserves modifier-click navigation. This final bubble
-  // listener runs after the component handler, records that contract, then
-  // prevents jsdom from attempting an unsupported document navigation.
-  document.addEventListener("click", stopJsdomNavigation, { once: true });
-  link.dispatchEvent(event);
-  return componentPrevented;
-}
 
 beforeEach(() => {
   clipboardWrite.mockClear();

@@ -76,6 +76,10 @@ export function NumericAutosaveEditor({
   const successMessageRef = useRef(setting.successMessage);
   const labelRef = useRef(setting.label);
   const locallySavedDraft = useRef<string | null>(null);
+  // setQueryData publishes the saved value before the mutation resolves. Keep
+  // just the stale pre-save echo from replacing the successful local value;
+  // any later, genuinely different external value must still win.
+  const staleSavedAfterLocalSave = useRef<string | null>(null);
   const validation = setting.validate(draft);
 
   useEffect(() => {
@@ -89,7 +93,10 @@ export function NumericAutosaveEditor({
     const next = String(saved);
     if (locallySavedDraft.current !== null) {
       if (locallySavedDraft.current === next) locallySavedDraft.current = null;
-      else return;
+      else if (staleSavedAfterLocalSave.current === next) {
+        staleSavedAfterLocalSave.current = null;
+        return;
+      } else locallySavedDraft.current = null;
     }
     latestDraft.current = next;
     lastAttemptedDraft.current = null;
@@ -115,6 +122,7 @@ export function NumericAutosaveEditor({
           const next = String(savedValue);
           latestDraft.current = next;
           locallySavedDraft.current = next;
+          staleSavedAfterLocalSave.current = saved === undefined ? null : String(saved);
           setDraft(next);
           setDirty(false);
           toast.success(successMessageRef.current(savedValue));

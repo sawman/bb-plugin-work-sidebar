@@ -4,24 +4,9 @@ import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getPluginQueryClient } from "../../../query-runtime";
+import { dispatchHrefClickWithoutJsdomNavigation } from "../../../tests/utils/dispatch-href-click";
 
 const project = { id: "project", name: "Project", isPersonal: false };
-
-function dispatchHrefClickWithoutJsdomNavigation(
-  link: HTMLElement,
-  event: MouseEvent,
-) {
-  let componentPrevented = false;
-  const stopJsdomNavigation = (dispatched: MouseEvent) => {
-    componentPrevented = dispatched.defaultPrevented;
-    dispatched.preventDefault();
-  };
-  // Preserve the native modifier-click assertion while stopping only jsdom's
-  // unsupported document navigation after the component handler has run.
-  document.addEventListener("click", stopJsdomNavigation, { once: true });
-  link.dispatchEvent(event);
-  return componentPrevented;
-}
 
 function thread(
   id: string,

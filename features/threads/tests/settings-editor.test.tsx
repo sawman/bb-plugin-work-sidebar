@@ -118,4 +118,23 @@ describe("numeric settings editor lifecycle", () => {
     );
     expect(input.value).toBe("1.02");
   });
+
+  it("adopts a different external saved value after its local save resolves", async () => {
+    let resolveSave!: (value: number) => void;
+    const save = vi.fn(() => new Promise<number>((resolve) => { resolveSave = resolve; }));
+    const { rerender } = render(
+      <NumericAutosaveEditor setting={textScale} saved={1} pending={false} onSave={save} />,
+    );
+    const input = screen.getByRole("spinbutton", { name: "Text scale" }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "1.05" } });
+    await waitFor(() => expect(save).toHaveBeenCalledWith(1.05));
+
+    // The mutation's optimistic/cache write happens before its promise resolves.
+    rerender(<NumericAutosaveEditor setting={textScale} saved={1.05} pending={false} onSave={save} />);
+    resolveSave(1.05);
+    await waitFor(() => expect(input.value).toBe("1.05"));
+
+    rerender(<NumericAutosaveEditor setting={textScale} saved={0.98} pending={false} onSave={save} />);
+    await waitFor(() => expect(input.value).toBe("0.98"));
+  });
 });

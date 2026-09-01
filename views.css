@@ -1045,7 +1045,7 @@
 .ws-work-toolbar-actions {
   display: flex;
   min-width: 0;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 0.25rem;
@@ -1853,7 +1853,6 @@ button.ws-change-file-row:hover {
 }
 .ws-thread-settings-link {
   color: var(--foreground);
-  font: var(--ws-text-label);
   line-height: inherit;
   text-decoration: none;
 }

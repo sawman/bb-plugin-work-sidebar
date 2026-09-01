@@ -530,8 +530,10 @@ describe("registered tracker card", () => {
     await waitFor(() =>
       expect(client.getQueryCache().find({ queryKey: key })?.getObserversCount()).toBe(1),
     );
-    // The existing Work-tab policy deliberately refreshes on every mount.
-    expect(getWorkTracker).toHaveBeenCalledTimes(2);
+    // A fresh context remains cached across Work-tab activation; stale data,
+    // manual refresh, realtime invalidation, and error retry have dedicated
+    // query-policy coverage below.
+    expect(getWorkTracker).toHaveBeenCalledTimes(1);
     slot.lifecycle.unmount();
   });
 
