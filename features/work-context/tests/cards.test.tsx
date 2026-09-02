@@ -1101,6 +1101,35 @@ describe("registered Work context cards", () => {
     getPluginQueryClient().clear();
   });
 
+  it("does not render a primary goal again as a promotable backlog item", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      {
+        rpc: fixture({
+          getWorkOutcome: () => populatedOutcome,
+          getWorkItemQueue: () => ({
+            rootThreadId: "thr_one",
+            configured: true,
+            queue: {
+              current: { source: "bb_task", id: "task_1" },
+              backlog: [{ source: "bb_task", id: "task_1" }],
+            },
+          }),
+        }),
+      },
+    );
+    await slot.findByRole("button", {
+      name: "Change status for WORK-1: To do",
+    });
+    expect(slot.queryByRole("button", { name: "Make current" })).toBeNull();
+    expect(slot.getAllByText("Ship cards")).toHaveLength(1);
+    slot.lifecycle.unmount();
+    getPluginQueryClient().clear();
+  });
+
   it("keeps cached A visible across A-to-B-to-A registered slot switches while revalidating", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));

@@ -24,7 +24,12 @@ import {
   useWorkStatus,
 } from "./queries";
 import { CardState } from "./card-state";
-import { projectWorkItem, promoteWorkItem, type WorkItemReference } from "./work-item-model";
+import {
+  projectWorkItem,
+  promoteWorkItem,
+  resolveWorkItemQueue,
+  type WorkItemReference,
+} from "./work-item-model";
 import { useTrackerMutations, useTrackerSearch } from "../tracker/queries";
 import type { useTracker } from "../tracker/queries";
 
@@ -84,7 +89,18 @@ export function WorkItemCard({
   // Existing roots have no queue row until their first transition. Keep their
   // durable Outcome/Linear primary visible through the one-time projection;
   // the first queue mutation writes the explicit representation.
-  const queue = queueQuery.data?.configured ? persistedQueue! : workItem.queue;
+  // A persisted queue is user data and may predate duplicate protection. Keep
+  // the rendered lanes canonical so a current goal can never also appear as a
+  // backlog row with a misleading "Make current" control.
+  const queue = resolveWorkItemQueue({
+    outcome: outcome ?? null,
+    linked: tracker.data?.items.map(({ item, statusOptions }) => ({
+      ...item,
+      statusOptions,
+    })) ?? [],
+    primaryLinearKey: tracker.data?.primaryKey ?? null,
+    queue: queueQuery.data?.configured ? persistedQueue! : workItem.queue,
+  });
   const goalTaskIds = new Set(
     [queue.current, ...queue.backlog].flatMap((reference) =>
       reference?.source === "bb_task" ? [reference.id] : [],
