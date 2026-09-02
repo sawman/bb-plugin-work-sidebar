@@ -6,6 +6,7 @@ import type {
   ThreadProviderDirectory,
 } from "@/components/threads/thread-provider-logo";
 import type { ThreadDropTarget } from "./store";
+import type { ProviderRetry } from "./schemas";
 
 export type { ThreadDropTarget } from "./store";
 
@@ -20,6 +21,8 @@ export type ThreadRowProps = {
   children: number;
   activeChildren: number;
   staleWorkingMinutes?: number;
+  providerRetry?: ProviderRetry;
+  providerRetryNow?: number;
   childrenExpanded: boolean;
   selected: boolean;
   groupId: string | null;
@@ -70,4 +73,5 @@ export type WorkThreadTreeProps = Omit<
   subtextRefreshKey: number;
   staleWorkingMinutes: number;
   depth?: number;
+  providerRetriesByThread?: ReadonlyMap<string, ProviderRetry>;
 };

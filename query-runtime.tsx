@@ -133,6 +133,14 @@ export const queryPolicies = {
     retry: 1,
     refetchOnWindowFocus: false,
   },
+  providerRetries: {
+    // Queue changes publish exact realtime signals. A retry schedule never
+    // needs background polling; its visible countdown is client-local.
+    staleTime: Infinity,
+    gcTime: 5 * 60_000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  },
   workContext: {
     staleTime: 5_000,
     gcTime: 10 * 60_000,

@@ -41,6 +41,7 @@ export default function plugin(
     getSidebarAppearance: threads.getSidebarAppearance,
     saveSidebarAppearance: threads.saveSidebarAppearance,
     moveSidebarThread: threads.moveSidebarThread,
+    sidebarProviderRetries: threads.sidebarProviderRetries,
     sidebarTasks: tasks.sidebarTasks,
     sidebarTaskLinks: tasks.sidebarTaskLinks,
     sidebarPullRequestStacks: pullRequests.sidebarPullRequestStacks,

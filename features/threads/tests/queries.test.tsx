@@ -13,6 +13,7 @@ import {
   saveThreadGroups,
   saveSidebarAppearance,
   useArchivedThreadsQuery,
+  useProviderRetriesQuery,
   useThreadHierarchyMutation,
   type ThreadsRpc,
 } from "../queries";
@@ -32,6 +33,43 @@ function deferred<T>() {
 }
 
 describe("R9 Threads query ownership", () => {
+  it("observes provider retries only while the Work tab is active", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const rpc = {
+      call: vi.fn(async () => ({
+        retries: [
+          {
+            id: "queued_retry",
+            threadId: "thr_retry",
+            reason: "Provider overloaded",
+            attempt: 1,
+            sendAt: 1_800_000_000_000,
+          },
+        ],
+      })),
+    };
+    const view = renderHook(
+      ({ active }: { active: boolean }) =>
+        useProviderRetriesQuery(rpc as unknown as ThreadsRpc, active),
+      { initialProps: { active: false }, wrapper: queryWrapper(client) },
+    );
+    expect(view.result.current.fetchStatus).toBe("idle");
+    expect(rpc.call).not.toHaveBeenCalled();
+    view.rerender({ active: true });
+    await waitFor(() => expect(rpc.call).toHaveBeenCalledWith(
+      "sidebarProviderRetries",
+      null,
+    ));
+    await waitFor(() =>
+      expect(view.result.current.data).toEqual([
+        expect.objectContaining({ threadId: "thr_retry" }),
+      ]),
+    );
+    view.unmount();
+    client.clear();
+  });
   it("round-trips text scale through the shared typed appearance query", async () => {
     const client = new QueryClient();
     const rpc = {

@@ -1,17 +1,14 @@
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { rpcContract } from "../../contracts.js";
-import {
-  createArchivedThreadService,
-  createThreadPreferencesService,
-} from "./server.js";
+import { createArchivedThreadService, createThreadPreferencesService } from "./server.js";
 import { createRecycleBinExpiryHandler } from "./recycle-bin-expiry.js";
 import { createSdkThreadHierarchyService, type WorkBindingReader } from "./hierarchy-server.js";
 import { registerThreadSettings } from "./settings-registration.js";
-
+import { createProviderRetryRegistration } from "./provider-retry-server.js";
 type ThreadHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
-  "getSidebarOrder" | "saveSiblingOrder" | "getLaterThreads" | "saveLaterThreads" | "getThreadGroups" | "saveThreadGroups" | "getSidebarAppearance" | "saveSidebarAppearance" | "moveSidebarThread" |
-    "getRecycleBin" | "binSidebarThread" | "restoreBinnedSidebarThread" | "expireRecycleBinThreads" | "sidebarArchivedThreads" | "unarchiveSidebarThread"
+  "sidebarProviderRetries" | "getSidebarOrder" | "saveSiblingOrder" | "getLaterThreads" | "saveLaterThreads" | "getThreadGroups" | "saveThreadGroups" | "getSidebarAppearance" | "saveSidebarAppearance" | "moveSidebarThread"
+    | "getRecycleBin" | "binSidebarThread" | "restoreBinnedSidebarThread" | "expireRecycleBinThreads" | "sidebarArchivedThreads" | "unarchiveSidebarThread"
 >;
 
 /** Thread preference and archive RPC handlers stay with the Threads slice. */
@@ -27,7 +24,9 @@ export function createThreadRegistration(
     publish: (channel, payload) => bb.realtime.publish(channel, payload),
   });
   const hierarchy = createSdkThreadHierarchyService(bb, work, preferences);
+  const providerRetries = createProviderRetryRegistration(bb);
   return {
+    sidebarProviderRetries: providerRetries.sidebarProviderRetries,
     async getSidebarOrder() {
       return { threadIds: await preferences.order() };
     },

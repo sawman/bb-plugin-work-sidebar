@@ -1217,6 +1217,21 @@
   color: var(--foreground);
   stroke-width: 2.2;
 }
+.ws-provider-retry {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.1rem;
+  color: var(--warning);
+  font: var(--ws-text-metadata);
+  line-height: 1;
+  white-space: nowrap;
+}
+.ws-provider-retry svg {
+  width: 0.68rem;
+  height: 0.68rem;
+  stroke-width: 2.2;
+}
 @keyframes ws-thread-pulse {
   0%,
   100% {

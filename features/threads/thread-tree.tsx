@@ -26,6 +26,8 @@ export function WorkThreadTree({
   onDropThread,
   subtextRefreshKey,
   staleWorkingMinutes,
+  providerRetriesByThread,
+  providerRetryNow,
   depth = 0,
 }: WorkThreadTreeProps) {
   const children = childrenByThread.get(thread.id) ?? [];
@@ -42,6 +44,8 @@ export function WorkThreadTree({
         children={children.length}
         activeChildren={activeChildren}
         staleWorkingMinutes={staleWorkingMinutes}
+        providerRetry={providerRetriesByThread?.get(thread.id)}
+        providerRetryNow={providerRetryNow}
         childrenExpanded={childrenExpanded}
         selected={selectedThreadIds.has(thread.id)}
         groupId={groupIds.get(thread.id) ?? null}
@@ -93,6 +97,8 @@ export function WorkThreadTree({
               onDropThread={onDropThread}
               subtextRefreshKey={subtextRefreshKey}
               staleWorkingMinutes={staleWorkingMinutes}
+              providerRetriesByThread={providerRetriesByThread}
+              providerRetryNow={providerRetryNow}
               depth={depth + 1}
             />
           </div>

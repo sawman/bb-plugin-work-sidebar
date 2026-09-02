@@ -11,6 +11,8 @@ import {
 } from "@/components/threads/thread-provider-logo";
 import { pullRequestPresentation } from "@/features/pull-requests/presentation";
 import { PullRequestIdentifierBadge } from "@/features/pull-requests/identifier-badge";
+import { providerRetryCountdown, providerRetryLabel } from "./provider-retry";
+import type { ProviderRetry } from "./schemas";
 import type { ThreadProject } from "./thread-row-types";
 import {
   threadProviderRuntimeState,
@@ -23,12 +25,16 @@ export function ThreadRuntimeProvider({
   activeChildren = 0,
   staleWorking,
   staleWorkingMinutes = 30,
+  providerRetry,
+  providerRetryNow = Date.now(),
 }: {
   thread: PluginSidebarThread;
   provider?: ThreadProvider;
   activeChildren?: number;
   staleWorking: boolean;
   staleWorkingMinutes?: number;
+  providerRetry?: ProviderRetry;
+  providerRetryNow?: number;
 }) {
   const runtimeState = threadProviderRuntimeState(
     thread,
@@ -109,11 +115,15 @@ export function ThreadStatus({
   hasComposerDraft,
   staleWorking = false,
   staleWorkingMinutes = 30,
+  providerRetry,
+  providerRetryNow = Date.now(),
 }: {
   thread: PluginSidebarThread;
   hasComposerDraft: boolean;
   staleWorking?: boolean;
   staleWorkingMinutes?: number;
+  providerRetry?: ProviderRetry;
+  providerRetryNow?: number;
 }) {
   return (
     <span className="ws-thread-trailing ws-sidebar-row-trailing">
@@ -133,6 +143,20 @@ export function ThreadStatus({
           className="ws-status-stale-clock"
           aria-label={`${thread.indicatorLabel ?? "Thread activity"}; no agent update for ${staleWorkingMinutes} minutes`}
         />
+      )}
+      {providerRetry && (
+        <span
+          className="ws-provider-retry"
+          role="status"
+          aria-label={providerRetryLabel(providerRetry, providerRetryNow)}
+          title={providerRetryLabel(providerRetry, providerRetryNow)}
+          data-retry-reason={providerRetry.reason}
+        >
+          <Icon name="Clock" aria-hidden />
+          <span aria-hidden>
+            {providerRetryCountdown(providerRetry, providerRetryNow)}
+          </span>
+        </span>
       )}
     </span>
   );

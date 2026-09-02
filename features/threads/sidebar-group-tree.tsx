@@ -8,6 +8,7 @@ import { WorkThreadTree } from "./thread-tree";
 import { ThreadToTopDropZone } from "./thread-to-top-drop-zone";
 import { RecycleBinView } from "./recycle-bin-view";
 import type { RecycleBinEntry } from "./recycle-bin";
+import type { ProviderRetry } from "./schemas";
 type SidebarGroupTreeProps = {
   organization: SidebarThreadOrganization;
   activeThreadId: string | null;
@@ -15,6 +16,8 @@ type SidebarGroupTreeProps = {
   onNavigate(): void;
   subtextRefreshKey: number;
   staleWorkingMinutes: number;
+  providerRetriesByThread: ReadonlyMap<string, ProviderRetry>;
+  providerRetryNow: number;
   searchQuery: string;
   emptyMessage: string;
   recycleBinEntries: readonly RecycleBinEntry[];
@@ -22,7 +25,7 @@ type SidebarGroupTreeProps = {
   disclosures: Readonly<Record<string, boolean>>; onDisclosureChange(id: string, open: boolean): void; disclosuresReady: boolean;
 };
 
-type ThreadTreeProps = Pick<SidebarGroupTreeProps, "activeThreadId" | "providersById" | "onNavigate" | "subtextRefreshKey" | "staleWorkingMinutes"> & {
+type ThreadTreeProps = Pick<SidebarGroupTreeProps, "activeThreadId" | "providersById" | "onNavigate" | "subtextRefreshKey" | "staleWorkingMinutes" | "providerRetriesByThread" | "providerRetryNow"> & {
   organization: SidebarThreadOrganization;
   roots: readonly PluginSidebarThread[];
   childrenByThread: ReadonlyMap<string, PluginSidebarThread[]>;
@@ -38,6 +41,8 @@ function ThreadTree({
   onNavigate,
   subtextRefreshKey,
   staleWorkingMinutes,
+  providerRetriesByThread,
+  providerRetryNow,
   label,
 }: ThreadTreeProps) {
   return (
@@ -67,6 +72,8 @@ function ThreadTree({
             onDropThread={organization.reorder}
             subtextRefreshKey={subtextRefreshKey}
             staleWorkingMinutes={staleWorkingMinutes}
+            providerRetriesByThread={providerRetriesByThread}
+            providerRetryNow={providerRetryNow}
           />
         ))}
       </SidebarTable>
@@ -74,9 +81,7 @@ function ThreadTree({
   );
 }
 
-function sourceId(event: DragEvent<HTMLElement>, dragThreadId: string | null) {
-  return dragThreadId ?? event.dataTransfer.getData("text/plain");
-}
+const sourceId = (event: DragEvent<HTMLElement>, dragThreadId: string | null) => dragThreadId ?? event.dataTransfer.getData("text/plain");
 
 export function SidebarThreadGroups({
   organization,
@@ -85,12 +90,18 @@ export function SidebarThreadGroups({
   onNavigate,
   subtextRefreshKey,
   staleWorkingMinutes,
+  providerRetriesByThread,
+  providerRetryNow,
   searchQuery,
   emptyMessage,
   recycleBinEntries,
   allThreads,
   disclosures, onDisclosureChange, disclosuresReady,
 }: SidebarGroupTreeProps) {
+  const sharedTreeProps = {
+    organization, activeThreadId, providersById, onNavigate, subtextRefreshKey,
+    staleWorkingMinutes, providerRetriesByThread, providerRetryNow,
+  };
   const dropTargetId =
     organization.dropTarget?.kind === "group"
       ? organization.dropTarget.groupId
@@ -152,14 +163,9 @@ export function SidebarThreadGroups({
                   Active <span>{organization.activeRoots.length}</span>
                 </summary>
                 <ThreadTree
-                  organization={organization}
+                  {...sharedTreeProps}
                   roots={organization.activeRoots}
                   childrenByThread={organization.activeChildren}
-                  activeThreadId={activeThreadId}
-                  providersById={providersById}
-                  onNavigate={onNavigate}
-                  subtextRefreshKey={subtextRefreshKey}
-                  staleWorkingMinutes={staleWorkingMinutes}
                   label="Work threads"
                 />
               </details>
@@ -189,14 +195,9 @@ export function SidebarThreadGroups({
               </summary>
               {roots.length > 0 ? (
                 <ThreadTree
-                  organization={organization}
+                  {...sharedTreeProps}
                   roots={roots}
                   childrenByThread={tree?.children ?? new Map()}
-                  activeThreadId={activeThreadId}
-                  providersById={providersById}
-                  onNavigate={onNavigate}
-                  subtextRefreshKey={subtextRefreshKey}
-                  staleWorkingMinutes={staleWorkingMinutes}
                   label={`${group.name} threads`}
                 />
               ) : (

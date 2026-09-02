@@ -39,6 +39,7 @@ import {
   useThreadPreferences,
   useRecycleBin,
 } from "./queries";
+import { useSidebarProviderRetries } from "./provider-retry";
 import { useSidebarThreadOrganization } from "./sidebar-organization";
 import { threadInteractionStore } from "./store";
 import { SidebarThreadToolbar } from "./sidebar-toolbar";
@@ -71,6 +72,8 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   const actions = experimental_useSidebarThreadActions();
   const queryClient = useQueryClient();
   const threadPreferences = useThreadPreferences();
+  const [view, setView] = useState<SidebarView>("work");
+  const providerRetriesByThread = useSidebarProviderRetries(view === "work");
   const recycleBin = useRecycleBin();
   const binnedIds = useMemo(
     () => new Set((recycleBin.bin.data ?? []).map((entry) => entry.threadId)),
@@ -86,7 +89,6 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   // Sole task-links observer, including native mode: Agents and WorkThreadTree share one
   // cache and polling owner rather than creating per-consumer intervals.
   const { data: taskLinksData, refetch: refetchTaskLinks } = useTaskLinksRead();
-  const [view, setView] = useState<SidebarView>("work");
   const [threadSearchQuery, setThreadSearchQuery] = useState("");
   const [subtextRefreshKey, setSubtextRefreshKey] = useState(0);
   const providersById = useMemo(
@@ -182,12 +184,10 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     restore: async (threadId, groupIds) =>
       recycleBin.restore.mutateAsync({ threadId, groupIds }),
   });
-
   useEffect(() => {
     const threadIds = threads.map((thread) => thread.id);
     threadInteractionStore.getState().reconcileRoster(threadIds);
   }, [threads]);
-
   const refreshThreadDetails = useCallback(async () => {
     setSubtextRefreshKey((current) => current + 1);
     await Promise.all([
@@ -328,6 +328,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
               staleWorkingMinutes={Number(
                 pluginSettings.values?.stuckThreadMinutes ?? "30",
               )}
+              providerRetriesByThread={providerRetriesByThread}
               searchQuery={effectiveThreadSearchQuery}
               emptyMessage={
                 effectiveThreadSearchQuery
