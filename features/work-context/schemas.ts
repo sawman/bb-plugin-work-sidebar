@@ -75,7 +75,7 @@ export const workStatusSchema = z.object({
   rootThreadId: z.string(),
   currentThread: z.object({
     title: z.string(),
-    status: z.enum(["active", "error", "idle", "starting", "stopping"]),
+    status: z.enum(["active", "error", "idle", "pending", "starting", "stopping"]),
     runtimeStatus: z.string(),
     providerId: z.string(),
   }),
@@ -121,7 +121,7 @@ export const workContextSchema = z.object({
   tasksAvailable: z.boolean(),
   currentThread: z.object({
     title: z.string(),
-    status: z.enum(["active", "error", "idle", "starting", "stopping"]),
+    status: z.enum(["active", "error", "idle", "pending", "starting", "stopping"]),
     runtimeStatus: z.string(),
     providerId: z.string(),
   }),

@@ -208,4 +208,11 @@ describe("semantic typography architecture", () => {
     );
     expect(missingLineHeight).toEqual([]);
   });
+
+  test("uses normal-weight metadata text for action tooltips", () => {
+    const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    expect(source).toMatch(
+      /\.ws-action-tooltip-content\s*\{[\s\S]*?font:\s*var\(--ws-text-metadata\);/,
+    );
+  });
 });

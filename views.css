@@ -3672,7 +3672,7 @@ button.ws-provider-health:focus-visible {
   background: var(--popover);
   box-shadow: 0 0.25rem 0.8rem color-mix(in srgb, var(--foreground) 18%, transparent);
   color: var(--popover-foreground);
-  font: var(--ws-text-label);
+  font: var(--ws-text-metadata);
   line-height: 1.15;
   opacity: 0;
   pointer-events: none;

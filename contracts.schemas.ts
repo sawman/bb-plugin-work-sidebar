@@ -104,7 +104,7 @@ export const rpcSchemas = {
     input: z.object({ threadId: z.string().startsWith("thr_") }).strict(),
     output: z.object({
       currentThread: z.object({
-        status: z.enum(["active", "error", "idle", "starting", "stopping"]),
+        status: z.enum(["active", "error", "idle", "pending", "starting", "stopping"]),
         runtimeStatus: z.string(),
       }),
       latest: z.object({ text: z.string(), kind: z.enum(["assistant", "user", "command", "activity"]) }).nullable(),

@@ -1063,6 +1063,7 @@ describe("registered Work context cards", () => {
       goalRow.querySelector(".ws-task-workflow-copy.ws-work-item-reference"),
     ).toBeTruthy();
     expect(goalRow.querySelector(".ws-work-item-queue-action")).toBeNull();
+    expect(slot.queryByRole("button", { name: "Make current" })).toBeNull();
     expect(slot.getByRole("button", { name: "Move to tasks" })).toBeTruthy();
     expect(
       goalRow.querySelector('[aria-label="Copy current goal BB task WORK-1"]'),
@@ -1084,6 +1085,14 @@ describe("registered Work context cards", () => {
     expect(document.getElementById(moveToTasks.getAttribute("aria-describedby")!)?.textContent).toBe(
       "Move to task queue",
     );
+    const actionLabels = Array.from(
+      goalRow.querySelector(".ws-task-workflow-actions")!.children,
+    ).map((child) => child.querySelector("[aria-label]")?.getAttribute("aria-label"));
+    expect(actionLabels).toEqual([
+      "Defer",
+      "Move to tasks",
+      "Change status for WORK-1: To do",
+    ]);
     fireEvent.click(control);
     fireEvent.click(slot.getByRole("option", { name: "In Progress" }));
     await waitFor(() =>
@@ -1781,6 +1790,14 @@ describe("registered Work context cards", () => {
     const promote = await slot.findByRole("button", {
       name: "Make WORK-2 a goal",
     });
+    const queueActions = promote.closest(".ws-task-workflow-actions")!;
+    expect(Array.from(queueActions.children).map(
+      (child) => child.querySelector("[aria-label]")?.getAttribute("aria-label"),
+    )).toEqual([
+      "Make WORK-2 a goal",
+      "Detach WORK-2 from this thread",
+      "Change status for WORK-2: To do",
+    ]);
     fireEvent.click(promote);
     await waitFor(() =>
       expect(saveWorkItemQueue).toHaveBeenCalledWith({

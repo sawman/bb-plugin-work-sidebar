@@ -221,36 +221,44 @@ function WorkflowRow({
         role="group"
         aria-label={`Actions for ${task.key}`}
       >
+        {detachable && onMakeGoal ? (
+          <ActionTooltip label="Move to Goals">
+            {(tooltipId) => (
+              <button
+                type="button"
+                className="ws-task-workflow-action"
+                disabled={busy}
+                aria-describedby={tooltipId}
+                aria-label={`Make ${task.key} a goal`}
+                onClick={() => onMakeGoal(task.id)}
+              >
+                <Icon className="ws-task-workflow-icon" name="ArrowUp" aria-hidden />
+              </button>
+            )}
+          </ActionTooltip>
+        ) : null}
+        {detachable ? (
+          <ActionTooltip label="Detach from this thread">
+            {(tooltipId) => (
+              <button
+                type="button"
+                className="ws-task-workflow-action"
+                disabled={busy}
+                aria-describedby={tooltipId}
+                aria-label={`Detach ${task.key} from this thread`}
+                onClick={() => onDetach(task.id)}
+              >
+                <Icon className="ws-task-workflow-icon" name="X" aria-hidden />
+              </button>
+            )}
+          </ActionTooltip>
+        ) : null}
         <TaskStatusControl
           taskKey={task.key}
           status={task.status}
           busy={busy}
           onChange={(next) => onStatusChange(task.id, next)}
         />
-        {detachable && onMakeGoal ? (
-          <button
-            type="button"
-            className="ws-task-workflow-action"
-            disabled={busy}
-            aria-label={`Make ${task.key} a goal`}
-            title="Move to Goals"
-            onClick={() => onMakeGoal(task.id)}
-          >
-            <Icon className="ws-task-workflow-icon" name="ArrowUp" aria-hidden />
-          </button>
-        ) : null}
-        {detachable ? (
-          <button
-            type="button"
-            className="ws-task-workflow-action"
-            disabled={busy}
-            aria-label={`Detach ${task.key} from this thread`}
-            title="Detach from this thread"
-            onClick={() => onDetach(task.id)}
-          >
-            <Icon className="ws-task-workflow-icon" name="X" aria-hidden />
-          </button>
-        ) : null}
       </span>
     </article>
   );

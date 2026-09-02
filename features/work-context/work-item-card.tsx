@@ -688,14 +688,6 @@ function WorkItemQueueActions({
 }) {
   return (
     <span className="ws-task-workflow-actions" role="group" aria-label="Work item actions">
-      {task ? (
-        <TaskStatusControl
-          taskKey={task.key}
-          status={task.status}
-          busy={disabled}
-          onChange={(status) => onStatus(task.id, status)}
-        />
-      ) : null}
       {onDefer ? (
         <ActionTooltip label="Defer to Goals backlog">
           {(tooltipId) => (
@@ -723,7 +715,7 @@ function WorkItemQueueActions({
               aria-label="Make current"
               onClick={onMakeCurrent}
             >
-              <Icon className="ws-task-workflow-icon" name="ArrowRight" aria-hidden />
+              <Icon className="ws-task-workflow-icon" name="ArrowUp" aria-hidden />
             </button>
           )}
         </ActionTooltip>
@@ -742,6 +734,14 @@ function WorkItemQueueActions({
           </button>
         )}
       </ActionTooltip>
+      {task ? (
+        <TaskStatusControl
+          taskKey={task.key}
+          status={task.status}
+          busy={disabled}
+          onChange={(status) => onStatus(task.id, status)}
+        />
+      ) : null}
     </span>
   );
 }
