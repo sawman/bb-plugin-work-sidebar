@@ -1064,7 +1064,7 @@ describe("registered Work context cards", () => {
     ).toBeTruthy();
     expect(goalRow.querySelector(".ws-work-item-queue-action")).toBeNull();
     expect(slot.queryByRole("button", { name: "Make current" })).toBeNull();
-    expect(slot.getByRole("button", { name: "Move to tasks" })).toBeTruthy();
+    expect(slot.queryByRole("button", { name: "Move to tasks" })).toBeNull();
     expect(
       goalRow.querySelector('[aria-label="Copy current goal BB task WORK-1"]'),
     ).toBeTruthy();
@@ -1077,16 +1077,10 @@ describe("registered Work context cards", () => {
     expect(document.getElementById(statusTooltipId!)?.textContent).toBe(
       "Change status: To do",
     );
-    const moveToTasks = slot.getByRole("button", { name: "Move to tasks" });
-    expect(document.getElementById(moveToTasks.getAttribute("aria-describedby")!)?.textContent).toBe(
-      "Add a backlog goal before moving the current goal to tasks",
-    );
-    expect(moveToTasks).toHaveProperty("disabled", true);
     const actionLabels = Array.from(
       goalRow.querySelector(".ws-task-workflow-actions")!.children,
     ).map((child) => child.querySelector("[aria-label]")?.getAttribute("aria-label"));
     expect(actionLabels).toEqual([
-      "Move to tasks",
       "Change status for WORK-1: To do",
     ]);
     fireEvent.click(control);

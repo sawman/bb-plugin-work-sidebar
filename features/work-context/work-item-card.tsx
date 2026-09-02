@@ -529,8 +529,6 @@ function WorkQueue({
                     disabled={pending}
                     task={taskById.get(queue.current.id)}
                     onStatus={onTaskStatus}
-                    canMoveToTasks={queue.backlog.length > 0}
-                    onMoveToTasks={() => onMoveToExecution(queue.current!)}
                   />
                 }
               />
@@ -689,15 +687,13 @@ function WorkItemQueueActions({
   task,
   onStatus,
   onMakeCurrent,
-  canMoveToTasks = true,
   onMoveToTasks,
 }: {
   disabled: boolean;
   task?: TaskSummary;
   onStatus(taskId: string, status: TaskStatus): void;
   onMakeCurrent?: () => void;
-  canMoveToTasks?: boolean;
-  onMoveToTasks: () => void;
+  onMoveToTasks?: () => void;
 }) {
   return (
     <span className="ws-task-workflow-actions" role="group" aria-label="Work item actions">
@@ -717,20 +713,22 @@ function WorkItemQueueActions({
           )}
         </ActionTooltip>
       ) : null}
-      <ActionTooltip label={canMoveToTasks ? "Move to task queue" : "Add a backlog goal before moving the current goal to tasks"}>
-        {(tooltipId) => (
-          <button
-            type="button"
-            className="ws-task-workflow-action"
-            disabled={disabled || !canMoveToTasks}
-            aria-describedby={tooltipId}
-            aria-label="Move to tasks"
-            onClick={onMoveToTasks}
-          >
-            <Icon className="ws-task-workflow-icon" name="ArrowDown" aria-hidden />
-          </button>
-        )}
-      </ActionTooltip>
+      {onMoveToTasks ? (
+        <ActionTooltip label="Move to task queue">
+          {(tooltipId) => (
+            <button
+              type="button"
+              className="ws-task-workflow-action"
+              disabled={disabled}
+              aria-describedby={tooltipId}
+              aria-label="Move to tasks"
+              onClick={onMoveToTasks}
+            >
+              <Icon className="ws-task-workflow-icon" name="ArrowDown" aria-hidden />
+            </button>
+          )}
+        </ActionTooltip>
+      ) : null}
       {task ? (
         <TaskStatusControl
           taskKey={task.key}
