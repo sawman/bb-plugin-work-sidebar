@@ -8,6 +8,7 @@ import {
   ContextMenuTrigger,
 } from "../../components/ui/context-menu";
 import { CopyBadge } from "../../components/ui/copy-badge";
+import { ActionTooltip } from "../../components/ui/action-tooltip";
 import { Icon } from "../../components/ui/icon";
 import type {
   ThreadProvider,
@@ -196,18 +197,19 @@ export function TaskRow(props: TaskRowProps) {
           }}
         >
           <div className="ws-sidebar-row-main">
-            <button
+            <ActionTooltip label={task.title}>
+              {(tooltipId) => <button
               className={`ws-task-assign ${assigned ? "ws-task-assigned" : ""}`}
               type="button"
               aria-pressed={selectedTaskIds.has(task.id)}
-              aria-describedby={ownerState ? bindingDescriptionId : undefined}
+              aria-describedby={[ownerState ? bindingDescriptionId : null, tooltipId].filter(Boolean).join(" ")}
               onClick={(event) => onSelect(task.id, event)}
-              title={task.title}
             >
-              <span className="ws-task-title ws-sidebar-row-title" title={task.title}>
+              <span className="ws-task-title ws-sidebar-row-title">
                 {task.title}
               </span>
-            </button>
+              </button>}
+            </ActionTooltip>
             <div className="ws-task-meta ws-sidebar-row-meta">
               {task.dueDate && (
                 <span className="ws-task-badge">Due {task.dueDate}</span>
@@ -246,21 +248,24 @@ export function TaskRow(props: TaskRowProps) {
               <span className="ws-task-priority-slot">
                 <TaskPriorityIcon priority={task.priority} />
               </span>
-              <span
+              <ActionTooltip label={isUnowned
+                ? "An unowned task can be reassigned from this row's context menu."
+                : "Assignment is changed from the Work card when this task has an owner thread."}>
+                {(tooltipId) => <span
                 className="ws-task-assignee-readonly"
-              role="img"
-              aria-label={`${task.assignee === "agent" ? "Agent" : "Human"} assigned (read-only)`}
-                title={isUnowned
-                  ? "An unowned task can be reassigned from this row's context menu."
-                  : "Assignment is changed from the Work card when this task has an owner thread."}
+                role="img"
+                aria-label={`${task.assignee === "agent" ? "Agent" : "Human"} assigned (read-only)`}
+                aria-describedby={tooltipId}
               >
                 <Icon name={task.assignee === "agent" ? "Bot" : "User"} aria-hidden />
-              </span>
+                </span>}
+              </ActionTooltip>
             </span>
             <span className="ws-task-row-controls">
-              <label
+              <ActionTooltip label={status.label}>
+                {(tooltipId) => <label
                 className={`ws-task-status-picker ws-task-status-${task.status}`}
-                title={status.label}
+                aria-describedby={tooltipId}
               >
                 <Icon name={status.icon} aria-hidden />
                 <span className="ws-sr-only">Change status for {task.key}</span>
@@ -281,7 +286,8 @@ export function TaskRow(props: TaskRowProps) {
                     </option>
                   ))}
                 </select>
-              </label>
+                </label>}
+              </ActionTooltip>
             </span>
           </div>
           {node.children.length > 0 && (

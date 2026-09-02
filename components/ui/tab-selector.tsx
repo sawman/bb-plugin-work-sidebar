@@ -1,4 +1,5 @@
 import type { KeyboardEvent } from "react";
+import { ActionTooltip } from "./action-tooltip";
 
 type TabSelectorItem<Value extends string> = {
   id: Value;
@@ -53,7 +54,8 @@ export function TabSelector<Value extends string>({
       aria-label={ariaLabel}
     >
       {items.map((item) => (
-        <button
+        item.description ? <ActionTooltip key={item.id} label={item.description} semantic={false}>
+          {(tooltipId) => <button
           key={item.id}
           id={`${idPrefix}-tab-${item.id}`}
           type="button"
@@ -62,12 +64,24 @@ export function TabSelector<Value extends string>({
           aria-selected={tabs ? value === item.id : undefined}
           aria-pressed={tabs ? undefined : value === item.id}
           tabIndex={tabs ? (value === item.id ? 0 : -1) : undefined}
-          title={item.description}
+          aria-describedby={tooltipId}
           onClick={() => onValueChange(item.id)}
           onKeyDown={onKeyDown}
-        >
+          >
           {item.label}
-        </button>
+          </button>}
+        </ActionTooltip> : <button
+          key={item.id}
+          id={`${idPrefix}-tab-${item.id}`}
+          type="button"
+          role={tabs ? "tab" : undefined}
+          aria-controls={controls?.(item.id)}
+          aria-selected={tabs ? value === item.id : undefined}
+          aria-pressed={tabs ? undefined : value === item.id}
+          tabIndex={tabs ? (value === item.id ? 0 : -1) : undefined}
+          onClick={() => onValueChange(item.id)}
+          onKeyDown={onKeyDown}
+        >{item.label}</button>
       ))}
     </nav>
   );

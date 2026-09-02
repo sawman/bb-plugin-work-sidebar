@@ -3,6 +3,7 @@ import {
   type ComponentPropsWithoutRef,
   type ReactNode,
 } from "react";
+import { ActionTooltip } from "./action-tooltip";
 
 type SidebarListIconButtonProps = Omit<
   ComponentPropsWithoutRef<"button">,
@@ -12,8 +13,16 @@ type SidebarListIconButtonProps = Omit<
 export const SidebarListIconButton = forwardRef<
   HTMLButtonElement,
   SidebarListIconButtonProps
->(function SidebarListIconButton({ type = "button", ...props }, ref) {
-  return <button {...props} ref={ref} type={type} className="ws-icon-button" />;
+>(function SidebarListIconButton({ type = "button", title, ...props }, ref) {
+  const renderButton = (tooltipId?: string) => (
+    <button {...props} ref={ref} type={type} className="ws-icon-button" aria-describedby={tooltipId} />
+  );
+  if (!title) return renderButton();
+  return (
+    <ActionTooltip label={title}>
+      {renderButton}
+    </ActionTooltip>
+  );
 });
 
 export function SidebarListActions({

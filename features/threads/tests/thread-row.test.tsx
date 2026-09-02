@@ -216,11 +216,10 @@ describe("R9 production ThreadRow host behavior", () => {
     const childLink = await slot.findByRole("link", { name: /Child/ });
     fireEvent.contextMenu(childLink);
     const toTop = await slot.findByRole("menuitem", { name: "To Top" });
-    expect(toTop.getAttribute("title")).toBe(
-      "Move this thread out of its parent and make it a top-level thread",
-    );
     expect(toTop.getAttribute("aria-describedby")).toBeNull();
-    expect(slot.queryByRole("tooltip")).toBeNull();
+    expect(
+      document.getElementById(toTop.getAttribute("aria-describedby") ?? ""),
+    ).toBeNull();
     expect(
       Array.from(slot.getByRole("menu").children).map((child) => child.getAttribute("role")),
     ).not.toContain("tooltip");

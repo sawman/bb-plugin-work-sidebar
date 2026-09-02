@@ -6,6 +6,7 @@ import type {
   ReactNode,
 } from "react";
 import { toast } from "sonner";
+import { ActionTooltip } from "./action-tooltip";
 
 type CopyBadgeProps = {
   value: string;
@@ -67,13 +68,14 @@ export function CopyBadge({
   };
 
   return (
-    <span
+    <ActionTooltip label={title ?? `Copy ${value}`}>
+      {(tooltipId) => <span
       {...spanProps}
       className={`ws-copy-badge ws-identifier-badge${className ? ` ${className}` : ""}`}
       role="button"
       tabIndex={0}
       aria-label={`Copy ${label} ${value}`}
-      title={title ?? `Copy ${value}`}
+      aria-describedby={tooltipId}
       data-tone={tone}
       data-typography={typography}
       data-variant={variant}
@@ -96,6 +98,7 @@ export function CopyBadge({
       }}
     >
       {children}
-    </span>
+      </span>}
+    </ActionTooltip>
   );
 }

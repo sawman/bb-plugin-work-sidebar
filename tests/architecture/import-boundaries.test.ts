@@ -112,6 +112,32 @@ function sourceCallCount(path: string, name: string): number {
   return count;
 }
 
+function intrinsicTitleAttributes(path: string): string[] {
+  const source = ts.createSourceFile(
+    path,
+    readFileSync(resolve(repositoryRoot, path), "utf8"),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+  const violations: string[] = [];
+  const visit = (node: ts.Node) => {
+    if (ts.isJsxOpeningLikeElement(node)) {
+      const tag = node.tagName.getText(source);
+      const intrinsic = /^[a-z]/.test(tag);
+      const title = node.attributes.properties.find(
+        (property): property is ts.JsxAttribute =>
+          ts.isJsxAttribute(property) && property.name.getText(source) === "title",
+      );
+      if (intrinsic && title)
+        violations.push(`${path}:${source.getLineAndCharacterOfPosition(title.getStart(source)).line + 1} <${tag}>`);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return violations;
+}
+
 function topLevelImplementationDeclarations(path: string): number {
   const source = ts.createSourceFile(path, readFileSync(resolve(repositoryRoot, path), "utf8"), ts.ScriptTarget.Latest, true);
   return source.statements.filter((statement) => {
@@ -122,6 +148,13 @@ function topLevelImplementationDeclarations(path: string): number {
 }
 
 describe("R16 composition boundaries", () => {
+  it("uses rendered tooltips instead of native title attributes in production UI", () => {
+    const violations = productionSourcePaths(repositoryRoot)
+      .filter((path) => path.endsWith(".tsx"))
+      .flatMap((path) => intrinsicTitleAttributes(path.slice(`${repositoryRoot}/`.length)));
+    expect(violations, "native title tooltips are unreliable in BB; use ActionTooltip").toEqual([]);
+  });
+
   it("keeps components runtime-independent from feature slices and proves the gate rejects an illegal edge", () => {
     const graph = collectComponentsRuntimeImportGraph(repositoryRoot);
     expect(() => assertNoComponentsToFeaturesRuntimeImports(graph, repositoryRoot)).not.toThrow();

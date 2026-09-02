@@ -163,7 +163,8 @@ describe("registered Status activity lifecycle", () => {
       },
     );
     const indicator = await slot.findByRole("img", { name: "Blocked" });
-    expect(indicator.closest(".ws-runtime-state")?.getAttribute("title")).toBe("Blocked");
+    const state = indicator.closest(".ws-runtime-state");
+    expect(document.getElementById(state?.getAttribute("aria-describedby") ?? "")?.getAttribute("aria-label")).toBe("Blocked");
     slot.lifecycle.unmount();
   });
 

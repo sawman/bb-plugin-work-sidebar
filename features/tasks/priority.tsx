@@ -1,4 +1,5 @@
 import { Icon, type IconName } from "../../components/ui/icon";
+import { ActionTooltip } from "../../components/ui/action-tooltip";
 import type { SidebarTask } from "../../work-model";
 
 type TaskPriority = SidebarTask["priority"];
@@ -14,14 +15,16 @@ export function TaskPriorityIcon({ priority }: { priority: TaskPriority }) {
   if (priority === "none") return null;
   const presentation = priorityPresentation[priority];
   return (
-    <span
+    <ActionTooltip label={presentation.label}>
+      {(tooltipId) => <span
       className={`ws-task-priority-icon ws-task-priority-${priority}`}
       data-priority={priority}
       role="img"
       aria-label={presentation.label}
-      title={presentation.label}
+      aria-describedby={tooltipId}
     >
       <Icon name={presentation.icon} aria-hidden />
-    </span>
+      </span>}
+    </ActionTooltip>
   );
 }

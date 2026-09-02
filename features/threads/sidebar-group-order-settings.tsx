@@ -4,6 +4,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { Icon } from "@/components/ui/icon";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 import type { SidebarThreadGroup, SidebarThreadGroupPosition } from "./model";
 import { AddThreadGroupControl } from "./sidebar-group-create";
 
@@ -112,39 +113,42 @@ export function ThreadGroupOrderSettings({
             }}
           >
             {group ? (
-              <button
+              <ActionTooltip label={`Rename ${group.name}`}>
+                {(tooltipId) => <button
                 type="button"
                 className="ws-thread-group-rename"
-                title={`Rename ${group.name}`}
+                aria-describedby={tooltipId}
                 onClick={() => settings.onRenameGroup(group)}
-              >
+                >
                 {group.name}
-              </button>
+                </button>}
+              </ActionTooltip>
             ) : (
               <span className="ws-thread-group-system">Active</span>
             )}
             {group ? (
-              <button
+              <ActionTooltip label={occupied
+                ? "Move its threads before removing"
+                : `Remove ${group.name}`}>
+                {(tooltipId) => <button
                 type="button"
                 className="ws-thread-group-remove"
-                title={
-                  occupied
-                    ? "Move its threads before removing"
-                    : `Remove ${group.name}`
-                }
+                aria-describedby={tooltipId}
                 aria-label={`Remove ${group.name}`}
                 disabled={occupied}
                 onClick={() => settings.onRemoveGroup(group)}
-              >
+                >
                 <Icon name="X" aria-hidden />
-              </button>
+                </button>}
+              </ActionTooltip>
             ) : (
               <span aria-hidden />
             )}
-            <button
+            <ActionTooltip label={`Drag ${position.name} to reorder`}>
+              {(tooltipId) => <button
               type="button"
               className="ws-thread-group-drag"
-              title={`Drag ${position.name} to reorder`}
+              aria-describedby={tooltipId}
               aria-label={`Drag ${position.name} to reorder`}
               aria-keyshortcuts="ArrowUp ArrowDown"
               draggable={!settings.groupReorderPending}
@@ -152,9 +156,10 @@ export function ThreadGroupOrderSettings({
               onDragStart={(event) => startDrag(event, position.id)}
               onDragEnd={finishDrag}
               onKeyDown={(event) => moveWithKeyboard(event, position.id)}
-            >
+              >
               <Icon name="GripVertical" aria-hidden />
-            </button>
+              </button>}
+            </ActionTooltip>
           </div>
         );
       })}

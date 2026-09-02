@@ -5,6 +5,7 @@ import {
   type ComponentPropsWithoutRef,
 } from "react";
 import { Icon } from "./icon";
+import { ActionTooltip } from "./action-tooltip";
 
 type RefreshButtonProps = Omit<
   ComponentPropsWithoutRef<"button">,
@@ -48,14 +49,15 @@ export const RefreshButton = forwardRef<
   }, [disabled, onRefresh, refreshing]);
 
   return (
-    <button
+    <ActionTooltip label={title ?? label}>
+      {(tooltipId) => <button
       {...props}
       ref={ref}
       type={type}
       className="ws-icon-button ws-refresh-button"
       aria-label={label}
+      aria-describedby={tooltipId}
       aria-busy={refreshing || undefined}
-      title={title ?? label}
       disabled={disabled || refreshing}
       onClick={refresh}
     >
@@ -65,6 +67,7 @@ export const RefreshButton = forwardRef<
         data-motion={refreshing ? "spin" : undefined}
         aria-hidden
       />
-    </button>
+      </button>}
+    </ActionTooltip>
   );
 });

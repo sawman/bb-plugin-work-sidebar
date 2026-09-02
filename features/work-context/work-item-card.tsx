@@ -604,16 +604,18 @@ function WorkQueue({
           query={search}
           selectedValues={[]}
         />
-        <button
+        <ActionTooltip label={`Create a BB task as ${destination === "goal" ? "Goal" : "Queue"}`}>
+          {(tooltipId) => <button
           type="button"
           className="ws-task-workflow-action"
           aria-label={`Create a BB task as ${destination === "goal" ? "Goal" : "Queue"}`}
-          title={`Create BB task as ${destination === "goal" ? "Goal" : "Queue"}`}
+          aria-describedby={tooltipId}
           disabled={!search.trim() || pending || !canCreateBBTask(destination)}
           onClick={() => void createFromSearch()}
-        >
+          >
           <Icon className="ws-task-workflow-icon" name="Plus" aria-hidden />
-        </button>
+          </button>}
+        </ActionTooltip>
       </div>
       {linearError ? (
         <div className="ws-callout" role="alert">

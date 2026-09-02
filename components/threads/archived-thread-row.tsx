@@ -10,6 +10,7 @@ import {
 import type { ThreadProvider } from "./thread-provider-logo";
 import { ThreadRowContent } from "./thread-row-content";
 import { ThreadWorkspaceBadge } from "./thread-workspace-badge";
+import { ActionTooltip } from "../ui/action-tooltip";
 
 export type ArchivedThread = {
   id: string;
@@ -99,14 +100,16 @@ export function ArchivedThreadRow({
               trailing={
                 <span className="ws-thread-trailing ws-sidebar-row-trailing">
                   {duration ? (
-                    <time
+                    <ActionTooltip label={`Archived ${duration} ago`}>
+                      {(tooltipId) => <time
                       className="ws-thread-archive-age"
                       dateTime={new Date(thread.archivedAt).toISOString()}
                       aria-label={`Archived ${duration} ago`}
-                      title={`Archived ${duration} ago`}
+                      aria-describedby={tooltipId}
                     >
                       {duration}
-                    </time>
+                      </time>}
+                    </ActionTooltip>
                   ) : null}
                 </span>
               }

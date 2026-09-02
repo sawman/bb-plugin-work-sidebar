@@ -1,5 +1,6 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import { Icon } from "@/components/ui/icon";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 
 type AddThreadGroupControlProps = {
   onAddGroup(name: string): boolean;
@@ -30,17 +31,19 @@ export function AddThreadGroupControl({
   };
   return (
     <>
-      <button
+      <ActionTooltip label="Add group">
+        {(tooltipId) => <button
         ref={triggerRef}
         type="button"
         className="ws-thread-group-add"
-        title="Add group"
+        aria-describedby={tooltipId}
         aria-label="Add group"
         aria-expanded={name !== null}
         onClick={() => setName((current) => (current === null ? "" : null))}
-      >
+        >
         <Icon name="Plus" aria-hidden />
-      </button>
+        </button>}
+      </ActionTooltip>
       {name !== null && (
         <form
           className="ws-thread-group-create"

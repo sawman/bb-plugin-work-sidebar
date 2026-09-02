@@ -1074,7 +1074,7 @@ describe("registered Work context cards", () => {
     ).toBeTruthy();
     const statusTooltipId = control.getAttribute("aria-describedby");
     expect(statusTooltipId).toBeTruthy();
-    expect(document.getElementById(statusTooltipId!)?.textContent).toBe(
+    expect(document.getElementById(statusTooltipId!)?.getAttribute("aria-label")).toBe(
       "Change status: To do",
     );
     const actionLabels = Array.from(

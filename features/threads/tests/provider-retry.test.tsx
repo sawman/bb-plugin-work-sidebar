@@ -65,7 +65,11 @@ describe("provider retry presentation and read contract", () => {
     expect(status.textContent).toBe("1m");
     expect(status.querySelector('[data-icon="Clock"]')).toBeTruthy();
     expect(status.getAttribute("aria-describedby")).toBeTruthy();
-    expect(view.getByRole("tooltip").textContent).toBe(
+    expect(
+      document
+        .getElementById(status.getAttribute("aria-describedby") ?? "")
+        ?.getAttribute("aria-label"),
+    ).toBe(
       "Rate limited; retry 2 in 1m.",
     );
     view.unmount();

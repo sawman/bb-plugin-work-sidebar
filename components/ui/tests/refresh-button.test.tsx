@@ -16,6 +16,9 @@ describe("shared refresh button", () => {
     render(<RefreshButton label="Refresh test data" onRefresh={refresh} />);
 
     const button = screen.getByRole("button", { name: "Refresh test data" });
+    expect(button.getAttribute("title")).toBeNull();
+    expect(button.getAttribute("aria-describedby")).toBeTruthy();
+    expect(screen.getByRole("tooltip").getAttribute("aria-label")).toBe("Refresh test data");
     fireEvent.click(button);
     fireEvent.click(button);
 

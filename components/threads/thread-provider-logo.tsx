@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { CSSProperties } from "react";
 import { queryKeys, queryPolicies } from "@/query-runtime";
 import { Icon } from "../ui/icon";
+import { ActionTooltip } from "../ui/action-tooltip";
 
 export type ThreadProvider = Pick<
   PluginProvidersState["providers"][number],
@@ -69,20 +70,20 @@ export function ThreadProviderLogo({
 }) {
   const displayName = provider?.displayName ?? providerId;
   const accessibleLabel = `${displayName} provider${statusLabel ? ` status: ${statusLabel}` : ""}`;
+  const tooltipLabel = title === undefined
+    ? statusLabel
+      ? accessibleLabel
+      : displayName
+    : title;
   return (
-    <span
+    <ActionTooltip label={tooltipLabel ?? displayName}>
+      {(tooltipId) => <span
       className="ws-thread-provider"
       data-provider-id={providerId}
       data-runtime-state={runtimeState}
       role="img"
       aria-label={accessibleLabel}
-      title={
-        title === undefined
-          ? statusLabel
-            ? accessibleLabel
-            : displayName
-          : (title ?? undefined)
-      }
+      aria-describedby={tooltipId}
     >
       <span className="ws-thread-provider-glyph" aria-hidden>
         {provider?.logoUrl ? (
@@ -94,6 +95,7 @@ export function ThreadProviderLogo({
           className="ws-thread-provider-fallback-shine"
         />
       </span>
-    </span>
+      </span>}
+    </ActionTooltip>
   );
 }

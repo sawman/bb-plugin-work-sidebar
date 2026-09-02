@@ -64,15 +64,12 @@ export function ThreadRowMenu({
         <ContextMenuItem onSelect={actions.startRename}>Rename</ContextMenuItem>
         <ContextMenuSeparator />
         {parentThreadId ? (
-          <>
-            <ContextMenuItem
-              disabled={hierarchy.disabled}
-              title={hierarchy.toTopDescription}
-              onSelect={() => void hierarchy.promote()}
-            >
-              To Top
-            </ContextMenuItem>
-          </>
+          <ContextMenuItem
+            disabled={hierarchy.disabled}
+            onSelect={() => void hierarchy.promote()}
+          >
+            To Top
+          </ContextMenuItem>
         ) : null}
         <ContextMenuItem
           disabled={hierarchy.disabled}

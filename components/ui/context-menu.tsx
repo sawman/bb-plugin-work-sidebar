@@ -14,6 +14,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { textScaleStyle, useTextScale } from "../../shared/text-scale";
+import { ActionTooltip } from "./action-tooltip";
 
 type MenuState = {
   close(): void;
@@ -175,17 +176,19 @@ export function ContextMenuItem({
   onClick,
   onKeyDown,
   className,
+  title,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   onSelect?(event: React.MouseEvent<HTMLButtonElement>): void;
 }) {
   const menu = useContext(MenuContext);
-  return (
+  const renderButton = (tooltipId?: string) => (
     <button
       type="button"
       {...props}
       className={`ws-context-menu-item${className ? ` ${className}` : ""}`}
       role="menuitem"
+      aria-describedby={tooltipId}
       onClick={(event) => {
         onClick?.(event);
         onSelect?.(event);
@@ -204,6 +207,12 @@ export function ContextMenuItem({
     >
       {children}
     </button>
+  );
+  if (!title) return renderButton();
+  return (
+    <ActionTooltip label={title} semantic={false}>
+      {renderButton}
+    </ActionTooltip>
   );
 }
 

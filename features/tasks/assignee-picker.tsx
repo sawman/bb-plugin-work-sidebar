@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "../../components/ui/icon";
+import { ActionTooltip } from "../../components/ui/action-tooltip";
 import type { SidebarTask } from "../../work-model";
 
 export function AssigneePicker({
@@ -57,8 +58,12 @@ export function AssigneePicker({
     if (pending && pending === value) clearPending();
   }, [pending, value]);
 
+  const tooltipLabel = pending
+    ? `Switching to ${pending === "agent" ? "Agent" : "Human"} in 2 seconds. Click again or press Escape to cancel.`
+    : "Swipe left for Human, right for Agent";
   return (
-    <button
+    <ActionTooltip label={tooltipLabel}>
+      {(tooltipId) => <button
       type="button"
       className="ws-assignee-toggle"
       data-assignee={current}
@@ -71,11 +76,7 @@ export function AssigneePicker({
           ? `${pending === "agent" ? "Agent" : "Human"} assignment pending for ${taskKey ?? "task"}; activate again or press Escape to cancel`
           : label
       }
-      title={
-        pending
-          ? `Switching to ${pending === "agent" ? "Agent" : "Human"} in 2 seconds. Click again or press Escape to cancel.`
-          : "Swipe left for Human, right for Agent"
-      }
+      aria-describedby={tooltipId}
       onPointerDown={(event) => {
         pointerStart.current = event.clientX;
         event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -102,7 +103,7 @@ export function AssigneePicker({
           queue("agent");
         }
       }}
-    >
+      >
       <span className="ws-assignee-toggle-viewport" aria-hidden>
         <span className="ws-assignee-toggle-track">
           <span className="ws-assignee-toggle-state">
@@ -113,6 +114,7 @@ export function AssigneePicker({
           </span>
         </span>
       </span>
-    </button>
+      </button>}
+    </ActionTooltip>
   );
 }

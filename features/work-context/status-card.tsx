@@ -2,6 +2,7 @@ import { useState } from "react";
 import { experimental_useProviders, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { Icon, type IconName } from "../../components/ui/icon";
 import { ThreadProviderLogo } from "../../components/threads/thread-provider-logo";
+import { ActionTooltip } from "../../components/ui/action-tooltip";
 import { readableStatus, runtimeStatusPresentation } from "../../work-model";
 import { useLatestActivity, useWorkProviderHealth, useWorkStatus } from "./queries";
 import { CardState } from "./card-state";
@@ -96,22 +97,28 @@ function StatusHeading({
 }) {
   return (
     <span className="ws-status-heading-meta">
-      <span
+      <ActionTooltip label={runtime.label}>
+        {(tooltipId) => <span
         className={`ws-runtime-state ws-runtime-state-${runtime.tone}`}
-        title={runtime.label}
+        aria-describedby={tooltipId}
       >
         <Icon name={runtimeIcons[runtime.tone]} aria-label={runtime.label} />
-      </span>
-      <span title={countLabel(total, "child agent")}>
+        </span>}
+      </ActionTooltip>
+      <ActionTooltip label={countLabel(total, "child agent")}>
+        {(tooltipId) => <span aria-describedby={tooltipId}>
         <Icon name="Bot" aria-hidden />
         <span aria-hidden>{total}</span>
         <span className="ws-sr-only">{countLabel(total, "child agent")}</span>
-      </span>
-      <span className="ws-active-agent-count" title={countLabel(active, "active child agent")}>
+        </span>}
+      </ActionTooltip>
+      <ActionTooltip label={countLabel(active, "active child agent")}>
+        {(tooltipId) => <span className="ws-active-agent-count" aria-describedby={tooltipId}>
         <Icon name="Wrench" aria-hidden />
         <span aria-hidden>{active}</span>
         <span className="ws-sr-only">{countLabel(active, "active child agent")}</span>
-      </span>
+        </span>}
+      </ActionTooltip>
       {provider ? <ProviderHealth provider={provider} providerLogo={providerLogo} /> : null}
     </span>
   );
@@ -171,18 +178,22 @@ function ProviderHealth({
     </span>
   );
   return provider.statusUrl ? (
-    <button
+    <ActionTooltip label={label}>
+      {(tooltipId) => <button
       type="button"
       className={`ws-provider-health ws-provider-health-${provider.tone}`}
       aria-label={label}
-      title={label}
+      aria-describedby={tooltipId}
       onClick={() => navigate.openUrl(provider.statusUrl!)}
-    >
+      >
       {icon}
-    </button>
+      </button>}
+    </ActionTooltip>
   ) : (
-    <span className={`ws-provider-health ws-provider-health-${provider.tone}`} role="img" aria-label={label} title={label}>
-      {icon}
-    </span>
+    <ActionTooltip label={label}>
+      {(tooltipId) => <span className={`ws-provider-health ws-provider-health-${provider.tone}`} role="img" aria-label={label} aria-describedby={tooltipId}>
+        {icon}
+      </span>}
+    </ActionTooltip>
   );
 }

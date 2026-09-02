@@ -16,23 +16,26 @@ import { WorkThreadList } from "./features/threads/left-sidebar";
 import { SidebarAppearanceSettings } from "./features/threads/sidebar-appearance-settings";
 import { WorkPanel } from "./features/work-context/panel";
 import { withPluginProviders } from "./query-runtime";
+import { ActionTooltip } from "./components/ui/action-tooltip";
 
 function WorkContextHeaderAction({
   isCompactViewport,
 }: PluginThreadHeaderActionProps) {
   const navigate = useBbNavigate();
   return (
-    <button
+    <ActionTooltip label="Open Work">
+      {(tooltipId) => <button
       type="button"
       className="ws-header-action"
       aria-label="Open Work"
-      title="Open Work"
+      aria-describedby={tooltipId}
       onClick={() => {
         navigate.openThreadPanel({ actionId: "work-context" });
       }}
     >
       {isCompactViewport ? "▣" : "Work"}
-    </button>
+      </button>}
+    </ActionTooltip>
   );
 }
 
@@ -101,14 +104,16 @@ function TrackWorkAction() {
     }
   };
   return (
-    <button
+    <ActionTooltip label="Create and attach a BB task before sending">
+      {(tooltipId) => <button
       className="ws-track-action"
       aria-label="Track this work as a task"
-      title="Create and attach a BB task before sending"
+      aria-describedby={tooltipId}
       onClick={() => void track()}
     >
       Task
-    </button>
+      </button>}
+    </ActionTooltip>
   );
 }
 

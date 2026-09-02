@@ -47,6 +47,9 @@ describe("TabSelector", () => {
     });
     const view = render(<ControlledSelector tabs />);
     const work = view.getByRole("tab", { name: "Work" });
+    expect(work.getAttribute("title")).toBeNull();
+    expect(work.getAttribute("aria-describedby")).toBeTruthy();
+    expect(view.container.querySelector(".ws-action-tooltip-content")?.getAttribute("role")).toBeNull();
     fireEvent.keyDown(work, { key: "ArrowRight" });
 
     const changes = view.getByRole("tab", { name: "Changes" });

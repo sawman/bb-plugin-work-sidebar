@@ -396,8 +396,10 @@ describe("R15 registered Agents Work slot", () => {
     fireEvent.click(slot.getByRole("button", { name: "Open thr_child" }));
     fireEvent.click(slot.getByRole("button", { name: "Open thr_child in split" }));
 
-    expect(slot.getByText("1m 5s").getAttribute("title")).toBe("Agent thread age");
-    expect(slot.getByTitle("Agent checkout worktree: bb/agent-child").getAttribute("data-workspace-kind")).toBe("managed-worktree");
+    const duration = slot.getByText("1m 5s");
+    expect(document.getElementById(duration.getAttribute("aria-describedby") ?? "")?.getAttribute("aria-label")).toBe("Agent thread age");
+    const workspace = slot.getByRole("button", { name: "Copy agent workspace bb/agent-child" });
+    expect(workspace.getAttribute("data-workspace-kind")).toBe("managed-worktree");
     expect(slot.inspection.sidebarActionCalls).toEqual([
       { method: "open", threadId: "thr_child", options: { split: false } },
       { method: "open", threadId: "thr_child", options: { split: true } },

@@ -36,8 +36,16 @@
   align-self: center;
 }
 .ws-thread-anchor {
+  position: relative;
   padding-inline: 0.4rem;
   gap: 0.32rem;
+}
+.ws-thread-anchor > .ws-action-tooltip {
+  display: contents;
+}
+.ws-sidebar-row-main > .ws-action-tooltip {
+  display: block;
+  min-width: 0;
 }
 .ws-thread-has-children {
   padding-left: 1.35rem;
@@ -641,6 +649,13 @@
   font: var(--ws-text-title);
   line-height: inherit;
   cursor: pointer;
+}
+.ws-tabs > .ws-action-tooltip {
+  display: grid;
+  min-width: 0;
+}
+.ws-tabs > .ws-action-tooltip > button {
+  width: 100%;
 }
 .ws-tabs button:hover,
 .ws-tabs button[aria-selected="true"],
@@ -1293,7 +1308,11 @@
   align-items: center;
   gap: 0.16rem;
 }
-.ws-thread-location > .ws-identifier-badge {
+.ws-thread-location > .ws-action-tooltip {
+  min-width: 0;
+  max-width: 100%;
+}
+.ws-thread-location > .ws-action-tooltip > .ws-identifier-badge {
   min-width: 0;
   max-width: 100%;
 }
@@ -3695,6 +3714,9 @@ button.ws-provider-health:focus-visible {
   transform: translateY(0.12rem);
   transition: opacity 0.1s ease, transform 0.1s ease;
   white-space: nowrap;
+}
+.ws-action-tooltip-content::before {
+  content: attr(data-tooltip-label);
 }
 .ws-action-tooltip:hover .ws-action-tooltip-content,
 .ws-action-tooltip:focus-within .ws-action-tooltip-content {

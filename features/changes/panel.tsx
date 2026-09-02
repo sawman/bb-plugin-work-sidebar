@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import type { rpcContract } from "../../contracts";
 import { CopyBadge } from "../../components/ui/copy-badge";
 import { Icon } from "../../components/ui/icon";
+import { ActionTooltip } from "../../components/ui/action-tooltip";
 import { useGitHubApiHealth } from "../pull-requests/queries";
 import { githubHealthPresentation } from "../pull-requests/presentation";
 import { StackNumberBadge } from "../pull-requests/stack-number";
@@ -109,13 +110,15 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
         </div>
         <span className="ws-section-count ws-changes-header-meta">
           {githubHealth && (
-            <span
+            <ActionTooltip label={githubHealth.detail}>
+              {(tooltipId) => <span
               className={`ws-github-api-indicator ws-github-api-${githubHealth.tone}`}
-              title={githubHealth.detail}
-            >
+              aria-describedby={tooltipId}
+              >
               <Icon name={githubHealth.icon} aria-hidden />
               {githubHealth.label}
-            </span>
+              </span>}
+            </ActionTooltip>
           )}
           {currentPullRequestNumber != null ? (
             <CopyBadge

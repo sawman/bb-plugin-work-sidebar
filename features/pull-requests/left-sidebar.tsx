@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useBbNavigate, useRpc, useSettings } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Icon } from "@/components/ui/icon";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 import { RefreshButton } from "@/components/ui/refresh-button";
 import { SidebarListActions } from "@/components/ui/sidebar-list-actions";
 import { SidebarTable } from "@/components/ui/sidebar-table";
@@ -155,13 +156,15 @@ export function PullRequestsLeftSidebar({
         <SidebarListActions
           context={
             health ? (
-              <span
+              <ActionTooltip label={health.detail}>
+                {(tooltipId) => <span
                 className={`ws-github-api-indicator ws-github-api-${health.tone}`}
-                title={health.detail}
-              >
+                aria-describedby={tooltipId}
+                >
                 <Icon name={health.icon} aria-hidden />
                 {health.label}
-              </span>
+                </span>}
+              </ActionTooltip>
             ) : undefined
           }
           search={

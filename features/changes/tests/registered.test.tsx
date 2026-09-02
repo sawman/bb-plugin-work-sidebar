@@ -624,7 +624,7 @@ describe("R13 registered Changes Work slot", () => {
     expect(
       slot.getByText("GraphQL limited · GQL 0/5,000 · REST 4,812/5,000"),
     ).toBeTruthy();
-    expect(slot.getByTitle(/GraphQL 0\/5,000.*REST 4,812\/5,000/)).toBeTruthy();
+    expect(slot.container.querySelector('[aria-label*="GraphQL 0/5,000"]')).toBeTruthy();
     expect(getChanges).toHaveBeenCalledTimes(1);
     slot.lifecycle.unmount();
   });

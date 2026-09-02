@@ -155,7 +155,9 @@ describe("thread attention presentation", () => {
     expect(view.queryByLabelText(/no agent update for 30 minutes/i)).toBeNull();
     act(() => vi.advanceTimersByTime(1));
     expect(
-      view.getAllByLabelText(/no agent update for 30 minutes/i),
+      view.getAllByRole("img", {
+        name: /no agent update for 30 minutes/i,
+      }),
     ).toHaveLength(2);
     const provider = view.getByRole("img", {
       name: "codex provider status: Thread is running; no agent update for 30 minutes",

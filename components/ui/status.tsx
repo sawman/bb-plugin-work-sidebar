@@ -1,5 +1,6 @@
 import { Icon } from "./icon";
 import type { IconName } from "./icon";
+import { ActionTooltip } from "./action-tooltip";
 
 export type StatusPresentation = {
   icon: IconName;
@@ -28,11 +29,12 @@ export function Status({
     ? `, ${presentation.count} review comment${presentation.count === 1 ? "" : "s"}`
     : "";
   return (
-    <span
+    <ActionTooltip label={presentation.label}>
+      {(tooltipId) => <span
       className={["ws-status", className].filter(Boolean).join(" ")}
       data-tone={presentation.tone}
       data-motion={presentation.icon === "LoaderCircle" ? "spin" : undefined}
-      title={presentation.label}
+      aria-describedby={tooltipId}
       role="img"
       aria-label={`${presentation.label}${countLabel}`}
     >
@@ -41,6 +43,7 @@ export function Status({
         <Icon name={presentation.overlayIcon} aria-hidden />
       )}
       {presentation.count ? <b aria-hidden>{presentation.count}</b> : null}
-    </span>
+      </span>}
+    </ActionTooltip>
   );
 }

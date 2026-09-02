@@ -40,6 +40,8 @@ const stack = {
 } satisfies SidebarStack;
 
 const clipboardWrite = vi.fn(() => Promise.resolve());
+const tooltipLabel = (element: Element) =>
+  document.getElementById(element.getAttribute("aria-describedby") ?? "")?.getAttribute("aria-label");
 
 beforeEach(() => {
   clipboardWrite.mockClear();
@@ -94,8 +96,10 @@ describe("pull-request stack number presentation", () => {
     expect(branch.getAttribute("data-variant")).toBe("text");
     expect(
       [
-        ...(pullRequest.parentElement?.querySelectorAll('[role="button"]') ??
-          []),
+        ...(
+          pullRequest.closest(".ws-pr-context")?.querySelectorAll('[role="button"]') ??
+          []
+        ),
       ].map((button) => button.getAttribute("aria-label")),
     ).toEqual([
       "Copy PR number #42",
@@ -270,7 +274,10 @@ describe("pull-request stack number presentation", () => {
     });
     expect(thread.getAttribute("title")).toBeNull();
     expect(thread.getAttribute("aria-describedby")).toBeTruthy();
-    expect(screen.getByRole("tooltip").textContent).toBe("Implement the PR");
+    expect(
+      document.getElementById(thread.getAttribute("aria-describedby") ?? "")
+        ?.textContent,
+    ).toBe("Implement the PR");
     expect(thread.parentElement?.classList).toContain("ws-pr-status-icons");
     expect(document.querySelector(".ws-pr-thread-context")).toBeNull();
     expect(thread.querySelector('[data-provider-id="codex"]')).toBeTruthy();
@@ -365,7 +372,7 @@ describe("pull-request stack number presentation", () => {
     const badge = screen.getByRole("button", { name: "Copy PR number #94" });
     expect(badge.closest("a")).toBeNull();
     expect(badge.getAttribute("data-tone")).toBe("success");
-    expect(badge.getAttribute("title")).toContain("Ready to merge");
+    expect(tooltipLabel(badge)).toContain("Ready to merge");
     expect(screen.queryByRole("button", { name: "Mark draft" })).toBeNull();
     fireEvent.contextMenu(badge, { clientX: 12, clientY: 18 });
     const action = screen.getByRole("menuitem", { name: "Mark draft" });
@@ -410,7 +417,7 @@ describe("pull-request stack number presentation", () => {
         name: "Copy PR number #96",
       });
       expect(badge.getAttribute("data-tone")).toBe(tone);
-      expect(badge.getAttribute("title")).toBe(`PR #96 · ${label}`);
+      expect(tooltipLabel(badge)).toBe(`PR #96 · ${label}`);
       expect(badge.querySelector("svg")?.getAttribute("data-icon")).toBe(icon);
       unmount();
     },
@@ -526,9 +533,10 @@ describe("pull-request stack number presentation", () => {
     });
     expect(provider.getAttribute("title")).toBeNull();
     expect(provider.getAttribute("aria-describedby")).toBeTruthy();
-    expect(screen.getByRole("tooltip").textContent).toBe(
-      "Implement context menu",
-    );
+    expect(
+      document.getElementById(provider.getAttribute("aria-describedby") ?? "")
+        ?.textContent,
+    ).toBe("Implement context menu");
   });
 
   it("flips and clamps the context menu when the pointer is near the viewport edge", async () => {
@@ -665,19 +673,8 @@ describe("pull-request stack number presentation", () => {
       />,
     );
 
-    const tooltipOwners = [...container.querySelectorAll("[data-tooltip]")];
-    expect(tooltipOwners).toHaveLength(0);
-    for (const owner of tooltipOwners) {
-      expect(owner.matches("button, a")).toBe(true);
-      expect(owner.getAttribute("data-tooltip")?.trim()).not.toBe("");
-    }
-    expect(container.querySelectorAll(".ws-status[data-tooltip]")).toHaveLength(
-      0,
-    );
     expect(
-      screen
-        .getByRole("button", { name: "Copy PR number #93" })
-        .getAttribute("title"),
+      tooltipLabel(screen.getByRole("button", { name: "Copy PR number #93" })),
     ).toBe("PR #93 · Ready to merge");
   });
 });

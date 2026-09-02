@@ -11,6 +11,7 @@ import {
 import { ThreadRowContent } from "@/components/threads/thread-row-content";
 import { ThreadWorkspaceBadge } from "@/components/threads/thread-workspace-badge";
 import { SidebarTable } from "@/components/ui/sidebar-table";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 import type {
   ThreadProvider,
   ThreadProviderDirectory,
@@ -141,12 +142,13 @@ function RecycleBinRow({
     <article className="ws-thread ws-recycle-bin-row">
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <button
+          <ActionTooltip label="Restore this thread to its previous group.">
+            {(tooltipId) => <button
             type="button"
             className="ws-thread-anchor ws-sidebar-row"
             onClick={onRestore}
-            title="Restore this thread to its previous group."
-          >
+            aria-describedby={tooltipId}
+            >
             <ThreadRowContent
               providerId={thread.providerId}
               provider={provider}
@@ -173,7 +175,8 @@ function RecycleBinRow({
                 ) : null
               }
             />
-          </button>
+            </button>}
+          </ActionTooltip>
         </ContextMenuTrigger>
         <ContextMenuContent aria-label={`Actions for ${title}`}>
           <ContextMenuLabel>{title}</ContextMenuLabel>

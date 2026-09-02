@@ -949,7 +949,9 @@ describe("R18 registered left sidebar parity", () => {
     const activeHandle = slot.getByRole("button", {
       name: "Drag Active to reorder",
     });
-    expect(activeHandle.parentElement?.lastElementChild).toBe(activeHandle);
+    expect(activeHandle.parentElement?.lastElementChild?.previousElementSibling).toBe(
+      activeHandle,
+    );
     const betaRow = slot
       .getByRole("button", { name: "Drag Beta to reorder" })
       .closest("[data-group-position]")!;
@@ -960,8 +962,8 @@ describe("R18 registered left sidebar parity", () => {
     const betaHandle = slot.getByRole("button", {
       name: "Drag Beta to reorder",
     });
-    expect(betaRow.lastElementChild).toBe(betaHandle);
-    expect(betaHandle.previousElementSibling).toBe(
+    expect(betaRow.lastElementChild?.firstElementChild).toBe(betaHandle);
+    expect(betaHandle.parentElement?.previousElementSibling?.firstElementChild).toBe(
       slot.getByRole("button", { name: "Remove Beta" }),
     );
     fireEvent.dragStart(activeHandle, {
@@ -1078,7 +1080,7 @@ describe("R18 registered left sidebar parity", () => {
     fireEvent.click(slot.getByRole("button", { name: "Thread list settings" }));
     const menu = slot.getByRole("dialog", { name: "Thread list settings" });
     expect(menu.classList.contains("ws-thread-settings-menu")).toBe(true);
-    expect(slot.getByLabelText("Remove Later").hasAttribute("disabled")).toBe(
+    expect(slot.getByRole("button", { name: "Remove Later" }).hasAttribute("disabled")).toBe(
       false,
     );
     fireEvent.click(slot.getByRole("button", { name: "Add group" }));
@@ -1096,7 +1098,7 @@ describe("R18 registered left sidebar parity", () => {
         }),
       ),
     );
-    fireEvent.click(slot.getByTitle("Rename Later"));
+    fireEvent.click(slot.getByRole("button", { name: "Later" }));
     await waitFor(() =>
       expect(saveGroups).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1106,7 +1108,7 @@ describe("R18 registered left sidebar parity", () => {
         }),
       ),
     );
-    fireEvent.click(slot.getByLabelText("Remove Later renamed"));
+    fireEvent.click(slot.getByRole("button", { name: "Remove Later renamed" }));
     await waitFor(() =>
       expect(saveGroups).toHaveBeenLastCalledWith(
         expect.objectContaining({
@@ -1149,7 +1151,7 @@ describe("R18 registered left sidebar parity", () => {
     await waitFor(() => expect(slot.getByText("Later")).toBeTruthy());
     expect(slot.getByText("2 threads")).toBeTruthy();
     fireEvent.click(slot.getByRole("button", { name: "Thread list settings" }));
-    expect(slot.getByLabelText("Remove Later").hasAttribute("disabled")).toBe(
+    expect(slot.getByRole("button", { name: "Remove Later" }).hasAttribute("disabled")).toBe(
       true,
     );
     expect(slot.getByRole("spinbutton", { name: "Row height" })).toBeTruthy();
@@ -1348,7 +1350,9 @@ describe("R18 registered left sidebar parity", () => {
     const duration = archivedLink.querySelector("time");
     expect(duration?.textContent).toBe("3h");
     expect(duration?.getAttribute("aria-label")).toBe("Archived 3h ago");
-    expect(duration?.parentElement?.classList).toContain("ws-thread-trailing");
+    expect(duration?.parentElement?.parentElement?.classList).toContain(
+      "ws-thread-trailing",
+    );
     expect(
       archivedLink.querySelector(
         '.ws-thread-leading .ws-thread-provider[data-provider-id="codex"]',
@@ -1483,8 +1487,8 @@ describe("R18 registered left sidebar parity", () => {
       threadId: "thr_child",
       options: { split: false },
     });
-    expect(slot.getByTitle("Checks passing")).toBeTruthy();
-    expect(slot.getByTitle("Approved")).toBeTruthy();
+    expect(slot.getByRole("img", { name: "Checks passing" })).toBeTruthy();
+    expect(slot.getByRole("img", { name: /^Approved/ })).toBeTruthy();
     const baseLink = slot.getByRole("link", { name: /Base/ });
     expect(baseLink.getAttribute("href")).toBe(
       "https://github.com/acme/repo/pull/1",

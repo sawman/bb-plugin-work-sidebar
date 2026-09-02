@@ -19,6 +19,7 @@ import { useThreadRowPointerDrag } from "./use-thread-row-pointer-drag";
 import { useThreadHierarchy } from "./thread-hierarchy-context";
 import { THREAD_TO_TOP_DESCRIPTION } from "./use-thread-hierarchy-menu";
 import { toast } from "sonner";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 
 export function ThreadRow({
   thread,
@@ -111,13 +112,9 @@ export function ThreadRow({
       onDragEnd={finishNativeDrag}
     >
       {dragThreadId ? (
-        <span
-          className="ws-thread-reparent-target"
-          data-ws-thread-reparent-target={thread.id}
-          role="note"
-          aria-label={`Move a thread under ${title}`}
-          title={`Drop to make ${title} the parent`}
-        />
+        <ActionTooltip label={`Drop to make ${title} the parent`}>
+          {(tooltipId) => <span className="ws-thread-reparent-target" data-ws-thread-reparent-target={thread.id} role="note" aria-label={`Move a thread under ${title}`} aria-describedby={tooltipId} />}
+        </ActionTooltip>
       ) : null}
       {rowActions.renaming ? (
         <div className="ws-rename">
@@ -157,11 +154,6 @@ export function ThreadRow({
             data-sidebar-thread-id={thread.id}
             data-sidebar-thread-parent-id={thread.parentThreadId ?? ""}
             className={`ws-thread-anchor ws-sidebar-row ${children > 0 ? "ws-thread-has-children" : ""}`}
-            title={
-              isAvailable
-                ? "Drag into the main area to open; drop at an edge to split"
-                : undefined
-            }
             aria-current={selected ? "true" : undefined}
             data-selected={selected || undefined}
             onMouseDown={(event) => {
@@ -194,7 +186,8 @@ export function ThreadRow({
               );
             }}
           >
-            <ThreadRowContent
+            <ActionTooltip label={isAvailable ? "Drag into the main area to open; drop at an edge to split" : "Open thread"}>
+              {() => <ThreadRowContent
               leading={
                 <ThreadAgentControl
                   thread={thread}
@@ -231,7 +224,8 @@ export function ThreadRow({
                   staleWorkingMinutes={staleWorkingMinutes} providerRetry={providerRetry} providerRetryNow={providerRetryNow}
                 />
               }
-            />
+              />}
+            </ActionTooltip>
           </a>
         </ThreadRowMenu>
       )}

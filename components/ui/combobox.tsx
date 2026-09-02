@@ -11,6 +11,7 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
+import { ActionTooltip } from "./action-tooltip";
 import { fitContextMenuPosition } from "./context-menu";
 import { textScaleStyle, useTextScale } from "../../shared/text-scale";
 
@@ -331,8 +332,8 @@ export function SearchCombobox({
           {error.message}
         </button>
       ) : visible.length ? visible.map((option, index) => (
-        <button
-          key={option.value}
+        <ActionTooltip key={option.value} label={option.title ?? option.label} semantic={false}>
+          {(tooltipId) => <button
           id={`${listId}-option-${index}`}
           type="button"
           role="option"
@@ -341,16 +342,17 @@ export function SearchCombobox({
           data-active={activeIndex === index || undefined}
           disabled={option.disabled}
           tabIndex={-1}
-          title={option.title}
+          aria-describedby={tooltipId}
           onMouseDown={(event) => event.preventDefault()}
           onPointerMove={() => setActiveIndex(index)}
           onClick={() => choose(option)}
-        >
+          >
           {option.leading ? <span className="ws-search-shell-leading" aria-hidden>{option.leading}</span> : null}
           <span className="ws-search-shell-option-label">{option.label}</span>
           {option.detail ? <small>{option.detail}</small> : null}
           {option.trailing ? <span className="ws-search-shell-trailing" aria-hidden>{option.trailing}</span> : null}
-        </button>
+          </button>}
+        </ActionTooltip>
       )) : (
         <button type="button" role="option" aria-disabled="true" disabled tabIndex={-1}>
           {emptyMessage}

@@ -16,7 +16,9 @@ describe("task priority icon", () => {
 
     const icon = screen.getByRole("img", { name: label });
     expect(icon.getAttribute("data-priority")).toBe(priority);
-    expect(icon.getAttribute("title")).toBe(label);
+    expect(icon.getAttribute("title")).toBeNull();
+    expect(icon.getAttribute("aria-describedby")).toBeTruthy();
+    expect(screen.getByRole("tooltip").getAttribute("aria-label")).toBe(label);
     expect(icon.querySelectorAll('[data-priority-bar="active"]')).toHaveLength(
       activeBars,
     );

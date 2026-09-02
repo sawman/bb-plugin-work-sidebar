@@ -11,6 +11,7 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { CopyBadge } from "../../components/ui/copy-badge";
 import { Icon, type IconName } from "../../components/ui/icon";
+import { ActionTooltip } from "../../components/ui/action-tooltip";
 import {
   agentDurationLabel,
   agentRuntimePresentation,
@@ -49,14 +50,16 @@ function AgentDuration({ createdAt }: { createdAt: number }) {
   const now = useContext(AgentClockContext);
   const duration = agentDurationLabel(createdAt, now);
   return duration ? (
-    <time
+    <ActionTooltip label="Agent thread age">
+      {(tooltipId) => <time
       className="ws-agent-duration"
       dateTime={new Date(createdAt).toISOString()}
       aria-label={`Agent thread age ${duration}`}
-      title="Agent thread age"
+      aria-describedby={tooltipId}
     >
       {duration}
-    </time>
+      </time>}
+    </ActionTooltip>
   ) : null;
 }
 
@@ -126,10 +129,12 @@ export function AgentRow({
       >
         <strong>{title}</strong>
         <span className="ws-agent-facts">
-          <span className="ws-agent-fact" title="Agent model">
+          <ActionTooltip label="Agent model">
+            {(tooltipId) => <span className="ws-agent-fact" aria-describedby={tooltipId}>
             <Icon name="Bot" aria-hidden />
             <span>{model ?? "Model unavailable"}</span>
-          </span>
+            </span>}
+          </ActionTooltip>
           {workspace ? (
             <CopyBadge
               value={workspace.label}
@@ -146,16 +151,18 @@ export function AgentRow({
             </CopyBadge>
           ) : null}
           {annotation.taskKey ? (
-            <span
+            <ActionTooltip label="Assigned task">
+              {(tooltipId) => <span
               className="ws-agent-fact ws-agent-task"
-              title="Assigned task"
+              aria-describedby={tooltipId}
             >
               <Icon name="ListTodo" aria-hidden />
               <b>{annotation.taskKey}</b>
               {annotation.taskTitle ? (
                 <span>{annotation.taskTitle}</span>
               ) : null}
-            </span>
+              </span>}
+            </ActionTooltip>
           ) : null}
         </span>
         {annotation.recoveryMessage ? (
@@ -164,25 +171,29 @@ export function AgentRow({
       </a>
       <span className="ws-agent-actions">
         <span className="ws-agent-action-buttons">
-          <button
+          <ActionTooltip label="Open agent">
+            {(tooltipId) => <button
             type="button"
             className="ws-agent-action"
             onClick={() => open(false)}
             aria-label={`Open ${title}`}
-            title="Open agent"
-          >
+            aria-describedby={tooltipId}
+            >
             <Icon name="ArrowRight" aria-hidden />
-          </button>
+            </button>}
+          </ActionTooltip>
           {isAvailable ? (
-            <button
+            <ActionTooltip label="Open in split">
+              {(tooltipId) => <button
               type="button"
               className="ws-agent-action"
               onClick={() => open(true)}
               aria-label={`Open ${title} in split`}
-              title="Open in split"
-            >
+              aria-describedby={tooltipId}
+              >
               <Icon name="Columns2" aria-hidden />
-            </button>
+              </button>}
+            </ActionTooltip>
           ) : null}
         </span>
         <AgentDuration createdAt={child.thread.createdAt} />

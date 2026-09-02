@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { SearchCombobox } from "../../components/ui/combobox";
 import { CopyBadge } from "../../components/ui/copy-badge";
 import { Icon } from "../../components/ui/icon";
+import { ActionTooltip } from "../../components/ui/action-tooltip";
 import {
   ThreadProviderLogo,
   type ThreadProvider,
@@ -105,22 +106,23 @@ export function ThreadAssignmentPicker({
             <span>No thread</span>
           </span>
         )}
-        <button
+        <ActionTooltip label={ownerLocked
+          ? "This owner thread is managed by a durable Work binding."
+          : `Edit threads for ${taskKey}`}>
+          {(tooltipId) => <button
           ref={triggerRef}
           type="button"
           disabled={disabled}
           className="ws-task-thread-trigger"
           aria-label={`Edit threads for ${taskKey}`}
-          aria-describedby={ownerLocked ? lockDescriptionId : undefined}
-          title={ownerLocked
-            ? "This owner thread is managed by a durable Work binding."
-            : `Edit threads for ${taskKey}`}
+          aria-describedby={ownerLocked ? `${lockDescriptionId} ${tooltipId}` : tooltipId}
           aria-haspopup="listbox"
           aria-expanded={open}
           onClick={() => setOpen((current) => !current)}
-        >
+          >
           <Icon name="ChevronDown" aria-hidden />
-        </button>
+          </button>}
+        </ActionTooltip>
         {ownerLocked ? (
           <span id={lockDescriptionId} className="ws-sr-only">
             This owner thread is managed by a durable Work binding.

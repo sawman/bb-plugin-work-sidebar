@@ -1,6 +1,7 @@
 import { CopyBadge } from "../ui/copy-badge";
 import { BranchName } from "../ui/branch-name";
 import { Icon } from "../ui/icon";
+import { ActionTooltip } from "../ui/action-tooltip";
 
 export type ThreadWorkspaceProject = {
   name: string;
@@ -85,18 +86,18 @@ export function ThreadWorkspaceBadge({
     workspace,
     workspaceDisplayKind,
   });
+  const tooltipLabel = `${contextTitle} · ${location.value}`;
   return (
     <span
       className="ws-thread-location"
       data-location-kind={location.kind}
-      title={`${contextTitle} · ${location.value}`}
     >
       {location.copyLabel && location.copyValue ? (
         <CopyBadge
           value={location.value}
           copyValue={location.copyValue}
           label={location.copyLabel}
-          title={`${contextTitle} · ${location.value}`}
+          title={tooltipLabel}
           typography="context"
           variant="text"
         >
@@ -104,10 +105,12 @@ export function ThreadWorkspaceBadge({
           <span className="ws-thread-location-label">{location.value}</span>
         </CopyBadge>
       ) : (
-        <>
-          <Icon name={location.icon} aria-hidden />
-          <span className="ws-thread-location-label">{location.value}</span>
-        </>
+        <ActionTooltip label={tooltipLabel}>
+          {(tooltipId) => <span aria-describedby={tooltipId}>
+            <Icon name={location.icon} aria-hidden />
+            <span className="ws-thread-location-label">{location.value}</span>
+          </span>}
+        </ActionTooltip>
       )}
     </span>
   );
