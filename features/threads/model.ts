@@ -131,13 +131,10 @@ export function threadCountPresentation(threads: readonly CountableThread[]) {
     (thread) =>
       !thread.parentThreadId || !ids.has(thread.parentThreadId),
   ).length;
-  const subthreadCount = threads.length - rootCount;
   const threadLabel = `${rootCount} thread${rootCount === 1 ? "" : "s"}`;
-  const subthreadLabel = `${subthreadCount} subthread${subthreadCount === 1 ? "" : "s"}`;
   return {
     threads: rootCount,
-    subthreads: subthreadCount,
-    label: `${threadLabel} · ${subthreadLabel}`,
+    label: threadLabel,
   };
 }
 

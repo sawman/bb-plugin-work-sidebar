@@ -1147,7 +1147,7 @@ describe("R18 registered left sidebar parity", () => {
       ],
     });
     await waitFor(() => expect(slot.getByText("Later")).toBeTruthy());
-    expect(slot.getByText("2 threads · 1 subthread")).toBeTruthy();
+    expect(slot.getByText("2 threads")).toBeTruthy();
     fireEvent.click(slot.getByRole("button", { name: "Thread list settings" }));
     expect(slot.getByLabelText("Remove Later").hasAttribute("disabled")).toBe(
       true,

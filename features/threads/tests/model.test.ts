@@ -43,7 +43,7 @@ describe("thread tree traversal", () => {
 });
 
 describe("thread count presentation", () => {
-  it("separates top-level threads from subthreads across the active roster", () => {
+  it("reports top-level threads without exposing a separate subthread count", () => {
     expect(
       threadCountPresentation([
         { id: "thr_root", parentThreadId: null },
@@ -53,8 +53,7 @@ describe("thread count presentation", () => {
       ]),
     ).toEqual({
       threads: 2,
-      subthreads: 2,
-      label: "2 threads · 2 subthreads",
+      label: "2 threads",
     });
   });
 });

@@ -150,7 +150,7 @@ export function PullRequestsLeftSidebar({
     <>
       <div className="ws-list-toolbar">
         <span>
-          {visible.length} open pull request{visible.length === 1 ? "" : "s"}
+          {visible.length} open PR{visible.length === 1 ? "" : "s"}
         </span>
         <SidebarListActions
           context={
