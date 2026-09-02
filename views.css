@@ -1009,8 +1009,6 @@
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) - 3px);
   background: color-mix(in srgb, var(--background) 96%, var(--foreground) 4%);
-  box-shadow: 0 0.4rem 1rem
-    color-mix(in srgb, var(--foreground) 18%, transparent);
   color: var(--foreground);
   font: var(--ws-text-subtext);
   line-height: 1.2;
@@ -2086,8 +2084,6 @@ button.ws-change-file-row:hover {
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) - 3px);
   background: var(--popover);
-  box-shadow: 0 0.25rem 0.8rem
-    color-mix(in srgb, var(--foreground) 18%, transparent);
   color: var(--popover-foreground);
   content: attr(data-tooltip);
   font: var(--ws-text-label);
@@ -3691,7 +3687,6 @@ button.ws-provider-health:focus-visible {
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) - 3px);
   background: var(--popover);
-  box-shadow: 0 0.25rem 0.8rem color-mix(in srgb, var(--foreground) 18%, transparent);
   color: var(--popover-foreground);
   font: var(--ws-text-metadata);
   line-height: 1.15;

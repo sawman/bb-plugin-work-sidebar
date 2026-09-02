@@ -182,4 +182,25 @@ describe("stylesheet policy", () => {
     expect(search).toContain("display: inline-flex");
     expect(search).toContain("flex: none");
   });
+
+  test("keeps plugin tooltips flat instead of adding a bright underglow", () => {
+    const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    for (const [selector, body] of [
+      [
+        ".ws-action-tooltip-content",
+        source.match(/\.ws-action-tooltip-content\s*\{([\s\S]*?)\}/)?.[1],
+      ],
+      [
+        ".ws-pr-thread-tooltip",
+        source.match(/\.ws-pr-thread-tooltip\s*\{([\s\S]*?)\}/)?.[1],
+      ],
+      [
+        ".ws-pr-tooltip::after",
+        source.match(/\.ws-pr-tooltip::after\s*\{([\s\S]*?)\}/)?.[1],
+      ],
+    ] as const) {
+      expect(body, selector).toBeDefined();
+      expect(body, selector).not.toContain("box-shadow");
+    }
+  });
 });
