@@ -1077,19 +1077,15 @@ describe("registered Work context cards", () => {
     expect(document.getElementById(statusTooltipId!)?.textContent).toBe(
       "Change status: To do",
     );
-    const defer = slot.getByRole("button", { name: "Defer" });
-    expect(document.getElementById(defer.getAttribute("aria-describedby")!)?.textContent).toBe(
-      "Defer to Goals backlog",
-    );
     const moveToTasks = slot.getByRole("button", { name: "Move to tasks" });
     expect(document.getElementById(moveToTasks.getAttribute("aria-describedby")!)?.textContent).toBe(
-      "Move to task queue",
+      "Add a backlog goal before moving the current goal to tasks",
     );
+    expect(moveToTasks).toHaveProperty("disabled", true);
     const actionLabels = Array.from(
       goalRow.querySelector(".ws-task-workflow-actions")!.children,
     ).map((child) => child.querySelector("[aria-label]")?.getAttribute("aria-label"));
     expect(actionLabels).toEqual([
-      "Defer",
       "Move to tasks",
       "Change status for WORK-1: To do",
     ]);

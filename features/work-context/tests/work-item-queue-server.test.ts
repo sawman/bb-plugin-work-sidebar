@@ -69,4 +69,25 @@ describe("durable work-item queue", () => {
       backlog: [],
     });
   });
+
+  it("requires a backlog replacement before moving the sole current goal to tasks", async () => {
+    const createExecution = vi.fn(async () => ({ task: { id: "task-execution" } }));
+    const publish = vi.fn();
+    const service = createWorkItemQueueService({
+      get: async () => ({ thr_root: { current: { source: "linear", id: "LIN-1" }, backlog: [] } }),
+      set: vi.fn(),
+      publish,
+      ensureOutcome: vi.fn(),
+      createExecution,
+    });
+
+    await expect(service.moveToExecution(
+      "thr_root",
+      { source: "linear", id: "LIN-1" },
+      "Ship it",
+      "External goal",
+    )).rejects.toThrow("Add a backlog goal before moving the current goal to tasks.");
+    expect(createExecution).not.toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
+  });
 });

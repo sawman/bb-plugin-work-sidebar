@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TaskSummary } from "../../../work-model";
 import {
-  demoteCurrentWorkItem,
   moveWorkItemToTasks,
   promoteWorkItem,
   projectWorkItem,
@@ -48,15 +47,11 @@ describe("unified work item projection", () => {
     });
   });
 
-  it("promotes and demotes without duplicating a work-item reference", () => {
+  it("promotes a backlog goal by swapping it with the current goal", () => {
     const initial = { current: { source: "linear" as const, id: "LIN-1" }, backlog: [{ source: "bb_task" as const, id: "task-2" }, { source: "linear" as const, id: "LIN-3" }] };
     expect(promoteWorkItem(initial, { source: "bb_task", id: "task-2" })).toEqual({
       current: { source: "bb_task", id: "task-2" },
       backlog: [{ source: "linear", id: "LIN-1" }, { source: "linear", id: "LIN-3" }],
-    });
-    expect(demoteCurrentWorkItem(initial)).toEqual({
-      current: null,
-      backlog: [{ source: "linear", id: "LIN-1" }, { source: "bb_task", id: "task-2" }, { source: "linear", id: "LIN-3" }],
     });
   });
 

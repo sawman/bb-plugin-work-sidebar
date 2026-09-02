@@ -24,7 +24,7 @@ import {
   useWorkStatus,
 } from "./queries";
 import { CardState } from "./card-state";
-import { projectWorkItem, promoteWorkItem, demoteCurrentWorkItem, type WorkItemReference } from "./work-item-model";
+import { projectWorkItem, promoteWorkItem, type WorkItemReference } from "./work-item-model";
 import { useTrackerMutations, useTrackerSearch } from "../tracker/queries";
 import type { useTracker } from "../tracker/queries";
 
@@ -222,7 +222,6 @@ export function WorkItemCard({
         }
         onCreateBBTask={createBBTask}
         onPromote={(reference) => void saveQueue(promoteWorkItem(queue, reference))}
-        onDemote={() => void saveQueue(demoteCurrentWorkItem(queue))}
         onAddGoal={(reference) => {
           const nextQueue = queue.current
             ? { ...queue, backlog: [...queue.backlog, reference] }
@@ -431,7 +430,6 @@ function WorkQueue({
   canCreateBBTask,
   onCreateBBTask,
   onPromote,
-  onDemote,
   onAddGoal,
   onAddToQueue,
   onMoveToExecution,
@@ -448,7 +446,6 @@ function WorkQueue({
   canCreateBBTask(destination: "goal" | "queue"): boolean;
   onCreateBBTask(title: string, destination: "goal" | "queue"): Promise<void>;
   onPromote(reference: WorkItemReference): void;
-  onDemote(): void;
   onAddGoal(reference: WorkItemReference): void;
   onAddToQueue(reference: WorkItemReference): void;
   onMoveToExecution(reference: WorkItemReference): void;
@@ -516,7 +513,7 @@ function WorkQueue({
                     disabled={pending}
                     task={taskById.get(queue.current.id)}
                     onStatus={onTaskStatus}
-                    onDefer={onDemote}
+                    canMoveToTasks={queue.backlog.length > 0}
                     onMoveToTasks={() => onMoveToExecution(queue.current!)}
                   />
                 }
@@ -675,35 +672,19 @@ function WorkItemQueueActions({
   disabled,
   task,
   onStatus,
-  onDefer,
   onMakeCurrent,
+  canMoveToTasks = true,
   onMoveToTasks,
 }: {
   disabled: boolean;
   task?: TaskSummary;
   onStatus(taskId: string, status: TaskStatus): void;
-  onDefer?: () => void;
   onMakeCurrent?: () => void;
+  canMoveToTasks?: boolean;
   onMoveToTasks: () => void;
 }) {
   return (
     <span className="ws-task-workflow-actions" role="group" aria-label="Work item actions">
-      {onDefer ? (
-        <ActionTooltip label="Defer to Goals backlog">
-          {(tooltipId) => (
-            <button
-              type="button"
-              className="ws-task-workflow-action"
-              disabled={disabled}
-              aria-describedby={tooltipId}
-              aria-label="Defer"
-              onClick={onDefer}
-            >
-              <Icon className="ws-task-workflow-icon" name="Clock" aria-hidden />
-            </button>
-          )}
-        </ActionTooltip>
-      ) : null}
       {onMakeCurrent ? (
         <ActionTooltip label="Make current Goal">
           {(tooltipId) => (
@@ -720,12 +701,12 @@ function WorkItemQueueActions({
           )}
         </ActionTooltip>
       ) : null}
-      <ActionTooltip label="Move to task queue">
+      <ActionTooltip label={canMoveToTasks ? "Move to task queue" : "Add a backlog goal before moving the current goal to tasks"}>
         {(tooltipId) => (
           <button
             type="button"
             className="ws-task-workflow-action"
-            disabled={disabled}
+            disabled={disabled || !canMoveToTasks}
             aria-describedby={tooltipId}
             aria-label="Move to tasks"
             onClick={onMoveToTasks}

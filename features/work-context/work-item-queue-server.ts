@@ -59,6 +59,10 @@ export function createWorkItemQueueService(dependencies: {
     const existing = (await read(rootThreadId)).queue;
     const matches = (item: StoredReference | null) => item?.source === reference.source && item.id.toUpperCase() === reference.id.toUpperCase();
     if (![existing.current, ...existing.backlog].some(matches)) throw new Error("This work item is not a current goal or backlog entry.");
+    const remaining = existing.backlog.filter((item) => !matches(item));
+    if (matches(existing.current) && remaining.length === 0) {
+      throw new Error("Add a backlog goal before moving the current goal to tasks.");
+    }
     await dependencies.ensureOutcome({ rootThreadId, title: `Outcome for ${title}`, description: "Created while moving a work goal into execution." });
     const execution = await dependencies.createExecution({
       rootThreadId,
@@ -67,7 +71,6 @@ export function createWorkItemQueueService(dependencies: {
       idempotencyKey: `work-item-execution:${reference.source}:${reference.id}`,
       assignee: "agent",
     });
-    const remaining = existing.backlog.filter((item) => !matches(item));
     const next = matches(existing.current)
       ? { current: remaining[0] ?? null, backlog: remaining.slice(1) }
       : { current: existing.current, backlog: remaining };

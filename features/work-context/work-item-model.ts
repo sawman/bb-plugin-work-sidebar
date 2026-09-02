@@ -86,12 +86,7 @@ export function promoteWorkItem(queue: WorkItemQueue, reference: WorkItemReferen
   };
 }
 
-export function demoteCurrentWorkItem(queue: WorkItemQueue): WorkItemQueue {
-  if (!queue.current) return queue;
-  return { current: null, backlog: distinctReferences([queue.current, ...queue.backlog]) };
-}
-
-/** Removes a goal from the queue; the first backlog entry becomes Current. */
+/** Removes a goal from the queue; the first remaining backlog goal becomes Current. */
 export function moveWorkItemToTasks(
   queue: WorkItemQueue,
   reference: WorkItemReference,
