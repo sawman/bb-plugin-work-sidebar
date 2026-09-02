@@ -413,7 +413,12 @@ describe("registered Work context cards", () => {
     const statusB = {
       ...status,
       rootThreadId: "thr_root_b",
-      currentThread: { ...status.currentThread, title: "Thread B" },
+      currentThread: {
+        ...status.currentThread,
+        title: "Thread B",
+        status: "active" as const,
+        runtimeStatus: "active",
+      },
     };
     let resolveStatusB!: (value: typeof statusB) => void;
     const pendingStatusB = new Promise<typeof statusB>((resolve) => {
@@ -450,7 +455,9 @@ describe("registered Work context cards", () => {
       expect(getWorkPlan).toHaveBeenCalledTimes(callsBeforeOldRoot);
 
       resolveStatusB(statusB);
-      await waitFor(() => expect(slot.getByText("Thread B")).toBeTruthy());
+      await waitFor(() =>
+        expect(slot.getByRole("img", { name: "Working" })).toBeTruthy(),
+      );
       await slot.behavior.emitRealtime("work-sidebar:changed", {
         family: "work",
         rootThreadId: "thr_root_b",

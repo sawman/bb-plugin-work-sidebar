@@ -534,25 +534,6 @@ describe("registered tracker card", () => {
     slot.lifecycle.unmount();
   });
 
-  it("uses BB navigation for the global Linear header badge", async () => {
-    const app = await loadPluginApp(() => import("../../../app"));
-    const slot = renderSlot(
-      app.threadPanelActions[0]!,
-      { threadId: "thr_nav", params: null },
-      { rpc: fixture({ getWorkTracker: () => linked }) },
-    );
-    await waitFor(() =>
-      expect(slot.getByLabelText("LIN-1 status")).toBeTruthy(),
-    );
-    const headerBadge = slot.getByRole("button", { name: "LIN-1" });
-    expect(headerBadge.classList).toContain("ws-identifier-badge");
-    fireEvent.click(headerBadge);
-    expect(slot.inspection.navigateCalls).toEqual([
-      { method: "openUrl", url: linked.items[0].item.url },
-    ]);
-    slot.lifecycle.unmount();
-  });
-
   it("shows a retry:1 search failure and recovers through the search retry button", async () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const searchLinearIssues = vi

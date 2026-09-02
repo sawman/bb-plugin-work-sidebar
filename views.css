@@ -308,42 +308,24 @@
 .ws-pr-meta {
   color: var(--muted-foreground);
 }
-.ws-panel-header {
+.ws-panel-tabbar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.6rem;
-  padding: 0.6rem 0.7rem;
+  align-items: stretch;
   border-bottom: 1px solid var(--border);
-  background: var(--card);
+  background: var(--background);
 }
-.ws-panel-heading {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
+.ws-panel-tabbar .ws-tabs {
+  flex: 1;
   min-width: 0;
+  border-bottom: 0;
 }
-.ws-panel-heading > div {
+.ws-panel-tabbar > .ws-action-tooltip {
   display: grid;
-  min-width: 0;
+  border-left: 1px solid var(--border);
 }
-.ws-panel-heading strong {
-  font: var(--ws-text-primary);
-  line-height: inherit;
-}
-.ws-panel-heading span {
-  overflow: hidden;
-  color: var(--muted-foreground);
-  font: var(--ws-text-subtext);
-  line-height: inherit;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ws-panel-icon {
-  width: 0.9rem;
-  height: 0.9rem;
-  flex: none;
-  color: var(--primary);
+.ws-panel-tabbar .ws-refresh-button {
+  width: 2rem;
+  height: 100%;
 }
 .ws-icon-button {
   /* R17 important: host icon controls must use the fixed hit-target display. */
@@ -403,18 +385,6 @@
 .ws-panel-body:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: -2px;
-}
-.ws-section-stack > header > div {
-  min-width: 0;
-}
-.ws-section-stack > header h2 {
-  margin: 0;
-}
-.ws-section-stack header span {
-  white-space: nowrap;
-}
-.ws-section-count {
-  color: var(--muted-foreground);
 }
 .ws-header-action {
   height: 1.75rem;
@@ -1421,9 +1391,6 @@
   font: var(--ws-text-subtext);
   line-height: inherit;
 }
-.ws-panel-header .ws-panel-heading strong {
-  letter-spacing: 0.01em;
-}
 .ws-activity-copy {
   display: -webkit-box;
   margin: 0;
@@ -1948,21 +1915,9 @@ button.ws-change-file-row:hover {
   color: var(--destructive);
   font-style: normal;
 }
-.ws-section-stack {
-  gap: 0.58rem;
-}
 .ws-work-context-cards {
   display: grid;
   gap: 0.58rem;
-}
-.ws-section-stack > header {
-  align-items: center;
-  margin-top: 0.12rem;
-}
-.ws-section-stack h2 {
-  font: var(--ws-text-title);
-  line-height: inherit;
-  letter-spacing: 0.01em;
 }
 .ws-card {
   display: grid;
@@ -2202,15 +2157,6 @@ button.ws-change-file-row:hover {
     animation: none;
   }
 }
-.ws-section-count {
-  font: var(--ws-text-label);
-  line-height: inherit;
-}
-.ws-changes-header-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
 .ws-outcome-empty,
 .ws-empty-state-card {
   gap: 0.32rem;
@@ -2316,9 +2262,6 @@ button.ws-change-file-row:hover {
   color: var(--muted-foreground);
   font: var(--ws-text-subtext);
   line-height: inherit;
-}
-.ws-panel-body > .ws-status-card {
-  margin-bottom: 0.58rem;
 }
 .ws-status-card {
   position: relative;
@@ -2470,22 +2413,10 @@ button.ws-provider-health:focus-visible {
   word-break: break-word;
   -webkit-line-clamp: unset;
 }
-.ws-work-header-badges {
-  display: flex;
-  align-items: center;
-  gap: 0.24rem;
-}
 .ws-work-header-badge {
   max-width: 5.5rem;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.ws-linear-header-badge {
-  color: var(--primary);
-}
-.ws-linear-header-badge:hover {
-  background: var(--accent);
-  color: var(--foreground);
 }
 .ws-thread-selected,
 .ws-thread-selected:hover,
@@ -2889,9 +2820,12 @@ button.ws-provider-health:focus-visible {
 .ws-github-api-unavailable {
   color: var(--destructive);
 }
-.ws-section-count .ws-github-api-indicator {
-  margin-right: 0.32rem;
-  vertical-align: middle;
+.ws-repository-heading-meta {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.3rem;
 }
 .ws-task-meta {
   align-items: center;

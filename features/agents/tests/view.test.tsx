@@ -177,7 +177,7 @@ describe("R15 registered Agents Work slot", () => {
     expect(slot.getByRole("img", { name: "Waiting for input" })).toBeTruthy();
     expect(slot.queryByText("Working")).toBeNull();
     expect(slot.queryByText("Waiting")).toBeNull();
-    expect(slot.getByText("2")).toBeTruthy();
+    expect(slot.queryByText("2")).toBeNull();
     slot.lifecycle.unmount();
   });
 

@@ -417,15 +417,23 @@ describe("R19D registered slot accessibility", () => {
     await waitFor(() =>
       expect(slot.getByText("Accessible execution task")).toBeTruthy(),
     );
+    expect(slot.queryByRole("heading", { name: "Work" })).toBeNull();
+    expect(
+      slot.getByRole("button", { name: "Refresh work context" }).closest(
+        ".ws-panel-tabbar",
+      ),
+    ).not.toBeNull();
     expect(slot.getByRole("heading", { name: "Queue" })).toBeTruthy();
     await expectNoAriaViolations(slot.container);
     fireEvent.click(slot.getByRole("tab", { name: "Changes" }));
     await waitFor(() =>
       expect(slot.getAllByText("main").length).toBeGreaterThan(0),
     );
+    expect(slot.queryByRole("heading", { name: "Changes" })).toBeNull();
     await expectNoAriaViolations(slot.container);
     fireEvent.click(slot.getByRole("tab", { name: "Agents" }));
     await waitFor(() => expect(slot.getByText("gpt-5.6-terra")).toBeTruthy());
+    expect(slot.queryByRole("heading", { name: "Agents" })).toBeNull();
     expect(slot.getByText("bb/accessible-agent")).toBeTruthy();
     expect(slot.getByText("Accessible delegated task")).toBeTruthy();
     await expectNoAriaViolations(slot.container);

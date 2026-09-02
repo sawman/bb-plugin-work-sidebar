@@ -8,7 +8,7 @@ import { ActionTooltip } from "../../components/ui/action-tooltip";
 import { useGitHubApiHealth } from "../pull-requests/queries";
 import { githubHealthPresentation } from "../pull-requests/presentation";
 import { StackNumberBadge } from "../pull-requests/stack-number";
-import { changesHeaderLabel, mergeStackBranchSignals } from "./model";
+import { mergeStackBranchSignals } from "./model";
 import {
   useChanges,
   useCheckoutStackBranch,
@@ -102,51 +102,45 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
         (branch) => branch.pr?.number === currentPullRequestNumber,
       ) ?? null;
   const githubHealth = githubHealthPresentation(githubApiHealth);
-  return (
-    <div className="ws-section-stack">
-      <header>
-        <div>
-          <h2>Changes</h2>
-        </div>
-        <span className="ws-section-count ws-changes-header-meta">
-          {githubHealth && (
-            <ActionTooltip label={githubHealth.detail}>
-              {(tooltipId) => <span
+  const contextMeta = (
+    <>
+      {githubHealth ? (
+        <ActionTooltip label={githubHealth.detail}>
+          {(tooltipId) => (
+            <span
               className={`ws-github-api-indicator ws-github-api-${githubHealth.tone}`}
               aria-describedby={tooltipId}
-              >
+            >
               <Icon name={githubHealth.icon} aria-hidden />
               {githubHealth.label}
-              </span>}
-            </ActionTooltip>
+            </span>
           )}
-          {currentPullRequestNumber != null ? (
-            <CopyBadge
-              value={`#${currentPullRequestNumber}`}
-              copyValue={`PR #${currentPullRequestNumber}`}
-              label="PR number"
-              className="ws-pr-number-badge"
-              title={`PR #${currentPullRequestNumber}`}
-            >
-              <Icon name="GitPullRequest" aria-hidden />
-              <span aria-hidden>#{currentPullRequestNumber}</span>
-            </CopyBadge>
-          ) : (
-            changesHeaderLabel(
-              changesQuery.data,
-              changesQuery.isPending,
-              changesQuery.isError,
-            )
-          )}
-          {changesQuery.data?.stack?.number != null && (
-            <StackNumberBadge number={changesQuery.data.stack.number} />
-          )}
-        </span>
-      </header>
+        </ActionTooltip>
+      ) : null}
+      {currentPullRequestNumber != null ? (
+        <CopyBadge
+          value={`#${currentPullRequestNumber}`}
+          copyValue={`PR #${currentPullRequestNumber}`}
+          label="PR number"
+          className="ws-pr-number-badge"
+          title={`PR #${currentPullRequestNumber}`}
+        >
+          <Icon name="GitPullRequest" aria-hidden />
+          <span aria-hidden>#{currentPullRequestNumber}</span>
+        </CopyBadge>
+      ) : null}
+      {changesQuery.data?.stack?.number != null ? (
+        <StackNumberBadge number={changesQuery.data.stack.number} />
+      ) : null}
+    </>
+  );
+  return (
+    <div className="ws-changes-content">
       <ChangesRepositoryCard
         repository={changesQuery.data?.repository}
         loading={changesQuery.isPending}
         expanded={presentation?.repositoryExpanded ?? false}
+        contextMeta={contextMeta}
         onToggle={() =>
           changesInteractionStore.getState().toggleRepository(threadId)
         }

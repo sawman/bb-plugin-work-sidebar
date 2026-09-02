@@ -57,13 +57,7 @@ export function AgentsView({ threadId }: { threadId: string }) {
     );
 
   return (
-    <div className="ws-section-stack" data-agent-view>
-      <header>
-        <div>
-          <h2>Agents</h2>
-        </div>
-        <span className="ws-section-count">{children.length}</span>
-      </header>
+    <div data-agent-view>
       <AgentDurationClock
         active={children.some(({ thread }) => thread.createdAt > 0)}
       >

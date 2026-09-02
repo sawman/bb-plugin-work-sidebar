@@ -114,6 +114,7 @@ export function ChangesRepositoryCard({
   repository,
   loading,
   expanded,
+  contextMeta,
   onToggle,
   onOpenFile,
   preview,
@@ -121,6 +122,7 @@ export function ChangesRepositoryCard({
   repository: Repository | undefined;
   loading: boolean;
   expanded: boolean;
+  contextMeta?: ReactNode;
   onToggle(): void;
   onOpenFile(path: string): void;
   preview?: ReactNode;
@@ -142,10 +144,13 @@ export function ChangesRepositoryCard({
       <SurfaceCardHeading
         title={repository?.branch ?? "Repository"}
         trailing={
-          <span
-            className={`ws-pill ${presentation.tone === "changed" ? "ws-pr-changes_requested" : ""}`}
-          >
-            {presentation.label}
+          <span className="ws-repository-heading-meta">
+            {contextMeta}
+            <span
+              className={`ws-pill ${presentation.tone === "changed" ? "ws-pr-changes_requested" : ""}`}
+            >
+              {presentation.label}
+            </span>
           </span>
         }
       />

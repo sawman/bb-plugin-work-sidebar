@@ -593,7 +593,8 @@ describe("R13 registered Changes Work slot", () => {
     );
     const slot = await changesSlot({ getChanges, getWorkStatus });
     await waitFor(() => expect(slot.getByText("Clean")).toBeTruthy());
-    expect(slot.getByRole("tabpanel").textContent).toContain("Changes");
+    expect(slot.getByRole("tabpanel").textContent).toContain("main");
+    expect(slot.queryByRole("heading", { name: "Changes" })).toBeNull();
     expect(getChanges).toHaveBeenCalledTimes(1);
     slot.lifecycle.unmount();
   });

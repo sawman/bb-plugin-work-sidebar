@@ -5,7 +5,6 @@ import {
   useRealtime,
   type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
-import { Icon } from "../../components/ui/icon";
 import { RefreshButton } from "../../components/ui/refresh-button";
 import { TabSelector } from "../../components/ui/tab-selector";
 import { ChangesPanel } from "../changes/panel";
@@ -14,7 +13,6 @@ import { changesInteractionStore } from "../changes/store";
 import { AgentsView } from "../agents/views";
 import { invalidateGitHubApiHealth } from "../pull-requests/queries";
 import { threadInteractionStore, type WorkTab } from "../threads/store";
-import { TrackerHeaderBadge } from "../tracker/card";
 import { invalidateTracker, useTracker } from "../tracker/queries";
 import { invalidateWorkContextCards, useWorkStatus } from "./queries";
 import { parseWorkSidebarRealtimeEvent } from "../../shared/work-realtime";
@@ -65,7 +63,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
     threadInteractionStore,
     (state) => state.workTabsByThread.get(threadId) ?? "work",
   );
-  // The status query powers the header and root-scoped realtime matching.
+  // The status query establishes root-scoped realtime matching.
   // Poll it only while the Work tab is visible; the other tab panels keep the
   // warm cache and still receive targeted realtime invalidation.
   const status = useWorkStatus(threadId, { poll: tab === "work" });
@@ -128,14 +126,15 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
         data-working-provider-animation={workingProviderAnimation}
         style={textScaleStyle(textScale)}
       >
-        <header className="ws-panel-header">
-          <div className="ws-panel-heading">
-            <Icon name="ListTodo" className="ws-panel-icon" aria-hidden />
-            <div>
-              <strong>Work</strong>
-              <span>{status.data?.currentThread.title ?? "Active thread"}</span>
-            </div>
-          </div>
+        <div className="ws-panel-tabbar">
+          <TabSelector
+            ariaLabel="Work context views"
+            controls={(id) => `${tabIdPrefix}-panel-${id}`}
+            idPrefix={tabIdPrefix}
+            items={WORK_TABS}
+            value={tab}
+            onValueChange={selectTab}
+          />
           <RefreshButton
             label="Refresh work context"
             onRefresh={() =>
@@ -148,15 +147,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
             }
             disabled={tab === "work" && status.isPending}
           />
-        </header>
-        <TabSelector
-          ariaLabel="Work context views"
-          controls={(id) => `${tabIdPrefix}-panel-${id}`}
-          idPrefix={tabIdPrefix}
-          items={WORK_TABS}
-          value={tab}
-          onValueChange={selectTab}
-        />
+        </div>
         <div
           className="ws-panel-body"
           role="tabpanel"
@@ -197,17 +188,5 @@ function WorkTabContent({ threadId }: { threadId: string }) {
   // lets inactive Changes and Agents tabs retain the warm cache without a live
   // query subscription.
   const tracker = useTracker(threadId);
-  return (
-    <div className="ws-section-stack">
-      <header>
-        <div>
-          <h2>Work</h2>
-        </div>
-        <span className="ws-work-header-badges">
-          <TrackerHeaderBadge items={tracker.data} />
-        </span>
-      </header>
-      <WorkContextCards threadId={threadId} tracker={tracker} />
-    </div>
-  );
+  return <WorkContextCards threadId={threadId} tracker={tracker} />;
 }

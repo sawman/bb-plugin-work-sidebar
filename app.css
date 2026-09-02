@@ -104,24 +104,6 @@
   overflow: auto;
   padding: 1rem;
 }
-.ws-section-stack {
-  display: grid;
-  gap: 0.75rem;
-}
-.ws-section-stack > header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-}
-.ws-section-stack h2 {
-  font: var(--ws-text-title);
-  line-height: inherit;
-}
-.ws-section-stack header span {
-  color: var(--muted-foreground);
-  font: var(--ws-text-subtext);
-  line-height: inherit;
-}
 .ws-pill {
   border: 1px solid var(--border);
   border-radius: 999px;
