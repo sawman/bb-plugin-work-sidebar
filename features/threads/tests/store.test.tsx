@@ -23,6 +23,26 @@ describe("thread interaction store", () => {
     });
   });
 
+  it("does not notify consumers for repeated drag hover or unchanged roster reconciliation", () => {
+    const store = createThreadInteractionStore();
+    let notifications = 0;
+    const unsubscribe = store.subscribe(() => { notifications += 1; });
+    const target = {
+      kind: "group" as const,
+      groupId: "group_later",
+    };
+
+    store.getState().setDrag("thr_one", target);
+    store.getState().setDrag("thr_one", { ...target });
+    expect(notifications).toBe(1);
+
+    store.getState().reconcileRoster(["thr_one"]);
+    store.getState().reconcileRoster(["thr_one"]);
+    expect(notifications).toBe(1);
+    expect(store.getState().dropTarget).toEqual(target);
+    unsubscribe();
+  });
+
   it("keeps Work view state per thread but does not persist across a new store/remount", () => {
     const store = createThreadInteractionStore();
     store.getState().setWorkTab("thr_a", "changes");

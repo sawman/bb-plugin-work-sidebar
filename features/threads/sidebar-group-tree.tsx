@@ -92,8 +92,8 @@ export function SidebarThreadGroups({
   disclosures, onDisclosureChange, disclosuresReady,
 }: SidebarGroupTreeProps) {
   const dropTargetId =
-    organization.dropTarget?.kind === "reorder"
-      ? organization.dropTarget.threadId
+    organization.dropTarget?.kind === "group"
+      ? organization.dropTarget.groupId
       : null;
   const searching = searchQuery.trim().length > 0;
   const showToTop = Boolean(organization.dragThreadId);
@@ -104,11 +104,10 @@ export function SidebarThreadGroups({
     organization.setDragThreadId(null);
     organization.setDropTarget(null);
   };
-  const setReorderTarget = (threadId: string) =>
+  const setGroupTarget = (groupId: string) =>
     organization.setDropTarget({
-      kind: "reorder",
-      threadId,
-      placement: "after",
+      kind: "group",
+      groupId,
     });
   const allowActiveDrop = (event: DragEvent<HTMLElement>) => {
     const id = sourceId(event, organization.dragThreadId);
@@ -140,7 +139,7 @@ export function SidebarThreadGroups({
                 open={searching || disclosures.active !== false}
                 onToggle={(event) => { if (!searching && disclosuresReady) onDisclosureChange("active", event.currentTarget.open); }}
                 onDragOver={(event) => {
-                  if (allowActiveDrop(event)) setReorderTarget("active");
+                  if (allowActiveDrop(event)) setGroupTarget("active");
                 }}
                 onDrop={(event) => {
                   const id = allowActiveDrop(event);
@@ -176,7 +175,7 @@ export function SidebarThreadGroups({
               open={searching || disclosures[group.id] !== false}
               onToggle={(event) => { if (!searching && disclosuresReady) onDisclosureChange(group.id, event.currentTarget.open); }}
               onDragOver={(event) => {
-                if (allowGroupDrop(event, group.id)) setReorderTarget(group.id);
+                if (allowGroupDrop(event, group.id)) setGroupTarget(group.id);
               }}
               onDrop={(event) => {
                 const id = allowGroupDrop(event, group.id);

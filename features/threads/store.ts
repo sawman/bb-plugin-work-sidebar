@@ -8,12 +8,51 @@ export type ThreadDropTarget =
       placement: "before" | "after";
     }
   | {
+      kind: "group";
+      groupId: string;
+    }
+  | {
       kind: "reparent";
       parentThreadId: string | null;
     }
   | null;
 
 const MAX_THREAD_VIEW_ENTRIES = 40;
+
+function sameStringSet(left: ReadonlySet<string>, right: ReadonlySet<string>) {
+  return left.size === right.size && [...left].every((value) => right.has(value));
+}
+
+function sameOrderedMap(
+  left: ReadonlyMap<string, WorkTab>,
+  right: ReadonlyMap<string, WorkTab>,
+) {
+  if (left.size !== right.size) return false;
+  const leftEntries = left.entries();
+  const rightEntries = right.entries();
+  for (;;) {
+    const leftEntry = leftEntries.next();
+    const rightEntry = rightEntries.next();
+    if (leftEntry.done || rightEntry.done) return leftEntry.done === rightEntry.done;
+    if (
+      leftEntry.value[0] !== rightEntry.value[0] ||
+      leftEntry.value[1] !== rightEntry.value[1]
+    )
+      return false;
+  }
+}
+
+function sameDropTarget(left: ThreadDropTarget, right: ThreadDropTarget) {
+  if (left === right) return true;
+  if (!left || !right || left.kind !== right.kind) return false;
+  return left.kind === "reorder"
+    ? right.kind === "reorder" &&
+      left.threadId === right.threadId &&
+      left.placement === right.placement
+    : left.kind === "group"
+      ? right.kind === "group" && left.groupId === right.groupId
+      : right.kind === "reparent" && left.parentThreadId === right.parentThreadId;
+}
 
 export type ThreadInteractionState = {
   selectedThreadIds: Set<string>;
@@ -58,7 +97,15 @@ export function createThreadInteractionStore() {
         else expandedThreadIds.add(threadId);
         return { expandedThreadIds };
       }),
-    setDrag: (dragThreadId, dropTarget) => set({ dragThreadId, dropTarget }),
+    // Pointer drag-over can run every frame. Do not turn a stable hover target
+    // into a fresh store update that rerenders and re-reconciles the sidebar.
+    setDrag: (dragThreadId, dropTarget) =>
+      set((current) =>
+        current.dragThreadId === dragThreadId &&
+        sameDropTarget(current.dropTarget, dropTarget)
+          ? current
+          : { dragThreadId, dropTarget },
+      ),
     setWorkTab: (threadId, tab) =>
       set((current) => {
         const workTabsByThread = new Map(current.workTabsByThread);
@@ -99,15 +146,26 @@ export function createThreadInteractionStore() {
           current.dragThreadId && roster.has(current.dragThreadId)
             ? current.dragThreadId
             : null;
-        const dropTarget =
-          current.dropTarget?.kind === "reparent"
-            ? !current.dropTarget.parentThreadId ||
-              roster.has(current.dropTarget.parentThreadId)
+        const dropTarget = current.dropTarget?.kind === "reparent"
+          ? !current.dropTarget.parentThreadId || roster.has(current.dropTarget.parentThreadId)
+            ? current.dropTarget
+            : null
+          : current.dropTarget?.kind === "reorder"
+            ? roster.has(current.dropTarget.threadId)
               ? current.dropTarget
               : null
-            : current.dropTarget && roster.has(current.dropTarget.threadId)
+            : current.dropTarget?.kind === "group" && dragThreadId
               ? current.dropTarget
               : null;
+        if (
+          sameStringSet(current.selectedThreadIds, selectedThreadIds) &&
+          current.selectionAnchorId === selectionAnchorId &&
+          sameStringSet(current.expandedThreadIds, expandedThreadIds) &&
+          sameOrderedMap(current.workTabsByThread, workTabsByThread) &&
+          current.dragThreadId === dragThreadId &&
+          sameDropTarget(current.dropTarget, dropTarget)
+        )
+          return current;
         return {
           selectedThreadIds,
           selectionAnchorId,

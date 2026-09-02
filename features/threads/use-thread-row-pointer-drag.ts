@@ -91,9 +91,8 @@ export function useThreadRowPointerDrag({
         (!targetId && zone && zone !== groupId)
       ) {
         onDropTargetChange({
-          kind: "reorder",
-          threadId: targetGroup ?? zone!,
-          placement: "after",
+          kind: "group",
+          groupId: targetGroup ?? zone!,
         });
         moveEvent.preventDefault();
         return;

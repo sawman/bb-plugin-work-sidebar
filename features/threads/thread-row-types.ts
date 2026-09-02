@@ -5,18 +5,9 @@ import type {
   ThreadProvider,
   ThreadProviderDirectory,
 } from "@/components/threads/thread-provider-logo";
+import type { ThreadDropTarget } from "./store";
 
-export type ThreadDropTarget =
-  | {
-      kind: "reorder";
-      threadId: string;
-      placement: "before" | "after";
-    }
-  | {
-      kind: "reparent";
-      parentThreadId: string | null;
-    }
-  | null;
+export type { ThreadDropTarget } from "./store";
 
 export type ThreadProject = {
   name: string;
