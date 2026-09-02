@@ -98,12 +98,12 @@ export function ThreadRowMenu({
             {group.name}
           </ContextMenuItem>
         ))}
+        <ContextMenuSeparator />
         <ContextMenuItem
           onSelect={() => (onMoveToRecycleBin ?? actions.archiveTree)(threadId)}
         >
           Move to Recycle Bin
         </ContextMenuItem>
-        <ContextMenuSeparator />
         <ContextMenuItem data-tone="destructive" onSelect={actions.archiveTree}>
           Archive permanently
         </ContextMenuItem>

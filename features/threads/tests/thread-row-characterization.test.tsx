@@ -87,6 +87,7 @@ function renderRow({
     onSelect: vi.fn(onSelect),
     onToggleChildren: vi.fn(),
     onMoveToGroup: vi.fn(),
+    onMoveToRecycleBin: vi.fn(),
     onNavigate: vi.fn(),
     onDragThreadChange: vi.fn(),
     onDropTargetChange: vi.fn(),
@@ -402,8 +403,14 @@ describe("R21D ThreadRow characterization", () => {
     expect(view.queryByRole("menuitem", { name: "Move down" })).toBeNull();
     const active = view.getByRole("menuitem", { name: "Active" });
     const later = view.getByRole("menuitem", { name: "Later" });
+    const recycle = view.getByRole("menuitem", { name: "Move to Recycle Bin" });
+    const permanentArchive = view.getByRole("menuitem", {
+      name: "Archive permanently",
+    });
+    const menuItems = view.getAllByRole("menuitem");
     expect(active.className).toBe(later.className);
     expect(menu.querySelectorAll('[data-tone="destructive"]')).toHaveLength(2);
+    expect(menuItems.slice(-3)).toEqual([recycle, permanentArchive, view.getByRole("menuitem", { name: "Delete" })]);
 
     fireEvent.click(active);
     expect(view.onMoveToGroup).toHaveBeenCalledWith(thread.id, null);
