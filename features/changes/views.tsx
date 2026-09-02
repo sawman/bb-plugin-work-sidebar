@@ -231,6 +231,21 @@ function readableStatus(status: string): string {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function checkSummary(checks: CurrentPullRequestView["checks"]): string {
+  if (checks.failedCount === 0 && checks.pendingCount === 0) {
+    return checks.passedCount > 0
+      ? `${checks.passedCount} checks passed`
+      : "No checks";
+  }
+  return [
+    checks.passedCount > 0 ? `${checks.passedCount} passed` : null,
+    checks.pendingCount > 0 ? `${checks.pendingCount} pending` : null,
+    checks.failedCount > 0 ? `${checks.failedCount} failed` : null,
+  ]
+    .filter((value): value is string => value !== null)
+    .join(" · ");
+}
+
 function currentPullRequestBranch(
   pullRequest: CurrentPullRequestView,
   branch?: GitHubStackBranch | null,
@@ -265,15 +280,14 @@ function CurrentPullRequestDetails({
   pullRequest: CurrentPullRequestView;
 }) {
   const signal = pullRequestSignalPresentation(pullRequest.signal);
+  const summary = [
+    signal.review.label,
+    checkSummary(pullRequest.checks),
+    `Merge ${readableStatus(pullRequest.mergeability.state)}`,
+  ].join(" · ");
   return (
-    <div className="ws-current-pr-details">
-      <span>Review: {signal.review.label}</span>
-      <span>
-        Checks: {pullRequest.checks.passedCount} passed ·{" "}
-        {pullRequest.checks.pendingCount} pending ·{" "}
-        {pullRequest.checks.failedCount} failed
-      </span>
-      <span>Merge: {readableStatus(pullRequest.mergeability.state)}</span>
+    <div className="ws-current-pr-details" aria-label={summary}>
+      <span>{summary}</span>
     </div>
   );
 }

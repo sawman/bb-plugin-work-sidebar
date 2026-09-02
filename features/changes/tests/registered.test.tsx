@@ -291,7 +291,9 @@ describe("R13 registered Changes Work slot", () => {
         .disabled,
     ).toBe(true);
     fireEvent.click(nonStackDisclosure);
-    expect(nonStack.getByText("Review: Approved")).toBeTruthy();
+    expect(
+      nonStack.getByText("Approved · 2 checks passed · Merge Mergeable"),
+    ).toBeTruthy();
     expect(nonStack.getByText("Changed files are unavailable.")).toBeTruthy();
     nonStack.lifecycle.unmount();
 

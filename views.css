@@ -1503,12 +1503,16 @@
    standalone metadata remains a separate detail band above the file list. */
 .ws-current-pr-details {
   display: grid;
-  gap: 0.14rem;
   border-top: 1px solid var(--border);
   padding: 0.35rem 0.45rem;
   color: var(--muted-foreground);
   font: var(--ws-text-subtext);
   line-height: inherit;
+}
+.ws-current-pr-details > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ws-pr-changes_requested {
   color: var(--destructive);
