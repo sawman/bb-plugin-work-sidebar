@@ -104,6 +104,9 @@ decision appear different.
 - Do not introduce hardcoded gray/color palettes, `all: unset`, or
   `!important`. If host integration truly requires an exception, document why
   at the declaration.
+- Do not rely on native `title` attributes for product tooltips; they are not
+  reliably visible in BB. Render explanatory hover/focus content through the
+  plugin tooltip primitive instead.
 - Preserve accessibility: semantic elements, keyboard navigation, visible
   focus, accessible names for icon buttons, and native/modifier-click behavior.
 
