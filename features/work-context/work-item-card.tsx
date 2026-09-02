@@ -651,26 +651,15 @@ function WorkItemGoalRow({
     >
       <span className="ws-task-workflow-copy ws-work-item-reference">
         <span className="ws-task-workflow-title-line">
-          {task ? (
-            <span className="ws-work-item-reference-meta">
-              <TaskPriorityIcon priority={task.priority} />
-              <CopyBadge
-                value={task.key}
-                label="task ID"
-                className="ws-work-header-badge"
-              >
-                {task.key}
-              </CopyBadge>
-            </span>
-          ) : (
-            <CopyBadge
-              value={reference.id}
-              label="Linear issue"
-              className="ws-work-header-badge"
-            >
-              {reference.id}
-            </CopyBadge>
-          )}
+          {task ? <TaskPriorityIcon priority={task.priority} /> : null}
+          <CopyBadge
+            value={task?.key ?? reference.id}
+            label={task ? "current goal BB task" : "current goal Linear issue"}
+            className="ws-task-workflow-key"
+            variant="text"
+          >
+            {task?.key ?? reference.id}
+          </CopyBadge>
           <span className="ws-task-workflow-title ws-work-item-reference-title">
             {task?.title ?? label}
           </span>
@@ -707,16 +696,37 @@ function WorkItemQueueActions({
         />
       ) : null}
       {onDefer ? (
-        <button type="button" className="ws-task-workflow-action" disabled={disabled} aria-label="Defer" title="Defer current goal" onClick={onDefer}>
+        <button
+          type="button"
+          className="ws-task-workflow-action"
+          disabled={disabled}
+          aria-label="Defer"
+          title="Defer to Goals backlog"
+          onClick={onDefer}
+        >
           <Icon className="ws-task-workflow-icon" name="Clock" aria-hidden />
         </button>
       ) : null}
       {onMakeCurrent ? (
-        <button type="button" className="ws-task-workflow-action" disabled={disabled} aria-label="Make current" title="Make current goal" onClick={onMakeCurrent}>
+        <button
+          type="button"
+          className="ws-task-workflow-action"
+          disabled={disabled}
+          aria-label="Make current"
+          title="Make current Goal"
+          onClick={onMakeCurrent}
+        >
           <Icon className="ws-task-workflow-icon" name="ArrowRight" aria-hidden />
         </button>
       ) : null}
-      <button type="button" className="ws-task-workflow-action" disabled={disabled} aria-label="Move to tasks" title="Move to tasks" onClick={onMoveToTasks}>
+      <button
+        type="button"
+        className="ws-task-workflow-action"
+        disabled={disabled}
+        aria-label="Move to tasks"
+        title="Move to task queue"
+        onClick={onMoveToTasks}
+      >
         <Icon className="ws-task-workflow-icon" name="ArrowDown" aria-hidden />
       </button>
     </span>

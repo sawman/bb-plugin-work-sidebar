@@ -1065,8 +1065,19 @@ describe("registered Work context cards", () => {
     expect(goalRow.querySelector(".ws-work-item-queue-action")).toBeNull();
     expect(slot.getByRole("button", { name: "Move to tasks" })).toBeTruthy();
     expect(
-      slot.getByRole("button", { name: "Copy current goal BB task WORK-1" }),
+      goalRow.querySelector('[aria-label="Copy current goal BB task WORK-1"]'),
     ).toBeTruthy();
+    expect(goalRow.querySelector(".ws-work-header-badge")).toBeNull();
+    expect(
+      goalRow.querySelector('[data-variant="text"].ws-task-workflow-key'),
+    ).toBeTruthy();
+    expect(control.getAttribute("title")).toBe("Change status: To do");
+    expect(slot.getByRole("button", { name: "Defer" }).getAttribute("title")).toBe(
+      "Defer to Goals backlog",
+    );
+    expect(slot.getByRole("button", { name: "Move to tasks" }).getAttribute("title")).toBe(
+      "Move to task queue",
+    );
     fireEvent.click(control);
     fireEvent.click(slot.getByRole("option", { name: "In Progress" }));
     await waitFor(() =>
