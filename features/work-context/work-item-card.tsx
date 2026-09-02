@@ -2,6 +2,7 @@ import { useEffect, useId, useState, type ReactNode } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { CopyBadge } from "../../components/ui/copy-badge";
+import { ActionTooltip } from "../../components/ui/action-tooltip";
 import { Icon } from "../../components/ui/icon";
 import { SearchCombobox } from "../../components/ui/combobox";
 import type { TaskStatus } from "../tasks/model";
@@ -696,39 +697,51 @@ function WorkItemQueueActions({
         />
       ) : null}
       {onDefer ? (
-        <button
-          type="button"
-          className="ws-task-workflow-action"
-          disabled={disabled}
-          aria-label="Defer"
-          title="Defer to Goals backlog"
-          onClick={onDefer}
-        >
-          <Icon className="ws-task-workflow-icon" name="Clock" aria-hidden />
-        </button>
+        <ActionTooltip label="Defer to Goals backlog">
+          {(tooltipId) => (
+            <button
+              type="button"
+              className="ws-task-workflow-action"
+              disabled={disabled}
+              aria-describedby={tooltipId}
+              aria-label="Defer"
+              onClick={onDefer}
+            >
+              <Icon className="ws-task-workflow-icon" name="Clock" aria-hidden />
+            </button>
+          )}
+        </ActionTooltip>
       ) : null}
       {onMakeCurrent ? (
-        <button
-          type="button"
-          className="ws-task-workflow-action"
-          disabled={disabled}
-          aria-label="Make current"
-          title="Make current Goal"
-          onClick={onMakeCurrent}
-        >
-          <Icon className="ws-task-workflow-icon" name="ArrowRight" aria-hidden />
-        </button>
+        <ActionTooltip label="Make current Goal">
+          {(tooltipId) => (
+            <button
+              type="button"
+              className="ws-task-workflow-action"
+              disabled={disabled}
+              aria-describedby={tooltipId}
+              aria-label="Make current"
+              onClick={onMakeCurrent}
+            >
+              <Icon className="ws-task-workflow-icon" name="ArrowRight" aria-hidden />
+            </button>
+          )}
+        </ActionTooltip>
       ) : null}
-      <button
-        type="button"
-        className="ws-task-workflow-action"
-        disabled={disabled}
-        aria-label="Move to tasks"
-        title="Move to task queue"
-        onClick={onMoveToTasks}
-      >
-        <Icon className="ws-task-workflow-icon" name="ArrowDown" aria-hidden />
-      </button>
+      <ActionTooltip label="Move to task queue">
+        {(tooltipId) => (
+          <button
+            type="button"
+            className="ws-task-workflow-action"
+            disabled={disabled}
+            aria-describedby={tooltipId}
+            aria-label="Move to tasks"
+            onClick={onMoveToTasks}
+          >
+            <Icon className="ws-task-workflow-icon" name="ArrowDown" aria-hidden />
+          </button>
+        )}
+      </ActionTooltip>
     </span>
   );
 }

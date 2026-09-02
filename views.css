@@ -3654,6 +3654,37 @@ button.ws-provider-health:focus-visible {
   align-items: center;
   gap: 0.18rem;
 }
+.ws-action-tooltip {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+.ws-action-tooltip-content {
+  position: absolute;
+  z-index: 40;
+  right: 0;
+  bottom: calc(100% + 0.3rem);
+  width: max-content;
+  max-width: 12rem;
+  padding: 0.22rem 0.36rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 3px);
+  background: var(--popover);
+  box-shadow: 0 0.25rem 0.8rem color-mix(in srgb, var(--foreground) 18%, transparent);
+  color: var(--popover-foreground);
+  font: var(--ws-text-label);
+  line-height: 1.15;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(0.12rem);
+  transition: opacity 0.1s ease, transform 0.1s ease;
+  white-space: nowrap;
+}
+.ws-action-tooltip:hover .ws-action-tooltip-content,
+.ws-action-tooltip:focus-within .ws-action-tooltip-content {
+  opacity: 1;
+  transform: translateY(0);
+}
 .ws-task-workflow-action {
   display: grid;
   width: 1.35rem;

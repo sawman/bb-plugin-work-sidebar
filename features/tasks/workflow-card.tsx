@@ -5,6 +5,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { ActionTooltip } from "../../components/ui/action-tooltip";
 import { Icon } from "../../components/ui/icon";
 import { taskStatusPresentation } from "./model";
 import { TaskPriorityIcon } from "./priority";
@@ -279,6 +280,7 @@ export function TaskStatusControl({
   const root = useRef<HTMLSpanElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const presentation = taskStatusPresentation(status);
+  const tooltip = `Change status: ${presentation.label}`;
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
@@ -298,23 +300,27 @@ export function TaskStatusControl({
   }, [open]);
   return (
     <span className="ws-task-workflow-status" ref={root}>
-      <button
-        ref={trigger}
-        type="button"
-        className={`ws-task-status-${status}`}
-        disabled={busy}
-        aria-label={`Change status for ${taskKey}: ${presentation.label}`}
-        title={`Change status: ${presentation.label}`}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <Icon
-          className="ws-task-workflow-icon"
-          name={presentation.icon}
-          aria-hidden
-        />
-      </button>
+      <ActionTooltip label={tooltip}>
+        {(tooltipId) => (
+          <button
+            ref={trigger}
+            type="button"
+            className={`ws-task-status-${status}`}
+            disabled={busy}
+            aria-describedby={tooltipId}
+            aria-label={`Change status for ${taskKey}: ${presentation.label}`}
+            aria-haspopup="listbox"
+            aria-expanded={open}
+            onClick={() => setOpen((current) => !current)}
+          >
+            <Icon
+              className="ws-task-workflow-icon"
+              name={presentation.icon}
+              aria-hidden
+            />
+          </button>
+        )}
+      </ActionTooltip>
       {open ? (
         <span
           className="ws-task-workflow-status-options"

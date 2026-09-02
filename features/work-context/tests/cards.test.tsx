@@ -1071,11 +1071,17 @@ describe("registered Work context cards", () => {
     expect(
       goalRow.querySelector('[data-variant="text"].ws-task-workflow-key'),
     ).toBeTruthy();
-    expect(control.getAttribute("title")).toBe("Change status: To do");
-    expect(slot.getByRole("button", { name: "Defer" }).getAttribute("title")).toBe(
+    const statusTooltipId = control.getAttribute("aria-describedby");
+    expect(statusTooltipId).toBeTruthy();
+    expect(document.getElementById(statusTooltipId!)?.textContent).toBe(
+      "Change status: To do",
+    );
+    const defer = slot.getByRole("button", { name: "Defer" });
+    expect(document.getElementById(defer.getAttribute("aria-describedby")!)?.textContent).toBe(
       "Defer to Goals backlog",
     );
-    expect(slot.getByRole("button", { name: "Move to tasks" }).getAttribute("title")).toBe(
+    const moveToTasks = slot.getByRole("button", { name: "Move to tasks" });
+    expect(document.getElementById(moveToTasks.getAttribute("aria-describedby")!)?.textContent).toBe(
       "Move to task queue",
     );
     fireEvent.click(control);
