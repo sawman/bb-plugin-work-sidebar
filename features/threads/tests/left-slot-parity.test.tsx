@@ -1283,6 +1283,56 @@ describe("R18 registered left sidebar parity", () => {
       ),
     );
 
+    // An empty, collapsed custom-group header remains a real pointer target.
+    // Its hover presentation must survive until pointer-up can persist the move.
+    const laterGroup = slot.container.querySelector<HTMLElement>(
+      '[data-ws-thread-drop-zone="group_later"]',
+    )!;
+    const activeRow = slot.container.querySelector<HTMLElement>(
+      '[data-ws-thread-group="active"][data-ws-thread-id="thr_grouped"]',
+    )!;
+    elementAt.mockReturnValue(laterGroup.querySelector("summary"));
+    fireEvent.pointerDown(activeRow, {
+      button: 0,
+      pointerId: 91,
+      clientX: 0,
+      clientY: 0,
+    });
+    fireEvent.pointerMove(window, { pointerId: 91, clientX: 10, clientY: 20 });
+    expect(laterGroup.dataset.dropTarget).toBe("true");
+    fireEvent.pointerUp(window, { pointerId: 91, clientX: 10, clientY: 20 });
+    await waitFor(() =>
+      expect(saveGroups).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          groups: [{ id: "group_later", name: "Later", threadIds: ["thr_grouped"] }],
+        }),
+      ),
+    );
+
+    // Native drag is a reliable fallback for the ordinary browser drag gesture.
+    const nativeSource = slot.container.querySelector<HTMLElement>(
+      '[data-ws-thread-group="group_later"][data-ws-thread-id="thr_grouped"]',
+    )!;
+    const transfer = {
+      effectAllowed: "none",
+      dropEffect: "none",
+      setData: vi.fn(),
+      getData: vi.fn(() => "thr_grouped"),
+    };
+    fireEvent.dragStart(nativeSource, { dataTransfer: transfer });
+    expect(transfer.setData).toHaveBeenCalledWith("text/plain", "thr_grouped");
+    fireEvent.dragOver(activeZone, { dataTransfer: transfer });
+    expect(activeZone.dataset.dropTarget).toBe("true");
+    fireEvent.drop(activeZone, { dataTransfer: transfer });
+    fireEvent.dragEnd(nativeSource);
+    await waitFor(() =>
+      expect(saveGroups).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          groups: [{ id: "group_later", name: "Later", threadIds: [] }],
+        }),
+      ),
+    );
+
     const archiveDisclosure =
       slot.container.querySelector<HTMLDetailsElement>(".ws-archived")!;
     expect(archiveDisclosure.open).toBe(false);

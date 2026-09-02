@@ -14,6 +14,7 @@ import { ThreadMetadata, ThreadStatus } from "./thread-row-presentation";
 import { ThreadRowStackNumber } from "./thread-row-stack-number";
 import type { ThreadRowProps } from "./thread-row-types";
 import { useThreadRowActions } from "./use-thread-row-actions";
+import { createThreadRowNativeDragHandlers } from "./thread-row-native-drag";
 import { useThreadRowPointerDrag } from "./use-thread-row-pointer-drag";
 import { useThreadHierarchy } from "./thread-hierarchy-context";
 import { THREAD_TO_TOP_DESCRIPTION } from "./use-thread-hierarchy-menu";
@@ -83,9 +84,8 @@ export function ThreadRow({
         );
     },
   });
-  const projectLabel = project?.isPersonal
-    ? "Personal"
-    : (project?.name ?? "Project");
+  const { startNativeDrag, finishNativeDrag } = createThreadRowNativeDragHandlers({ threadId: thread.id, onDragThreadChange, onDropTargetChange });
+  const projectLabel = project?.isPersonal ? "Personal" : (project?.name ?? "Project");
   const title = threadTitle(thread);
   const hasComposerDraft = threadReportsComposerDraft(thread);
   const staleWorking = useStaleWorking(thread, staleWorkingMinutes);
@@ -95,18 +95,18 @@ export function ThreadRow({
       data-ws-thread-id={thread.id}
       data-ws-thread-group={groupId ?? "active"}
       data-depth={thread.parentThreadId ? "child" : "root"}
-      data-drop-placement={
-        dropTarget?.kind === "reorder" && dropTarget.threadId === thread.id
-          ? dropTarget.placement
-          : undefined
-      }
+      data-drop-placement={dropTarget?.kind === "reorder" && dropTarget.threadId === thread.id
+        ? dropTarget.placement : undefined}
       data-reparent-target={
         dropTarget?.kind === "reparent" &&
         dropTarget.parentThreadId === thread.id
           ? "true"
           : undefined
       }
+      draggable={!reorderDisabled}
       onPointerDown={startUnifiedDrag}
+      onDragStart={startNativeDrag}
+      onDragEnd={finishNativeDrag}
     >
       {dragThreadId ? (
         <span
