@@ -32,4 +32,20 @@ describe("shared Changes file list", () => {
     fireEvent.click(interactiveRow);
     expect(openFile).toHaveBeenCalledWith("src/changed.ts");
   });
+
+  it("labels pull request file openers by their source", () => {
+    render(
+      <ChangedFilesList
+        files={files}
+        onOpenFile={() => undefined}
+        openFileLabel={(path) => `Open pull request diff for ${path}`}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", {
+        name: "Open pull request diff for src/changed.ts",
+      }),
+    ).toBeTruthy();
+  });
 });

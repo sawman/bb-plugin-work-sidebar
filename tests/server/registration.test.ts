@@ -201,6 +201,7 @@ describe("R2 server registration and disposal", () => {
       "getChangesFingerprint",
       "checkoutStackBranch",
       "getWorkingTreeFileDiff",
+      "getPullRequestFileDiff",
       "sidebarProviderRetries",
       "getSidebarOrder",
       "saveSiblingOrder",

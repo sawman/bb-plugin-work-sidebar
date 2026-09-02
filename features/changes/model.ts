@@ -56,6 +56,15 @@ export const changesKeys = {
       fingerprint ?? "unknown",
       path,
     ] as const,
+  pullRequestFileDiff: (threadId: string, pullRequestNumber: number, path: string) =>
+    [
+      "work-sidebar",
+      "changes",
+      threadId,
+      "pull-request-file-diff",
+      pullRequestNumber,
+      path,
+    ] as const,
 };
 export const changesPolicies = {
   projection: {

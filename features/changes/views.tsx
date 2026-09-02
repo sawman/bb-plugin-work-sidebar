@@ -277,11 +277,13 @@ export function ChangesCurrentPullRequestRow({
   branch,
   expanded,
   onToggle,
+  onOpenFile,
 }: {
   pullRequest: CurrentPullRequestView;
   branch?: GitHubStackBranch | null;
   expanded: boolean;
   onToggle(): void;
+  onOpenFile(path: string): void;
 }) {
   const rowBranch = currentPullRequestBranch(pullRequest, branch);
   return (
@@ -303,6 +305,7 @@ export function ChangesCurrentPullRequestRow({
         checkingOut={false}
         onToggle={onToggle}
         onCheckout={() => undefined}
+        onOpenFile={onOpenFile}
         expandedDetails={
           <CurrentPullRequestDetails pullRequest={pullRequest} />
         }
@@ -313,13 +316,17 @@ export function ChangesCurrentPullRequestRow({
 
 function PullRequestFiles({
   diff,
+  onOpenFile,
 }: {
   diff: GitHubStackBranch["diff"];
+  onOpenFile?: (path: string) => void;
 }): ReactElement {
   return (
     <ChangedFilesList
       files={diff?.files ?? null}
       truncated={diff?.truncated ?? false}
+      onOpenFile={onOpenFile}
+      openFileLabel={(path) => `Open pull request diff for ${path}`}
     />
   );
 }
@@ -331,6 +338,7 @@ export function ChangesStackBranchRow({
   checkingOut,
   onToggle,
   onCheckout,
+  onOpenFile,
   expandedDetails,
 }: {
   branch: GitHubStackBranch;
@@ -339,6 +347,7 @@ export function ChangesStackBranchRow({
   checkingOut: boolean;
   onToggle(): void;
   onCheckout(): void;
+  onOpenFile?: (path: string) => void;
   expandedDetails?: ReactNode;
 }) {
   const pr = branch.pr;
@@ -438,7 +447,7 @@ export function ChangesStackBranchRow({
       {expanded && (
         <>
           {expandedDetails}
-          <PullRequestFiles diff={branch.diff} />
+          <PullRequestFiles diff={branch.diff} onOpenFile={onOpenFile} />
         </>
       )}
     </li>

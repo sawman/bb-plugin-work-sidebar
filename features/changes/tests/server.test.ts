@@ -29,6 +29,7 @@ describe("R13 Changes server adapter", () => {
       fingerprint: vi.fn(async () => ({ fingerprint: null })),
       checkout: vi.fn(async () => ({ ok: true, message: "Checked out", detail: null })),
       fileDiff: vi.fn(async (_threadId, path) => ({ kind: "absent" as const, path, patch: null, message: "No diff" })),
+      pullRequestFileDiff: vi.fn(async (_threadId, _number, path) => ({ kind: "absent" as const, path, patch: null, message: "No diff" })),
     });
     await expect(service.get("thr_one")).resolves.toMatchObject({
       repository: { outcome: "unavailable" },
@@ -70,6 +71,7 @@ describe("R13 Changes server adapter", () => {
       fingerprint,
       checkout: vi.fn(async () => ({ ok: true, message: "Checked out", detail: null })),
       fileDiff: vi.fn(async (_threadId, path) => ({ kind: "absent" as const, path, patch: null, message: "No diff" })),
+      pullRequestFileDiff: vi.fn(async (_threadId, _number, path) => ({ kind: "absent" as const, path, patch: null, message: "No diff" })),
     });
     expect((await service.get("thr_stack")).stack).not.toBeNull();
     expect((await service.get("thr_single")).stack).toBeNull();
@@ -84,12 +86,14 @@ describe("R13 Changes server adapter", () => {
   it("forwards checkout and one lazy file-diff read through the injected thread service", async () => {
     const checkout = vi.fn(async () => ({ ok: false, message: "Blocked", tone: "warning" as const, detail: null }));
     const fileDiff = vi.fn(async (_threadId: string, path: string) => ({ kind: "binary" as const, path, patch: null, message: "Binary" }));
+    const pullRequestFileDiff = vi.fn(async (_threadId: string, _number: number, path: string) => ({ kind: "patch" as const, path, patch: "@@ -1 +1 @@", message: null }));
     const service = createChangesService({
       repository: async () => ({ outcome: "available", message: null, branch: "main", base: "main", ahead: 0, behind: 0, worktreeState: "clean", hasUncommittedChanges: false, changedFileCount: 0, changedInsertions: 0, changedDeletions: 0, changedFiles: [] }),
       projection: async () => ({ currentPullRequest: null, stack: null, stackUnavailableReason: null, githubStack: null }),
       fingerprint: async () => ({ fingerprint: null }),
       checkout,
       fileDiff,
+      pullRequestFileDiff,
     });
     await expect(service.checkout("thr_one", "feature/one")).resolves.toMatchObject({ ok: false, message: "Blocked" });
     await expect(service.fileDiff("thr_one", "image.png")).resolves.toMatchObject({ kind: "binary", path: "image.png" });
@@ -97,6 +101,8 @@ describe("R13 Changes server adapter", () => {
     expect(checkout).toHaveBeenCalledWith("thr_one", "feature/one");
     expect(fileDiff).toHaveBeenCalledOnce();
     expect(fileDiff).toHaveBeenCalledWith("thr_one", "image.png");
+    await expect(service.pullRequestFileDiff("thr_one", 12, "src/file.ts")).resolves.toMatchObject({ kind: "patch", path: "src/file.ts" });
+    expect(pullRequestFileDiff).toHaveBeenCalledWith("thr_one", 12, "src/file.ts");
   });
 });
 

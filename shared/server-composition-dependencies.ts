@@ -37,4 +37,7 @@ export type PullRequestChangesAdapter = {
   checkout(threadId: string, branch: string): Promise<Awaited<
     ReturnType<PluginRpcHandlers<typeof rpcContract>["checkoutStackBranch"]>
   >>;
+  fileDiff(threadId: string, pullRequestNumber: number, path: string): Promise<Awaited<
+    ReturnType<PluginRpcHandlers<typeof rpcContract>["getPullRequestFileDiff"]>
+  >>;
 };

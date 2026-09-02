@@ -32,6 +32,7 @@ export default function plugin(
     getChangesFingerprint: changes.getChangesFingerprint,
     checkoutStackBranch: changes.checkoutStackBranch,
     getWorkingTreeFileDiff: changes.getWorkingTreeFileDiff,
+    getPullRequestFileDiff: changes.getPullRequestFileDiff,
     getSidebarOrder: threads.getSidebarOrder,
     saveSiblingOrder: threads.saveSiblingOrder,
     getLaterThreads: threads.getLaterThreads,

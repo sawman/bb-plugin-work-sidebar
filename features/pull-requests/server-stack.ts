@@ -127,16 +127,11 @@ export async function readGitHubPullRequestDiff(
   pullRequest: number,
   run: GitHubApiRunner,
 ): Promise<NonNullable<GitHubStackBranch["diff"]>> {
-  const raw: unknown = JSON.parse(await run([
-    "api",
-    "--method",
-    "GET",
-    `repos/${owner}/${repo}/pulls/${pullRequest}/files?per_page=100`,
-    "-H",
-    `Accept: ${GITHUB_ACCEPT_HEADER}`,
-    "-H",
-    `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`,
-  ], 4_000_000));
+  const raw: unknown = JSON.parse(await run(githubPullRequestFilesApiArgs(
+    owner,
+    repo,
+    pullRequest,
+  ), 4_000_000));
   if (!Array.isArray(raw)) throw new Error("GitHub pull request files response is invalid");
   const files = raw.map((value) => {
     if (!isRecord(value)) throw new Error("GitHub pull request files response contains an invalid file");
@@ -162,6 +157,57 @@ export async function readGitHubPullRequestDiff(
     files,
     truncated: files.length === 100,
   };
+}
+
+function githubPullRequestFilesApiArgs(
+  owner: string,
+  repo: string,
+  pullRequest: number,
+): string[] {
+  return [
+    "api",
+    "--method",
+    "GET",
+    `repos/${owner}/${repo}/pulls/${pullRequest}/files?per_page=100`,
+    "-H",
+    `Accept: ${GITHUB_ACCEPT_HEADER}`,
+    "-H",
+    `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`,
+  ];
+}
+
+export async function readGitHubPullRequestFilePatch(
+  owner: string,
+  repo: string,
+  pullRequest: number,
+  path: string,
+  run: GitHubApiRunner,
+): Promise<
+  | { kind: "patch"; path: string; patch: string; message: null }
+  | { kind: "absent"; path: string; patch: null; message: string }
+> {
+  const raw: unknown = JSON.parse(
+    await run(githubPullRequestFilesApiArgs(owner, repo, pullRequest), 4_000_000),
+  );
+  if (!Array.isArray(raw)) throw new Error("GitHub pull request files response is invalid");
+  const file = raw.find(
+    (value) => isRecord(value) && value.filename === path,
+  );
+  if (!file)
+    return {
+      kind: "absent",
+      path,
+      patch: null,
+      message: "This file is no longer part of the pull request.",
+    };
+  if (typeof file.patch !== "string" || !file.patch)
+    return {
+      kind: "absent",
+      path,
+      patch: null,
+      message: "GitHub did not provide a text diff for this file.",
+    };
+  return { kind: "patch", path, patch: file.patch, message: null };
 }
 
 function signalFromGraphql(value: unknown): GitHubSignal | null {

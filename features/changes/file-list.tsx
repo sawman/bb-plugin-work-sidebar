@@ -10,9 +10,11 @@ export type ChangedFileListItem = {
 function ChangedFileRow({
   file,
   onOpenFile,
+  openFileLabel,
 }: {
   file: ChangedFileListItem;
   onOpenFile?: (path: string) => void;
+  openFileLabel?: (path: string) => string;
 }): ReactElement {
   const status = ["added", "deleted", "modified", "renamed", "untracked"].includes(
     file.status,
@@ -54,7 +56,7 @@ function ChangedFileRow({
       type="button"
       className="ws-change-file-row"
       onClick={() => onOpenFile(file.path)}
-      aria-label={`Open uncommitted diff for ${file.path}`}
+      aria-label={openFileLabel?.(file.path) ?? `Open uncommitted diff for ${file.path}`}
     >
       {content}
     </button>
@@ -66,12 +68,14 @@ function ChangedFileRow({
 export function ChangedFilesList({
   files,
   onOpenFile,
+  openFileLabel,
   unavailableMessage = "Changed files are unavailable.",
   emptyMessage = "No changed files.",
   truncated = false,
 }: {
   files: readonly ChangedFileListItem[] | null;
   onOpenFile?: (path: string) => void;
+  openFileLabel?: (path: string) => string;
   unavailableMessage?: string;
   emptyMessage?: string;
   truncated?: boolean;
@@ -88,6 +92,7 @@ export function ChangedFilesList({
             key={file.path}
             file={file}
             onOpenFile={onOpenFile}
+            openFileLabel={openFileLabel}
           />
         ))
       )}

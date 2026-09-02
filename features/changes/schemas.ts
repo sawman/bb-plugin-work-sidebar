@@ -169,6 +169,16 @@ export const changesRpcSchemas = {
       .strict(),
     output: workingTreeFileDiffSchema,
   },
+  getPullRequestFileDiff: {
+    input: z
+      .object({
+        threadId: z.string().startsWith("thr_"),
+        pullRequestNumber: z.number().int().positive(),
+        path: z.string().min(1),
+      })
+      .strict(),
+    output: workingTreeFileDiffSchema,
+  },
 };
 export type Changes = z.infer<typeof changesSchema>;
 export type Repository = z.infer<typeof repositorySchema>;

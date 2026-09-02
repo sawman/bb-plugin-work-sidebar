@@ -11,6 +11,7 @@ import { changesHeaderLabel, mergeStackBranchSignals } from "./model";
 import {
   useChanges,
   useCheckoutStackBranch,
+  usePullRequestFileDiff,
   useWorkingTreeFileDiff,
 } from "./queries";
 import { changesInteractionStore } from "./store";
@@ -42,17 +43,29 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
     state.byThread.get(threadId),
   );
   const selectedFilePath = presentation?.selectedFilePath ?? null;
+  const selectedPullRequestNumber =
+    presentation?.selectedPullRequestNumber ?? null;
   const workingTreeDiff = useWorkingTreeFileDiff(
     rpc,
     threadId,
     changesQuery.fingerprint.data?.fingerprint ?? null,
-    selectedFilePath,
+    selectedPullRequestNumber ? null : selectedFilePath,
+  );
+  const pullRequestDiff = usePullRequestFileDiff(
+    rpc,
+    threadId,
+    selectedPullRequestNumber,
+    selectedPullRequestNumber ? selectedFilePath : null,
   );
   const checkout = useCheckoutStackBranch(rpc, threadId);
   const expandedStackBranches =
     presentation?.expandedStackBranches ?? new Set<string>();
   const openWorkingTreeDiff = (path: string) =>
     changesInteractionStore.getState().selectFile(threadId, path);
+  const openPullRequestDiff = (pullRequestNumber: number, path: string) =>
+    changesInteractionStore
+      .getState()
+      .selectFile(threadId, path, pullRequestNumber);
   const checkoutStackBranch = (branch: string) => {
     if (checkout.isPending) return;
     checkout.mutate(branch, {
@@ -72,6 +85,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
   const currentPullRequestNumber =
     changesQuery.data?.currentPullRequest?.number ??
     changesQuery.data?.stack?.currentPullRequest;
+  const currentPullRequest = changesQuery.data?.currentPullRequest ?? null;
   const standaloneBranch = changesQuery.data?.stack
     ? null
     : githubStack?.branches.find(
@@ -129,7 +143,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
       {selectedFilePath && (
         <ChangesWorkingTreePreview
           path={selectedFilePath}
-          query={workingTreeDiff}
+          query={selectedPullRequestNumber ? pullRequestDiff : workingTreeDiff}
           onClose={() =>
             changesInteractionStore.getState().selectFile(threadId, null)
           }
@@ -163,16 +177,25 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
                     .toggleStackBranch(threadId, branch.name)
                 }
                 onCheckout={() => checkoutStackBranch(branch.name)}
+                onOpenFile={(path) => {
+                  if (branch.pr) openPullRequestDiff(branch.pr.number, path);
+                }}
               />
             ))}
           </ol>
-        ) : changesQuery.data?.currentPullRequest ? (
+        ) : currentPullRequest ? (
           <ChangesCurrentPullRequestRow
-            pullRequest={changesQuery.data.currentPullRequest}
+            pullRequest={currentPullRequest}
             branch={standaloneBranch}
             expanded={presentation?.currentPullRequestExpanded ?? false}
             onToggle={() =>
               changesInteractionStore.getState().togglePullRequest(threadId)
+            }
+            onOpenFile={(path) =>
+              openPullRequestDiff(
+                currentPullRequest.number,
+                path,
+              )
             }
           />
         ) : (

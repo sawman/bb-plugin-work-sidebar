@@ -12,6 +12,7 @@ import {
 import {
   fetchGitHubStack,
   needsGitHubPullRequestRecovery,
+  readGitHubPullRequestFilePatch,
   readGitHubPullRequestRest,
   readGitHubPullRequestDiff,
 } from "./server-stack.js";
@@ -35,7 +36,7 @@ type ThreadStackHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
   "sidebarPullRequestStacks" | "sidebarThreadPullRequests"
 >;
-export type ThreadStackService = ThreadStackHandlers & Pick<PullRequestChangesAdapter, "projection" | "checkout">;
+export type ThreadStackService = ThreadStackHandlers & Pick<PullRequestChangesAdapter, "projection" | "checkout" | "fileDiff">;
 
 const ghStackPayloadSchema = z.object({
   stack: z.object({
@@ -370,5 +371,39 @@ export function createThreadStackService(
   };
   const checkout: PullRequestChangesAdapter["checkout"] = (threadId, branch) =>
     githubStackCall("checkoutBranch", { threadId, branch }, ghStackActionSchema);
-  return { ...handlers, projection, checkout };
+  const fileDiff: PullRequestChangesAdapter["fileDiff"] = async (
+    threadId,
+    pullRequestNumber,
+    path,
+  ) => {
+    const remote = await stackForThread(threadId);
+    const current = remote.currentPullRequest;
+    const repository = current?.url.match(
+      /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+/,
+    );
+    if (!repository)
+      return {
+        kind: "unavailable",
+        path,
+        patch: null,
+        message: "This pull request is no longer available for the thread.",
+      };
+    try {
+      return await readGitHubPullRequestFilePatch(
+        repository[1],
+        repository[2],
+        pullRequestNumber,
+        path,
+        (args, buffer) => read(args, buffer),
+      );
+    } catch (error) {
+      return {
+        kind: "unavailable",
+        path,
+        patch: null,
+        message: error instanceof Error ? error.message : "Could not load the pull request file diff.",
+      };
+    }
+  };
+  return { ...handlers, projection, checkout, fileDiff };
 }

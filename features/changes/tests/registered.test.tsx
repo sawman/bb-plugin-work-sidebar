@@ -98,6 +98,11 @@ type ChangesFixture = {
     threadId: string;
     path: string;
   }) => unknown;
+  getPullRequestFileDiff?: (input: {
+    threadId: string;
+    pullRequestNumber: number;
+    path: string;
+  }) => unknown;
 };
 function rpc({
   getChanges,
@@ -114,6 +119,12 @@ function rpc({
     detail: null,
   }),
   getWorkingTreeFileDiff = ({ path }) => ({
+    kind: "absent",
+    path,
+    patch: null,
+    message: "No diff",
+  }),
+  getPullRequestFileDiff = ({ path }) => ({
     kind: "absent",
     path,
     patch: null,
@@ -165,6 +176,7 @@ function rpc({
     getWorkBackgroundJobs: () => ({ items: [] }),
     checkoutStackBranch,
     getWorkingTreeFileDiff,
+    getPullRequestFileDiff,
     sidebarTasks: () => ({
       available: true,
       tasks: [],
@@ -318,6 +330,16 @@ describe("R13 registered Changes Work slot", () => {
       checks: "passing",
       review: "approved",
     };
+    const getPullRequestFileDiff = vi.fn(({ path }: {
+      threadId: string;
+      pullRequestNumber: number;
+      path: string;
+    }) => ({
+      kind: "patch",
+      path,
+      patch: "@@ -1 +1 @@\n-old\n+new",
+      message: null,
+    }));
     const stack = await changesSlot({
       getChanges: () =>
         changesResult(repository("available"), {
@@ -339,6 +361,7 @@ describe("R13 registered Changes Work slot", () => {
             error: null,
           },
         }),
+      getPullRequestFileDiff,
     });
     await waitFor(() =>
       expect(
@@ -373,6 +396,21 @@ describe("R13 registered Changes Work slot", () => {
     expect(stack.getByText("renamed.ts")).toBeTruthy();
     expect(stack.getByLabelText("2 lines added").textContent).toBe("+2");
     expect(stack.getByLabelText("1 line deleted").textContent).toBe("−1");
+    fireEvent.click(
+      stack.getByRole("button", {
+        name: "Open pull request diff for renamed.ts",
+      }),
+    );
+    await waitFor(() =>
+      expect(getPullRequestFileDiff).toHaveBeenCalledWith({
+        threadId: "thr_changes",
+        pullRequestNumber: 43,
+        path: "renamed.ts",
+      }),
+    );
+    expect(
+      stack.getByRole("button", { name: "Close diff for renamed.ts" }),
+    ).toBeTruthy();
     stack.lifecycle.unmount();
   });
 

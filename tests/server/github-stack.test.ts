@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   fetchGitHubStack,
+  readGitHubPullRequestFilePatch,
   readGitHubSignals,
   readGitHubPullRequestDiff,
 } from "../../features/pull-requests/server-stack.js";
@@ -238,6 +239,63 @@ describe("GitHub Stack enrichment ownership", () => {
         "--method",
         "GET",
         "repos/SystemEarth/systemearth/pulls/1184/files?per_page=100",
+        "-H",
+        "Accept: application/vnd.github+json",
+        "-H",
+        "X-GitHub-Api-Version: 2026-03-10",
+      ],
+      4_000_000,
+    );
+  });
+
+  it("loads only the selected pull request file patch on demand", async () => {
+    const run = vi.fn(async () =>
+      JSON.stringify([
+        {
+          filename: "src/selected.ts",
+          status: "modified",
+          patch: "@@ -1 +1 @@\n-old\n+new",
+        },
+        {
+          filename: "src/other.ts",
+          status: "modified",
+          patch: "@@ -1 +1 @@\n-before\n+after",
+        },
+      ]),
+    );
+
+    await expect(
+      readGitHubPullRequestFilePatch(
+        "acme",
+        "repo",
+        42,
+        "src/selected.ts",
+        run,
+      ),
+    ).resolves.toEqual({
+      kind: "patch",
+      path: "src/selected.ts",
+      patch: "@@ -1 +1 @@\n-old\n+new",
+      message: null,
+    });
+    await expect(
+      readGitHubPullRequestFilePatch(
+        "acme",
+        "repo",
+        42,
+        "src/missing.ts",
+        run,
+      ),
+    ).resolves.toMatchObject({
+      kind: "absent",
+      path: "src/missing.ts",
+    });
+    expect(run).toHaveBeenCalledWith(
+      [
+        "api",
+        "--method",
+        "GET",
+        "repos/acme/repo/pulls/42/files?per_page=100",
         "-H",
         "Accept: application/vnd.github+json",
         "-H",

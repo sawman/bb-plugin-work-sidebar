@@ -12,6 +12,7 @@ type ChangesHandlers = Pick<
   | "getChangesFingerprint"
   | "checkoutStackBranch"
   | "getWorkingTreeFileDiff"
+  | "getPullRequestFileDiff"
 >;
 
 function repositoryUnavailable(message: string) {
@@ -97,6 +98,7 @@ export function createChangesRegistration(
     fingerprint: pullRequests.fingerprint,
     checkout: pullRequests.checkout,
     fileDiff,
+    pullRequestFileDiff: pullRequests.fileDiff,
   });
   return {
     async getChanges({ threadId }) { return changes.get(threadId); },
@@ -108,6 +110,9 @@ export function createChangesRegistration(
     },
     async getWorkingTreeFileDiff({ threadId, path }) {
       return changes.fileDiff(threadId, path);
+    },
+    async getPullRequestFileDiff({ threadId, pullRequestNumber, path }) {
+      return changes.pullRequestFileDiff(threadId, pullRequestNumber, path);
     },
   };
 }

@@ -91,6 +91,29 @@ export function useWorkingTreeFileDiff(
   });
 }
 
+export function usePullRequestFileDiff(
+  rpc: ChangesRpc,
+  threadId: string,
+  pullRequestNumber: number | null,
+  path: string | null,
+) {
+  return useQuery({
+    queryKey: changesKeys.pullRequestFileDiff(
+      threadId,
+      pullRequestNumber ?? 0,
+      path ?? "none",
+    ),
+    queryFn: () =>
+      rpc.call("getPullRequestFileDiff", {
+        threadId,
+        pullRequestNumber: pullRequestNumber!,
+        path: path!,
+      }),
+    enabled: Boolean(path && pullRequestNumber),
+    ...changesPolicies.fileDiff,
+  });
+}
+
 export function useCheckoutStackBranch(rpc: ChangesRpc, threadId: string) {
   const client = useQueryClient();
   return useMutation({

@@ -6,6 +6,11 @@ export type ChangesServiceDependencies = {
   fingerprint(threadId: string, url: string): Promise<{ fingerprint: string | null }>;
   checkout(threadId: string, branch: string): Promise<CheckoutStackBranchResult>;
   fileDiff(threadId: string, path: string): Promise<WorkingTreeFileDiff>;
+  pullRequestFileDiff(
+    threadId: string,
+    pullRequestNumber: number,
+    path: string,
+  ): Promise<WorkingTreeFileDiff>;
 };
 
 type WorkingTreePatchResult =
@@ -59,5 +64,8 @@ export function createChangesService(dependencies: ChangesServiceDependencies) {
     fingerprint(threadId: string, url: string) { return dependencies.fingerprint(threadId, url); },
     checkout(threadId: string, branch: string) { return dependencies.checkout(threadId, branch); },
     fileDiff(threadId: string, path: string) { return dependencies.fileDiff(threadId, path); },
+    pullRequestFileDiff(threadId: string, pullRequestNumber: number, path: string) {
+      return dependencies.pullRequestFileDiff(threadId, pullRequestNumber, path);
+    },
   };
 }

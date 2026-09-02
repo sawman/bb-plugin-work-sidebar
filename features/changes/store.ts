@@ -5,19 +5,21 @@ type ChangesPresentation = {
   currentPullRequestExpanded: boolean;
   expandedStackBranches: Set<string>;
   selectedFilePath: string | null;
+  selectedPullRequestNumber: number | null;
 };
 export type ChangesInteractionState = {
   byThread: Map<string, ChangesPresentation>;
   toggleRepository(threadId: string): void;
   togglePullRequest(threadId: string): void;
   toggleStackBranch(threadId: string, branch: string): void;
-  selectFile(threadId: string, path: string | null): void;
+  selectFile(threadId: string, path: string | null, pullRequestNumber?: number | null): void;
 };
 const empty = (): ChangesPresentation => ({
   repositoryExpanded: false,
   currentPullRequestExpanded: false,
   expandedStackBranches: new Set(),
   selectedFilePath: null,
+  selectedPullRequestNumber: null,
 });
 const cap = (entries: Iterable<[string, ChangesPresentation]>) => {
   const next = new Map(entries);
@@ -61,12 +63,18 @@ export function createChangesInteractionStore() {
         byThread.set(threadId, { ...value, expandedStackBranches });
         return { byThread: cap(byThread) };
       }),
-    selectFile: (threadId, selectedFilePath) =>
+    selectFile: (threadId, selectedFilePath, selectedPullRequestNumber = null) =>
       set((state) => {
         const byThread = new Map(state.byThread);
         const value = byThread.get(threadId) ?? empty();
         byThread.delete(threadId);
-        byThread.set(threadId, { ...value, selectedFilePath });
+        byThread.set(threadId, {
+          ...value,
+          selectedFilePath,
+          selectedPullRequestNumber: selectedFilePath
+            ? selectedPullRequestNumber
+            : null,
+        });
         return { byThread: cap(byThread) };
       }),
   }));
