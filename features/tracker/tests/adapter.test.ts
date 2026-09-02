@@ -97,7 +97,8 @@ describe("Taskboard tracker adapter", () => {
     ).resolves.toMatchObject({
       visible: true,
       available: false,
-      message: "Taskboard plugin is not installed",
+      message:
+        "Linear integration is unavailable because the optional Taskboard plugin is not installed.",
     });
     const nonLinear = setup(
       vi

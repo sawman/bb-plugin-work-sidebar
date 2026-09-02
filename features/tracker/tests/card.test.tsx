@@ -280,6 +280,11 @@ describe("registered tracker card", () => {
       );
       await waitFor(() => expect(slot.getByText("Status")).toBeTruthy());
       expect(slot.getByText("Work items")).toBeTruthy();
+      if (typeof result === "object" && result && "available" in result && !result.available) {
+        await waitFor(() =>
+          expect(slot.getByPlaceholderText("Add BB task…")).toBeTruthy(),
+        );
+      }
       slot.lifecycle.unmount();
     }
   });

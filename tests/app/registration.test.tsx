@@ -16,6 +16,7 @@ describe("R2 app registration and Query lifecycle", () => {
     expect(app.settingsSections.map(({ id }) => id)).toEqual([
       "sidebar-appearance",
       "github-polling",
+      "optional-integrations",
     ]);
     expect(app.threadLists.map(({ id }) => id)).toEqual(["work-queue"]);
     expect(app.threadPanelActions.map(({ id }) => id)).toEqual([

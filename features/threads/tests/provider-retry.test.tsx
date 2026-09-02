@@ -64,8 +64,10 @@ describe("provider retry presentation and read contract", () => {
     });
     expect(status.textContent).toBe("1m");
     expect(status.querySelector('[data-icon="Clock"]')).toBeTruthy();
-    expect(status.getAttribute("title")).toBe("Rate limited; retry 2 in 1m.");
+    expect(status.getAttribute("aria-describedby")).toBeTruthy();
+    expect(view.getByRole("tooltip").textContent).toBe(
+      "Rate limited; retry 2 in 1m.",
+    );
     view.unmount();
   });
-
 });

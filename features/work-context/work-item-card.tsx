@@ -301,7 +301,7 @@ export function WorkItemCard({
             "Could not add Linear issue to Queue",
           );
         }}
-        linearSearch={tracker.data?.visible ? {
+        linearSearch={tracker.data?.visible && tracker.data.available ? {
           query: trackerQuery,
           options: (trackerQuery.trim() ? trackerSearch.data?.items ?? [] : tracker.data.suggestions)
             .map((item) => ({ value: item.key, label: item.key, detail: item.title }))
@@ -481,6 +481,7 @@ function WorkQueue({
     .filter((item) => !referenced({ source: "linear", id: item.value }))
     .map((item) => ({ value: `linear:${item.value}`, label: item.label, detail: item.detail }));
   const options = [...bbOptions, ...linearOptions];
+  const taskSources = linearSearch ? "BB or Linear" : "BB";
   const close = () => {
     setSearch("");
     setDestination("goal");
@@ -583,8 +584,8 @@ function WorkQueue({
           busy={linearSearch?.searching ?? false}
           disabled={pending}
           error={linearSearch?.error ?? null}
-          emptyMessage="No matching BB or Linear tasks."
-          listboxLabel="Available BB and Linear tasks"
+          emptyMessage={`No matching ${taskSources} tasks.`}
+          listboxLabel={`Available ${taskSources} tasks`}
           onDismiss={close}
           onOpenChange={setPickerOpen}
           onQueryChange={(value) => {
@@ -598,7 +599,7 @@ function WorkQueue({
           }}
           open={pickerOpen}
           options={options}
-          placeholder="Add BB or Linear task…"
+          placeholder={`Add ${taskSources} task…`}
           portal
           query={search}
           selectedValues={[]}

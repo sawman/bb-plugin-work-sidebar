@@ -4,6 +4,7 @@ import type {
   PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
+import { ActionTooltip } from "@/components/ui/action-tooltip";
 import { ThreadWorkspaceBadge } from "@/components/threads/thread-workspace-badge";
 import {
   ThreadProviderLogo,
@@ -145,18 +146,22 @@ export function ThreadStatus({
         />
       )}
       {providerRetry && (
-        <span
-          className="ws-provider-retry"
-          role="status"
-          aria-label={providerRetryLabel(providerRetry, providerRetryNow)}
-          title={providerRetryLabel(providerRetry, providerRetryNow)}
-          data-retry-reason={providerRetry.reason}
-        >
-          <Icon name="Clock" aria-hidden />
-          <span aria-hidden>
-            {providerRetryCountdown(providerRetry, providerRetryNow)}
-          </span>
-        </span>
+        <ActionTooltip label={providerRetryLabel(providerRetry, providerRetryNow)}>
+          {(tooltipId) => (
+            <span
+              className="ws-provider-retry"
+              role="status"
+              aria-label={providerRetryLabel(providerRetry, providerRetryNow)}
+              aria-describedby={tooltipId}
+              data-retry-reason={providerRetry.reason}
+            >
+              <Icon name="Clock" aria-hidden />
+              <span aria-hidden>
+                {providerRetryCountdown(providerRetry, providerRetryNow)}
+              </span>
+            </span>
+          )}
+        </ActionTooltip>
       )}
     </span>
   );

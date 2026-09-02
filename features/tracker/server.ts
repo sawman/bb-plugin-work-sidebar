@@ -83,12 +83,15 @@ function linksFrom(value: unknown, version: "v1" | "v2"): Links {
 }
 
 function unavailable(error: unknown): TrackerContext {
-  const message =
+  const detail =
     error instanceof Error ? error.message : "Linear is unavailable.";
+  const taskboardMissing = /(?:taskboard.*(?:not installed|not found)|(?:not installed|not found).*taskboard)/i.test(detail);
   return {
-    visible: !/Linear is not the selected tracker/i.test(message),
+    visible: !/Linear is not the selected tracker/i.test(detail),
     available: false,
-    message,
+    message: taskboardMissing
+      ? "Linear integration is unavailable because the optional Taskboard plugin is not installed."
+      : detail,
     primaryKey: null,
     suggestions: [],
     items: [],

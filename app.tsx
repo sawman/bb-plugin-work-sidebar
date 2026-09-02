@@ -58,6 +58,21 @@ function GitHubPollingSettings() {
   );
 }
 
+function OptionalIntegrationsSettings() {
+  return (
+    <section className="ws-settings-card" data-layout="narrow">
+      <strong>Optional integrations</strong>
+      <p>
+        Install and configure Taskboard to link Linear issues to Work items.
+      </p>
+      <small>
+        Without Taskboard, Linear controls stay hidden while BB Tasks and the
+        rest of Work Sidebar continue to work normally.
+      </small>
+    </section>
+  );
+}
+
 function TrackWorkAction() {
   const rpc = useRpc<typeof rpcContract>();
   const composer = useComposer();
@@ -109,6 +124,12 @@ export default definePluginApp((app) => {
     title: "GitHub polling",
     description: "Control Work Sidebar GitHub polling and shared REST budget.",
     component: withPluginProviders(GitHubPollingSettings),
+  });
+  app.slots.settingsSection({
+    id: "optional-integrations",
+    title: "Optional integrations",
+    description: "Enhance Work items with external tracker support.",
+    component: withPluginProviders(OptionalIntegrationsSettings),
   });
   app.slots.experimental_threadList({
     id: "work-queue",
