@@ -67,11 +67,13 @@ function RepositoryDetails({
   expanded,
   onToggle,
   onOpenFile,
+  preview,
 }: {
   repository: Repository;
   expanded: boolean;
   onToggle(): void;
   onOpenFile(path: string): void;
+  preview?: ReactNode;
 }) {
   const countLabel = `${expanded ? "Hide" : "Show"} ${repository.changedFileCount} working-tree file${repository.changedFileCount === 1 ? "" : "s"}`;
   return (
@@ -103,6 +105,7 @@ function RepositoryDetails({
       {expanded && repository.changedFileCount > 0 && (
         <RepositoryFiles repository={repository} onOpenFile={onOpenFile} />
       )}
+      {expanded && preview}
     </>
   );
 }
@@ -113,12 +116,14 @@ export function ChangesRepositoryCard({
   expanded,
   onToggle,
   onOpenFile,
+  preview,
 }: {
   repository: Repository | undefined;
   loading: boolean;
   expanded: boolean;
   onToggle(): void;
   onOpenFile(path: string): void;
+  preview?: ReactNode;
 }) {
   if (loading)
     return (
@@ -150,6 +155,7 @@ export function ChangesRepositoryCard({
           expanded={expanded}
           onToggle={onToggle}
           onOpenFile={onOpenFile}
+          preview={preview}
         />
       ) : (
         <p className="ws-card-note">
@@ -278,12 +284,14 @@ export function ChangesCurrentPullRequestRow({
   expanded,
   onToggle,
   onOpenFile,
+  preview,
 }: {
   pullRequest: CurrentPullRequestView;
   branch?: GitHubStackBranch | null;
   expanded: boolean;
   onToggle(): void;
   onOpenFile(path: string): void;
+  preview?: ReactNode;
 }) {
   const rowBranch = currentPullRequestBranch(pullRequest, branch);
   return (
@@ -306,6 +314,7 @@ export function ChangesCurrentPullRequestRow({
         onToggle={onToggle}
         onCheckout={() => undefined}
         onOpenFile={onOpenFile}
+        preview={preview}
         expandedDetails={
           <CurrentPullRequestDetails pullRequest={pullRequest} />
         }
@@ -339,6 +348,7 @@ export function ChangesStackBranchRow({
   onToggle,
   onCheckout,
   onOpenFile,
+  preview,
   expandedDetails,
 }: {
   branch: GitHubStackBranch;
@@ -348,6 +358,7 @@ export function ChangesStackBranchRow({
   onToggle(): void;
   onCheckout(): void;
   onOpenFile?: (path: string) => void;
+  preview?: ReactNode;
   expandedDetails?: ReactNode;
 }) {
   const pr = branch.pr;
@@ -448,6 +459,7 @@ export function ChangesStackBranchRow({
         <>
           {expandedDetails}
           <PullRequestFiles diff={branch.diff} onOpenFile={onOpenFile} />
+          {preview}
         </>
       )}
     </li>

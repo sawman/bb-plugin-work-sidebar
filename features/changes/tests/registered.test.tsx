@@ -408,9 +408,15 @@ describe("R13 registered Changes Work slot", () => {
         path: "renamed.ts",
       }),
     );
-    expect(
-      stack.getByRole("button", { name: "Close diff for renamed.ts" }),
-    ).toBeTruthy();
+    const file = stack.getByRole("button", {
+      name: "Open pull request diff for renamed.ts",
+    });
+    const close = stack.getByRole("button", {
+      name: "Close diff for renamed.ts",
+    });
+    expect(file.compareDocumentPosition(close)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     stack.lifecycle.unmount();
   });
 

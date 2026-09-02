@@ -86,6 +86,15 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
     changesQuery.data?.currentPullRequest?.number ??
     changesQuery.data?.stack?.currentPullRequest;
   const currentPullRequest = changesQuery.data?.currentPullRequest ?? null;
+  const selectedDiffPreview = selectedFilePath ? (
+    <ChangesWorkingTreePreview
+      path={selectedFilePath}
+      query={selectedPullRequestNumber ? pullRequestDiff : workingTreeDiff}
+      onClose={() =>
+        changesInteractionStore.getState().selectFile(threadId, null)
+      }
+    />
+  ) : null;
   const standaloneBranch = changesQuery.data?.stack
     ? null
     : githubStack?.branches.find(
@@ -139,16 +148,8 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
           changesInteractionStore.getState().toggleRepository(threadId)
         }
         onOpenFile={openWorkingTreeDiff}
+        preview={selectedPullRequestNumber === null ? selectedDiffPreview : null}
       />
-      {selectedFilePath && (
-        <ChangesWorkingTreePreview
-          path={selectedFilePath}
-          query={selectedPullRequestNumber ? pullRequestDiff : workingTreeDiff}
-          onClose={() =>
-            changesInteractionStore.getState().selectFile(threadId, null)
-          }
-        />
-      )}
       {changesQuery.isError && (
         <ChangesError
           error={changesQuery.error}
@@ -180,6 +181,11 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
                 onOpenFile={(path) => {
                   if (branch.pr) openPullRequestDiff(branch.pr.number, path);
                 }}
+                preview={
+                  branch.pr?.number === selectedPullRequestNumber
+                    ? selectedDiffPreview
+                    : null
+                }
               />
             ))}
           </ol>
@@ -196,6 +202,11 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
                 currentPullRequest.number,
                 path,
               )
+            }
+            preview={
+              currentPullRequest.number === selectedPullRequestNumber
+                ? selectedDiffPreview
+                : null
             }
           />
         ) : (

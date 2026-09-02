@@ -9,8 +9,8 @@ import { createChangesInteractionStore } from "../store";
 import { ChangesRepositoryCard, ChangesWorkingTreePreview } from "../views";
 
 vi.mock("@get-bb/plugin-sdk/app", () => ({
-  experimental_Diff: ({ patch, path }: { patch: string; path: string }) => <pre data-renderer="diff" data-path={path}>{patch}</pre>,
-  experimental_SourceCode: ({ content, path }: { content: string; path: string }) => <pre data-renderer="source" data-path={path}>{content}</pre>,
+  experimental_Diff: ({ patch, path, overflow }: { patch: string; path: string; overflow: string }) => <pre data-renderer="diff" data-path={path} data-overflow={overflow}>{patch}</pre>,
+  experimental_SourceCode: ({ content, path, overflow }: { content: string; path: string; overflow: string }) => <pre data-renderer="source" data-path={path} data-overflow={overflow}>{content}</pre>,
 }));
 
 afterEach(cleanup);
@@ -39,6 +39,11 @@ describe("R14 Changes interactions", () => {
 
     await waitFor(() => expect(rpc.call).toHaveBeenCalledOnce());
     await waitFor(() => expect(view.container.querySelector('[data-renderer="diff"]')?.getAttribute("data-path")).toBe("src/file.ts"));
+    expect(
+      view.container
+        .querySelector('[data-renderer="diff"]')
+        ?.getAttribute("data-overflow"),
+    ).toBe("wrap");
     expect(rpc.call).toHaveBeenCalledWith("getWorkingTreeFileDiff", {
       threadId: "thr_one",
       path: "src/file.ts",
@@ -73,6 +78,11 @@ describe("R14 Changes interactions", () => {
       />,
     );
     expect(preview.container.querySelector('[data-renderer="source"]')?.getAttribute("data-path")).toBe("notes.txt");
+    expect(
+      preview.container
+        .querySelector('[data-renderer="source"]')
+        ?.getAttribute("data-overflow"),
+    ).toBe("wrap");
 
     const store = createChangesInteractionStore();
     store.getState().selectFile("thr_one", "one.ts");

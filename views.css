@@ -2483,8 +2483,10 @@ button.ws-provider-health:focus-visible {
   color: var(--muted-foreground);
 }
 .ws-working-tree-diff {
+  min-width: 0;
   max-height: 32rem;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .ws-working-tree-diff .ws-card-heading {
   position: sticky;

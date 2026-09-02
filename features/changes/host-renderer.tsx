@@ -14,8 +14,8 @@ export function HostWorkingTreeRenderer({ file }: { file: Extract<WorkingTreeFil
       patch={file.patch}
       path={file.path}
       view="unified"
-      overflow="scroll"
+      overflow="wrap"
       showLineNumbers
     />;
-  return <SourceCode content={file.patch} path={file.path} overflow="scroll" />;
+  return <SourceCode content={file.patch} path={file.path} overflow="wrap" />;
 }
