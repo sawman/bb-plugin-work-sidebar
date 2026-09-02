@@ -44,7 +44,7 @@ export function ThreadRowMenu({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent aria-label={`Actions for ${title}`}>
+      <ContextMenuContent aria-label={`Actions for ${title}`} className="ws-thread-context-menu">
         <ContextMenuLabel>{title}</ContextMenuLabel>
         <ContextMenuItem onSelect={() => actions.setPinned(!isPinned)}>
           {isPinned ? "Unpin" : "Pin"}
@@ -102,10 +102,10 @@ export function ThreadRowMenu({
         <ContextMenuItem
           onSelect={() => (onMoveToRecycleBin ?? actions.archiveTree)(threadId)}
         >
-          Move to Recycle Bin
+          Recycle Bin
         </ContextMenuItem>
         <ContextMenuItem data-tone="destructive" onSelect={actions.archiveTree}>
-          Archive permanently
+          Archive
         </ContextMenuItem>
         <ContextMenuItem
           data-tone="destructive"

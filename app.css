@@ -214,6 +214,10 @@
   isolation: isolate;
   opacity: 1;
 }
+.ws-context-menu.ws-thread-context-menu {
+  min-width: 10rem;
+  max-width: 15rem;
+}
 .ws-context-menu-info {
   padding: 0.3rem 0.45rem;
   color: var(--muted-foreground);

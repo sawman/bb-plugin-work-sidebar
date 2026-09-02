@@ -270,7 +270,7 @@ describe("R9 production ThreadRow host behavior", () => {
     fireEvent.click(await slot.findByRole("menuitem", { name: "Delete" }));
     fireEvent.contextMenu(slot.getByRole("link", { name: /Parent/ }));
     fireEvent.click(
-      await slot.findByRole("menuitem", { name: "Archive permanently" }),
+      await slot.findByRole("menuitem", { name: "Archive" }),
     );
     expect(slot.inspection.sidebarActionCalls).toContainEqual({
       method: "archive",

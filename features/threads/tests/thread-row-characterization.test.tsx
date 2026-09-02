@@ -376,7 +376,7 @@ describe("R21D ThreadRow characterization", () => {
     const afterRename = renderRow();
     openMenu(afterRename);
     fireEvent.click(
-      afterRename.getByRole("menuitem", { name: "Archive permanently" }),
+      afterRename.getByRole("menuitem", { name: "Archive" }),
     );
     expect(host.actions.archive).toHaveBeenCalledWith(thread.id);
     openMenu(afterRename);
@@ -403,12 +403,13 @@ describe("R21D ThreadRow characterization", () => {
     expect(view.queryByRole("menuitem", { name: "Move down" })).toBeNull();
     const active = view.getByRole("menuitem", { name: "Active" });
     const later = view.getByRole("menuitem", { name: "Later" });
-    const recycle = view.getByRole("menuitem", { name: "Move to Recycle Bin" });
+    const recycle = view.getByRole("menuitem", { name: "Recycle Bin" });
     const permanentArchive = view.getByRole("menuitem", {
-      name: "Archive permanently",
+      name: "Archive",
     });
     const menuItems = view.getAllByRole("menuitem");
     expect(active.className).toBe(later.className);
+    expect(menu.classList).toContain("ws-thread-context-menu");
     expect(menu.querySelectorAll('[data-tone="destructive"]')).toHaveLength(2);
     expect(menuItems.slice(-3)).toEqual([recycle, permanentArchive, view.getByRole("menuitem", { name: "Delete" })]);
 

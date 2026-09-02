@@ -182,7 +182,7 @@ function RecycleBinRow({
             data-tone="destructive"
             onSelect={() => actions.archive(thread.id)}
           >
-            Archive permanently
+            Archive
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
