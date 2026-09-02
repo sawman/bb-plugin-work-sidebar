@@ -5,12 +5,21 @@ import type { ServerLifecycle } from "../../server-lifecycle.js";
 import type { PullRequestChangesAdapter } from "../../shared/server-composition-dependencies.js";
 import type { PluginRpcInput } from "../../shared/server-plugin-rpc.js";
 import type { SidebarStack } from "../../work-model.js";
-import { normalizePullRequestSignal } from "./presentation.js";
+import {
+  normalizePullRequestSignal,
+  pullRequestAttentionFromSignal,
+} from "./presentation.js";
 import {
   fetchGitHubStack,
+  needsGitHubPullRequestRecovery,
+  readGitHubPullRequestRest,
   readGitHubPullRequestDiff,
 } from "./server-stack.js";
-import type { CurrentPullRequest, GitHubReadRunner } from "./server-types.js";
+import type {
+  CurrentPullRequest,
+  GitHubPullRequest,
+  GitHubReadRunner,
+} from "./server-types.js";
 
 const GITHUB_STACK_PLUGIN_ID = "gh-stack";
 
@@ -69,6 +78,79 @@ function projectCurrentPullRequest(pullRequest: CurrentPullRequest): CurrentPull
     review: { ...pullRequest.review },
     mergeability: { ...pullRequest.mergeability },
     signal: { ...pullRequest.signal },
+  };
+}
+
+function currentPullRequestRecord(
+  pullRequest: CurrentPullRequest,
+): GitHubPullRequest {
+  return {
+    number: pullRequest.number,
+    state: pullRequest.state,
+    draft: pullRequest.state === "draft",
+    head: pullRequest.head,
+    base: pullRequest.base,
+    title: pullRequest.title,
+    url: pullRequest.url,
+    reviewCommentCount: pullRequest.signal.reviewCommentCount,
+  };
+}
+
+function restCurrentPullRequestState(
+  pullRequest: GitHubPullRequest,
+): CurrentPullRequest["state"] {
+  if (pullRequest.state === "merged") return "merged";
+  if (pullRequest.draft) return "draft";
+  return pullRequest.state === "closed" ? "closed" : "open";
+}
+
+function applyRestPullRequestRecovery(
+  current: CurrentPullRequest,
+  recovered: Awaited<ReturnType<typeof readGitHubPullRequestRest>>,
+): CurrentPullRequest {
+  if (!recovered) return current;
+  const { pullRequest, signal } = recovered;
+  return {
+    ...current,
+    title: pullRequest.title || current.title,
+    url: pullRequest.url || current.url,
+    state: restCurrentPullRequestState(pullRequest),
+    head: pullRequest.head || current.head,
+    base: pullRequest.base || current.base,
+    checks: recovered.checks,
+    review: {
+      reviewRequestCount: recovered.reviewRequestCount,
+      state: signal.review,
+    },
+    attention: pullRequestAttentionFromSignal(signal),
+    signal: { ...signal, reviewCommentCount: pullRequest.reviewCommentCount },
+  };
+}
+
+function mergeRecoveredStackBranches(
+  stack: GitHubStackProjection,
+  recovered: readonly (GitHubPullRequest & { checks: GitHubStackBranch["checks"]; review: GitHubStackBranch["review"] })[],
+): GitHubStackProjection {
+  const byNumber = new Map(recovered.map((pullRequest) => [pullRequest.number, pullRequest]));
+  return {
+    ...stack,
+    branches: stack.branches.map((branch) => {
+      const pullRequest = branch.pr ? byNumber.get(branch.pr.number) : null;
+      if (!pullRequest) return branch;
+      return {
+        ...branch,
+        name: branch.name || pullRequest.head,
+        pr: {
+          ...branch.pr!,
+          url: branch.pr!.url || pullRequest.url,
+          state: branch.pr!.state || pullRequest.state,
+          title: branch.pr!.title || pullRequest.title,
+          isDraft: branch.pr!.isDraft || pullRequest.draft,
+        },
+        checks: pullRequest.checks,
+        review: pullRequest.review,
+      };
+    }),
   };
 }
 
@@ -157,7 +239,7 @@ export function createThreadStackService(
       if (result.outcome !== "available") {
         return { currentPullRequest: null, stack: null, reason: result.outcome === "unavailable" ? result.message : "No GitHub pull request is linked to this branch." };
       }
-      const currentPullRequest = projectCurrentPullRequest({
+      let currentPullRequest = projectCurrentPullRequest({
         number: result.pullRequest.number, title: result.pullRequest.title, url: result.pullRequest.url, state: result.pullRequest.state,
         head: result.pullRequest.headRefName, base: result.pullRequest.baseRefName, checks: result.pullRequest.checks, review: result.pullRequest.review,
         attention: result.pullRequest.attention, mergeability: result.pullRequest.mergeability,
@@ -165,6 +247,18 @@ export function createThreadStackService(
       });
       const match = currentPullRequest.url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
       if (!match) return { currentPullRequest, stack: null, reason: "The linked pull request is not hosted on GitHub." };
+      if (needsGitHubPullRequestRecovery(currentPullRequestRecord(currentPullRequest))) {
+        currentPullRequest = applyRestPullRequestRecovery(
+          currentPullRequest,
+          await readGitHubPullRequestRest(
+            match[1],
+            match[2],
+            currentPullRequest.number,
+            lifecycle,
+            (args, buffer) => read(args, buffer),
+          ),
+        );
+      }
       const stack = await fetchGitHubStack(match[1], match[2], currentPullRequest.number, (args, buffer) => read(args, buffer), lifecycle);
       return stack ? { currentPullRequest, stack, reason: null } : { currentPullRequest, stack: null, reason: "This pull request is not part of a Stack." };
     } catch (error) {
@@ -175,7 +269,7 @@ export function createThreadStackService(
     const remote = await stackForThread(threadId);
     try {
       const payload = await githubStackCall("getStack", { threadId }, ghStackPayloadSchema);
-      const stack = payload.stack ? {
+      const payloadStack = payload.stack ? {
         ...payload.stack,
         branches: payload.stack.branches.map((branch) => ({ ...branch })),
       } : remote.stack ? {
@@ -199,6 +293,9 @@ export function createThreadStackService(
         trunkBehind: null,
         prunableBranchCount: null,
       } : null;
+      const stack = payloadStack && remote.stack
+        ? mergeRecoveredStackBranches(payloadStack, remote.stack.pullRequests)
+        : payloadStack;
       const stackWithChanges = await hydratePullRequestDiffs(
         stack,
         remote.currentPullRequest,

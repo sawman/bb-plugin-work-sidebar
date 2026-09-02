@@ -148,6 +148,47 @@ describe("GitHub Stack enrichment ownership", () => {
     expect(run).toHaveBeenCalledTimes(3);
   });
 
+  it("uses one REST recovery snapshot for incomplete stack PR metadata and signals", async () => {
+    const lifecycle = createServerLifecycle();
+    const run = vi.fn(async (args: readonly string[]) => {
+      if (args.some((value) => value.endsWith("/stacks"))) {
+        return JSON.stringify([{ number: 12, base: { ref: "main" }, pull_requests: [{
+          number: 12, state: "open", draft: false, title: "", html_url: "",
+        }] }]);
+      }
+      if (args.some((value) => value.endsWith("/reviews?per_page=100")))
+        return JSON.stringify([{ user: { login: "reviewer" }, state: "APPROVED" }]);
+      if (args.some((value) => value.includes("/check-runs?per_page=100")))
+        return JSON.stringify({ check_runs: [{ status: "completed", conclusion: "SUCCESS" }] });
+      if (args[1] === "graphql") throw new Error("GraphQL should not run after REST recovery");
+      return JSON.stringify({
+        title: "Recovered title",
+        html_url: "https://github.com/acme/repo/pull/12",
+        state: "open",
+        draft: false,
+        head: { ref: "feature/recovered", sha: "abc" },
+        base: { ref: "main" },
+        requested_reviewers: [{ login: "reviewer" }],
+        requested_teams: [],
+        review_comments: 4,
+      });
+    });
+
+    const stack = await fetchGitHubStack("acme", "repo", 12, run, lifecycle);
+
+    expect(stack?.pullRequests).toEqual([expect.objectContaining({
+      number: 12,
+      title: "Recovered title",
+      url: "https://github.com/acme/repo/pull/12",
+      head: "feature/recovered",
+      base: "main",
+      checks: "passing",
+      review: "approved",
+      requestedReviewers: ["reviewer"],
+    })]);
+    expect(run.mock.calls.some(([args]) => (args as readonly string[])[1] === "graphql")).toBe(false);
+  });
+
   it("recovers a missing stack-layer diff from the pull request files endpoint", async () => {
     const run = vi.fn(async () =>
       JSON.stringify([
@@ -284,6 +325,96 @@ describe("GitHub Stack enrichment ownership", () => {
           },
         ],
       },
+    });
+  });
+
+  it("normalizes an incomplete current PR through the same REST recovery path", async () => {
+    const bb = {
+      sdk: {
+        threads: { get: vi.fn(async () => ({ environmentId: "env_recovery" })) },
+        environments: {
+          pullRequest: vi.fn(async () => ({
+            outcome: "available",
+            pullRequest: {
+              number: 1280,
+              title: "",
+              url: "https://github.com/acme/repo/pull/1280",
+              state: "open",
+              headRefName: "",
+              baseRefName: "",
+              checks: { failedCount: 0, passedCount: 0, pendingCount: 0, state: "unknown", totalCount: 0 },
+              review: { reviewRequestCount: 0, state: "none" },
+              attention: "none",
+              mergeability: { mergeStateStatus: "UNKNOWN", mergeable: "UNKNOWN", state: "unknown" },
+            },
+          })),
+        },
+        plugins: {
+          callRpc: vi.fn(async () => ({
+            stack: {
+              trunk: "main",
+              currentBranch: "feature/current",
+              branches: [{
+                name: "feature/current",
+                isCurrent: true,
+                isMerged: false,
+                isQueued: false,
+                needsRebase: false,
+                hasStash: false,
+                stashCount: null,
+                pr: { number: 1280, url: "https://github.com/acme/repo/pull/1280", state: "open", title: null, isDraft: false, metadataStale: false },
+                diff: null,
+                aheadOfRemote: null,
+                behindRemote: null,
+              }],
+              trunkBehind: null,
+              prunableBranchCount: null,
+            },
+            pending: null,
+            error: null,
+            fetchedAt: Date.now(),
+          })),
+        },
+      },
+    };
+    const read = vi.fn(async (args: readonly string[]) => {
+      if (args.some((value) => value.endsWith("/stacks"))) {
+        return JSON.stringify([{ number: 1280, base: { ref: "main" }, pull_requests: [{
+          number: 1280, state: "open", draft: false, title: "", html_url: "",
+        }] }]);
+      }
+      if (args.some((value) => value.endsWith("/reviews?per_page=100"))) return "[]";
+      if (args.some((value) => value.includes("/check-runs?per_page=100")))
+        return JSON.stringify({ check_runs: [{ status: "completed", conclusion: "SUCCESS" }] });
+      if (args.some((value) => value.includes("/files?per_page=100"))) return "[]";
+      return JSON.stringify({
+        title: "Recovered current title",
+        html_url: "https://github.com/acme/repo/pull/1280",
+        state: "open",
+        draft: false,
+        head: { ref: "feature/current", sha: "def" },
+        base: { ref: "main" },
+        requested_reviewers: [],
+        requested_teams: [],
+        review_comments: 3,
+      });
+    });
+    const service = createThreadStackService(bb as never, createServerLifecycle(), read);
+
+    const result = await service.projection("thr_recovery");
+
+    expect(result.currentPullRequest).toMatchObject({
+      title: "Recovered current title",
+      head: "feature/current",
+      base: "main",
+      checks: { passedCount: 1, state: "passing", totalCount: 1 },
+      review: { reviewRequestCount: 0, state: "none" },
+      signal: { checks: "passing", review: "none", reviewCommentCount: 3 },
+    });
+    expect(result.githubStack?.stack?.branches[0]?.pr).toMatchObject({
+      title: "Recovered current title",
+      url: "https://github.com/acme/repo/pull/1280",
+      state: "open",
     });
   });
 });

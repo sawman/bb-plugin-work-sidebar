@@ -84,12 +84,16 @@ function parseStackPullRequest(value: unknown): GitHubPullRequest {
     number: requiredNumber(value.number, "pull request number"),
     state: requiredString(value.state, "pull request state"),
     draft: value.draft === true,
-    head: requiredString(head, "pull request head"),
+    head: typeof head === "string" ? head : "",
     base: typeof base === "string" ? base : "",
-    title: typeof value.title === "string" ? value.title : `Pull request #${value.number}`,
+    title: typeof value.title === "string" ? value.title.trim() : "",
     url: typeof value.html_url === "string" ? value.html_url : "",
     reviewCommentCount: typeof value.review_comments === "number" && Number.isFinite(value.review_comments) ? value.review_comments : 0,
   };
+}
+
+export function needsGitHubPullRequestRecovery(pullRequest: GitHubPullRequest) {
+  return !pullRequest.title || !pullRequest.url || !pullRequest.head || !pullRequest.base;
 }
 
 export function parseGitHubStacksResponse(value: unknown): Array<{ number: number; base: string; pullRequests: GitHubPullRequest[] }> {
@@ -192,6 +196,19 @@ function signalKey(owner: string, repo: string, number: number) {
   return `${owner}/${repo}#${number}`.toLowerCase();
 }
 
+export type GitHubRestPullRequest = {
+  pullRequest: GitHubPullRequest;
+  signal: GitHubSignal;
+  checks: {
+    failedCount: number;
+    passedCount: number;
+    pendingCount: number;
+    state: "failing" | "no_checks" | "passing" | "pending" | "unknown";
+    totalCount: number;
+  };
+  reviewRequestCount: number;
+};
+
 function graphQlRateLimited(error: unknown) {
   return /graphql_rate_limit|API rate limit already exceeded|secondary rate limit/i.test(error instanceof Error ? error.message : String(error));
 }
@@ -241,7 +258,8 @@ export async function readGitHubSignals(
     const key = signalKey(owner, repo, number);
     const pending = lifecycle.githubPullRequestSignalPending.get(key);
     if (pending) return [number, await pending] as const;
-    const request = readRestSignal(owner, repo, number, lifecycle, run)
+    const request = readGitHubPullRequestRest(owner, repo, number, lifecycle, run)
+      .then((recovered) => recovered?.signal ?? null)
       .finally(() => lifecycle.releasePending("pullRequestSignal", key));
     lifecycle.githubPullRequestSignalPending.set(key, request);
     return [number, await request] as const;
@@ -252,13 +270,13 @@ export async function readGitHubSignals(
   return signals;
 }
 
-async function readRestSignal(
+export async function readGitHubPullRequestRest(
   owner: string,
   repo: string,
   number: number,
   lifecycle: ServerLifecycle,
   run: GitHubApiRunner,
-): Promise<GitHubSignal | null> {
+): Promise<GitHubRestPullRequest | null> {
   try {
     const headers = ["-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`];
     const [pullRequestText, reviewsText] = await Promise.all([
@@ -292,18 +310,51 @@ async function readRestSignal(
       : reviewStates.includes("APPROVED") ? "approved"
         : requests > 0 ? "review_requested" : "none";
     const sha = isRecord(pullRequest.head) && typeof pullRequest.head.sha === "string" ? pullRequest.head.sha : null;
-    if (!sha) return { checks: "unknown", review, ...metadata };
+    const recoveredPullRequest: GitHubPullRequest = {
+      number,
+      state: pullRequest.merged === true ? "merged" : typeof pullRequest.state === "string" ? pullRequest.state : "open",
+      draft: pullRequest.draft === true,
+      head: head ?? "",
+      base: base ?? "",
+      title: typeof pullRequest.title === "string" ? pullRequest.title.trim() : "",
+      url: typeof pullRequest.html_url === "string" ? pullRequest.html_url : `https://github.com/${owner}/${repo}/pull/${number}`,
+      reviewCommentCount: typeof pullRequest.review_comments === "number" && Number.isFinite(pullRequest.review_comments) ? pullRequest.review_comments : 0,
+    };
+    if (!sha) {
+      const signal = { checks: "unknown", review, ...metadata } satisfies GitHubSignal;
+      return {
+        pullRequest: recoveredPullRequest,
+        signal,
+        checks: { failedCount: 0, passedCount: 0, pendingCount: 0, state: "unknown", totalCount: 0 },
+        reviewRequestCount: requests,
+      };
+    }
     const checks = JSON.parse(await run([
       "api", "--method", "GET", `repos/${owner}/${repo}/commits/${sha}/check-runs?per_page=100`,
       ...headers,
     ], 4_000_000)) as unknown;
     const runs = isRecord(checks) && Array.isArray(checks.check_runs) ? checks.check_runs : [];
+    const failedStates = new Set(["FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE"]);
     const conclusions = runs.map((item) => isRecord(item) ? String(item.conclusion ?? "") : "");
-    const failed = conclusions.some((state) => ["FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE"].includes(state));
-    const pending = runs.some((item) => !isRecord(item) || item.status !== "completed" || item.conclusion === null);
+    const failedCount = conclusions.filter((state) => failedStates.has(state)).length;
+    const pendingCount = runs.filter((item) => !isRecord(item) || item.status !== "completed" || item.conclusion === null).length;
+    const passedCount = conclusions.filter((state) => state === "SUCCESS").length;
+    const failed = failedCount > 0;
+    const pending = pendingCount > 0;
     const signal = { checks: failed ? "failed" : pending ? "pending" : runs.length ? "passing" : "none", review, ...metadata } satisfies GitHubSignal;
     lifecycle.cacheGitHubPullRequestSignal(signalKey(owner, repo, number), signal, Date.now() + GITHUB_SIGNAL_CACHE_MS);
-    return signal;
+    return {
+      pullRequest: recoveredPullRequest,
+      signal,
+      checks: {
+        failedCount,
+        passedCount,
+        pendingCount,
+        state: failed ? "failing" : pending ? "pending" : runs.length ? "passing" : "no_checks",
+        totalCount: runs.length,
+      },
+      reviewRequestCount: requests,
+    };
   } catch {
     return null;
   }
@@ -319,26 +370,11 @@ export async function fetchGitHubStack(
   const raw = parseGitHubStackResponse(JSON.parse(await run(githubStackApiArgs(owner, repo, pullRequest), 4_000_000)));
   if (!raw) return null;
   const pullRequests = await Promise.all(raw.pullRequests.map(async (item) => {
-    if (item.url) return item;
-    try {
-      const details = JSON.parse(await run([
-        "api", "--method", "GET", `repos/${owner}/${repo}/pulls/${item.number}`,
-        "-H", `Accept: ${GITHUB_ACCEPT_HEADER}`,
-        "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`,
-      ], 2_000_000)) as unknown;
-      if (!isRecord(details)) return item;
-      return {
-        ...item,
-        title: typeof details.title === "string" ? details.title : item.title,
-        url: typeof details.html_url === "string" ? details.html_url : `https://github.com/${owner}/${repo}/pull/${item.number}`,
-        state: details.merged === true ? "merged" : typeof details.state === "string" ? details.state : item.state,
-        draft: typeof details.draft === "boolean" ? details.draft : item.draft,
-        head: isRecord(details.head) && typeof details.head.ref === "string" ? details.head.ref : item.head,
-        base: isRecord(details.base) && typeof details.base.ref === "string" ? details.base.ref : item.base,
-      };
-    } catch {
-      return { ...item, url: `https://github.com/${owner}/${repo}/pull/${item.number}` };
-    }
+    if (!needsGitHubPullRequestRecovery(item)) return item;
+    const recovered = await readGitHubPullRequestRest(owner, repo, item.number, lifecycle, run);
+    if (!recovered) return { ...item, url: item.url || `https://github.com/${owner}/${repo}/pull/${item.number}` };
+    lifecycle.cacheGitHubPullRequestSignal(signalKey(owner, repo, item.number), recovered.signal, Date.now() + GITHUB_SIGNAL_CACHE_MS);
+    return { ...item, ...recovered.pullRequest };
   }));
   const signals = await readGitHubSignals(owner, repo, pullRequests.map((item) => item.number), lifecycle, run);
   return {
