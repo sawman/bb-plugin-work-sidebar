@@ -307,7 +307,7 @@ describe("R13 Changes error presentation", () => {
     );
   });
 
-  it("renders additions and deletions in separate accessible count columns", () => {
+  it("uses the shared accessible line-delta presentation in summaries and file columns", () => {
     render(
       <ChangesStackBranchRow
         branch={stackBranch({
@@ -343,16 +343,31 @@ describe("R13 Changes error presentation", () => {
     const additions = screen.getAllByLabelText(/lines? added$/);
     const deletions = screen.getAllByLabelText(/lines? deleted$/);
     expect(additions.map((count) => count.textContent)).toEqual([
+      "+1241",
       "+1",
       "+1234",
     ]);
-    expect(deletions.map((count) => count.textContent)).toEqual(["−23", "−4"]);
+    expect(deletions.map((count) => count.textContent)).toEqual([
+      "−134",
+      "−23",
+      "−4",
+    ]);
     expect(
-      additions.every((count) => count.classList.contains("ws-file-additions")),
+      additions.every((count) => count.classList.contains("ws-line-delta-additions")),
     ).toBe(true);
     expect(
-      deletions.every((count) => count.classList.contains("ws-file-deletions")),
+      deletions.every((count) => count.classList.contains("ws-line-delta-deletions")),
     ).toBe(true);
+    expect(
+      additions
+        .filter((count) => count.classList.contains("ws-file-additions"))
+        .map((count) => count.textContent),
+    ).toEqual(["+1", "+1234"]);
+    expect(
+      deletions
+        .filter((count) => count.classList.contains("ws-file-deletions"))
+        .map((count) => count.textContent),
+    ).toEqual(["−23", "−4"]);
   });
 
   it("keeps title, checkout, and trailing disclosure interactions isolated", () => {

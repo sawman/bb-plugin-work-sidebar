@@ -16,6 +16,7 @@ import {
 } from "../pull-requests/presentation.js";
 import { HostWorkingTreeRenderer } from "./host-renderer.js";
 import { ChangedFilesList } from "./file-list.js";
+import { ChangeLineDeltas } from "./line-deltas.js";
 import type { Repository, WorkingTreeFileDiff } from "./schemas.js";
 import { repositoryPresentation, type StackBranchSignals } from "./model";
 import { StackBranchActions } from "./stack-branch-actions.js";
@@ -93,8 +94,11 @@ function RepositoryDetails({
           >
             <b>{repository.changedFileCount}</b> file
             {repository.changedFileCount === 1 ? "" : "s"}{" "}
-            <i>+{repository.changedInsertions}</i>{" "}
-            <em>−{repository.changedDeletions}</em>
+            <ChangeLineDeltas
+              additions={repository.changedInsertions}
+              deletions={repository.changedDeletions}
+              className="ws-repository-line-deltas"
+            />
             <Icon
               className="ws-changes-disclosure-icon"
               name={expanded ? "ChevronDown" : "ChevronRight"}
@@ -455,8 +459,11 @@ export function ChangesStackBranchRow({
             {branch.diff ? (
               <>
                 {" "}
-                · <b>+{branch.diff.additions}</b>{" "}
-                <i>−{branch.diff.deletions}</i>
+                · <ChangeLineDeltas
+                  additions={branch.diff.additions}
+                  deletions={branch.diff.deletions}
+                  className="ws-stack-line-deltas"
+                />
               </>
             ) : null}
           </small>

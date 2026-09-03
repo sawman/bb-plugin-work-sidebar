@@ -1,4 +1,5 @@
 import type { ReactElement } from "react";
+import { ChangeLineDelta } from "./line-deltas.js";
 
 export type ChangedFileListItem = {
   path: string;
@@ -27,28 +28,16 @@ function ChangedFileRow({
         {status[0]?.toUpperCase()}
       </b>
       <em>{file.path}</em>
-      <small
+      <ChangeLineDelta
+        kind="additions"
+        value={file.additions}
         className="ws-file-additions"
-        aria-label={
-          file.additions === null
-            ? undefined
-            : `${file.additions} ${file.additions === 1 ? "line" : "lines"} added`
-        }
-        aria-hidden={file.additions === null ? true : undefined}
-      >
-        {file.additions === null ? "" : `+${file.additions}`}
-      </small>
-      <small
+      />
+      <ChangeLineDelta
+        kind="deletions"
+        value={file.deletions}
         className="ws-file-deletions"
-        aria-label={
-          file.deletions === null
-            ? undefined
-            : `${file.deletions} ${file.deletions === 1 ? "line" : "lines"} deleted`
-        }
-        aria-hidden={file.deletions === null ? true : undefined}
-      >
-        {file.deletions === null ? "" : `−${file.deletions}`}
-      </small>
+      />
     </>
   );
   return onOpenFile ? (

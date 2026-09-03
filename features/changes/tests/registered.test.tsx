@@ -396,8 +396,16 @@ describe("R13 registered Changes Work slot", () => {
     expect(disclosure.getAttribute("aria-expanded")).toBe("true");
     expect(trailingDisclosure.getAttribute("aria-expanded")).toBe("true");
     expect(stack.getByText("renamed.ts")).toBeTruthy();
-    expect(stack.getByLabelText("2 lines added").textContent).toBe("+2");
-    expect(stack.getByLabelText("1 line deleted").textContent).toBe("−1");
+    expect(
+      stack.getAllByLabelText("2 lines added")
+        .find((count) => count.classList.contains("ws-file-additions"))
+        ?.textContent,
+    ).toBe("+2");
+    expect(
+      stack.getAllByLabelText("1 line deleted")
+        .find((count) => count.classList.contains("ws-file-deletions"))
+        ?.textContent,
+    ).toBe("−1");
     fireEvent.click(
       stack.getByRole("button", {
         name: "Open pull request diff for renamed.ts",

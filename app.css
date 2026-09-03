@@ -1,3 +1,8 @@
+:root {
+  /* Shared overlays stay distinct without the bright halo of host popovers. */
+  --ws-overlay-shadow: 0 0.12rem 0.45rem
+    color-mix(in srgb, var(--foreground) 12%, transparent);
+}
 .ws-list,
 .ws-panel {
   color: var(--foreground);
@@ -190,8 +195,7 @@
   border-radius: var(--radius);
   padding: 0.28rem;
   background: color-mix(in srgb, var(--background) 96%, var(--foreground) 4%);
-  box-shadow: 0 0.5rem 1.5rem
-    color-mix(in srgb, var(--foreground) 20%, transparent);
+  box-shadow: var(--ws-overlay-shadow);
   color: var(--popover-foreground);
   isolation: isolate;
   opacity: 1;

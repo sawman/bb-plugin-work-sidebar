@@ -1632,15 +1632,6 @@
   line-height: inherit;
   color: var(--muted-foreground);
 }
-.ws-stack-layer-toggle small b {
-  color: var(--success);
-  font: var(--ws-text-subtext);
-  line-height: inherit;
-}
-.ws-stack-layer-toggle small i {
-  color: var(--destructive);
-  font-style: normal;
-}
 .ws-stack-expand {
   display: grid;
   place-items: center;
@@ -1765,17 +1756,38 @@ button.ws-change-file-row:hover {
   font: var(--ws-text-metadata);
   line-height: inherit;
 }
-.ws-stack-files small.ws-file-additions {
-  color: var(--success);
+.ws-line-deltas {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.18rem;
+  font: inherit;
   font-variant-numeric: tabular-nums;
+  line-height: inherit;
+  white-space: nowrap;
+}
+.ws-line-delta {
+  display: inline-block;
+  color: var(--muted-foreground);
+  font: inherit;
+  line-height: inherit;
   text-align: right;
   white-space: nowrap;
 }
-.ws-stack-files small.ws-file-deletions {
+.ws-line-delta-additions {
+  color: var(--success);
+}
+.ws-line-delta-deletions {
   color: var(--destructive);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  white-space: nowrap;
+}
+.ws-change-file-row .ws-line-delta {
+  min-width: 5ch;
+}
+.ws-stack-line-deltas {
+  margin-left: 0.1rem;
+  vertical-align: baseline;
+}
+.ws-repository-line-deltas {
+  margin-left: 0.04rem;
 }
 .ws-stack-files-truncated {
   padding-top: 0.1rem;
@@ -1797,7 +1809,7 @@ button.ws-change-file-row:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--popover);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--foreground) 18%, transparent);
+  box-shadow: var(--ws-overlay-shadow);
   /* R17 important: host popover placement must overlay the sticky toolbar from the top. */
   top: calc(100% + 0.2rem) !important;
   /* R17 important: host popover placement must not anchor below the sticky toolbar. */
@@ -1973,14 +1985,6 @@ button.ws-change-file-row:hover {
 .ws-repository-changes-toggle b {
   font: inherit;
   line-height: inherit;
-}
-.ws-repository-changes-toggle i {
-  color: var(--success);
-  font-style: normal;
-}
-.ws-repository-changes-toggle em {
-  color: var(--destructive);
-  font-style: normal;
 }
 .ws-work-context-cards {
   display: grid;
@@ -3046,8 +3050,7 @@ button.ws-provider-health:focus-visible {
   border-radius: var(--radius);
   padding: 0.35rem;
   background: var(--popover);
-  box-shadow: 0 0.35rem 1rem
-    color-mix(in srgb, var(--foreground) 18%, transparent);
+  box-shadow: var(--ws-overlay-shadow);
   color: var(--popover-foreground);
 }
 .ws-search-shell-content[data-portalled="true"] {
@@ -3519,8 +3522,7 @@ button.ws-provider-health:focus-visible {
   border-radius: 3px;
   padding: 0.12rem;
   background: var(--popover);
-  box-shadow: 0 0.35rem 1rem
-    color-mix(in srgb, var(--foreground) 18%, transparent);
+  box-shadow: var(--ws-overlay-shadow);
 }
 .ws-assignee-options button {
   display: flex;
@@ -3879,7 +3881,7 @@ button.ws-provider-health:focus-visible {
   overflow: hidden;
   border: 1px solid var(--border);
   background: var(--popover);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--ws-overlay-shadow);
 }
 .ws-task-workflow-status-options > button {
   display: flex;
@@ -3989,7 +3991,7 @@ button.ws-provider-health:focus-visible {
   gap: 0.38rem;
   margin-top: 0;
   border-top: 0;
-  padding-top: 0.3rem;
+  padding-top: 0.16rem;
 }
 .ws-work-item-destination {
   display: inline-flex;
