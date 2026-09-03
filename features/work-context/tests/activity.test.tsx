@@ -216,8 +216,8 @@ describe("registered Status activity lifecycle", () => {
     expect(slot.getByRole("progressbar", { name: "Weekly usage" }).getAttribute("data-tone")).toBe("critical");
     const userCopy = slot.getByText("User request");
     const agentCopy = slot.getByText("Agent reply");
-    expect(userCopy.nextElementSibling?.textContent).toBe("5m ago");
-    expect(agentCopy.nextElementSibling?.textContent).toBe("1h ago");
+    expect(userCopy.nextElementSibling?.textContent).toBe("5m");
+    expect(agentCopy.nextElementSibling?.textContent).toBe("1h");
     const providerIcon = slot.getByRole("img", {
       name: "Codex provider status: Ready · 100% used",
     });
@@ -232,9 +232,9 @@ describe("registered Status activity lifecycle", () => {
   it("formats compact activity ages", () => {
     const now = Date.UTC(2026, 8, 3, 12);
     expect(formatActivityAge(now - 30_000, now)).toBe("now");
-    expect(formatActivityAge(now - 12 * 60_000, now)).toBe("12m ago");
-    expect(formatActivityAge(now - 3 * 60 * 60_000, now)).toBe("3h ago");
-    expect(formatActivityAge(now - 2 * 24 * 60 * 60_000, now)).toBe("2d ago");
+    expect(formatActivityAge(now - 12 * 60_000, now)).toBe("12m");
+    expect(formatActivityAge(now - 3 * 60 * 60_000, now)).toBe("3h");
+    expect(formatActivityAge(now - 2 * 24 * 60 * 60_000, now)).toBe("2d");
   });
 
   it("preserves source timestamps in the latest conversation projection", () => {

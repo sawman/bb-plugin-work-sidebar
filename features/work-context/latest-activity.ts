@@ -5,10 +5,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function formatActivityAge(createdAt: number, now = Date.now()) {
   const elapsedMinutes = Math.max(0, Math.floor((now - createdAt) / 60_000));
   if (elapsedMinutes < 1) return "now";
-  if (elapsedMinutes < 60) return `${elapsedMinutes}m ago`;
+  if (elapsedMinutes < 60) return `${elapsedMinutes}m`;
   const elapsedHours = Math.floor(elapsedMinutes / 60);
-  if (elapsedHours < 24) return `${elapsedHours}h ago`;
-  return `${Math.floor(elapsedHours / 24)}d ago`;
+  if (elapsedHours < 24) return `${elapsedHours}h`;
+  return `${Math.floor(elapsedHours / 24)}d`;
 }
 
 export function projectLatestActivity(
