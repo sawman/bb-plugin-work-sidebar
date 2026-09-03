@@ -229,6 +229,23 @@ describe("pull-request stack number presentation", () => {
     ).toBeNull();
   });
 
+  it("spins a pending-check PR badge", () => {
+    render(
+      <PullRequestIdentifierBadge
+        kind="pull-request"
+        number={42}
+        presentation={{ icon: "LoaderCircle", label: "Checks pending", tone: "muted" }}
+      />,
+    );
+
+    expect(
+      screen
+        .getByRole("button", { name: "Copy PR number #42" })
+        .querySelector('[data-icon="LoaderCircle"]')
+        ?.getAttribute("data-motion"),
+    ).toBe("spin");
+  });
+
   it("opens a uniquely linked thread from its provider in the trailing rail", () => {
     const provider = { id: "codex", displayName: "Codex", logoUrl: null };
     const openThread = vi.fn();

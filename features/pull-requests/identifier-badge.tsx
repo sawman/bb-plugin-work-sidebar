@@ -42,6 +42,9 @@ export function PullRequestIdentifierBadge(
     >
       <Icon
         name={identifier.presentation?.icon ?? "GitPullRequest"}
+        data-motion={
+          identifier.presentation?.icon === "LoaderCircle" ? "spin" : undefined
+        }
         aria-hidden
       />
       <span>{value}</span>

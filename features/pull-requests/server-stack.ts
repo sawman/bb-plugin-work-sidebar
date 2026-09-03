@@ -63,11 +63,18 @@ function reviewerIdentity(value: string) {
   return value.trim().toLowerCase();
 }
 
+function flattenRestReviewPages(value: unknown): unknown[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) =>
+    Array.isArray(entry) ? flattenRestReviewPages(entry) : [entry],
+  );
+}
+
 /** Returns one latest review state per person, ignoring malformed entries. */
 function latestReviewerStates(value: unknown, source: ReviewSource) {
   const reviews = source === "graphql"
     ? isRecord(value) && Array.isArray(value.nodes) ? value.nodes : []
-    : Array.isArray(value) ? value : [];
+    : flattenRestReviewPages(value);
   const latest = new Map<string, { state: string; submittedAt: number }>();
   for (const review of reviews) {
     if (!isRecord(review)) continue;
@@ -342,8 +349,8 @@ export async function readGitHubSignals(
         [
           `p${index}: pullRequest(number: ${number}) {`,
           "headRefName baseRefName reviewDecision",
-          "reviewRequests(first: 20) { totalCount nodes { requestedReviewer { ... on User { login } ... on Team { slug } } } }",
-          "latestReviews(first: 100) { nodes { author { login } state submittedAt } }",
+          "reviewRequests(first: 100) { totalCount nodes { requestedReviewer { ... on User { login } ... on Team { slug } } } }",
+          "latestReviews(last: 100) { nodes { author { login } state submittedAt } }",
           "commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }",
           "}",
         ].join(" "),
@@ -390,7 +397,7 @@ export async function readGitHubPullRequestRest(
     const headers = ["-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`];
     const [pullRequestText, reviewsText] = await Promise.all([
       run(["api", "--method", "GET", `repos/${owner}/${repo}/pulls/${number}`, ...headers], 2_000_000),
-      run(["api", "--method", "GET", `repos/${owner}/${repo}/pulls/${number}/reviews?per_page=100`, ...headers], 2_000_000),
+      run(["api", "--method", "GET", "--paginate", "--slurp", `repos/${owner}/${repo}/pulls/${number}/reviews?per_page=100`, ...headers], 2_000_000),
     ]);
     const pullRequest = JSON.parse(pullRequestText) as unknown;
     const reviews = JSON.parse(reviewsText) as unknown;

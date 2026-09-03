@@ -15,11 +15,13 @@ import {
   readGitHubPullRequestFilePatch,
   readGitHubPullRequestRest,
   readGitHubPullRequestDiff,
+  readGitHubSignals,
 } from "./server-stack.js";
 import type {
   CurrentPullRequest,
   GitHubPullRequest,
   GitHubReadRunner,
+  GitHubSignal,
 } from "./server-types.js";
 
 const GITHUB_STACK_PLUGIN_ID = "gh-stack";
@@ -125,6 +127,37 @@ function applyRestPullRequestRecovery(
     },
     attention: pullRequestAttentionFromSignal(signal),
     signal: { ...signal, reviewCommentCount: pullRequest.reviewCommentCount },
+  };
+}
+
+/** GitHub facts refresh review/check state; BB still owns branch-local details. */
+function applyGitHubPullRequestSignal(
+  current: CurrentPullRequest,
+  signal: GitHubSignal | undefined,
+): CurrentPullRequest {
+  if (!signal) return current;
+  const checkState = signal.checks === "failed"
+    ? "failing"
+    : signal.checks === "none"
+      ? "no_checks"
+      : signal.checks;
+  return {
+    ...current,
+    checks: {
+      ...current.checks,
+      state: checkState,
+    },
+    review: {
+      reviewRequestCount: signal.requestedReviewers?.length ?? current.review.reviewRequestCount,
+      state: signal.review,
+    },
+    attention: current.attention === "conflicts"
+      ? current.attention
+      : pullRequestAttentionFromSignal(signal),
+    signal: {
+      ...signal,
+      reviewCommentCount: current.signal.reviewCommentCount,
+    },
   };
 }
 
@@ -261,6 +294,19 @@ export function createThreadStackService(
         );
       }
       const stack = await fetchGitHubStack(match[1], match[2], currentPullRequest.number, (args, buffer) => read(args, buffer), lifecycle);
+      const signal = stack?.pullRequests.find((pullRequest) =>
+        pullRequest.number === currentPullRequest.number,
+      ) ?? (await readGitHubSignals(
+        match[1],
+        match[2],
+        [currentPullRequest.number],
+        lifecycle,
+        (args, buffer) => read(args, buffer),
+      )).get(currentPullRequest.number);
+      currentPullRequest = applyGitHubPullRequestSignal(
+        currentPullRequest,
+        signal,
+      );
       return stack ? { currentPullRequest, stack, reason: null } : { currentPullRequest, stack: null, reason: "This pull request is not part of a Stack." };
     } catch (error) {
       return { currentPullRequest: null, stack: null, reason: error instanceof Error ? `Pull request unavailable: ${error.message}` : "Pull request unavailable." };

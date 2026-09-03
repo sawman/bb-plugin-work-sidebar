@@ -120,7 +120,12 @@ describe("GitHub Stack enrichment ownership", () => {
     expect(run.mock.calls[0]?.[0].join(" ")).toContain(
       "requestedReviewer",
     );
-    expect(run.mock.calls[0]?.[0].join(" ")).toContain("latestReviews");
+    expect(run.mock.calls[0]?.[0].join(" ")).toContain(
+      "reviewRequests(first: 100)",
+    );
+    expect(run.mock.calls[0]?.[0].join(" ")).toContain(
+      "latestReviews(last: 100)",
+    );
   });
 
   it("retains branch metadata when authored PR signals fall back to REST", async () => {
@@ -157,6 +162,11 @@ describe("GitHub Stack enrichment ownership", () => {
       requestedReviewers: ["reviewer-one", "platform-team"],
     });
     expect(run).toHaveBeenCalledTimes(3);
+    expect(
+      run.mock.calls.find(([args]) =>
+        (args as readonly string[]).some((value) => value.endsWith("/reviews?per_page=100")),
+      )?.[0],
+    ).toEqual(expect.arrayContaining(["--paginate", "--slurp"]));
   });
 
   it("uses one REST recovery snapshot for incomplete stack PR metadata and signals", async () => {
@@ -361,6 +371,15 @@ describe("GitHub Stack enrichment ownership", () => {
     const read = vi.fn(async (args: readonly string[]) =>
       args.some((value) => value.endsWith("/stacks"))
         ? "[]"
+        : args[1] === "graphql"
+          ? JSON.stringify({ data: { repository: { p0: {
+            headRefName: "deps/upgrade-pulumi",
+            baseRefName: "main",
+            reviewDecision: "REVIEW_REQUIRED",
+            reviewRequests: { totalCount: 0, nodes: [] },
+            latestReviews: { nodes: [] },
+            commits: { nodes: [{ commit: { statusCheckRollup: { state: "FAILURE" } } }] },
+          } } } })
         : JSON.stringify([
             {
               filename: ".github/workflows/ci_pulumi_preview.yml",
@@ -378,6 +397,11 @@ describe("GitHub Stack enrichment ownership", () => {
 
     const result = await service.projection("thr_pulumi");
 
+    expect(result.currentPullRequest).toMatchObject({
+      checks: { state: "failing" },
+      review: { state: "review_required" },
+      signal: { checks: "failed", review: "review_required" },
+    });
     expect(result.githubStack?.stack?.branches).toHaveLength(1);
     expect(result.githubStack?.stack?.branches[0]).toMatchObject({
       name: "deps/upgrade-pulumi",
@@ -393,6 +417,59 @@ describe("GitHub Stack enrichment ownership", () => {
           },
         ],
       },
+    });
+  });
+
+  it("overlays a current PR with its fresh re-requested reviewer signal", async () => {
+    const bb = {
+      sdk: {
+        threads: { get: vi.fn(async () => ({ environmentId: "env_current" })) },
+        environments: {
+          pullRequest: vi.fn(async () => ({
+            outcome: "available",
+            pullRequest: {
+              number: 1402,
+              title: "Fresh review state",
+              url: "https://github.com/acme/repo/pull/1402",
+              state: "open",
+              headRefName: "feature/current",
+              baseRefName: "main",
+              checks: { failedCount: 0, passedCount: 1, pendingCount: 0, state: "passing", totalCount: 1 },
+              review: { reviewRequestCount: 0, state: "changes_requested" },
+              attention: "changes_requested",
+              mergeability: { mergeStateStatus: "CLEAN", mergeable: "MERGEABLE", state: "mergeable" },
+            },
+          })),
+        },
+      },
+    };
+    const read = vi.fn(async (args: readonly string[]) => {
+      if (args.some((value) => value.endsWith("/stacks"))) {
+        return JSON.stringify([{ number: 1402, base: { ref: "main" }, pull_requests: [{
+          number: 1402, state: "open", draft: false, title: "Fresh review state",
+          html_url: "https://github.com/acme/repo/pull/1402",
+          head: { ref: "feature/current" }, base: { ref: "main" },
+        }] }]);
+      }
+      if (args[1] === "graphql") {
+        return JSON.stringify({ data: { repository: { p0: {
+          headRefName: "feature/current", baseRefName: "main",
+          reviewDecision: "CHANGES_REQUESTED",
+          reviewRequests: { totalCount: 1, nodes: [{ requestedReviewer: { login: "octocat" } }] },
+          latestReviews: { nodes: [{ author: { login: "octocat" }, state: "CHANGES_REQUESTED", submittedAt: "2026-09-04T00:00:00Z" }] },
+          commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
+        } } } });
+      }
+      throw new Error(`Unexpected GitHub request: ${args.join(" ")}`);
+    });
+    const service = createThreadStackService(bb as never, createServerLifecycle(), read);
+
+    const result = await service.sidebarThreadPullRequests({ threadIds: ["thr_current"] });
+
+    expect(result.pullRequests.thr_current).toMatchObject({
+      review: { reviewRequestCount: 1, state: "review_required" },
+      attention: "review_requested",
+      signal: { checks: "passing", review: "review_required" },
     });
   });
 

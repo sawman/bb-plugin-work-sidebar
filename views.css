@@ -2851,13 +2851,18 @@ button.ws-provider-health:focus-visible {
   transform-origin: center;
   animation: ws-status-spin 0.9s linear infinite;
 }
+.ws-pr-identifier-badge > [data-motion="spin"] {
+  transform-origin: center;
+  animation: ws-status-spin 0.9s linear infinite;
+}
 @keyframes ws-status-spin {
   to {
     transform: rotate(360deg);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ws-status[data-motion="spin"] > svg:first-child {
+  .ws-status[data-motion="spin"] > svg:first-child,
+  .ws-pr-identifier-badge > [data-motion="spin"] {
     animation: none;
   }
 }
