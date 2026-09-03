@@ -368,6 +368,12 @@ describe("R13 Changes error presentation", () => {
         .filter((count) => count.classList.contains("ws-file-deletions"))
         .map((count) => count.textContent),
     ).toEqual(["−23", "−4"]);
+    const summaryDeltas = document.querySelector(".ws-stack-line-deltas");
+    const toggle = screen.getByRole("button", {
+      name: /#8 A very long pull request title/,
+    });
+    expect(summaryDeltas?.parentElement).toBe(toggle);
+    expect(toggle.querySelector("small .ws-stack-line-deltas")).toBeNull();
   });
 
   it("keeps title, checkout, and trailing disclosure interactions isolated", () => {

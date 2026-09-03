@@ -456,17 +456,14 @@ export function ChangesStackBranchRow({
               )}
             </span>
             {branch.name}
-            {branch.diff ? (
-              <>
-                {" "}
-                · <ChangeLineDeltas
-                  additions={branch.diff.additions}
-                  deletions={branch.diff.deletions}
-                  className="ws-stack-line-deltas"
-                />
-              </>
-            ) : null}
           </small>
+          {branch.diff ? (
+            <ChangeLineDeltas
+              additions={branch.diff.additions}
+              deletions={branch.diff.deletions}
+              className="ws-stack-line-deltas"
+            />
+          ) : null}
         </button>
         <StackBranchActions
           pullRequest={pr}

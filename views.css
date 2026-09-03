@@ -1616,10 +1616,10 @@
 }
 .ws-stack-layer-toggle {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
-    "title"
-    "subtitle";
+    "title deltas"
+    "subtitle deltas";
   min-width: 0;
   gap: 0.05rem;
   border: 0;
@@ -1797,8 +1797,14 @@ button.ws-change-file-row:hover {
   color: var(--destructive);
 }
 .ws-stack-line-deltas {
-  margin-left: 0.1rem;
-  vertical-align: baseline;
+  grid-area: deltas;
+  grid-template-columns: repeat(2, 6ch);
+  align-self: center;
+  margin: 0;
+  vertical-align: initial;
+}
+.ws-stack-line-deltas .ws-line-delta {
+  min-width: 6ch;
 }
 .ws-repository-line-deltas {
   margin-left: 0.04rem;

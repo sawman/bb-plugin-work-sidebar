@@ -82,12 +82,21 @@ describe("stylesheet policy", () => {
     const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
     const pair = source.match(/\.ws-line-deltas\s*\{([\s\S]*?)\}/)?.[1];
     const delta = source.match(/\.ws-line-delta\s*\{([\s\S]*?)\}/)?.[1];
+    const stackPair = source.match(
+      /\.ws-stack-line-deltas\s*\{([\s\S]*?)\}/,
+    )?.[1];
+    const stackDelta = source.match(
+      /\.ws-stack-line-deltas \.ws-line-delta\s*\{([\s\S]*?)\}/,
+    )?.[1];
 
     expect(pair).toContain("display: inline-grid");
     expect(pair).toContain("grid-template-columns: repeat(2, 5ch)");
     expect(pair).toContain("font: var(--ws-text-metadata)");
     expect(delta).toContain("min-width: 5ch");
     expect(delta).toContain("font: var(--ws-text-metadata)");
+    expect(stackPair).toContain("grid-template-columns: repeat(2, 6ch)");
+    expect(stackPair).toContain("grid-area: deltas");
+    expect(stackDelta).toContain("min-width: 6ch");
   });
 
   test("keeps every plugin stylesheet structurally valid and diffable", () => {
