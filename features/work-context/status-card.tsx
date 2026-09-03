@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { experimental_useProviders } from "@get-bb/plugin-sdk/app";
+import { useStore } from "zustand";
 import { Icon, type IconName } from "../../components/ui/icon";
 import { ThreadProviderLogo } from "../../components/threads/thread-provider-logo";
 import { ActionTooltip } from "../../components/ui/action-tooltip";
@@ -8,6 +9,7 @@ import { useLatestActivity, useWorkProviderHealth, useWorkStatus } from "./queri
 import { CardState } from "./card-state";
 import { ProviderHealth, ProviderStatusSection } from "./provider-status-section";
 import { formatActivityAge } from "./latest-activity";
+import { threadInteractionStore } from "../threads/store";
 
 const runtimeIcons = {
   working: "LoaderCircle",
@@ -25,6 +27,10 @@ export function StatusCard({ threadId }: { threadId: string }) {
   const query = useWorkStatus(threadId);
   const latestActivity = useLatestActivity(threadId, query.data?.currentThread.status);
   const provider = useWorkProviderHealth(threadId, query.data?.currentThread);
+  const providerStatusExpanded = useStore(
+    threadInteractionStore,
+    (state) => state.providerStatusExpandedThreadIds.has(threadId),
+  );
   const providerDirectory = experimental_useProviders();
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const data = query.data;
@@ -60,7 +66,14 @@ export function StatusCard({ threadId }: { threadId: string }) {
       error={query.error}
       onRetry={() => void query.refetch()}
     >
-      {provider.data ? <ProviderStatusSection provider={provider.data} /> : null}
+      {provider.data ? (
+        <ProviderStatusSection
+          provider={provider.data}
+          expanded={providerStatusExpanded}
+          onExpandedChange={(expanded) =>
+            threadInteractionStore.getState().setProviderStatusExpanded(threadId, expanded)}
+        />
+      ) : null}
       {latestActivity.data?.latest || latestActivity.data?.lastUser ? (
         <div className="ws-activity-list">
           {latestActivity.data?.lastUser ? (

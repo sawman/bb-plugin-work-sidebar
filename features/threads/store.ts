@@ -23,6 +23,25 @@ function sameStringSet(left: ReadonlySet<string>, right: ReadonlySet<string>) {
   return left.size === right.size && [...left].every((value) => right.has(value));
 }
 
+function sameOrderedStringSet(left: ReadonlySet<string>, right: ReadonlySet<string>) {
+  if (left.size !== right.size) return false;
+  const leftEntries = left.values();
+  const rightEntries = right.values();
+  for (;;) {
+    const leftEntry = leftEntries.next();
+    const rightEntry = rightEntries.next();
+    if (leftEntry.done || rightEntry.done) return leftEntry.done === rightEntry.done;
+    if (leftEntry.value !== rightEntry.value) return false;
+  }
+}
+
+function cappedThreadIds(entries: Iterable<string>) {
+  const next = new Set(entries);
+  while (next.size > MAX_THREAD_VIEW_ENTRIES)
+    next.delete(next.values().next().value!);
+  return next;
+}
+
 function sameOrderedMap(
   left: ReadonlyMap<string, WorkTab>,
   right: ReadonlyMap<string, WorkTab>,
@@ -61,12 +80,14 @@ export type ThreadInteractionState = {
   dragThreadId: string | null;
   dropTarget: ThreadDropTarget;
   workTabsByThread: Map<string, WorkTab>;
+  providerStatusExpandedThreadIds: Set<string>;
   setSelected(anchorId: string | null, ids: Iterable<string>): void;
   toggleChildren(threadId: string): void;
   setDrag(threadId: string | null, target: ThreadDropTarget): void;
   setWorkTab(threadId: string, tab: WorkTab): void;
   touchWorkTab(threadId: string): void;
   workTabFor(threadId: string): WorkTab;
+  setProviderStatusExpanded(threadId: string, expanded: boolean): void;
   reconcileRoster(threadIds: Iterable<string>): void;
 };
 
@@ -88,6 +109,7 @@ export function createThreadInteractionStore() {
     dragThreadId: null,
     dropTarget: null,
     workTabsByThread: new Map(),
+    providerStatusExpandedThreadIds: new Set(),
     setSelected: (selectionAnchorId, ids) =>
       set({ selectedThreadIds: new Set(ids), selectionAnchorId }),
     toggleChildren: (threadId) =>
@@ -125,6 +147,20 @@ export function createThreadInteractionStore() {
         return { workTabsByThread };
       }),
     workTabFor: (threadId) => get().workTabsByThread.get(threadId) ?? "work",
+    setProviderStatusExpanded: (threadId, expanded) =>
+      set((current) => {
+        const providerStatusExpandedThreadIds = new Set(
+          current.providerStatusExpandedThreadIds,
+        );
+        if (expanded) {
+          providerStatusExpandedThreadIds.delete(threadId);
+          providerStatusExpandedThreadIds.add(threadId);
+        } else providerStatusExpandedThreadIds.delete(threadId);
+        const capped = cappedThreadIds(providerStatusExpandedThreadIds);
+        return sameOrderedStringSet(current.providerStatusExpandedThreadIds, capped)
+          ? current
+          : { providerStatusExpandedThreadIds: capped };
+      }),
     reconcileRoster: (threadIds) =>
       set((current) => {
         const roster = new Set(threadIds);
@@ -142,6 +178,9 @@ export function createThreadInteractionStore() {
         // in the right panel. Keep this presentation state and rely on the
         // bounded LRU instead of pruning by the left surface alone.
         const workTabsByThread = cappedWorkTabs(current.workTabsByThread);
+        const providerStatusExpandedThreadIds = cappedThreadIds(
+          current.providerStatusExpandedThreadIds,
+        );
         const dragThreadId =
           current.dragThreadId && roster.has(current.dragThreadId)
             ? current.dragThreadId
@@ -162,6 +201,10 @@ export function createThreadInteractionStore() {
           current.selectionAnchorId === selectionAnchorId &&
           sameStringSet(current.expandedThreadIds, expandedThreadIds) &&
           sameOrderedMap(current.workTabsByThread, workTabsByThread) &&
+          sameOrderedStringSet(
+            current.providerStatusExpandedThreadIds,
+            providerStatusExpandedThreadIds,
+          ) &&
           current.dragThreadId === dragThreadId &&
           sameDropTarget(current.dropTarget, dropTarget)
         )
@@ -171,6 +214,7 @@ export function createThreadInteractionStore() {
           selectionAnchorId,
           expandedThreadIds,
           workTabsByThread,
+          providerStatusExpandedThreadIds,
           dragThreadId,
           dropTarget,
         };

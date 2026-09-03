@@ -83,6 +83,23 @@ describe("thread interaction store", () => {
     expect(store.getState().workTabFor("thr_40")).toBe("agents");
   });
 
+  it("keeps provider disclosure expansion per thread with the same bounded retention", () => {
+    const store = createThreadInteractionStore();
+    store.getState().setProviderStatusExpanded("thr_a", true);
+    store.getState().setProviderStatusExpanded("thr_b", true);
+    store.getState().setProviderStatusExpanded("thr_b", false);
+    expect(store.getState().providerStatusExpandedThreadIds).toEqual(new Set(["thr_a"]));
+
+    for (let index = 0; index < 40; index += 1)
+      store.getState().setProviderStatusExpanded(`thr_${index}`, true);
+    expect(store.getState().providerStatusExpandedThreadIds.has("thr_a")).toBe(false);
+    expect(store.getState().providerStatusExpandedThreadIds.has("thr_0")).toBe(true);
+    store.getState().setProviderStatusExpanded("thr_0", true);
+    store.getState().setProviderStatusExpanded("thr_40", true);
+    expect(store.getState().providerStatusExpandedThreadIds.has("thr_0")).toBe(true);
+    expect(store.getState().providerStatusExpandedThreadIds.has("thr_1")).toBe(false);
+  });
+
   it("mounts selector consumers so left selection/drag and right tabs stay scoped", () => {
     const store = createThreadInteractionStore();
     let threadATabRenders = 0;

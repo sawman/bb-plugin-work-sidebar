@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createElement } from "react";
 import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { focusManager, onlineManager } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -228,6 +229,17 @@ describe("registered Status activity lifecycle", () => {
     expect(within(providerSummary!).queryByText("Provider")).toBeNull();
     fireEvent.click(providerSummary!);
     expect(providerSection.open).toBe(true);
+    slot.lifecycle.rerender(
+      createElement(app.threadPanelActions[0]!.component, {
+        threadId: "thr_provider_usage",
+        params: null,
+      }),
+    );
+    await waitFor(() => expect(
+      slot.container.querySelector<HTMLDetailsElement>(
+        ".ws-provider-status-section",
+      )?.open,
+    ).toBe(true));
     expect(slot.getByRole("progressbar", { name: "Five-hour usage" }).getAttribute("aria-valuenow")).toBe("84");
     expect(slot.getByText("Five-hour limit · resets in 2h")).toBeTruthy();
     expect(slot.getByRole("progressbar", { name: "Weekly usage" }).getAttribute("data-tone")).toBe("critical");

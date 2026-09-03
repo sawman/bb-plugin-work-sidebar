@@ -78,12 +78,20 @@ export function ProviderHealth({
 
 export function ProviderStatusSection({
   provider,
+  expanded,
+  onExpandedChange,
 }: {
   provider: WorkProviderStatus;
+  expanded: boolean;
+  onExpandedChange(expanded: boolean): void;
 }) {
   const status = readableStatus(provider.status);
   return (
-    <details className="ws-provider-status-section">
+    <details
+      className="ws-provider-status-section"
+      open={expanded}
+      onToggle={(event) => onExpandedChange(event.currentTarget.open)}
+    >
       <summary>
         <Icon name="ChevronRight" aria-hidden />
         <span className="ws-provider-status-title">
