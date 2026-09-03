@@ -19,13 +19,25 @@ type PullRequestIdentifierProps = PullRequestIdentifier & {
   onKeyDown?: HTMLAttributes<HTMLSpanElement>["onKeyDown"];
 };
 
-/** The tooltip must describe the visual badge state before any review detail. */
+/**
+ * Badge tooltip copy is a one-to-one explanation of the visual state. Review
+ * identities are useful only when that review state is what the badge shows.
+ */
 export function pullRequestBadgeTooltip(
   presentation?: StatusPresentation,
   reviewDetail?: string,
 ) {
   if (!presentation) return reviewDetail ?? "Pull request";
-  return reviewDetail ? `${presentation.label} · ${reviewDetail}` : presentation.label;
+  const matchingReviewPrefix: Partial<Record<StatusPresentation["label"], string>> = {
+    "Review requested": "Review:",
+    "Changes requested": "Changes:",
+    "Ready to merge": "Approved:",
+    Approved: "Approved:",
+  };
+  const prefix = matchingReviewPrefix[presentation.label];
+  return prefix && reviewDetail?.startsWith(prefix)
+    ? reviewDetail
+    : presentation.label;
 }
 
 export function PullRequestIdentifierBadge(

@@ -12,7 +12,10 @@ import {
   AuthoredPullRequestStack,
 } from "../authored-pull-requests";
 import { ThreadWorkspaceBadge } from "../../../components/threads/thread-workspace-badge";
-import { PullRequestIdentifierBadge } from "../identifier-badge";
+import {
+  PullRequestIdentifierBadge,
+  pullRequestBadgeTooltip,
+} from "../identifier-badge";
 import { StackNumberBadge } from "../stack-number";
 import { linkedThreadForStack, uniqueThreadsByBranch } from "../thread-link";
 import type { SidebarStack } from "../../../work-model";
@@ -487,7 +490,7 @@ describe("pull-request stack number presentation", () => {
 
     const badge = screen.getByRole("button", { name: "Copy PR number #97" });
     expect(badge.getAttribute("data-tone")).toBe("warning");
-    expect(tooltipLabel(badge)).toBe("Review requested · Review: octocat");
+    expect(tooltipLabel(badge)).toBe("Review: octocat");
     expect(badge.querySelector("svg")?.getAttribute("data-icon")).toBe("Eye");
   });
 
@@ -505,7 +508,23 @@ describe("pull-request stack number presentation", () => {
     const badge = screen.getByRole("button", { name: "Copy PR number #99" });
     expect(badge.getAttribute("data-tone")).toBe("destructive");
     expect(badge.querySelector("svg")?.getAttribute("data-icon")).toBe("X");
-    expect(tooltipLabel(badge)).toBe("CI failure · Approved: octocat");
+    expect(tooltipLabel(badge)).toBe("CI failure");
+  });
+
+  it.each([
+    ["Review requested", "Review: octocat", "Review: octocat"],
+    ["Changes requested", "Changes: octocat", "Changes: octocat"],
+    ["Ready to merge", "Approved: octocat", "Approved: octocat"],
+    ["Approved", "Approved: octocat", "Approved: octocat"],
+    ["CI failure", "Approved: octocat", "CI failure"],
+    ["Conflicts", "Review: octocat", "Conflicts"],
+  ])("maps %s to its matching tooltip only", (label, reviewDetail, expected) => {
+    expect(
+      pullRequestBadgeTooltip(
+        { icon: "X", label, tone: "destructive" },
+        reviewDetail,
+      ),
+    ).toBe(expected);
   });
 
   it.each([
