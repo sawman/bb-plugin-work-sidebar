@@ -258,17 +258,22 @@ describe("stylesheet policy", () => {
         ".ws-action-tooltip-content",
         source.match(/\.ws-action-tooltip-content\s*\{([\s\S]*?)\}/)?.[1],
       ],
-      [
-        ".ws-pr-thread-tooltip",
-        source.match(/\.ws-pr-thread-tooltip\s*\{([\s\S]*?)\}/)?.[1],
-      ],
-      [
-        ".ws-pr-tooltip::after",
-        source.match(/\.ws-pr-tooltip::after\s*\{([\s\S]*?)\}/)?.[1],
-      ],
     ] as const) {
       expect(body, selector).toBeDefined();
       expect(body, selector).not.toContain("box-shadow");
     }
+  });
+
+  test("reveals only the directly hovered tooltip in nested controls", () => {
+    const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    expect(source).toContain(
+      ".ws-action-tooltip:hover > .ws-action-tooltip-content",
+    );
+    expect(source).toContain(
+      ".ws-action-tooltip:focus-within > .ws-action-tooltip-content",
+    );
+    expect(source).not.toContain(
+      ".ws-action-tooltip:hover .ws-action-tooltip-content",
+    );
   });
 });

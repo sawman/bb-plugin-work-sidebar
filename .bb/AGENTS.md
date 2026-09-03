@@ -107,6 +107,9 @@ decision appear different.
 - Do not rely on native `title` attributes for product tooltips; they are not
   reliably visible in BB. Render explanatory hover/focus content through the
   plugin tooltip primitive instead.
+- Tooltip labels must be terse control hints of at most 40 characters. The
+  shared primitive enforces this defensively; never wrap a compound row in a
+  tooltip—only the specific control that needs an explanation.
 - Preserve accessibility: semantic elements, keyboard navigation, visible
   focus, accessible names for icon buttons, and native/modifier-click behavior.
 

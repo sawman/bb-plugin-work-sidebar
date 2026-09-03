@@ -136,6 +136,16 @@ describe("registered Status activity lifecycle", () => {
     expect(
       heading?.querySelector(".ws-active-agent-count > svg + span"),
     ).not.toBeNull();
+    expect(
+      heading?.querySelector(".ws-total-agent-count")?.getAttribute(
+        "aria-describedby",
+      ),
+    ).toBeNull();
+    expect(
+      heading?.querySelector(".ws-active-agent-count")?.getAttribute(
+        "aria-describedby",
+      ),
+    ).toBeNull();
     expect(slot.queryByRole("heading", { name: "Working" })).toBeNull();
     await waitFor(() => expect(slot.getByText(agentText)).toBeTruthy());
     expect(slot.getByText(userText)).toBeTruthy();

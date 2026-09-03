@@ -19,7 +19,6 @@ import { useThreadRowPointerDrag } from "./use-thread-row-pointer-drag";
 import { useThreadHierarchy } from "./thread-hierarchy-context";
 import { THREAD_TO_TOP_DESCRIPTION } from "./use-thread-hierarchy-menu";
 import { toast } from "sonner";
-import { ActionTooltip } from "@/components/ui/action-tooltip";
 
 export function ThreadRow({
   thread,
@@ -112,9 +111,12 @@ export function ThreadRow({
       onDragEnd={finishNativeDrag}
     >
       {dragThreadId ? (
-        <ActionTooltip label={`Drop to make ${title} the parent`}>
-          {(tooltipId) => <span className="ws-thread-reparent-target" data-ws-thread-reparent-target={thread.id} role="note" aria-label={`Move a thread under ${title}`} aria-describedby={tooltipId} />}
-        </ActionTooltip>
+        <span
+          className="ws-thread-reparent-target"
+          data-ws-thread-reparent-target={thread.id}
+          role="note"
+          aria-label={`Move a thread under ${title}`}
+        />
       ) : null}
       {rowActions.renaming ? (
         <div className="ws-rename">
@@ -186,8 +188,7 @@ export function ThreadRow({
               );
             }}
           >
-            <ActionTooltip label={isAvailable ? "Drag into the main area to open; drop at an edge to split" : "Open thread"}>
-              {() => <ThreadRowContent
+            <ThreadRowContent
               leading={
                 <ThreadAgentControl
                   thread={thread}
@@ -224,8 +225,7 @@ export function ThreadRow({
                   staleWorkingMinutes={staleWorkingMinutes} providerRetry={providerRetry} providerRetryNow={providerRetryNow}
                 />
               }
-              />}
-            </ActionTooltip>
+            />
           </a>
         </ThreadRowMenu>
       )}

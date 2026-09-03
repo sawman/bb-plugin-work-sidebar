@@ -1032,35 +1032,6 @@
   color: inherit;
   cursor: pointer;
 }
-.ws-pr-thread-tooltip {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 0.35rem);
-  z-index: 1100;
-  width: max-content;
-  max-width: 14rem;
-  overflow: hidden;
-  padding: 0.28rem 0.42rem;
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 3px);
-  background: color-mix(in srgb, var(--background) 96%, var(--foreground) 4%);
-  color: var(--foreground);
-  font: var(--ws-text-subtext);
-  line-height: 1.2;
-  opacity: 0;
-  pointer-events: none;
-  text-overflow: ellipsis;
-  transform: translateY(0.1rem);
-  transition:
-    opacity 0.12s ease,
-    transform 0.12s ease;
-  white-space: nowrap;
-}
-.ws-pr-thread-provider-link:hover .ws-pr-thread-tooltip,
-.ws-pr-thread-provider-link:focus-visible .ws-pr-thread-tooltip {
-  opacity: 1;
-  transform: translateY(0);
-}
 .ws-pr-thread-provider-link:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
@@ -2099,36 +2070,6 @@ button.ws-change-file-row:hover {
   font: var(--ws-text-subtext);
   line-height: inherit;
   padding: 0.3rem 0.12rem;
-}
-.ws-pr-tooltip {
-  position: relative;
-}
-.ws-pr-tooltip::after {
-  position: absolute;
-  z-index: 30;
-  right: 0;
-  bottom: calc(100% + 0.35rem);
-  width: max-content;
-  max-width: 11rem;
-  padding: 0.18rem 0.32rem;
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 3px);
-  background: var(--popover);
-  color: var(--popover-foreground);
-  content: attr(data-tooltip);
-  font: var(--ws-text-label);
-  line-height: 1.15;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(0.12rem);
-  transition:
-    opacity 0.06s ease,
-    transform 0.06s ease;
-}
-.ws-pr-tooltip:hover::after,
-.ws-pr-tooltip:focus-visible::after {
-  opacity: 1;
-  transform: translateY(0);
 }
 .ws-agent-card > span:nth-child(2) {
   gap: 0.1rem;
@@ -3720,8 +3661,8 @@ button.ws-provider-health:focus-visible {
 .ws-action-tooltip-content::before {
   content: attr(data-tooltip-label);
 }
-.ws-action-tooltip:hover .ws-action-tooltip-content,
-.ws-action-tooltip:focus-within .ws-action-tooltip-content {
+.ws-action-tooltip:hover > .ws-action-tooltip-content,
+.ws-action-tooltip:focus-within > .ws-action-tooltip-content {
   opacity: 1;
   transform: translateY(0);
 }

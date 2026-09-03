@@ -61,12 +61,15 @@ export function ThreadProviderLogo({
   title,
   runtimeState = "idle",
   statusLabel,
+  tooltip = true,
 }: {
   providerId: string;
   provider?: ThreadProvider;
   title?: string | null;
   runtimeState?: ThreadProviderRuntimeState;
   statusLabel?: string | null;
+  /** The enclosing interactive control owns the tooltip when false. */
+  tooltip?: boolean;
 }) {
   const displayName = provider?.displayName ?? providerId;
   const accessibleLabel = `${displayName} provider${statusLabel ? ` status: ${statusLabel}` : ""}`;
@@ -75,9 +78,8 @@ export function ThreadProviderLogo({
       ? accessibleLabel
       : displayName
     : title;
-  return (
-    <ActionTooltip label={tooltipLabel ?? displayName}>
-      {(tooltipId) => <span
+  const mark = (tooltipId?: string) => (
+    <span
       className="ws-thread-provider"
       data-provider-id={providerId}
       data-runtime-state={runtimeState}
@@ -95,7 +97,12 @@ export function ThreadProviderLogo({
           className="ws-thread-provider-fallback-shine"
         />
       </span>
-      </span>}
+    </span>
+  );
+  if (!tooltip) return mark();
+  return (
+    <ActionTooltip label={tooltipLabel ?? displayName}>
+      {(tooltipId) => mark(tooltipId)}
     </ActionTooltip>
   );
 }

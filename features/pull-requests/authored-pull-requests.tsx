@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Icon } from "../../components/ui/icon";
 import { BbUrlLink } from "../../components/ui/url-link";
 import { Status } from "../../components/ui/status";
@@ -21,6 +21,7 @@ import { orderStackLayers, type SidebarStack } from "../../work-model";
 import { PullRequestIdentifierBadge } from "./identifier-badge";
 import { StackNumberBadge } from "./stack-number";
 import { ThreadProviderLogo } from "../../components/threads/thread-provider-logo";
+import { ActionTooltip } from "../../components/ui/action-tooltip";
 import {
   linkedThreadForStack,
   type PullRequestThreadReference,
@@ -68,7 +69,6 @@ export function AuthoredPullRequestRow({
   onToggleDraft(pullRequest: AuthoredRow): void;
   rpc?: PullRequestRpc;
 }) {
-  const threadTooltipId = useId();
   const reviewerTriggerRef = useRef<HTMLButtonElement>(null);
   const [reviewerPickerOpen, setReviewerPickerOpen] = useState(false);
   const signal = pullRequestSignalPresentation(pullRequest);
@@ -125,26 +125,24 @@ export function AuthoredPullRequestRow({
           </div>
           <span className="ws-pr-status-icons ws-sidebar-row-trailing">
             {linkedThread && onOpenThread ? (
-              <button
-                type="button"
-                className="ws-pr-thread-provider-link"
-                aria-label={`Open linked thread ${linkedThread.title}`}
-                aria-describedby={threadTooltipId}
-                onClick={() => onOpenThread(linkedThread.id)}
-              >
-                <ThreadProviderLogo
-                  providerId={linkedThread.providerId}
-                  provider={linkedThread.provider}
-                  title={null}
-                />
-                <span
-                  className="ws-pr-thread-tooltip"
-                  id={threadTooltipId}
-                  role="tooltip"
-                >
-                  {linkedThread.title}
-                </span>
-              </button>
+              <ActionTooltip label={`Open ${linkedThread.title}`}>
+                {(tooltipId) => (
+                  <button
+                    type="button"
+                    className="ws-pr-thread-provider-link"
+                    aria-label={`Open linked thread ${linkedThread.title}`}
+                    aria-describedby={tooltipId}
+                    onClick={() => onOpenThread(linkedThread.id)}
+                  >
+                    <ThreadProviderLogo
+                      providerId={linkedThread.providerId}
+                      provider={linkedThread.provider}
+                      title={null}
+                      tooltip={false}
+                    />
+                  </button>
+                )}
+              </ActionTooltip>
             ) : null}
             <Status presentation={signal.checks} />
             {rpc && pullRequest.repository ? (

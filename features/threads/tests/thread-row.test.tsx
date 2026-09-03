@@ -158,6 +158,7 @@ describe("R9 production ThreadRow host behavior", () => {
     const link = slot.getByRole("link", { name: /Parent/ });
     expect(link.getAttribute("data-sidebar-thread-shortcut-target")).toBe("");
     expect(link.getAttribute("data-sidebar-thread-id")).toBe("thr_parent");
+    expect(link.querySelector(":scope > .ws-action-tooltip")).toBeNull();
     fireEvent.click(link, { ctrlKey: true });
     expect(slot.inspection.sidebarActionCalls).toEqual([]);
     fireEvent.click(link);

@@ -1,6 +1,7 @@
 import type { ReactElement } from "react";
 import type { GitHubStackBranch } from "../../contracts.js";
 import { Icon } from "../../components/ui/icon.js";
+import { ActionTooltip } from "../../components/ui/action-tooltip.js";
 import { BbUrlLink } from "../../components/ui/url-link.js";
 
 type StackBranchActionsProps = {
@@ -39,44 +40,55 @@ export function StackBranchActions({
     <span className="ws-stack-trailing-actions">
       <span className="ws-stack-action-slot">
         {pullRequest && (
-          <BbUrlLink
-            className="ws-pr-tooltip"
-            data-tooltip="Open on GitHub"
-            href={pullRequest.url}
-            aria-label={`Open pull request #${pullRequest.number} on GitHub`}
-          >
-            ↗
-          </BbUrlLink>
+          <ActionTooltip label="Open on GitHub">
+            {(tooltipId) => (
+              <BbUrlLink
+                href={pullRequest.url}
+                aria-label={`Open pull request #${pullRequest.number} on GitHub`}
+                aria-describedby={tooltipId}
+              >
+                ↗
+              </BbUrlLink>
+            )}
+          </ActionTooltip>
         )}
       </span>
       <span className="ws-stack-action-slot">
-        <button
-          type="button"
-          className="ws-stack-checkout ws-pr-tooltip"
-          data-tooltip={checkoutLabel}
-          onClick={onCheckout}
-          disabled={merged || current || checkingOut}
-          aria-label={checkoutLabel}
-        >
-          {checkingOut ? "…" : "⇥"}
-        </button>
+        <ActionTooltip label={checkoutLabel}>
+          {(tooltipId) => (
+            <button
+              type="button"
+              className="ws-stack-checkout"
+              onClick={onCheckout}
+              disabled={merged || current || checkingOut}
+              aria-label={checkoutLabel}
+              aria-describedby={tooltipId}
+            >
+              {checkingOut ? "…" : "⇥"}
+            </button>
+          )}
+        </ActionTooltip>
       </span>
       <span className="ws-stack-action-slot">
         {hasDisclosure && (
-          <button
-            type="button"
-            className="ws-stack-expand ws-pr-tooltip"
-            data-tooltip={filesLabel}
-            aria-label={filesLabel}
-            aria-expanded={expanded}
-            data-state={expanded ? "open" : "closed"}
-            onClick={onToggle}
-          >
-            <Icon
-              className="ws-changes-disclosure-icon"
-              name={expanded ? "ChevronDown" : "ChevronRight"}
-            />
-          </button>
+          <ActionTooltip label={filesLabel}>
+            {(tooltipId) => (
+              <button
+                type="button"
+                className="ws-stack-expand"
+                aria-label={filesLabel}
+                aria-describedby={tooltipId}
+                aria-expanded={expanded}
+                data-state={expanded ? "open" : "closed"}
+                onClick={onToggle}
+              >
+                <Icon
+                  className="ws-changes-disclosure-icon"
+                  name={expanded ? "ChevronDown" : "ChevronRight"}
+                />
+              </button>
+            )}
+          </ActionTooltip>
         )}
       </span>
     </span>

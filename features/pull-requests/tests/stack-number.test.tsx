@@ -276,9 +276,9 @@ describe("pull-request stack number presentation", () => {
     expect(thread.getAttribute("aria-describedby")).toBeTruthy();
     expect(
       document.getElementById(thread.getAttribute("aria-describedby") ?? "")
-        ?.textContent,
-    ).toBe("Implement the PR");
-    expect(thread.parentElement?.classList).toContain("ws-pr-status-icons");
+        ?.getAttribute("aria-label"),
+    ).toBe("Open Implement the PR");
+    expect(thread.closest(".ws-pr-status-icons")).not.toBeNull();
     expect(document.querySelector(".ws-pr-thread-context")).toBeNull();
     expect(thread.querySelector('[data-provider-id="codex"]')).toBeTruthy();
     fireEvent.click(thread);
@@ -535,8 +535,8 @@ describe("pull-request stack number presentation", () => {
     expect(provider.getAttribute("aria-describedby")).toBeTruthy();
     expect(
       document.getElementById(provider.getAttribute("aria-describedby") ?? "")
-        ?.textContent,
-    ).toBe("Implement context menu");
+        ?.getAttribute("aria-label"),
+    ).toBe("Open Implement context menu");
   });
 
   it("flips and clamps the context menu when the pointer is near the viewport edge", async () => {
