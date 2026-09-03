@@ -206,6 +206,31 @@ describe("R13 Changes error presentation", () => {
     expect(screen.getByRole("img", { name: "Ready to merge" })).toBeTruthy();
   });
 
+  it("keeps review counts at the stack subtitle metadata size", () => {
+    render(
+      <ChangesStackBranchRow
+        branch={stackBranch()}
+        signals={{
+          state: "open",
+          draft: false,
+          checks: "passing",
+          review: "review_requested",
+          reviewCommentCount: 12,
+        }}
+        expanded={false}
+        checkingOut={false}
+        onToggle={() => undefined}
+        onCheckout={() => undefined}
+      />,
+    );
+
+    const review = screen.getByRole("img", {
+      name: "Review requested, 12 review comments",
+    });
+    expect(review.getAttribute("data-size")).toBe("metadata");
+    expect(review.querySelector("b")?.textContent).toBe("12");
+  });
+
   it.each([
     { name: "ordinary", branch: stackBranch(), checkingOut: false },
     { name: "busy checkout", branch: stackBranch(), checkingOut: true },

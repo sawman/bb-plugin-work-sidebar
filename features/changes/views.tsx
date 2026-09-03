@@ -453,8 +453,8 @@ export function ChangesStackBranchRow({
             <span className="ws-stack-subtitle-signals">
               {presented && (
                 <>
-                  <Status presentation={presented.checks} />
-                  <Status presentation={presented.review} />
+                  <Status presentation={presented.checks} size="metadata" />
+                  <Status presentation={presented.review} size="metadata" />
                 </>
               )}
             </span>

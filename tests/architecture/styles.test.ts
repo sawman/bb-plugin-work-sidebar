@@ -111,6 +111,19 @@ describe("stylesheet policy", () => {
     expect(repositoryPill).toContain("font: var(--ws-text-subtext)");
   });
 
+  test("keeps compact status counts at the surrounding metadata size", () => {
+    const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    const compactStatus = source.match(
+      /\.ws-status\[data-size="metadata"\]\s*\{([\s\S]*?)\}/,
+    )?.[1];
+    const compactCount = source.match(
+      /\.ws-status\[data-size="metadata"\]\s*> b\s*\{([\s\S]*?)\}/,
+    )?.[1];
+
+    expect(compactStatus).toContain("font: var(--ws-text-metadata)");
+    expect(compactCount).toContain("font: inherit");
+  });
+
   test("uses equal metadata columns for every shared change delta pair", () => {
     const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
     const pair = source.match(/\.ws-line-deltas\s*\{([\s\S]*?)\}/)?.[1];

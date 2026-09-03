@@ -2869,6 +2869,15 @@ button.ws-provider-health:focus-visible {
   line-height: inherit;
   font-variant-numeric: tabular-nums;
 }
+.ws-status[data-size="metadata"] {
+  min-width: 0.58rem;
+  height: 0.58rem;
+  font: var(--ws-text-metadata);
+  line-height: inherit;
+}
+.ws-status[data-size="metadata"] > b {
+  font: inherit;
+}
 .ws-status[data-tone="open"],
 .ws-status[data-tone="success"] {
   color: var(--diff-added);

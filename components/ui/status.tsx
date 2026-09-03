@@ -21,9 +21,11 @@ export type StatusPresentation = {
 export function Status({
   presentation,
   className,
+  size = "default",
 }: {
   presentation: StatusPresentation;
   className?: string;
+  size?: "default" | "metadata";
 }) {
   const countLabel = presentation.count
     ? `, ${presentation.count} review comment${presentation.count === 1 ? "" : "s"}`
@@ -32,6 +34,7 @@ export function Status({
     <ActionTooltip label={presentation.label}>
       {(tooltipId) => <span
       className={["ws-status", className].filter(Boolean).join(" ")}
+      data-size={size === "metadata" ? size : undefined}
       data-tone={presentation.tone}
       data-motion={presentation.icon === "LoaderCircle" ? "spin" : undefined}
       aria-describedby={tooltipId}
