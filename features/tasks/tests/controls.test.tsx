@@ -781,7 +781,7 @@ describe("Tasks registered controls", () => {
     owned.rendered.lifecycle.unmount();
   });
 
-  it("collapses and expands left-row subtasks without hiding their parent", async () => {
+  it("starts left-row subtasks collapsed in a fixed hierarchy gutter", async () => {
     const child = {
       ...task,
       id: "task_child",
@@ -792,21 +792,27 @@ describe("Tasks registered controls", () => {
     };
     const { rendered } = await leftSlot([task, child]);
     const disclosure = rendered.getByRole("button", {
-      name: "Collapse subtasks for WORK-1",
+      name: "Expand subtasks for WORK-1",
     });
-    const children = rendered.getByRole("group", {
-      name: `Execution tasks for ${task.title}`,
-    });
-    expect(children.hidden).toBe(false);
+    const children = rendered.container.querySelector<HTMLElement>(
+      "#ws-task-children-task_1",
+    );
+    expect(children).not.toBeNull();
+    expect(children!.hidden).toBe(true);
+    const parentRow = rendered.getByText(task.title).closest(".ws-task-row")!;
+    const childRow = rendered.getByText(child.title).closest(".ws-task-row")!;
+    expect(parentRow.querySelector(":scope > .ws-task-hierarchy-slot")).toBeTruthy();
+    expect(childRow.querySelector(":scope > .ws-task-hierarchy-slot")).toBeTruthy();
+    expect(childRow.parentElement?.classList).toContain("ws-task-children");
     fireEvent.click(disclosure);
-    expect(disclosure.getAttribute("aria-expanded")).toBe("false");
-    expect(children.hidden).toBe(true);
+    expect(disclosure.getAttribute("aria-expanded")).toBe("true");
+    expect(children!.hidden).toBe(false);
     expect(rendered.getByText(task.title)).toBeTruthy();
     expect(
-      rendered.getByRole("button", { name: "Expand subtasks for WORK-1" }),
+      rendered.getByRole("button", { name: "Collapse subtasks for WORK-1" }),
     ).toBe(disclosure);
     fireEvent.click(disclosure);
-    expect(children.hidden).toBe(false);
+    expect(children!.hidden).toBe(true);
     await expectNoAriaViolations(rendered.container);
     rendered.lifecycle.unmount();
   });

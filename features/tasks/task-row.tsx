@@ -98,7 +98,7 @@ export function TaskRow(props: TaskRowProps) {
     onSelect,
   } = props;
   const { task } = node;
-  const [childrenOpen, setChildrenOpen] = useState(true);
+  const [childrenOpen, setChildrenOpen] = useState(false);
   const bindingLink = bindingLinks.get(task.id) ?? null;
   const bindingOwnerLink = bindingOwnerLinks.get(task.id) ?? null;
   const bindingOwned = Boolean(bindingOwnerLink);
@@ -189,28 +189,30 @@ export function TaskRow(props: TaskRowProps) {
             onDragTargetChange(null);
           }}
         >
+          <span className="ws-task-hierarchy-slot">
+            {node.children.length > 0 ? (
+              <ActionTooltip
+                label={`${childrenOpen ? "Collapse" : "Expand"} ${node.children.length} subtask${node.children.length === 1 ? "" : "s"}`}
+              >
+                {(tooltipId) => (
+                  <button
+                    type="button"
+                    className="ws-task-children-disclosure ws-pr-stack-disclosure"
+                    data-state={childrenOpen ? "open" : "closed"}
+                    aria-describedby={tooltipId}
+                    aria-controls={`ws-task-children-${task.id}`}
+                    aria-expanded={childrenOpen}
+                    aria-label={`${childrenOpen ? "Collapse" : "Expand"} subtasks for ${task.key}`}
+                    onClick={() => setChildrenOpen((current) => !current)}
+                  >
+                    <Icon name="ChevronRight" aria-hidden />
+                  </button>
+                )}
+              </ActionTooltip>
+            ) : null}
+          </span>
           <div className="ws-sidebar-row-main">
             <div className="ws-task-title-line">
-              {node.children.length > 0 ? (
-                <ActionTooltip
-                  label={`${childrenOpen ? "Collapse" : "Expand"} ${node.children.length} subtask${node.children.length === 1 ? "" : "s"}`}
-                >
-                  {(tooltipId) => (
-                    <button
-                      type="button"
-                      className="ws-task-children-disclosure ws-pr-stack-disclosure"
-                      data-state={childrenOpen ? "open" : "closed"}
-                      aria-describedby={tooltipId}
-                      aria-controls={`ws-task-children-${task.id}`}
-                      aria-expanded={childrenOpen}
-                      aria-label={`${childrenOpen ? "Collapse" : "Expand"} subtasks for ${task.key}`}
-                      onClick={() => setChildrenOpen((current) => !current)}
-                    >
-                      <Icon name="ChevronRight" aria-hidden />
-                    </button>
-                  )}
-                </ActionTooltip>
-              ) : null}
               <ActionTooltip label={task.title}>
                 {(tooltipId) => <button
                   className={`ws-task-assign ${assigned ? "ws-task-assigned" : ""}`}

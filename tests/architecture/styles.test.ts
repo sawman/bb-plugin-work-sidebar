@@ -219,7 +219,7 @@ describe("stylesheet policy", () => {
     expect(refresh).toContain("border-radius: 0");
   });
 
-  test("keeps left Task titles and child disclosures shrinkable and single-line", () => {
+  test("keeps left Task titles shrinkable in one fixed hierarchy grid", () => {
     const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
     const row = source.match(/\.ws-task-row\s*\{([\s\S]*?)\}/)?.[1];
     const main = source.match(
@@ -227,8 +227,8 @@ describe("stylesheet policy", () => {
     )?.[1];
     const title = source.match(/\.ws-task-title\s*\{([\s\S]*?)\}/)?.[1];
     const line = source.match(/\.ws-task-title-line\s*\{([\s\S]*?)\}/)?.[1];
-    const tooltip = source.match(
-      /\.ws-task-title-line > \.ws-action-tooltip\s*\{([\s\S]*?)\}/,
+    const gutter = source.match(
+      /\.ws-task-hierarchy-slot\s*\{([\s\S]*?)\}/,
     )?.[1];
     const picker = source.match(/\.ws-task-thread-picker\s*\{([\s\S]*?)\}/)?.[1];
     const chip = source.match(/\.ws-task-thread-chip\s*\{([\s\S]*?)\}/)?.[1];
@@ -236,18 +236,19 @@ describe("stylesheet policy", () => {
     expect(title).toContain("overflow: hidden");
     expect(title).toContain("text-overflow: ellipsis");
     expect(title).toContain("white-space: nowrap");
-    expect(row).toContain("grid-template-columns: minmax(0, 1fr) auto");
+    expect(row).toContain("grid-template-columns: var(--ws-task-hierarchy-gutter) minmax(0, 1fr) auto");
     expect(row).toContain("align-items: center");
+    expect(gutter).toContain("grid-column: 1");
+    expect(gutter).toContain("place-items: center");
     expect(main).toContain("overflow: hidden");
+    expect(main).toContain("grid-column: 2");
     expect(line).toContain("min-width: 0");
-    expect(tooltip).toContain("min-width: 0");
-    expect(tooltip).toContain("flex: 1 1 auto");
     const assign = source.match(/\.ws-task-assign\s*\{([\s\S]*?)\}/)?.[1];
     expect(assign).toContain("display: block");
     expect(assign).toContain("width: 100%");
     expect(assign).toContain("overflow: hidden");
-    expect(picker).toContain("width: 0");
-    expect(picker).toContain("flex: 1 1 5rem");
+    expect(picker).toContain("flex: 0 1 8rem");
+    expect(picker).toContain("max-width: 8rem");
     expect(chip).toContain("width: 100%");
   });
 
