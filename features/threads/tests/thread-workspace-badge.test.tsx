@@ -58,5 +58,15 @@ describe("thread workspace metadata", () => {
     expect(copyable[0]?.dataset.typography).toBe("context");
     expect(copyable[1]?.classList).toContain("ws-branch-name");
     expect(copyable[1]?.dataset.typography).toBeUndefined();
+    expect(
+      locations.map((location) =>
+        location.querySelector(".ws-thread-location-content"),
+      ),
+    ).toEqual([
+      expect.any(HTMLElement),
+      expect.any(HTMLElement),
+      expect.any(HTMLElement),
+      expect.any(HTMLElement),
+    ]);
   });
 });

@@ -1276,15 +1276,21 @@
   max-width: 100%;
   flex: 0 1 auto;
   align-items: center;
-  gap: 0.16rem;
 }
 .ws-thread-location > .ws-action-tooltip {
+  display: inline-flex;
   min-width: 0;
   max-width: 100%;
+  flex: 0 1 auto;
 }
-.ws-thread-location > .ws-action-tooltip > .ws-identifier-badge {
+.ws-thread-location-content {
+  display: inline-flex;
   min-width: 0;
   max-width: 100%;
+  align-items: center;
+  gap: 0.16rem;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .ws-thread-location svg {
   width: 0.58rem;

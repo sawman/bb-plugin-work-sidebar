@@ -74,6 +74,7 @@ export function ThreadWorkspaceBadge({
       <span className="ws-thread-location" data-location-kind="branch">
         <BranchName
           name={branch}
+          className="ws-thread-location-content"
           icon="GitBranch"
           title={`${contextTitle} · ${branch}`}
         />
@@ -97,6 +98,7 @@ export function ThreadWorkspaceBadge({
           value={location.value}
           copyValue={location.copyValue}
           label={location.copyLabel}
+          className="ws-thread-location-content"
           title={tooltipLabel}
           typography="context"
           variant="text"
@@ -106,7 +108,10 @@ export function ThreadWorkspaceBadge({
         </CopyBadge>
       ) : (
         <ActionTooltip label={tooltipLabel}>
-          {(tooltipId) => <span aria-describedby={tooltipId}>
+          {(tooltipId) => <span
+            className="ws-thread-location-content"
+            aria-describedby={tooltipId}
+          >
             <Icon name={location.icon} aria-hidden />
             <span className="ws-thread-location-label">{location.value}</span>
           </span>}

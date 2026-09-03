@@ -183,6 +183,27 @@ describe("stylesheet policy", () => {
     expect(search).toContain("flex: none");
   });
 
+  test("keeps every thread-location presentation in one shrinkable inline flow", () => {
+    const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    const location = source.match(
+      /\.ws-thread-meta \.ws-thread-location\s*\{([\s\S]*?)\}/,
+    )?.[1];
+    const tooltip = source.match(
+      /\.ws-thread-location > \.ws-action-tooltip\s*\{([\s\S]*?)\}/,
+    )?.[1];
+    const content = source.match(
+      /\.ws-thread-location-content\s*\{([\s\S]*?)\}/,
+    )?.[1];
+
+    expect(location).toContain("display: inline-flex");
+    expect(location).toContain("flex: 0 1 auto");
+    expect(tooltip).toContain("display: inline-flex");
+    expect(tooltip).toContain("flex: 0 1 auto");
+    expect(content).toContain("display: inline-flex");
+    expect(content).toContain("white-space: nowrap");
+    expect(content).toContain("overflow: hidden");
+  });
+
   test("keeps plugin tooltips flat instead of adding a bright underglow", () => {
     const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
     for (const [selector, body] of [
