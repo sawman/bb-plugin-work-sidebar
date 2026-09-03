@@ -88,6 +88,13 @@ describe("stylesheet policy", () => {
     const stackDelta = source.match(
       /\.ws-stack-line-deltas \.ws-line-delta\s*\{([\s\S]*?)\}/,
     )?.[1];
+    const additions = source.match(
+      /\.ws-line-delta-additions\s*\{([\s\S]*?)\}/,
+    )?.[1];
+    const deletions = source.match(
+      /\.ws-line-delta-deletions\s*\{([\s\S]*?)\}/,
+    )?.[1];
+    const changed = source.match(/\.ws-pr-changes_requested\s*\{([\s\S]*?)\}/)?.[1];
 
     expect(pair).toContain("display: inline-grid");
     expect(pair).toContain("grid-template-columns: repeat(2, 5ch)");
@@ -98,6 +105,9 @@ describe("stylesheet policy", () => {
     expect(stackPair).toContain("grid-area: deltas");
     expect(stackDelta).toContain("min-width: 6ch");
     expect(stackDelta).toContain("text-align: left");
+    expect(additions).toContain("color: var(--diff-added)");
+    expect(deletions).toContain("color: var(--diff-removed)");
+    expect(changed).toContain("color: var(--warning-text)");
     expect(source).toContain('"title title"\n    "subtitle deltas"');
   });
 

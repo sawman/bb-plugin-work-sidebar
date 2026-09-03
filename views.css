@@ -1596,7 +1596,7 @@
   white-space: nowrap;
 }
 .ws-pr-changes_requested {
-  color: var(--destructive);
+  color: var(--warning-text);
 }
 .ws-repository-card {
   gap: 0.32rem;
@@ -1806,10 +1806,10 @@ button.ws-change-file-row:hover {
   white-space: nowrap;
 }
 .ws-line-delta-additions {
-  color: var(--success);
+  color: var(--diff-added);
 }
 .ws-line-delta-deletions {
-  color: var(--destructive);
+  color: var(--diff-removed);
 }
 .ws-stack-line-deltas {
   grid-area: deltas;
