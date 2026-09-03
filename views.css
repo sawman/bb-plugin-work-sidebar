@@ -2309,11 +2309,11 @@ button.ws-change-file-row:hover {
   border-bottom: 1px solid var(--border);
 }
 .ws-provider-status-section > summary {
-  display: flex;
+  display: grid;
+  grid-template-columns: 0.9rem minmax(0, 1fr) auto;
   min-height: 1.4rem;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem;
+  column-gap: 0.2rem;
   color: var(--muted-foreground);
   font: var(--ws-text-metadata);
   line-height: inherit;
@@ -2325,26 +2325,21 @@ button.ws-change-file-row:hover {
 }
 .ws-provider-status-title,
 .ws-provider-status-summary {
-  display: inline-flex;
   min-width: 0;
-  align-items: center;
 }
 .ws-provider-status-title {
-  gap: 0.18rem;
   color: var(--foreground);
-  overflow: hidden;
-}
-.ws-provider-status-title > span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ws-provider-status-title svg {
+.ws-provider-status-section > summary > svg {
+  justify-self: center;
   width: 0.66rem;
   height: 0.66rem;
   transition: transform 120ms ease;
 }
-.ws-provider-status-section[open] .ws-provider-status-title svg {
+.ws-provider-status-section[open] > summary > svg {
   transform: rotate(90deg);
 }
 .ws-provider-status-summary {
