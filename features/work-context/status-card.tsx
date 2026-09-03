@@ -1,18 +1,20 @@
-import { useState } from "react";
-import { experimental_useProviders, useBbNavigate } from "@get-bb/plugin-sdk/app";
+import { useEffect, useState } from "react";
+import { experimental_useProviders } from "@get-bb/plugin-sdk/app";
 import { Icon, type IconName } from "../../components/ui/icon";
 import { ThreadProviderLogo } from "../../components/threads/thread-provider-logo";
 import { ActionTooltip } from "../../components/ui/action-tooltip";
-import { readableStatus, runtimeStatusPresentation } from "../../work-model";
+import { runtimeStatusPresentation } from "../../work-model";
 import { useLatestActivity, useWorkProviderHealth, useWorkStatus } from "./queries";
 import { CardState } from "./card-state";
+import { ProviderHealth, ProviderStatusSection } from "./provider-status-section";
+import { formatActivityAge } from "./latest-activity";
 
 const runtimeIcons = {
   working: "LoaderCircle",
   waiting: "UserClock",
   blocked: "AlertCircle",
   complete: "Check",
-  idle: "Circle",
+  idle: "Zzz",
 } satisfies Record<ReturnType<typeof runtimeStatusPresentation>["tone"], IconName>;
 
 function countLabel(count: number, description: string) {
@@ -58,6 +60,7 @@ export function StatusCard({ threadId }: { threadId: string }) {
       error={query.error}
       onRetry={() => void query.refetch()}
     >
+      {provider.data ? <ProviderStatusSection provider={provider.data} /> : null}
       {latestActivity.data?.latest || latestActivity.data?.lastUser ? (
         <div className="ws-activity-list">
           {latestActivity.data?.lastUser ? (
@@ -129,7 +132,7 @@ function ActivityRow({
   onToggle,
 }: {
   label: string;
-  entry: { text: string; kind: string };
+  entry: { text: string; kind: string; createdAt?: number | null };
   expanded: boolean;
   onToggle(): void;
 }) {
@@ -148,50 +151,22 @@ function ActivityRow({
       ) : (
         <span className="ws-activity-copy">{entry.text}</span>
       )}
+      <ActivityTime createdAt={entry.createdAt} />
     </button>
   );
 }
 
-function ProviderHealth({
-  provider,
-  providerLogo,
-}: {
-  provider: {
-    providerId: string;
-    tone: string;
-    providerName: string;
-    status: string;
-    statusUrl: string | null;
-    message: string | null;
-  };
-  providerLogo?: Parameters<typeof ThreadProviderLogo>[0]["provider"];
-}) {
-  const navigate = useBbNavigate();
-  const label = `${provider.providerName} provider status: ${readableStatus(
-    provider.status,
-  )}. ${provider.message ?? "No provider message."}`;
-  const icon = (
-    <span aria-hidden className="ws-provider-health-icon">
-      <ThreadProviderLogo providerId={provider.providerId} provider={providerLogo} runtimeState="idle" />
-    </span>
-  );
-  return provider.statusUrl ? (
-    <ActionTooltip label={label}>
-      {(tooltipId) => <button
-      type="button"
-      className={`ws-provider-health ws-provider-health-${provider.tone}`}
-      aria-label={label}
-      aria-describedby={tooltipId}
-      onClick={() => navigate.openUrl(provider.statusUrl!)}
-      >
-      {icon}
-      </button>}
-    </ActionTooltip>
-  ) : (
-    <ActionTooltip label={label}>
-      {(tooltipId) => <span className={`ws-provider-health ws-provider-health-${provider.tone}`} role="img" aria-label={label} aria-describedby={tooltipId}>
-        {icon}
-      </span>}
-    </ActionTooltip>
+function ActivityTime({ createdAt }: { createdAt?: number | null }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (createdAt == null) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, [createdAt]);
+  if (createdAt == null) return null;
+  return (
+    <time dateTime={new Date(createdAt).toISOString()}>
+      {formatActivityAge(createdAt, now)}
+    </time>
   );
 }

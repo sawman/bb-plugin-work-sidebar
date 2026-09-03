@@ -6,6 +6,7 @@ import { createBackgroundJobsReadService } from "./background-jobs-server.js";
 import { projectWorkBindingOwner } from "./server-owner-projection.js";
 import { createWorkItemQueueService, normalizeWorkItemQueue, WORK_ITEM_QUEUE_KEY } from "./work-item-queue-server.js";
 import { projectLatestActivity } from "./latest-activity.js";
+import { projectProviderStatus } from "./provider-status.js";
 
 type WorkContextHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
@@ -21,13 +22,6 @@ type WorkContextHandlers = Pick<
   | "getLatestActivity"
   | "getWorkBackgroundJobs"
 >;
-
-const PROVIDER_STATUS_URLS: Readonly<Record<string, string>> = {
-  codex: "https://status.openai.com/",
-  "claude-code": "https://status.claude.com/",
-  "acp-cursor": "https://status.cursor.com/",
-};
-
 
 const emptyLegacyContext = () => ({
   state: "none" as const,
@@ -232,40 +226,31 @@ export function createWorkContextRegistration(
     async getWorkBackgroundJobs({ threadId }) { return backgroundJobs.read(threadId); },
     async getWorkProviderStatus({ threadId }) {
       const thread = await bb.sdk.threads.get({ threadId });
-      try {
-        const states = await bb.sdk.system.providerStates(
+      const [statesResult, usageResult] = await Promise.allSettled([
+        bb.sdk.system.providerStates(
           thread.environmentId ? { environmentId: thread.environmentId } : {},
-        );
-        const provider = states.providers.find((candidate) => candidate.providerId === thread.providerId);
-        if (!provider) {
-          return {
-            tone: "amber" as const,
-            providerId: thread.providerId,
-            providerName: thread.providerId,
-            statusUrl: PROVIDER_STATUS_URLS[thread.providerId] ?? null,
-            status: "unavailable" as const,
-            message: "Provider health is not available from this host.",
-          };
-        }
-        const tone = provider.status === "ready" ? "green" as const : provider.status === "unknown" ? "amber" as const : "red" as const;
-        return {
-          tone,
+        ),
+        bb.sdk.system.usageLimits({ providerId: thread.providerId }),
+      ]);
+      const provider = statesResult.status === "fulfilled"
+        ? statesResult.value.providers.find(
+            (candidate) => candidate.providerId === thread.providerId,
+          ) ?? null
+        : {
           providerId: thread.providerId,
-          providerName: provider.displayName,
-          statusUrl: PROVIDER_STATUS_URLS[thread.providerId] ?? null,
-          status: provider.status,
-          message: provider.statusMessage,
-        };
-      } catch (error) {
-        return {
-          tone: "amber" as const,
-          providerId: thread.providerId,
-          providerName: thread.providerId,
-          statusUrl: PROVIDER_STATUS_URLS[thread.providerId] ?? null,
+          displayName: thread.providerId,
           status: "unknown" as const,
-          message: error instanceof Error ? error.message : "Provider health could not be checked.",
+          statusMessage: statesResult.reason instanceof Error
+            ? statesResult.reason.message
+            : "Provider health could not be checked.",
         };
-      }
+      return projectProviderStatus({
+        providerId: thread.providerId,
+        provider,
+        usage: usageResult.status === "fulfilled"
+          ? (usageResult.value[thread.providerId] ?? null)
+          : null,
+      });
     },
     async getLatestActivity({ threadId }) {
       const [thread, timeline, output] = await Promise.all([

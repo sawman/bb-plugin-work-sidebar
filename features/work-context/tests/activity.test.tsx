@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { act, cleanup, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { focusManager, onlineManager } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
 import type { rpcContract } from "../../../contracts";
 import { getPluginQueryClient } from "../../../query-runtime";
+import { formatActivityAge, projectLatestActivity } from "../latest-activity";
 
 type Rpc = NonNullable<RenderSlotOptions<typeof rpcContract>["rpc"]>;
 type ThreadState = "active" | "starting" | "idle";
@@ -156,6 +157,86 @@ describe("registered Status activity lifecycle", () => {
     ).toEqual(["User", "Agent"]);
 
     slot.lifecycle.unmount();
+  });
+
+  it("renders idle as Zzz and reveals provider usage above timestamped turns", async () => {
+    const now = Date.now();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_provider_usage", params: null },
+      {
+        rpc: fixture({
+          getWorkStatus: () => baseStatus("idle"),
+          getLatestActivity: () => ({
+            currentThread: { status: "idle", runtimeStatus: "idle" },
+            latest: {
+              text: "Agent reply",
+              kind: "assistant",
+              createdAt: now - 60 * 60_000,
+            },
+            lastUser: {
+              text: "User request",
+              kind: "user",
+              createdAt: now - 5 * 60_000,
+            },
+            current: null,
+          }),
+          getWorkProviderStatus: () => ({
+            tone: "red",
+            providerId: "codex",
+            providerName: "Codex",
+            statusUrl: null,
+            status: "ready",
+            message: null,
+            usage: {
+              status: "ok",
+              planLabel: "Pro",
+              message: null,
+              windows: [
+                { label: "Five-hour", usedPercent: 84, resetsAt: null },
+                { label: "Weekly", usedPercent: 100, resetsAt: null },
+              ],
+            },
+          }),
+        }),
+      },
+    );
+
+    const idle = await slot.findByRole("img", { name: "Idle" });
+    expect(idle.getAttribute("data-icon")).toBe("Zzz");
+    const providerSection = slot.container.querySelector<HTMLDetailsElement>(
+      ".ws-provider-status-section",
+    );
+    expect(providerSection?.open).toBe(false);
+    fireEvent.click(slot.getByText("Provider"));
+    expect(providerSection?.open).toBe(true);
+    expect(slot.getByRole("progressbar", { name: "Five-hour usage" }).getAttribute("aria-valuenow")).toBe("84");
+    expect(slot.getByRole("progressbar", { name: "Weekly usage" }).getAttribute("data-tone")).toBe("critical");
+    const userCopy = slot.getByText("User request");
+    const agentCopy = slot.getByText("Agent reply");
+    expect(userCopy.nextElementSibling?.textContent).toBe("5m ago");
+    expect(agentCopy.nextElementSibling?.textContent).toBe("1h ago");
+    expect(slot.getByRole("img", { name: "Codex provider status: Ready · 100% used" })).toBeTruthy();
+    slot.lifecycle.unmount();
+  });
+
+  it("formats compact activity ages", () => {
+    const now = Date.UTC(2026, 8, 3, 12);
+    expect(formatActivityAge(now - 30_000, now)).toBe("now");
+    expect(formatActivityAge(now - 12 * 60_000, now)).toBe("12m ago");
+    expect(formatActivityAge(now - 3 * 60 * 60_000, now)).toBe("3h ago");
+    expect(formatActivityAge(now - 2 * 24 * 60 * 60_000, now)).toBe("2d ago");
+  });
+
+  it("preserves source timestamps in the latest conversation projection", () => {
+    expect(projectLatestActivity([
+      { kind: "conversation", role: "user", text: "Question", createdAt: 100 },
+      { kind: "conversation", role: "assistant", text: "Answer", createdAt: 200 },
+    ], null, false)).toMatchObject({
+      lastUser: { text: "Question", createdAt: 100 },
+      latest: { text: "Answer", createdAt: 200 },
+    });
   });
 
   it("explains the blocked runtime indicator on hover", async () => {

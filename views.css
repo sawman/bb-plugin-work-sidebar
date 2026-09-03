@@ -2304,6 +2304,91 @@ button.ws-change-file-row:hover {
   position: relative;
   gap: 0.28rem;
 }
+.ws-provider-status-section {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.3rem;
+}
+.ws-provider-status-section > summary {
+  display: flex;
+  min-height: 1.4rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  color: var(--muted-foreground);
+  font: var(--ws-text-metadata);
+  line-height: inherit;
+  list-style: none;
+  cursor: pointer;
+}
+.ws-provider-status-section > summary::-webkit-details-marker {
+  display: none;
+}
+.ws-provider-status-title,
+.ws-provider-status-summary {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+}
+.ws-provider-status-title {
+  gap: 0.18rem;
+  color: var(--foreground);
+}
+.ws-provider-status-title svg {
+  width: 0.66rem;
+  height: 0.66rem;
+  transition: transform 120ms ease;
+}
+.ws-provider-status-section[open] .ws-provider-status-title svg {
+  transform: rotate(90deg);
+}
+.ws-provider-status-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-provider-status-content {
+  display: grid;
+  gap: 0.34rem;
+  padding: 0.2rem 0 0.08rem 0.84rem;
+}
+.ws-provider-status-message,
+.ws-provider-plan {
+  margin: 0;
+  color: var(--muted-foreground);
+  font: var(--ws-text-metadata);
+  line-height: 1.25;
+}
+.ws-provider-usage-list {
+  display: grid;
+  gap: 0.28rem;
+}
+.ws-provider-usage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.12rem 0.4rem;
+  color: var(--muted-foreground);
+  font: var(--ws-text-metadata);
+  line-height: 1.2;
+}
+.ws-provider-usage-track {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  height: 0.26rem;
+  border-radius: 999px;
+  background: var(--muted);
+}
+.ws-provider-usage-fill {
+  display: block;
+  width: var(--ws-provider-usage);
+  height: 100%;
+  background: var(--success);
+}
+.ws-provider-usage-track[data-tone="warning"] .ws-provider-usage-fill {
+  background: var(--warning);
+}
+.ws-provider-usage-track[data-tone="critical"] .ws-provider-usage-fill {
+  background: var(--destructive);
+}
 .ws-provider-health {
   flex: none;
   display: inline-grid;
@@ -2409,7 +2494,7 @@ button.ws-provider-health:focus-visible {
 }
 .ws-status-card .ws-activity-item {
   display: grid;
-  grid-template-columns: 2rem minmax(0, 1fr);
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
   width: 100%;
   align-items: start;
   gap: 0.2rem;
@@ -2449,6 +2534,12 @@ button.ws-provider-health:focus-visible {
   word-break: break-word;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+.ws-status-card .ws-activity-item > time {
+  color: var(--muted-foreground);
+  font: var(--ws-text-metadata);
+  line-height: 1.25;
+  white-space: nowrap;
 }
 .ws-status-card .ws-activity-item-expanded .ws-activity-copy,
 .ws-status-card .ws-activity-item-expanded .ws-activity-command {

@@ -94,6 +94,33 @@ export const workStatusSchema = z.object({
     }).nullable(),
   })),
 });
+export const workProviderStatusSchema = z.object({
+  tone: z.enum(["green", "amber", "red"]),
+  providerId: z.string(),
+  providerName: z.string(),
+  statusUrl: z.string().url().nullable(),
+  status: z.enum([
+    "ready",
+    "not_installed",
+    "unauthenticated",
+    "expired",
+    "unsupported_version",
+    "unknown",
+    "unavailable",
+  ]),
+  message: z.string().nullable(),
+  usage: z.object({
+    status: z.enum(["ok", "unavailable"]),
+    planLabel: z.string().nullable(),
+    message: z.string().nullable(),
+    windows: z.array(z.object({
+      label: z.string(),
+      usedPercent: z.number(),
+      resetsAt: z.string().nullable(),
+    })),
+  }).nullable().default(null),
+});
+export type WorkProviderStatus = z.infer<typeof workProviderStatusSchema>;
 export const workOutcomeSchema = z.object({
   rootThreadId: z.string(),
   tasksAvailable: z.boolean(),

@@ -13,6 +13,7 @@ import {
   workGoalSchema,
   workOutcomeSchema,
   workPlanSchema,
+  workProviderStatusSchema,
   workStatusSchema,
 } from "./features/work-context/schemas.js";
 const taskStatus = taskStatusSchema; const taskPriority = taskPrioritySchema;
@@ -23,14 +24,6 @@ const sidebarThreadPullRequest = z.object({
   number: z.number(), title: z.string(), url: z.string().url(),
   state: z.enum(["closed", "draft", "merged", "open"]),
   attention: z.enum(["blocked", "changes_requested", "checks_failed", "checks_pending", "closed", "conflicts", "draft", "merged", "none", "ready_to_merge", "review_requested"]),
-});
-const workProviderStatus = z.object({
-  tone: z.enum(["green", "amber", "red"]),
-  providerId: z.string(),
-  providerName: z.string(),
-  statusUrl: z.string().url().nullable(),
-  status: z.enum(["ready", "not_installed", "unauthenticated", "expired", "unsupported_version", "unknown", "unavailable"]),
-  message: z.string().nullable(),
 });
 export type GitHubStackBranch = z.infer<typeof githubStackBranchSchema>;
 export type GitHubStackSignal = z.infer<typeof sidebarStackLayer>;
@@ -98,7 +91,7 @@ export const rpcSchemas = {
   ...workContextRpcSchemas,
   getGitHubPollingPolicy: { input: z.null(), output: z.object({ activePollMs: z.number().int().positive(), backgroundPollMs: z.number().int().positive(), maxRestPollsPerMinute: z.number().int().positive() }) },
   ...trackerRpcSchemas,
-  getWorkProviderStatus: { input: z.object({ threadId: z.string() }).strict(), output: workProviderStatus },
+  getWorkProviderStatus: { input: z.object({ threadId: z.string() }).strict(), output: workProviderStatusSchema },
   getGitHubApiHealth: { input: z.null(), output: githubApiHealth },
   getLatestActivity: {
     input: z.object({ threadId: z.string().startsWith("thr_") }).strict(),
@@ -107,9 +100,9 @@ export const rpcSchemas = {
         status: z.enum(["active", "error", "idle", "pending", "starting", "stopping"]),
         runtimeStatus: z.string(),
       }),
-      latest: z.object({ text: z.string(), kind: z.enum(["assistant", "user", "command", "activity"]) }).nullable(),
-      lastUser: z.object({ text: z.string(), kind: z.literal("user") }).nullable(),
-      current: z.object({ text: z.string(), kind: z.enum(["assistant", "user", "command", "activity"]) }).nullable(),
+      latest: z.object({ text: z.string(), kind: z.enum(["assistant", "user", "command", "activity"]), createdAt: z.number().nullable().optional() }).nullable(),
+      lastUser: z.object({ text: z.string(), kind: z.literal("user"), createdAt: z.number().nullable().optional() }).nullable(),
+      current: z.object({ text: z.string(), kind: z.enum(["assistant", "user", "command", "activity"]), createdAt: z.number().nullable().optional() }).nullable(),
     }),
   },
   createWorkTask: {
