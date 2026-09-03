@@ -7,11 +7,20 @@ import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { rpcContract } from "../../../contracts";
 import { getPluginQueryClient } from "../../../query-runtime";
+import { workItemTaskKeyColumnWidth } from "../work-item-model";
 
 type Rpc = NonNullable<RenderSlotOptions<typeof rpcContract>["rpc"]>;
 const taskResult = { available: true, tasks: [], projects: [], error: null };
 const axe = configureAxe({
   runOnly: { type: "tag", values: ["cat.aria", "cat.name-role-value"] },
+});
+
+describe("Work-item task key sizing", () => {
+  it("measures one shared column from the widest visible key", () => {
+    expect(workItemTaskKeyColumnWidth(["BB-4", "LINEAR-1024", "WORK-72"])).toBe(
+      "11ch",
+    );
+  });
 });
 const aggregate = {
   rootThreadId: "thr_one",

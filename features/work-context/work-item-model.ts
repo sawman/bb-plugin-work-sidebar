@@ -152,3 +152,50 @@ export function projectWorkItem({
     queue: workQueue,
   };
 }
+/** One measured key track keeps every visible Work-items title columnar. */
+export function workItemTaskKeyColumnWidth(keys: Iterable<string>) {
+  let widest = 1;
+  for (const key of keys) widest = Math.max(widest, key.trim().length);
+  return `${widest}ch`;
+}
+
+type WorkItemTaskKeyCandidate = Readonly<{
+  id: string;
+  key: string;
+  linkedThreadIds: readonly string[];
+}>;
+
+type WorkItemExecutionKeyCandidate = Readonly<{ key: string }>;
+type WorkItemLinearKeyCandidate = Readonly<{ item: Readonly<{ key: string }> }>;
+
+export function workItemTaskKeyColumnWidthForVisibleRows({
+  queue,
+  tasks,
+  taskById,
+  linearByKey,
+  executionTasks,
+  threadId,
+  goalTaskIds,
+}: Readonly<{
+  queue: WorkItemQueue;
+  tasks: readonly WorkItemTaskKeyCandidate[];
+  taskById: ReadonlyMap<string, Readonly<{ key: string }>>;
+  linearByKey: ReadonlyMap<string, WorkItemLinearKeyCandidate>;
+  executionTasks: readonly WorkItemExecutionKeyCandidate[];
+  threadId: string;
+  goalTaskIds: ReadonlySet<string>;
+}>) {
+  const goalKeys = [queue.current, ...queue.backlog].flatMap((reference) => {
+    if (!reference) return [];
+    if (reference.source === "bb_task") return [taskById.get(reference.id)?.key ?? reference.id];
+    return [linearByKey.get(reference.id.toUpperCase())?.item.key ?? reference.id];
+  });
+  const workflowKeys = tasks
+    .filter((task) => task.linkedThreadIds.includes(threadId) && !goalTaskIds.has(task.id))
+    .map((task) => task.key);
+  return workItemTaskKeyColumnWidth([
+    ...goalKeys,
+    ...workflowKeys,
+    ...executionTasks.map((task) => task.key),
+  ]);
+}

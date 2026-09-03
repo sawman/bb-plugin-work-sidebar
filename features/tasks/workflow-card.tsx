@@ -222,7 +222,9 @@ function WorkflowRow({
     >
       <span className="ws-task-workflow-copy">
         <span className="ws-task-workflow-title-line">
-          <TaskPriorityIcon priority={task.priority ?? "none"} />
+          <span className="ws-task-workflow-priority">
+            <TaskPriorityIcon priority={task.priority ?? "none"} />
+          </span>
           <span className="ws-task-workflow-key">{task.key}</span>
           <span className="ws-task-workflow-title">{task.title}</span>
         </span>

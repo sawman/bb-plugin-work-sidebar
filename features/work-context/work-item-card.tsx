@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type CSSProperties, type ReactNode } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { CopyBadge } from "../../components/ui/copy-badge";
@@ -28,6 +28,7 @@ import {
   projectWorkItem,
   promoteWorkItem,
   resolveWorkItemQueue,
+  workItemTaskKeyColumnWidthForVisibleRows,
   type WorkItemReference,
 } from "./work-item-model";
 import { useTrackerMutations, useTrackerSearch } from "../tracker/queries";
@@ -125,6 +126,10 @@ export function WorkItemCard({
   const linearByKey = new Map(
     (tracker.data?.items ?? []).map((linked) => [linked.item.key.toUpperCase(), linked]),
   );
+  const workItemTaskKeyWidth = workItemTaskKeyColumnWidthForVisibleRows({
+    queue, tasks: tasks.data?.tasks ?? [], taskById, linearByKey,
+    executionTasks: query.data?.executionTasks ?? [], threadId, goalTaskIds,
+  });
   const labelForReference = (reference: WorkItemReference) => {
     if (reference.source === "bb_task") {
       const task = taskById.get(reference.id);
@@ -224,6 +229,9 @@ export function WorkItemCard({
       error={query.error}
       onRetry={() => void query.refetch()}
     >
+      <div className="ws-work-item-task-lanes" style={{
+        "--ws-work-item-key-width": workItemTaskKeyWidth,
+      } as CSSProperties}>
       <WorkQueue
         queue={queue}
         labelForReference={labelForReference}
@@ -397,6 +405,7 @@ export function WorkItemCard({
           }
         />
       )}
+      </div>
     </CardState>
   );
 }
@@ -666,7 +675,9 @@ function WorkItemGoalRow({
     >
       <span className="ws-task-workflow-copy ws-work-item-reference">
         <span className="ws-task-workflow-title-line">
-          {task ? <TaskPriorityIcon priority={task.priority} /> : null}
+          <span className="ws-task-workflow-priority">
+            {task ? <TaskPriorityIcon priority={task.priority} /> : null}
+          </span>
           <CopyBadge
             value={task?.key ?? reference.id}
             label={task ? "current goal BB task" : "current goal Linear issue"}

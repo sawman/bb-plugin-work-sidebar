@@ -3638,6 +3638,13 @@ button.ws-provider-health:focus-visible {
   align-items: center;
   gap: 0.26rem;
 }
+.ws-task-workflow-priority {
+  display: grid;
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: 0 0 0.7rem;
+  place-items: center;
+}
 .ws-task-workflow-key {
   flex: 0 0 auto;
   color: var(--muted-foreground);
@@ -3819,6 +3826,15 @@ button.ws-provider-health:focus-visible {
 }
 .ws-work-item-reference {
   min-width: 0;
+}
+.ws-work-item-task-lanes .ws-task-workflow-title-line {
+  display: grid;
+  grid-template-columns: 0.7rem var(--ws-work-item-key-width) minmax(0, 1fr);
+}
+.ws-work-item-task-lanes .ws-task-workflow-key {
+  min-width: 0;
+  overflow: visible;
+  white-space: nowrap;
 }
 .ws-work-item-reference-meta {
   display: inline-flex;

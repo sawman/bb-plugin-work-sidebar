@@ -5,6 +5,7 @@ import {
   promoteWorkItem,
   projectWorkItem,
   resolveWorkItemQueue,
+  workItemTaskKeyColumnWidthForVisibleRows,
   type WorkItemTrackerRecord,
 } from "../work-item-model";
 
@@ -36,6 +37,23 @@ const linear = (
 });
 
 describe("unified work item projection", () => {
+  it("uses one key track for the rows visible in Work items", () => {
+    expect(
+      workItemTaskKeyColumnWidthForVisibleRows({
+        queue: { current: { source: "linear", id: "LIN-1024" }, backlog: [] },
+        tasks: [
+          { id: "visible", key: "BBPLUG-72", linkedThreadIds: ["thr_work"] },
+          { id: "hidden", key: "UNRELATED-10000", linkedThreadIds: ["thr_other"] },
+        ],
+        taskById: new Map(),
+        linearByKey: new Map([["LIN-1024", { item: { key: "LIN-1024" } }]]),
+        executionTasks: [{ key: "WORK-3" }],
+        threadId: "thr_work",
+        goalTaskIds: new Set(),
+      }),
+    ).toBe("9ch");
+  });
+
   it("migrates existing outcome and Linear links into one explicit current goal and backlog", () => {
     expect(resolveWorkItemQueue({ outcome, linked: [linear("LIN-1"), linear("LIN-2")], primaryLinearKey: "LIN-2", queue: null })).toEqual({
       current: { source: "bb_task", id: outcome.id },
