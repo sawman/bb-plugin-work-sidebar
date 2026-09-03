@@ -45,10 +45,23 @@ describe("Work provider status projection", () => {
     expect(providerHealthTooltip(
       projectProviderStatus({ providerId: "codex", provider, usage: usage(84) }),
     )).toBe("84% used");
+    expect(providerHealthTooltip(
+      projectProviderStatus({ providerId: "codex", provider, usage: usage(100) }),
+    )).toBe("100% used");
+  });
+
+  it.each([
+    ["not_installed", "Not installed"],
+    ["unauthenticated", "Sign in"],
+    ["expired", "Expired"],
+    ["unsupported_version", "Update needed"],
+    ["unknown", "Unavailable"],
+    ["unavailable", "Unavailable"],
+  ] as const)("describes %s provider state as %s", (status, label) => {
     expect(providerHealthTooltip(projectProviderStatus({
       providerId: "codex",
-      provider: { ...provider, status: "expired" },
+      provider: { ...provider, status },
       usage: usage(84),
-    }))).toBe("Down");
+    }))).toBe(label);
   });
 });

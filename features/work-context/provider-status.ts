@@ -32,9 +32,11 @@ type ProviderUsage =
     };
 
 export function providerHealthTooltip(provider: WorkProviderStatus) {
-  if (provider.status !== "ready") {
-    return provider.tone === "red" ? "Down" : "Unavailable";
-  }
+  if (provider.status === "not_installed") return "Not installed";
+  if (provider.status === "unauthenticated") return "Sign in";
+  if (provider.status === "expired") return "Expired";
+  if (provider.status === "unsupported_version") return "Update needed";
+  if (provider.status !== "ready") return "Unavailable";
   if (provider.usage?.status === "ok") {
     const maximum = Math.max(
       0,
