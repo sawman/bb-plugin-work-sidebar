@@ -3,7 +3,15 @@ import type { Changes, Repository } from "./schemas.js";
 
 export type StackBranchSignals = Pick<
   GitHubStackSignal,
-  "state" | "draft" | "attention" | "checks" | "review" | "reviewCommentCount"
+  | "state"
+  | "draft"
+  | "attention"
+  | "checks"
+  | "review"
+  | "approvers"
+  | "changeRequesters"
+  | "requestedReviewers"
+  | "reviewCommentCount"
 >;
 
 /** Merge the stack summary and branch-local signals without weakening RPC types. */

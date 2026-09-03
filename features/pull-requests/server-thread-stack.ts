@@ -386,7 +386,10 @@ export function createThreadStackService(
             pullRequests: entry.stack.pullRequests.map((pullRequest) => ({
               number: pullRequest.number, title: pullRequest.title, state: pullRequest.state, draft: pullRequest.draft,
               url: pullRequest.url, head: pullRequest.head, base: pullRequest.base, checks: pullRequest.checks,
-              review: pullRequest.review, reviewCommentCount: pullRequest.reviewCommentCount,
+              review: pullRequest.review, approvers: pullRequest.approvers,
+              changeRequesters: pullRequest.changeRequesters,
+              requestedReviewers: pullRequest.requestedReviewers,
+              reviewCommentCount: pullRequest.reviewCommentCount,
             })),
           };
           return [[threadId, stack] as const];

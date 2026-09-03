@@ -9,6 +9,8 @@ export const pullRequestSignal = z.object({
     "review_required",
     "none",
   ]),
+  approvers: z.array(z.string()).optional(),
+  changeRequesters: z.array(z.string()).optional(),
   requestedReviewers: z.array(z.string()).optional(),
   reviewCommentCount: z.number().int().nonnegative(),
 });

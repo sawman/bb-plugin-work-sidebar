@@ -4,12 +4,43 @@ import {
   readGitHubPullRequestFilePatch,
   readGitHubSignals,
   readGitHubPullRequestDiff,
+  resolveReviewState,
 } from "../../features/pull-requests/server-stack.js";
 import { createThreadStackService } from "../../features/pull-requests/server-thread-stack.js";
 import { fetchGitHubStack as serverEntrypointFetchGitHubStack } from "../../server.js";
 import { createServerLifecycle } from "../../server-lifecycle.js";
 
 describe("GitHub Stack enrichment ownership", () => {
+  it.each([
+    {
+      name: "#1402 re-requests the same change requester after a later comment",
+      decision: "CHANGES_REQUESTED",
+      requested: ["yojo-se"],
+      reviews: [["yojo-se", "CHANGES_REQUESTED"]],
+      expected: "review_required",
+    },
+    {
+      name: "does not mistake another reviewer request for a re-request",
+      decision: "CHANGES_REQUESTED",
+      requested: ["someone-else"],
+      reviews: [["yojo-se", "CHANGES_REQUESTED"]],
+      expected: "changes_requested",
+    },
+    {
+      name: "#1408 retains its named approval",
+      decision: "APPROVED",
+      requested: [],
+      reviews: [["hendra-systemearth", "APPROVED"]],
+      expected: "approved",
+    },
+  ] as const)("classifies the recorded GitHub corpus: $name", ({ decision, requested, reviews, expected }) => {
+    expect(resolveReviewState({
+      reviewDecision: decision,
+      requestedReviewers: requested,
+      reviewerStates: new Map(reviews),
+    })).toBe(expected);
+  });
+
   it("evicts the oldest signal deterministically at the bounded cache limit", () => {
     const lifecycle = createServerLifecycle();
     const signal = { checks: "passing" as const, review: "approved" as const };
@@ -38,6 +69,13 @@ describe("GitHub Stack enrichment ownership", () => {
               p0: {
                 reviewDecision: "APPROVED",
                 reviewRequests: { totalCount: 0 },
+                reviews: {
+                  nodes: [{
+                    author: { login: "hendra-systemearth" },
+                    state: "APPROVED",
+                    submittedAt: "2026-09-03T08:00:22Z",
+                  }],
+                },
                 commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
               },
             },
@@ -56,12 +94,15 @@ describe("GitHub Stack enrichment ownership", () => {
 
     const stack = await fetchGitHubStack("acme", "work", 7, async (args, _maxBuffer) => run(args), lifecycle);
     expect(stack?.pullRequests).toEqual([expect.objectContaining({
-      number: 7, checks: "passing", review: "approved",
+      number: 7,
+      checks: "passing",
+      review: "approved",
+      approvers: ["hendra-systemearth"],
     })]);
     expect(lifecycle.githubReadCache.size).toBe(0);
   });
 
-  it("includes branch metadata in the existing authored PR signal read", async () => {
+  it("uses the re-requested-review corpus in the authored PR signal read", async () => {
     const lifecycle = createServerLifecycle();
     const run = vi.fn(async (_args: readonly string[], _maxBuffer: number) =>
       JSON.stringify({
@@ -74,16 +115,23 @@ describe("GitHub Stack enrichment ownership", () => {
               reviewRequests: {
                 totalCount: 2,
                 nodes: [
-                  { requestedReviewer: { login: "octocat" } },
+                  { requestedReviewer: { login: "yojo-se" } },
                   { requestedReviewer: { slug: "platform-team" } },
                 ],
               },
-              latestReviews: {
+              reviews: {
                 nodes: [
                   {
-                    author: { login: "octocat" },
+                    author: { login: "yojo-se" },
                     state: "CHANGES_REQUESTED",
-                    submittedAt: "2026-09-04T00:00:00Z",
+                    submittedAt: "2026-09-03T15:21:11Z",
+                  },
+                  {
+                    // The production #1402 corpus contains later comment-only
+                    // reviews. They must not erase yojo-se's change request.
+                    author: { login: "matthew-se" },
+                    state: "COMMENTED",
+                    submittedAt: "2026-09-03T16:49:15Z",
                   },
                 ],
               },
@@ -111,7 +159,8 @@ describe("GitHub Stack enrichment ownership", () => {
       base: "main",
       checks: "passing",
       review: "review_required",
-      requestedReviewers: ["octocat", "platform-team"],
+      changeRequesters: ["yojo-se"],
+      requestedReviewers: ["yojo-se", "platform-team"],
     });
     expect(run).toHaveBeenCalledTimes(1);
     expect(run.mock.calls[0]?.[0].join(" ")).toContain(
@@ -124,8 +173,54 @@ describe("GitHub Stack enrichment ownership", () => {
       "reviewRequests(first: 100)",
     );
     expect(run.mock.calls[0]?.[0].join(" ")).toContain(
-      "latestReviews(last: 100)",
+      "reviews(last: 100)",
     );
+    expect(run.mock.calls[0]?.[0].join(" ")).toContain("totalCount");
+  });
+
+  it("uses paginated REST rather than truncating a review-heavy PR corpus", async () => {
+    const lifecycle = createServerLifecycle();
+    const run = vi.fn(async (args: readonly string[]) => {
+      if (args[1] === "graphql") {
+        return JSON.stringify({
+          data: {
+            repository: {
+              p0: {
+                reviews: { totalCount: 101, nodes: [{ author: { login: "yojo-se" }, state: "CHANGES_REQUESTED" }] },
+              },
+            },
+          },
+        });
+      }
+      if (args.some((value) => value.endsWith("/reviews?per_page=100"))) {
+        return JSON.stringify([[
+          { user: { login: "yojo-se" }, state: "CHANGES_REQUESTED" },
+          { user: { login: "matthew-se" }, state: "COMMENTED" },
+        ]]);
+      }
+      return JSON.stringify({
+        head: { ref: "feature/review-heavy", sha: null },
+        base: { ref: "main" },
+        requested_reviewers: [{ login: "yojo-se" }],
+        requested_teams: [],
+      });
+    });
+
+    await expect(readGitHubSignals("acme", "repo", [93], lifecycle, run)).resolves.toEqual(
+      new Map([[93, {
+        head: "feature/review-heavy",
+        base: "main",
+        checks: "unknown",
+        review: "review_required",
+        changeRequesters: ["yojo-se"],
+        requestedReviewers: ["yojo-se"],
+      }]]),
+    );
+    expect(
+      run.mock.calls.some(([args]) =>
+        (args as readonly string[]).some((value) => value.endsWith("/reviews?per_page=100")),
+      ),
+    ).toBe(true);
   });
 
   it("retains branch metadata when authored PR signals fall back to REST", async () => {
@@ -159,6 +254,7 @@ describe("GitHub Stack enrichment ownership", () => {
       base: "main",
       checks: "unknown",
       review: "review_required",
+      changeRequesters: ["reviewer-one"],
       requestedReviewers: ["reviewer-one", "platform-team"],
     });
     expect(run).toHaveBeenCalledTimes(3);
@@ -377,7 +473,7 @@ describe("GitHub Stack enrichment ownership", () => {
             baseRefName: "main",
             reviewDecision: "REVIEW_REQUIRED",
             reviewRequests: { totalCount: 0, nodes: [] },
-            latestReviews: { nodes: [] },
+            reviews: { nodes: [] },
             commits: { nodes: [{ commit: { statusCheckRollup: { state: "FAILURE" } } }] },
           } } } })
         : JSON.stringify([
@@ -456,7 +552,7 @@ describe("GitHub Stack enrichment ownership", () => {
           headRefName: "feature/current", baseRefName: "main",
           reviewDecision: "CHANGES_REQUESTED",
           reviewRequests: { totalCount: 1, nodes: [{ requestedReviewer: { login: "octocat" } }] },
-          latestReviews: { nodes: [{ author: { login: "octocat" }, state: "CHANGES_REQUESTED", submittedAt: "2026-09-04T00:00:00Z" }] },
+          reviews: { nodes: [{ author: { login: "octocat" }, state: "CHANGES_REQUESTED", submittedAt: "2026-09-04T00:00:00Z" }] },
           commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
         } } } });
       }
@@ -469,7 +565,12 @@ describe("GitHub Stack enrichment ownership", () => {
     expect(result.pullRequests.thr_current).toMatchObject({
       review: { reviewRequestCount: 1, state: "review_required" },
       attention: "review_requested",
-      signal: { checks: "passing", review: "review_required" },
+      signal: {
+        checks: "passing",
+        review: "review_required",
+        changeRequesters: ["octocat"],
+        requestedReviewers: ["octocat"],
+      },
     });
   });
 

@@ -7,7 +7,7 @@ import {
   ThreadProviderLogo,
   type ThreadProvider,
 } from "@/components/threads/thread-provider-logo";
-import { pullRequestSummaryPresentation } from "@/features/pull-requests/presentation";
+import { pullRequestReviewDetail, pullRequestSummaryPresentation } from "@/features/pull-requests/presentation";
 import type { ThreadPullRequest } from "@/features/pull-requests/queries";
 import { PullRequestIdentifierBadge } from "@/features/pull-requests/identifier-badge";
 import {
@@ -88,6 +88,7 @@ export function ThreadMetadata({
           number={pullRequest.number}
           url={pullRequest.url}
           presentation={pullRequestStatus}
+          reviewDetail={pullRequest.signal ? pullRequestReviewDetail(pullRequest.signal) ?? undefined : undefined}
         />
       )}
       {stackNumber}

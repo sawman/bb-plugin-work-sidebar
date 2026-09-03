@@ -8,6 +8,7 @@ import {
   normalizePullRequestSignal,
   pullRequestAttentionFromSignal,
   pullRequestPresentation,
+  pullRequestReviewDetail,
   pullRequestSignalPresentation,
   pullRequestSummaryPresentation,
 } from "../presentation";
@@ -131,6 +132,33 @@ describe("pull-request presentation semantics", () => {
         }),
       }),
     ).toEqual({ icon: "Wrench", label: "Changes requested", tone: "closed" });
+  });
+
+  it("keeps review badge details short and tied to the active review lifecycle", () => {
+    expect(
+      pullRequestReviewDetail({
+        checks: "passing",
+        review: "review_required",
+        requestedReviewers: ["yojo-se", "platform-team", "extra"],
+        reviewCommentCount: 0,
+      }),
+    ).toBe("Review: yojo-se, platform-team, extra");
+    expect(
+      pullRequestReviewDetail({
+        checks: "passing",
+        review: "changes_requested",
+        changeRequesters: ["yojo-se"],
+        reviewCommentCount: 0,
+      }),
+    ).toBe("Changes: yojo-se");
+    expect(
+      pullRequestReviewDetail({
+        checks: "passing",
+        review: "approved",
+        approvers: ["hendra-systemearth"],
+        reviewCommentCount: 0,
+      }),
+    ).toBe("Approved: hendra-systemearth");
   });
 
   it("keeps comment counts, merged layers, archived repositories, and GitHub health semantic", () => {

@@ -487,7 +487,7 @@ describe("pull-request stack number presentation", () => {
 
     const badge = screen.getByRole("button", { name: "Copy PR number #97" });
     expect(badge.getAttribute("data-tone")).toBe("warning");
-    expect(tooltipLabel(badge)).toBe("Review requested");
+    expect(tooltipLabel(badge)).toBe("Review: octocat");
     expect(badge.querySelector("svg")?.getAttribute("data-icon")).toBe("Eye");
   });
 
@@ -602,7 +602,7 @@ describe("pull-request stack number presentation", () => {
     expect(
       screen
         .getByRole("menuitem", {
-          name: "Review: Review requested",
+          name: "Review: octocat, platform-team",
         })
         .getAttribute("aria-disabled"),
     ).toBe("true");

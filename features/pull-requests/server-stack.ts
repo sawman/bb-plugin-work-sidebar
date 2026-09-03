@@ -38,6 +38,16 @@ function requestedReviewerNames(value: unknown): string[] {
   return [...new Set(names)];
 }
 
+/** Only user requests can clear a user's change request; a team is not them. */
+function requestedReviewerLogins(value: unknown): string[] {
+  if (!isRecord(value) || !Array.isArray(value.nodes)) return [];
+  return [...new Set(value.nodes.flatMap((node) => {
+    if (!isRecord(node) || !isRecord(node.requestedReviewer)) return [];
+    const login = node.requestedReviewer.login;
+    return typeof login === "string" && login ? [login] : [];
+  }))];
+}
+
 function restRequestedReviewerNames(pullRequest: Record<string, unknown>): string[] {
   const users = Array.isArray(pullRequest.requested_reviewers)
     ? pullRequest.requested_reviewers.flatMap((reviewer) =>
@@ -57,6 +67,16 @@ function restRequestedReviewerNames(pullRequest: Record<string, unknown>): strin
   return [...new Set([...users, ...teams])];
 }
 
+function restRequestedReviewerLogins(pullRequest: Record<string, unknown>): string[] {
+  return Array.isArray(pullRequest.requested_reviewers)
+    ? [...new Set(pullRequest.requested_reviewers.flatMap((reviewer) =>
+        isRecord(reviewer) && typeof reviewer.login === "string" && reviewer.login
+          ? [reviewer.login]
+          : [],
+      ))]
+    : [];
+}
+
 type ReviewSource = "graphql" | "rest";
 
 function reviewerIdentity(value: string) {
@@ -70,8 +90,12 @@ function flattenRestReviewPages(value: unknown): unknown[] {
   );
 }
 
-/** Returns one latest review state per person, ignoring malformed entries. */
-function latestReviewerStates(value: unknown, source: ReviewSource) {
+/**
+ * Returns the latest review decision per person. COMMENTED reviews do not
+ * clear an earlier approval or change request; only a later decisive review
+ * (or dismissal) can do that.
+ */
+function latestReviewerDecisions(value: unknown, source: ReviewSource) {
   const reviews = source === "graphql"
     ? isRecord(value) && Array.isArray(value.nodes) ? value.nodes : []
     : flattenRestReviewPages(value);
@@ -83,6 +107,8 @@ function latestReviewerStates(value: unknown, source: ReviewSource) {
       ? author.login
       : null;
     if (!login || typeof review.state !== "string") continue;
+    if (!new Set(["APPROVED", "CHANGES_REQUESTED", "DISMISSED"]).has(review.state))
+      continue;
     const submitted = source === "graphql" ? review.submittedAt : review.submitted_at;
     const submittedAt = typeof submitted === "string" ? Date.parse(submitted) : 0;
     const previous = latest.get(login);
@@ -90,6 +116,23 @@ function latestReviewerStates(value: unknown, source: ReviewSource) {
       latest.set(login, { state: review.state, submittedAt });
   }
   return new Map([...latest].map(([login, review]) => [login, review.state]));
+}
+
+function reviewersWithState(
+  reviewerStates: ReadonlyMap<string, string>,
+  state: "APPROVED" | "CHANGES_REQUESTED",
+) {
+  return [...reviewerStates]
+    .filter(([, reviewerState]) => reviewerState === state)
+    .map(([reviewer]) => reviewer)
+    .sort((left, right) => left.localeCompare(right));
+}
+
+function reviewerFacts(reviewerStates: ReadonlyMap<string, string>) {
+  return {
+    approvers: reviewersWithState(reviewerStates, "APPROVED"),
+    changeRequesters: reviewersWithState(reviewerStates, "CHANGES_REQUESTED"),
+  };
 }
 
 /**
@@ -106,9 +149,7 @@ export function resolveReviewState({
   requestedReviewers: readonly string[];
   reviewerStates: ReadonlyMap<string, string>;
 }): GitHubSignal["review"] {
-  const changeRequesters = [...reviewerStates]
-    .filter(([, state]) => state === "CHANGES_REQUESTED")
-    .map(([reviewer]) => reviewer);
+  const changeRequesters = reviewersWithState(reviewerStates, "CHANGES_REQUESTED");
   // GitHub logins are case-insensitive. Keep the matching strict to the same
   // identity while avoiding a casing difference between review and request
   // payloads leaving an already re-requested reviewer as blocking.
@@ -279,15 +320,27 @@ export async function readGitHubPullRequestFilePatch(
 
 function signalFromGraphql(value: unknown): GitHubSignal | null {
   if (!isRecord(value)) return null;
+  const graphqlReviews = isRecord(value.reviews) ? value.reviews : null;
+  // GitHub caps a GraphQL connection at 100. Do not guess a reviewer's
+  // current decision from a truncated history: REST pagination is slower but
+  // complete, and is needed only for exceptionally review-heavy PRs.
+  if (
+    graphqlReviews &&
+    typeof graphqlReviews.totalCount === "number" &&
+    Array.isArray(graphqlReviews.nodes) &&
+    graphqlReviews.totalCount > graphqlReviews.nodes.length
+  )
+    return null;
   const reviewDecision = String(value.reviewDecision ?? "");
-  const reviewRequests = isRecord(value.reviewRequests) && typeof value.reviewRequests.totalCount === "number"
-    ? value.reviewRequests.totalCount : 0;
   const requestedReviewers = requestedReviewerNames(value.reviewRequests);
+  const requestedReviewerUsers = requestedReviewerLogins(value.reviewRequests);
+  const reviewerStates = latestReviewerDecisions(value.reviews, "graphql");
   const review = resolveReviewState({
     reviewDecision,
-    requestedReviewers,
-    reviewerStates: latestReviewerStates(value.latestReviews, "graphql"),
+    requestedReviewers: requestedReviewerUsers,
+    reviewerStates,
   });
+  const reviewerFact = reviewerFacts(reviewerStates);
   const commits = isRecord(value.commits) && Array.isArray(value.commits.nodes) ? value.commits.nodes : [];
   const commit = commits[commits.length - 1];
   const rollup = isRecord(commit) && isRecord(commit.commit) && isRecord(commit.commit.statusCheckRollup)
@@ -301,6 +354,12 @@ function signalFromGraphql(value: unknown): GitHubSignal | null {
   return {
     checks,
     review,
+    ...(reviewerFact.approvers.length
+      ? { approvers: reviewerFact.approvers }
+      : {}),
+    ...(reviewerFact.changeRequesters.length
+      ? { changeRequesters: reviewerFact.changeRequesters }
+      : {}),
     ...(requestedReviewers.length ? { requestedReviewers } : {}),
     ...(head ? { head } : {}),
     ...(base ? { base } : {}),
@@ -350,7 +409,7 @@ export async function readGitHubSignals(
           `p${index}: pullRequest(number: ${number}) {`,
           "headRefName baseRefName reviewDecision",
           "reviewRequests(first: 100) { totalCount nodes { requestedReviewer { ... on User { login } ... on Team { slug } } } }",
-          "latestReviews(last: 100) { nodes { author { login } state submittedAt } }",
+          "reviews(last: 100) { totalCount nodes { author { login } state submittedAt } }",
           "commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }",
           "}",
         ].join(" "),
@@ -407,6 +466,7 @@ export async function readGitHubPullRequestRest(
     const base = isRecord(pullRequest.base) && typeof pullRequest.base.ref === "string" && pullRequest.base.ref
       ? pullRequest.base.ref : null;
     const requestedReviewerList = restRequestedReviewerNames(pullRequest);
+    const requestedReviewerUsers = restRequestedReviewerLogins(pullRequest);
     const metadata = {
       ...(head ? { head } : {}),
       ...(base ? { base } : {}),
@@ -419,11 +479,13 @@ export async function readGitHubPullRequestRest(
       ? pullRequest.requested_teams.length
       : 0;
     const requests = requestedReviewers + requestedTeams;
+    const reviewerStates = latestReviewerDecisions(reviews, "rest");
     const review = resolveReviewState({
       reviewDecision: "",
-      requestedReviewers: requestedReviewerList,
-      reviewerStates: latestReviewerStates(reviews, "rest"),
+      requestedReviewers: requestedReviewerUsers,
+      reviewerStates,
     });
+    const reviewerFact = reviewerFacts(reviewerStates);
     const sha = isRecord(pullRequest.head) && typeof pullRequest.head.sha === "string" ? pullRequest.head.sha : null;
     const recoveredPullRequest: GitHubPullRequest = {
       number,
@@ -436,7 +498,17 @@ export async function readGitHubPullRequestRest(
       reviewCommentCount: typeof pullRequest.review_comments === "number" && Number.isFinite(pullRequest.review_comments) ? pullRequest.review_comments : 0,
     };
     if (!sha) {
-      const signal = { checks: "unknown", review, ...metadata } satisfies GitHubSignal;
+      const signal = {
+        checks: "unknown",
+        review,
+        ...(reviewerFact.approvers.length
+          ? { approvers: reviewerFact.approvers }
+          : {}),
+        ...(reviewerFact.changeRequesters.length
+          ? { changeRequesters: reviewerFact.changeRequesters }
+          : {}),
+        ...metadata,
+      } satisfies GitHubSignal;
       return {
         pullRequest: recoveredPullRequest,
         signal,
@@ -456,7 +528,17 @@ export async function readGitHubPullRequestRest(
     const passedCount = conclusions.filter((state) => state === "SUCCESS").length;
     const failed = failedCount > 0;
     const pending = pendingCount > 0;
-    const signal = { checks: failed ? "failed" : pending ? "pending" : runs.length ? "passing" : "none", review, ...metadata } satisfies GitHubSignal;
+    const signal = {
+      checks: failed ? "failed" : pending ? "pending" : runs.length ? "passing" : "none",
+      review,
+      ...(reviewerFact.approvers.length
+        ? { approvers: reviewerFact.approvers }
+        : {}),
+      ...(reviewerFact.changeRequesters.length
+        ? { changeRequesters: reviewerFact.changeRequesters }
+        : {}),
+      ...metadata,
+    } satisfies GitHubSignal;
     lifecycle.cacheGitHubPullRequestSignal(signalKey(owner, repo, number), signal, Date.now() + GITHUB_SIGNAL_CACHE_MS);
     return {
       pullRequest: recoveredPullRequest,

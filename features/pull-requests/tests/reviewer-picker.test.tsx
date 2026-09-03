@@ -342,7 +342,7 @@ describe("pull-request reviewer picker", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "Manage reviewers: Review requested",
+        name: "Manage reviewers: Review: alice",
       }),
     );
     expect(await screen.findByRole("combobox", { name: "Search reviewers" })).toBeTruthy();

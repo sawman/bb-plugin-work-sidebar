@@ -13,6 +13,7 @@ import {
 import {
   pullRequestSummaryPresentation,
   pullRequestSignalPresentation,
+  pullRequestReviewDetail,
   type PullRequestSignal,
 } from "./presentation";
 import { orderStackLayers, type SidebarStack } from "../../work-model";
@@ -43,6 +44,8 @@ export type AuthoredPullRequest = {
   base: string;
   checks: PullRequestSignal["checks"];
   review: PullRequestSignal["review"];
+  approvers?: string[];
+  changeRequesters?: string[];
   requestedReviewers?: string[];
   reviewCommentCount: number;
   stack: SidebarStack | null;
@@ -80,6 +83,7 @@ export function AuthoredPullRequestRow({
   const [reviewerPickerOpen, setReviewerPickerOpen] = useState(false);
   const signalSource = threadPullRequest?.signal ?? pullRequest;
   const signal = pullRequestSignalPresentation(signalSource);
+  const reviewDetail = pullRequestReviewDetail(signalSource);
   const state = pullRequestSummaryPresentation({
     state: threadPullRequest?.state ?? pullRequest.state,
     draft:
@@ -115,6 +119,7 @@ export function AuthoredPullRequestRow({
                   number={pullRequest.number}
                   url={pullRequest.url}
                   presentation={state}
+                  reviewDetail={reviewDetail ?? undefined}
                 />
               </ContextMenuTrigger>
               {stackNumber != null && <StackNumberBadge number={stackNumber} />}
@@ -191,7 +196,7 @@ export function AuthoredPullRequestRow({
         ) : null}
         <ContextMenuSeparator />
         <ContextMenuInfo>CI: {signal.checks.label}</ContextMenuInfo>
-        <ContextMenuInfo>Review: {signal.review.label}</ContextMenuInfo>
+        <ContextMenuInfo>{reviewDetail ?? `Review: ${signal.review.label}`}</ContextMenuInfo>
         {!rpc ? (
           <ContextMenuInfo>
             Reviewers:{" "}

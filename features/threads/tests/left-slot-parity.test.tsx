@@ -615,7 +615,7 @@ describe("R18 registered left sidebar parity", () => {
     );
     expect(
       slot
-        .getByRole("button", { name: "Manage reviewers: Review requested" })
+        .getByRole("button", { name: "Manage reviewers: Review: alice" })
         .querySelector(".ws-status")
         ?.getAttribute("data-tone"),
     ).toBe("warning");
@@ -631,7 +631,7 @@ describe("R18 registered left sidebar parity", () => {
 
     fireEvent.click(
       slot.getByRole("button", {
-        name: "Manage reviewers: Review requested",
+        name: "Manage reviewers: Review: alice",
       }),
     );
     expect(

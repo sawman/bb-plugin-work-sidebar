@@ -408,6 +408,9 @@ export function ChangesStackBranchRow({
     ? normalizePullRequestSignal({
         checks: signals.checks ?? "unknown",
         review: signals.review ?? "none",
+        approvers: signals.approvers,
+        changeRequesters: signals.changeRequesters,
+        requestedReviewers: signals.requestedReviewers,
         reviewCommentCount: signals.reviewCommentCount,
       })
     : null;

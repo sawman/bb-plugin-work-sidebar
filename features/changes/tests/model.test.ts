@@ -106,6 +106,9 @@ describe("R13 Changes model", () => {
             draft: false,
             checks: "passing",
             review: "approved",
+            approvers: ["hendra-systemearth"],
+            changeRequesters: ["yojo-se"],
+            requestedReviewers: ["yojo-se"],
             reviewCommentCount: 1,
           },
         ],
@@ -118,6 +121,9 @@ describe("R13 Changes model", () => {
       draft: false,
       checks: "failed",
       review: "changes_requested",
+      approvers: ["hendra-systemearth"],
+      changeRequesters: ["yojo-se"],
+      requestedReviewers: ["yojo-se"],
       reviewCommentCount: 2,
     });
   });

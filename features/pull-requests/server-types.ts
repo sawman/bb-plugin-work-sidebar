@@ -25,8 +25,11 @@ export interface CurrentPullRequest {
     state: "blocked" | "conflicts" | "draft" | "mergeable" | "unknown";
   };
   signal: {
+    approvers?: string[];
     checks: "failed" | "passing" | "pending" | "none" | "unknown";
+    changeRequesters?: string[];
     review: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
+    requestedReviewers?: string[];
     reviewCommentCount: number;
   };
 }
@@ -43,7 +46,9 @@ export type GitHubPullRequest = {
 };
 
 export type GitHubSignal = {
+  approvers?: string[];
   checks: "failed" | "passing" | "pending" | "none" | "unknown";
+  changeRequesters?: string[];
   review: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
   requestedReviewers?: string[];
   head?: string;
@@ -64,6 +69,8 @@ export type AuthoredPullRequest = {
   base: string;
   checks: GitHubSignal["checks"];
   review: GitHubSignal["review"];
+  approvers?: string[];
+  changeRequesters?: string[];
   requestedReviewers?: string[];
   reviewCommentCount: number;
   stack: SidebarStack | null;

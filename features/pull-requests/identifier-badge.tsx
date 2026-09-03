@@ -10,6 +10,7 @@ type PullRequestIdentifier =
       number: number;
       url: string;
       presentation?: StatusPresentation;
+      reviewDetail?: string;
     }
   | { kind: "branch"; name: string };
 
@@ -27,7 +28,7 @@ export function PullRequestIdentifierBadge(
     );
   }
   const value = `#${identifier.number}`;
-  const stateLabel = identifier.presentation?.label;
+  const stateLabel = identifier.reviewDetail ?? identifier.presentation?.label;
 
   return (
     <CopyBadge

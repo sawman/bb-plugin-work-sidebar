@@ -35,6 +35,8 @@ export type StatusTone =
 export type PullRequestSignal = {
   checks: PullRequestCheckState;
   review: PullRequestReviewState;
+  approvers?: string[];
+  changeRequesters?: string[];
   requestedReviewers?: string[];
   reviewCommentCount: number;
 };
@@ -163,10 +165,52 @@ export function pullRequestSignalPresentation(signal: PullRequestSignal): {
     },
     none: { icon: "UserClock", label: "No reviewer requested", tone: "muted" },
   };
+  const reviewDetail = pullRequestReviewDetail(signal);
   return {
     checks: checks[signal.checks],
-    review: { ...review[signal.review], count: signal.reviewCommentCount },
+    review: {
+      ...review[signal.review],
+      ...(reviewDetail ? { label: reviewDetail } : {}),
+      count: signal.reviewCommentCount,
+    },
   };
+}
+
+/** Compact, review-only status detail for a PR badge tooltip. */
+export function pullRequestReviewDetail(signal: PullRequestSignal): string | null {
+  const names =
+    signal.review === "approved"
+      ? signal.approvers
+      : signal.review === "changes_requested"
+        ? signal.changeRequesters
+        : signal.review === "review_requested" || signal.review === "review_required"
+          ? signal.requestedReviewers
+          : [];
+  const prefix =
+    signal.review === "approved"
+      ? "Approved"
+      : signal.review === "changes_requested"
+        ? "Changes"
+        : signal.review === "review_requested" || signal.review === "review_required"
+          ? "Review"
+          : "Review";
+  if (!names || names.length === 0) return null;
+  const uniqueNames = [...new Set(names)];
+  const head = `${prefix}: `;
+  const visible: string[] = [];
+  for (const name of uniqueNames) {
+    const remaining = uniqueNames.length - visible.length - 1;
+    const suffix = remaining > 0 ? ` +${remaining}` : "";
+    if (`${head}${[...visible, name].join(", ")}${suffix}`.length > 40) break;
+    visible.push(name);
+  }
+  if (visible.length > 0) {
+    const remaining = uniqueNames.length - visible.length;
+    return `${head}${visible.join(", ")}${remaining > 0 ? ` +${remaining}` : ""}`;
+  }
+  const suffix = uniqueNames.length > 1 ? ` +${uniqueNames.length - 1}` : "";
+  const available = 40 - head.length - suffix.length;
+  return `${head}${uniqueNames[0].slice(0, Math.max(1, available))}${suffix}`;
 }
 
 export function normalizePullRequestSignal(input: {
@@ -189,7 +233,10 @@ export function normalizePullRequestSignal(input: {
           | "none"
           | "review_requested"
           | "review_required";
-      };
+  };
+  approvers?: string[];
+  changeRequesters?: string[];
+  requestedReviewers?: string[];
   reviewCommentCount?: number;
 }): PullRequestSignal {
   const checks =
@@ -211,6 +258,13 @@ export function normalizePullRequestSignal(input: {
   return {
     checks,
     review,
+    ...(input.approvers?.length ? { approvers: input.approvers } : {}),
+    ...(input.changeRequesters?.length
+      ? { changeRequesters: input.changeRequesters }
+      : {}),
+    ...(input.requestedReviewers?.length
+      ? { requestedReviewers: input.requestedReviewers }
+      : {}),
     reviewCommentCount: Math.max(0, input.reviewCommentCount ?? 0),
   };
 }

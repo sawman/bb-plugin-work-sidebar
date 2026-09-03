@@ -531,7 +531,7 @@ describe("R13 registered Changes Work slot", () => {
     });
     fireEvent.click(disclosure);
     expect(
-      slot.getByText("Review requested · 2 checks passed · Merge Mergeable"),
+      slot.getByText("Review: octocat · 2 checks passed · Merge Mergeable"),
     ).toBeTruthy();
     slot.lifecycle.unmount();
   });

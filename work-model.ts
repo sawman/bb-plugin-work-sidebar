@@ -368,6 +368,8 @@ export interface StackLayer {
   attention?: string | null;
   checks: "failed" | "passing" | "pending" | "none" | "unknown";
   review: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
+  approvers?: string[];
+  changeRequesters?: string[];
   requestedReviewers?: string[];
   reviewCommentCount: number;
 }
@@ -441,6 +443,9 @@ export interface CurrentPullRequestView {
   signal: {
     checks: "failed" | "passing" | "pending" | "none" | "unknown";
     review: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
+    approvers?: string[];
+    changeRequesters?: string[];
+    requestedReviewers?: string[];
     reviewCommentCount: number;
   };
 }
