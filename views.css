@@ -1132,8 +1132,23 @@
 .ws-thread-group[open] summary::before {
   transform: rotate(90deg);
 }
-.ws-thread-group summary span {
+.ws-thread-group-summary-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-thread-group-summary-meta {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.24rem;
   margin-left: auto;
+}
+.ws-thread-group-attention {
+  width: 0.68rem;
+  height: 0.68rem;
+  color: var(--warning);
 }
 .ws-thread-group-empty {
   padding: 0.15rem 0.35rem 0.35rem;

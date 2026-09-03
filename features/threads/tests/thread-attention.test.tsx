@@ -7,6 +7,7 @@ import {
   DEFAULT_STALE_WORKING_MINUTES,
   STALE_WORKING_MS,
   threadNeedsAttention,
+  threadTreeNeedsAttention,
   threadReportsComposerDraft,
   useStaleWorking,
 } from "../thread-attention";
@@ -94,6 +95,19 @@ describe("thread attention presentation", () => {
     expect(threadNeedsAttention(thread({ indicator: "unread-success" }))).toBe(
       true,
     );
+  });
+
+  it("promotes actionable descendants to their group header", () => {
+    const root = thread({ id: "root" });
+    const child = thread({
+      id: "child",
+      parentThreadId: root.id,
+      indicator: "waiting-for-input",
+    });
+    expect(
+      threadTreeNeedsAttention([root], new Map([[root.id, [child]]])),
+    ).toBe(true);
+    expect(threadTreeNeedsAttention([root], new Map())).toBe(false);
   });
 
   it("does not paint an unread or completion dot", () => {

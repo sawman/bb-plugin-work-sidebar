@@ -3,12 +3,39 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { ArchivedThreads } from "./archived-threads";
 import type { SidebarThreadOrganization } from "./sidebar-organization";
 import type { ThreadProviderDirectory } from "@/components/threads/thread-provider-logo";
-import { SidebarTable } from "@/components/ui/sidebar-table";
-import { WorkThreadTree } from "./thread-tree";
 import { ThreadToTopDropZone } from "./thread-to-top-drop-zone";
 import { RecycleBinView } from "./recycle-bin-view";
 import type { RecycleBinEntry } from "./recycle-bin";
 import type { QueuedMessage } from "./schemas";
+import { threadTreeNeedsAttention } from "./thread-attention";
+import { Icon } from "@/components/ui/icon";
+import { SidebarThreadTree } from "./sidebar-thread-tree";
+
+function ThreadGroupSummary({
+  label,
+  count,
+  needsAttention,
+}: {
+  label: string;
+  count: number;
+  needsAttention: boolean;
+}) {
+  return (
+    <summary>
+      <span className="ws-thread-group-summary-label">{label}</span>
+      <span className="ws-thread-group-summary-meta">
+        <span>{count}</span>
+        {needsAttention ? (
+          <Icon
+            name="AlertCircle"
+            className="ws-thread-group-attention"
+            aria-label="Attention needed"
+          />
+        ) : null}
+      </span>
+    </summary>
+  );
+}
 type SidebarGroupTreeProps = {
   organization: SidebarThreadOrganization;
   activeThreadId: string | null;
@@ -24,62 +51,6 @@ type SidebarGroupTreeProps = {
   allThreads: readonly PluginSidebarThread[];
   disclosures: Readonly<Record<string, boolean>>; onDisclosureChange(id: string, open: boolean): void; disclosuresReady: boolean;
 };
-
-type ThreadTreeProps = Pick<SidebarGroupTreeProps, "activeThreadId" | "providersById" | "onNavigate" | "subtextRefreshKey" | "staleWorkingMinutes" | "queuedMessagesByThread" | "queuedMessageNow"> & {
-  organization: SidebarThreadOrganization;
-  roots: readonly PluginSidebarThread[];
-  childrenByThread: ReadonlyMap<string, PluginSidebarThread[]>;
-  label: string;
-};
-
-function ThreadTree({
-  organization,
-  roots,
-  childrenByThread,
-  activeThreadId,
-  providersById,
-  onNavigate,
-  subtextRefreshKey,
-  staleWorkingMinutes,
-  queuedMessagesByThread,
-  queuedMessageNow,
-  label,
-}: ThreadTreeProps) {
-  return (
-    <section className="ws-hierarchy" aria-label={label}>
-      <SidebarTable>
-        {roots.map((thread) => (
-          <WorkThreadTree
-            key={thread.id}
-            thread={thread}
-            childrenByThread={childrenByThread}
-            activeThreadId={activeThreadId}
-            selectedThreadIds={organization.selectedThreadIds}
-            groupIds={organization.groupIds}
-            groups={organization.groups}
-            projectsById={organization.projectsById}
-            providersById={providersById}
-            onNavigate={onNavigate}
-            onSelect={organization.selectThread}
-            onMoveToGroup={organization.moveToGroup}
-            onMoveToRecycleBin={organization.moveToRecycleBin}
-            orderedSiblings={roots}
-            reorderDisabled={organization.reorderDisabled}
-            dragThreadId={organization.dragThreadId}
-            onDragThreadChange={organization.setDragThreadId}
-            dropTarget={organization.dropTarget}
-            onDropTargetChange={organization.setDropTarget}
-            onDropThread={organization.reorder}
-            subtextRefreshKey={subtextRefreshKey}
-            staleWorkingMinutes={staleWorkingMinutes}
-            queuedMessagesByThread={queuedMessagesByThread}
-            queuedMessageNow={queuedMessageNow}
-          />
-        ))}
-      </SidebarTable>
-    </section>
-  );
-}
 
 const sourceId = (event: DragEvent<HTMLElement>, dragThreadId: string | null) => dragThreadId ?? event.dataTransfer.getData("text/plain");
 
@@ -159,10 +130,15 @@ export function SidebarThreadGroups({
                   clearDrop();
                 }}
               >
-                <summary>
-                  Active <span>{organization.activeRoots.length}</span>
-                </summary>
-                <ThreadTree
+                <ThreadGroupSummary
+                  label="Active"
+                  count={organization.activeRoots.length}
+                  needsAttention={threadTreeNeedsAttention(
+                    organization.activeRoots,
+                    organization.activeChildren,
+                  )}
+                />
+                <SidebarThreadTree
                   {...sharedTreeProps}
                   roots={organization.activeRoots}
                   childrenByThread={organization.activeChildren}
@@ -190,11 +166,16 @@ export function SidebarThreadGroups({
                 clearDrop();
               }}
             >
-              <summary>
-                {group.name} <span>{roots.length}</span>
-              </summary>
+              <ThreadGroupSummary
+                label={group.name}
+                count={roots.length}
+                needsAttention={threadTreeNeedsAttention(
+                  roots,
+                  tree?.children ?? new Map(),
+                )}
+              />
               {roots.length > 0 ? (
-                <ThreadTree
+                <SidebarThreadTree
                   {...sharedTreeProps}
                   roots={roots}
                   childrenByThread={tree?.children ?? new Map()}

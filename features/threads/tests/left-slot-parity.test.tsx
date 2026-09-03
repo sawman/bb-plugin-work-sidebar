@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -875,6 +875,31 @@ describe("R18 registered left sidebar parity", () => {
     );
     expect(document.activeElement).toBe(external);
     external.remove();
+    slot.lifecycle.unmount();
+  });
+
+  it("marks a group when one of its threads needs attention", async () => {
+    const actionable = thread("thr_attention", "Question");
+    actionable.indicator = "waiting-for-input";
+    const slot = await leftSlot({
+      threads: [actionable],
+      groups: [
+        {
+          id: "group_later",
+          name: "Later",
+          threadIds: [actionable.id],
+        },
+      ],
+    });
+    await waitFor(() => expect(slot.getByText("Later")).toBeTruthy());
+
+    const group = slot.getByText("Later").closest("summary")!;
+    expect(within(group).getByLabelText("Attention needed")).toBeTruthy();
+    expect(
+      within(slot.container.querySelector(".ws-active-threads summary")!).queryByLabelText(
+        "Attention needed",
+      ),
+    ).toBeNull();
     slot.lifecycle.unmount();
   });
 

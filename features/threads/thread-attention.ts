@@ -16,6 +16,23 @@ export function threadNeedsAttention(thread: PluginSidebarThread): boolean {
   );
 }
 
+/** A group is actionable when any visible root or descendant is actionable. */
+export function threadTreeNeedsAttention(
+  roots: readonly PluginSidebarThread[],
+  childrenByThread: ReadonlyMap<string, readonly PluginSidebarThread[]>,
+): boolean {
+  const pending = [...roots];
+  const visited = new Set<string>();
+  while (pending.length > 0) {
+    const thread = pending.pop();
+    if (!thread || visited.has(thread.id)) continue;
+    visited.add(thread.id);
+    if (threadNeedsAttention(thread)) return true;
+    pending.push(...(childrenByThread.get(thread.id) ?? []));
+  }
+  return false;
+}
+
 export function threadIsWorking(thread: PluginSidebarThread): boolean {
   const indicator = normalizeIndicator(String(thread.indicator));
   return (
