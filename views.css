@@ -1633,7 +1633,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
-    "title deltas"
+    "title title"
     "subtitle deltas";
   min-width: 0;
   gap: 0.05rem;
@@ -1820,6 +1820,7 @@ button.ws-change-file-row:hover {
 }
 .ws-stack-line-deltas .ws-line-delta {
   min-width: 6ch;
+  text-align: left;
 }
 .ws-repository-line-deltas {
   margin-left: 0.04rem;

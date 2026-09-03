@@ -97,6 +97,8 @@ describe("stylesheet policy", () => {
     expect(stackPair).toContain("grid-template-columns: repeat(2, 6ch)");
     expect(stackPair).toContain("grid-area: deltas");
     expect(stackDelta).toContain("min-width: 6ch");
+    expect(stackDelta).toContain("text-align: left");
+    expect(source).toContain('"title title"\n    "subtitle deltas"');
   });
 
   test("keeps every plugin stylesheet structurally valid and diffable", () => {
