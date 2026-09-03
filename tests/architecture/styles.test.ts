@@ -265,13 +265,10 @@ describe("stylesheet policy", () => {
     }
   });
 
-  test("reveals only the directly hovered tooltip in nested controls", () => {
+  test("renders measured tooltips without a nested hover cascade", () => {
     const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
     expect(source).toContain(
-      ".ws-action-tooltip:hover > .ws-action-tooltip-content",
-    );
-    expect(source).toContain(
-      ".ws-action-tooltip:focus-within > .ws-action-tooltip-content",
+      '.ws-action-tooltip-content[data-open="true"]',
     );
     expect(source).not.toContain(
       ".ws-action-tooltip:hover .ws-action-tooltip-content",

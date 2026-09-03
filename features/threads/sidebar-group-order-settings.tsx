@@ -1,4 +1,5 @@
 import {
+  useRef,
   useState,
   type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -19,7 +20,7 @@ export type ThreadGroupSettingsProps = {
     targetId: string,
     placement: "before" | "after",
   ): void;
-  onRenameGroup(group: SidebarThreadGroup): void;
+  onRenameGroup(group: SidebarThreadGroup, name: string): boolean;
   onRemoveGroup(group: SidebarThreadGroup): void;
 };
 
@@ -33,6 +34,11 @@ export function ThreadGroupOrderSettings({
     id: string;
     placement: "before" | "after";
   } | null>(null);
+  const [rename, setRename] = useState<{
+    groupId: string;
+    value: string;
+  } | null>(null);
+  const renameTriggerRefs = useRef(new Map<string, HTMLButtonElement>());
   const finishDrag = () => {
     setDraggedGroupId(null);
     setDragTarget(null);
@@ -56,6 +62,15 @@ export function ThreadGroupOrderSettings({
     if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
     event.preventDefault();
     settings.onMoveGroup(groupId, event.key === "ArrowUp" ? -1 : 1);
+  };
+  const closeRename = (groupId = rename?.groupId) => {
+    setRename(null);
+    if (groupId)
+      queueMicrotask(() => renameTriggerRefs.current.get(groupId)?.focus());
+  };
+  const commitRename = (group: SidebarThreadGroup) => {
+    if (rename?.groupId !== group.id) return;
+    if (settings.onRenameGroup(group, rename.value)) closeRename();
   };
   return (
     <div
@@ -112,13 +127,49 @@ export function ThreadGroupOrderSettings({
               finishDrag();
             }}
           >
-            {group ? (
-              <ActionTooltip label={`Rename ${group.name}`}>
+            {group && rename?.groupId === group.id ? (
+              <form
+                className="ws-thread-group-rename-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  commitRename(group);
+                }}
+              >
+                <input
+                  aria-label={`Rename ${group.name}`}
+                  autoFocus
+                  maxLength={40}
+                  value={rename.value}
+                  onChange={(event) =>
+                    setRename((current) =>
+                      current ? { ...current, value: event.target.value } : current,
+                    )
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      commitRename(group);
+                      return;
+                    }
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      closeRename();
+                    }
+                  }}
+                />
+              </form>
+            ) : group ? (
+              <ActionTooltip label="Rename">
                 {(tooltipId) => <button
+                ref={(node) => {
+                  if (node) renameTriggerRefs.current.set(group.id, node);
+                  else renameTriggerRefs.current.delete(group.id);
+                }}
                 type="button"
                 className="ws-thread-group-rename"
                 aria-describedby={tooltipId}
-                onClick={() => settings.onRenameGroup(group)}
+                onClick={() => setRename({ groupId: group.id, value: group.name })}
                 >
                 {group.name}
                 </button>}
@@ -128,8 +179,8 @@ export function ThreadGroupOrderSettings({
             )}
             {group ? (
               <ActionTooltip label={occupied
-                ? "Move its threads before removing"
-                : `Remove ${group.name}`}>
+                ? "Empty first"
+                : "Remove"}>
                 {(tooltipId) => <button
                 type="button"
                 className="ws-thread-group-remove"
@@ -144,7 +195,7 @@ export function ThreadGroupOrderSettings({
             ) : (
               <span aria-hidden />
             )}
-            <ActionTooltip label={`Drag ${position.name} to reorder`}>
+            <ActionTooltip label="Reorder">
               {(tooltipId) => <button
               type="button"
               className="ws-thread-group-drag"

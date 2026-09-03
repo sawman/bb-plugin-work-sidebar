@@ -50,7 +50,7 @@ function AgentDuration({ createdAt }: { createdAt: number }) {
   const now = useContext(AgentClockContext);
   const duration = agentDurationLabel(createdAt, now);
   return duration ? (
-    <ActionTooltip label="Agent thread age">
+    <ActionTooltip label="Age">
       {(tooltipId) => <time
       className="ws-agent-duration"
       dateTime={new Date(createdAt).toISOString()}
@@ -129,7 +129,7 @@ export function AgentRow({
       >
         <strong>{title}</strong>
         <span className="ws-agent-facts">
-          <ActionTooltip label="Agent model">
+          <ActionTooltip label="Model">
             {(tooltipId) => <span className="ws-agent-fact" aria-describedby={tooltipId}>
             <Icon name="Bot" aria-hidden />
             <span>{model ?? "Model unavailable"}</span>
@@ -151,7 +151,7 @@ export function AgentRow({
             </CopyBadge>
           ) : null}
           {annotation.taskKey ? (
-            <ActionTooltip label="Assigned task">
+            <ActionTooltip label="Task">
               {(tooltipId) => <span
               className="ws-agent-fact ws-agent-task"
               aria-describedby={tooltipId}
@@ -183,7 +183,7 @@ export function AgentRow({
             </button>}
           </ActionTooltip>
           {isAvailable ? (
-            <ActionTooltip label="Open in split">
+          <ActionTooltip label="Split">
               {(tooltipId) => <button
               type="button"
               className="ws-agent-action"

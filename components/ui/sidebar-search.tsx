@@ -23,7 +23,7 @@ export function SidebarSearch({
     <div className="ws-sidebar-search">
       <SidebarListIconButton
         ref={triggerRef}
-        title={`Search ${label}`}
+        title="Search"
         aria-label={`Search ${label}`}
         aria-haspopup="listbox"
         aria-expanded={open}

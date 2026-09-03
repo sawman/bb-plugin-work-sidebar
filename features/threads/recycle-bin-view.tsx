@@ -142,7 +142,7 @@ function RecycleBinRow({
     <article className="ws-thread ws-recycle-bin-row">
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <ActionTooltip label="Restore this thread to its previous group.">
+          <ActionTooltip label="Restore">
             {(tooltipId) => <button
             type="button"
             className="ws-thread-anchor ws-sidebar-row"

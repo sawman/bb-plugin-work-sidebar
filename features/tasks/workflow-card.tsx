@@ -241,7 +241,7 @@ function WorkflowRow({
           onChange={(assignee) => onAssigneeChange(task.id, assignee)}
         />
         {detachable && onMakeGoal ? (
-          <ActionTooltip label="Move to Goals">
+          <ActionTooltip label="Goals">
             {(tooltipId) => (
               <button
                 type="button"
@@ -257,7 +257,7 @@ function WorkflowRow({
           </ActionTooltip>
         ) : null}
         {detachable ? (
-          <ActionTooltip label="Detach from this thread">
+          <ActionTooltip label="Detach">
             {(tooltipId) => (
               <button
                 type="button"

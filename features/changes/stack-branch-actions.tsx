@@ -40,7 +40,7 @@ export function StackBranchActions({
     <span className="ws-stack-trailing-actions">
       <span className="ws-stack-action-slot">
         {pullRequest && (
-          <ActionTooltip label="Open on GitHub">
+          <ActionTooltip label="GitHub">
             {(tooltipId) => (
               <BbUrlLink
                 href={pullRequest.url}

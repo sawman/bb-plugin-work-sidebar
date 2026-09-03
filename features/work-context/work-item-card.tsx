@@ -613,7 +613,7 @@ function WorkQueue({
           query={search}
           selectedValues={[]}
         />
-        <ActionTooltip label={`Create a BB task as ${destination === "goal" ? "Goal" : "Queue"}`}>
+        <ActionTooltip label={`Add ${destination}`}>
           {(tooltipId) => <button
           type="button"
           className="ws-task-workflow-action"
@@ -712,7 +712,7 @@ function WorkItemQueueActions({
   return (
     <span className="ws-task-workflow-actions" role="group" aria-label="Work item actions">
       {onMakeCurrent ? (
-        <ActionTooltip label="Make current Goal">
+        <ActionTooltip label="Current">
           {(tooltipId) => (
             <button
               type="button"
@@ -728,7 +728,7 @@ function WorkItemQueueActions({
         </ActionTooltip>
       ) : null}
       {onMoveToTasks ? (
-        <ActionTooltip label="Move to task queue">
+        <ActionTooltip label="Queue">
           {(tooltipId) => (
             <button
               type="button"

@@ -64,7 +64,7 @@ export function ThreadListSettings({
     <div className="ws-thread-settings" ref={settingsRef}>
       <SidebarListIconButton
         ref={triggerRef}
-        title="Thread list settings"
+        title="Settings"
         aria-label="Thread list settings"
         aria-haspopup="dialog"
         aria-expanded={open}

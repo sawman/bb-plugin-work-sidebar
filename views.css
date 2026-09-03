@@ -1901,6 +1901,27 @@ button.ws-change-file-row:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.ws-thread-group-rename-form {
+  min-width: 0;
+  padding: 0 0.25rem;
+}
+.ws-thread-group-rename-form input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 3px);
+  padding: 0.27rem 0.2rem;
+  background: var(--background);
+  color: var(--foreground);
+  font: var(--ws-text-subtext);
+  line-height: inherit;
+}
+.ws-thread-group-rename-form input:focus-visible {
+  border-color: var(--ring);
+  outline: 2px solid color-mix(in srgb, var(--ring) 35%, transparent);
+  outline-offset: 1px;
+}
 .ws-thread-group-settings .ws-thread-group-rename:hover {
   background: transparent;
 }
@@ -3803,10 +3824,8 @@ button.ws-provider-health:focus-visible {
   flex: 0 0 auto;
 }
 .ws-action-tooltip-content {
-  position: absolute;
-  z-index: 40;
-  right: 0;
-  bottom: calc(100% + 0.3rem);
+  position: fixed;
+  z-index: 1000;
   width: max-content;
   max-width: 12rem;
   padding: 0.22rem 0.36rem;
@@ -3818,17 +3837,16 @@ button.ws-provider-health:focus-visible {
   line-height: 1.15;
   opacity: 0;
   pointer-events: none;
-  transform: translateY(0.12rem);
-  transition: opacity 0.1s ease, transform 0.1s ease;
+  transition: opacity 0.1s ease;
+  visibility: hidden;
   white-space: nowrap;
 }
 .ws-action-tooltip-content::before {
   content: attr(data-tooltip-label);
 }
-.ws-action-tooltip:hover > .ws-action-tooltip-content,
-.ws-action-tooltip:focus-within > .ws-action-tooltip-content {
+.ws-action-tooltip-content[data-open="true"] {
   opacity: 1;
-  transform: translateY(0);
+  visibility: visible;
 }
 .ws-task-workflow-action {
   display: grid;

@@ -49,7 +49,7 @@ export const RefreshButton = forwardRef<
   }, [disabled, onRefresh, refreshing]);
 
   return (
-    <ActionTooltip label={title ?? label}>
+    <ActionTooltip label={title ?? "Refresh"}>
       {(tooltipId) => <button
       {...props}
       ref={ref}

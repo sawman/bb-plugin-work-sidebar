@@ -90,7 +90,7 @@ export type SidebarThreadOrganization = {
     targetId: string,
     placement: "before" | "after",
   ): void;
-  renameGroup(group: SidebarThreadGroup): void;
+  renameGroup(group: SidebarThreadGroup, name: string): boolean;
   removeGroup(group: SidebarThreadGroup): void;
 };
 
@@ -407,12 +407,9 @@ export function useSidebarThreadOrganization({
     [groups, saveGroups],
   );
   const renameGroup = useCallback(
-    (group: SidebarThreadGroup) => {
-      const name = window
-        .prompt("Rename thread group", group.name)
-        ?.trim()
-        .slice(0, 40);
-      if (!name) return;
+    (group: SidebarThreadGroup, input: string) => {
+      const name = input.trim().slice(0, 40);
+      if (!name) return false;
       if (
         groups.some(
           (candidate) =>
@@ -421,13 +418,16 @@ export function useSidebarThreadOrganization({
               sensitivity: "accent",
             }) === 0,
         )
-      )
-        return toast.error("A group with that name already exists.");
+      ) {
+        toast.error("A group with that name already exists.");
+        return false;
+      }
       saveGroups(
         groups.map((candidate) =>
           candidate.id === group.id ? { ...candidate, name } : candidate,
         ),
       );
+      return true;
     },
     [groups, saveGroups],
   );

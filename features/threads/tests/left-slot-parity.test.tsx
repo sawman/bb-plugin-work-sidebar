@@ -1069,9 +1069,7 @@ describe("R18 registered left sidebar parity", () => {
     const saveGroups = vi.fn(({ groups }: { groups: unknown[] }) => ({
       groups,
     }));
-    const prompt = vi
-      .spyOn(window, "prompt")
-      .mockReturnValueOnce("Later renamed");
+    const prompt = vi.spyOn(window, "prompt");
     const slot = await leftSlot({ rpc: { saveThreadGroups: saveGroups } });
     await waitFor(() =>
       expect(slot.getByRole("link", { name: /One/ })).toBeTruthy(),
@@ -1099,6 +1097,10 @@ describe("R18 registered left sidebar parity", () => {
       ),
     );
     fireEvent.click(slot.getByRole("button", { name: "Later" }));
+    const renameInput = slot.getByRole("textbox", { name: "Rename Later" });
+    expect(document.activeElement).toBe(renameInput);
+    fireEvent.change(renameInput, { target: { value: "Later renamed" } });
+    fireEvent.keyDown(renameInput, { key: "Enter" });
     await waitFor(() =>
       expect(saveGroups).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1108,6 +1110,10 @@ describe("R18 registered left sidebar parity", () => {
         }),
       ),
     );
+    expect(document.activeElement).toBe(
+      slot.getByRole("button", { name: "Later renamed" }),
+    );
+    expect(prompt).not.toHaveBeenCalled();
     fireEvent.click(slot.getByRole("button", { name: "Remove Later renamed" }));
     await waitFor(() =>
       expect(saveGroups).toHaveBeenLastCalledWith(
