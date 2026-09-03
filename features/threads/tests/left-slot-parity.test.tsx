@@ -131,12 +131,6 @@ async function leftSlot({
       threads: [],
       error: null,
     }),
-    sidebarPullRequestStacks: () => ({
-      available: true,
-      stacks: {},
-      mergeTargets: {},
-      error: null,
-    }),
     sidebarAuthoredPullRequests: () => ({
       available: true,
       pullRequests: [],

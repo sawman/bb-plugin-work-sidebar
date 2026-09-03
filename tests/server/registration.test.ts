@@ -214,7 +214,6 @@ describe("R2 server registration and disposal", () => {
       "moveSidebarThread",
       "sidebarTasks",
       "sidebarTaskLinks",
-      "sidebarPullRequestStacks",
       "sidebarThreadPullRequests",
       "sidebarAuthoredPullRequests",
       "sidebarAuthoredPullRequestStacks",

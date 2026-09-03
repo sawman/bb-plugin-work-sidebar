@@ -156,9 +156,10 @@ describe("R2 app registration and Query lifecycle", () => {
     // Work-item queue is independently cacheable from the outcome and task
     // projections, so mounted Work now owns one additional query entry.
     // The plugin-managed Recycle Bin, queued-message state, and the single
-    // roster-wide PR directory are durable sidebar reads. Queue changes
-    // arrive through realtime; PR consumers observe this one Query entry.
-    expect(client.getQueryCache().getAll()).toHaveLength(22);
+    // roster-wide PR directory and normalized fact directory are durable
+    // sidebar reads. Queue changes arrive through realtime; PR consumers
+    // observe these one-way Query entries.
+    expect(client.getQueryCache().getAll()).toHaveLength(23);
     expect(
       client
         .getQueryCache()

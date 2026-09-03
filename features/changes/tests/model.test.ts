@@ -4,6 +4,10 @@ import {
   mergeStackBranchSignals,
   repositoryPresentation,
 } from "../model";
+import {
+  factFromThreadPullRequest,
+  mergePullRequestFacts,
+} from "../../pull-requests/facts";
 
 describe("R13 Changes model", () => {
   it("distinguishes clean, dirty, absent, and unavailable repositories and retains renamed, untracked, and deleted files", () => {
@@ -125,6 +129,74 @@ describe("R13 Changes model", () => {
       changeRequesters: ["yojo-se"],
       requestedReviewers: ["yojo-se"],
       reviewCommentCount: 2,
+    });
+  });
+
+  it("reads the shared PR fact before its local stack fallback", () => {
+    const branch = {
+      name: "feature/one",
+      isCurrent: true,
+      isMerged: false,
+      isQueued: false,
+      needsRebase: false,
+      hasStash: false,
+      stashCount: null,
+      pr: {
+        number: 1402,
+        url: "https://github.com/SystemEarth/systemearth/pull/1402",
+        state: "open",
+        title: "Review lifecycle",
+        isDraft: false,
+        metadataStale: false,
+      },
+      diff: null,
+      aheadOfRemote: 0,
+      behindRemote: 0,
+      checks: "passing",
+      review: "changes_requested",
+    } as const;
+    const facts = mergePullRequestFacts(undefined, [
+      factFromThreadPullRequest({
+        number: 1402,
+        title: "Review lifecycle",
+        url: "https://github.com/SystemEarth/systemearth/pull/1402",
+        state: "open",
+        head: "feature/one",
+        base: "main",
+        checks: {
+          failedCount: 0,
+          passedCount: 2,
+          pendingCount: 0,
+          state: "passing",
+          totalCount: 2,
+        },
+        review: { reviewRequestCount: 1, state: "review_required" },
+        attention: "review_requested",
+        mergeability: {
+          mergeStateStatus: "CLEAN",
+          mergeable: "MERGEABLE",
+          state: "mergeable",
+        },
+        signal: {
+          checks: "passing",
+          review: "review_required",
+          changeRequesters: ["yojo-se"],
+          requestedReviewers: ["yojo-se"],
+          reviewCommentCount: 2,
+        },
+        stackNumber: 17,
+      }),
+    ]);
+    expect(
+      mergeStackBranchSignals(
+        branch,
+        { currentPullRequest: null, stack: null } as never,
+        undefined,
+        facts,
+      ),
+    ).toMatchObject({
+      review: "review_required",
+      requestedReviewers: ["yojo-se"],
     });
   });
 });

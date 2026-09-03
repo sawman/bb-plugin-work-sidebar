@@ -4,7 +4,6 @@ import { rpcContract, type GitHubStackBranch } from "../../contracts.js";
 import type { ServerLifecycle } from "../../server-lifecycle.js";
 import type { PullRequestChangesAdapter } from "../../shared/server-composition-dependencies.js";
 import type { PluginRpcInput } from "../../shared/server-plugin-rpc.js";
-import type { SidebarStack } from "../../work-model.js";
 import {
   normalizePullRequestSignal,
   pullRequestAttentionFromSignal,
@@ -36,7 +35,7 @@ type GitHubStackProjection = {
 
 type ThreadStackHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
-  "sidebarPullRequestStacks" | "sidebarThreadPullRequests"
+  "sidebarThreadPullRequests"
 >;
 export type ThreadStackService = ThreadStackHandlers & Pick<PullRequestChangesAdapter, "projection" | "checkout" | "fileDiff">;
 
@@ -373,37 +372,6 @@ export function createThreadStackService(
     }
   };
   const handlers: ThreadStackHandlers = {
-    async sidebarPullRequestStacks({ threadIds }) {
-      try {
-        const entries = await Promise.all([...new Set(threadIds)].map(async (threadId) => [threadId, await stackForThread(threadId)] as const));
-        const stacks = Object.fromEntries(entries.flatMap(([threadId, entry]) => {
-          if (!entry.stack) return [];
-          const stack: SidebarStack = {
-            id: `github-stack:${threadId}:${entry.stack.number}`,
-            number: entry.stack.number,
-            base: entry.stack.base,
-            currentPullRequest: entry.stack.currentPullRequest,
-            pullRequests: entry.stack.pullRequests.map((pullRequest) => ({
-              number: pullRequest.number, title: pullRequest.title, state: pullRequest.state, draft: pullRequest.draft,
-              url: pullRequest.url, head: pullRequest.head, base: pullRequest.base, checks: pullRequest.checks,
-              review: pullRequest.review, approvers: pullRequest.approvers,
-              changeRequesters: pullRequest.changeRequesters,
-              requestedReviewers: pullRequest.requestedReviewers,
-              reviewCommentCount: pullRequest.reviewCommentCount,
-            })),
-          };
-          return [[threadId, stack] as const];
-        }));
-        return {
-          available: true,
-          stacks,
-          mergeTargets: Object.fromEntries(entries.flatMap(([threadId, entry]) => entry.currentPullRequest?.base ? [[threadId, entry.currentPullRequest.base] as const] : [])),
-          error: null,
-        };
-      } catch (error) {
-        return { available: false, stacks: {}, mergeTargets: {}, error: error instanceof Error ? error.message : String(error) };
-      }
-    },
     async sidebarThreadPullRequests({ threadIds }) {
       try {
         const pullRequests: Record<

@@ -93,30 +93,7 @@ function renderRow({
     onDropTargetChange: vi.fn(),
     onDropThread: vi.fn(),
   };
-  host.rpcCall.mockImplementation(
-    async (method: string, input: { threadIds?: string[] }) => {
-      if (method !== "sidebarPullRequestStacks")
-        throw new Error(`unexpected ${method}`);
-      const threadId = input.threadIds?.[0] ?? thread.id;
-      return {
-        available: true,
-        stacks:
-          host.stackNumber == null
-            ? {}
-            : {
-                [threadId]: {
-                  id: `github-stack:${threadId}:${host.stackNumber}`,
-                  number: host.stackNumber,
-                  base: "main",
-                  currentPullRequest: 42,
-                  pullRequests: [],
-                },
-              },
-        mergeTargets: {},
-        error: null,
-      };
-    },
-  );
+  host.rpcCall.mockReset();
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });

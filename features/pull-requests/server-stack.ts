@@ -157,9 +157,13 @@ export function resolveReviewState({
   const reRequested =
     changeRequesters.length > 0 &&
     changeRequesters.every((reviewer) => requested.has(reviewerIdentity(reviewer)));
+  // GitHub's aggregate decision is authoritative when it is present. In
+  // particular, an approved PR may retain historical change-request reviews;
+  // those must not turn an APPROVED decision back into a pending row.
+  if (reviewDecision === "APPROVED") return "approved";
   if (reviewDecision === "CHANGES_REQUESTED" || changeRequesters.length > 0)
     return reRequested ? "review_required" : "changes_requested";
-  if (reviewDecision === "APPROVED" || [...reviewerStates.values()].includes("APPROVED"))
+  if ([...reviewerStates.values()].includes("APPROVED"))
     return "approved";
   if (requested.size > 0) return "review_requested";
   return reviewDecision === "REVIEW_REQUIRED" ? "review_required" : "none";

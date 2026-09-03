@@ -45,7 +45,6 @@ export default function plugin(
     sidebarQueuedMessages: threads.sidebarQueuedMessages,
     sidebarTasks: tasks.sidebarTasks,
     sidebarTaskLinks: tasks.sidebarTaskLinks,
-    sidebarPullRequestStacks: pullRequests.sidebarPullRequestStacks,
     sidebarThreadPullRequests: pullRequests.sidebarThreadPullRequests,
     sidebarAuthoredPullRequests: pullRequests.sidebarAuthoredPullRequests,
     sidebarAuthoredPullRequestStacks:

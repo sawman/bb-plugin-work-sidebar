@@ -1,14 +1,24 @@
 import { useSettings, useRpc } from "@get-bb/plugin-sdk/app";
+import { useQueryClient } from "@tanstack/react-query";
 import { useStore } from "zustand";
 import { toast } from "sonner";
+import { useEffect } from "react";
 import type { rpcContract } from "../../contracts";
 import { CopyBadge } from "../../components/ui/copy-badge";
 import { Icon } from "../../components/ui/icon";
 import { ActionTooltip } from "../../components/ui/action-tooltip";
 import {
   useGitHubApiHealth,
-  useSharedThreadPullRequestDirectory,
+  hydratePullRequestFacts,
+  useSharedPullRequestFactDirectory,
 } from "../pull-requests/queries";
+import {
+  factFromPullRequest,
+  factFromSidebarStackLayer,
+  pullRequestFactForThread,
+  pullRequestFromFact,
+  resolvePullRequestFact,
+} from "../pull-requests/facts";
 import {
   githubHealthPresentation,
   pullRequestSummaryPresentation,
@@ -34,6 +44,7 @@ import {
 
 export function ChangesPanel({ threadId }: { threadId: string }) {
   const rpc = useRpc<typeof rpcContract>();
+  const queryClient = useQueryClient();
   const { values: pluginSettings } = useSettings();
   const changesQuery = useChanges(rpc, threadId, {
     visiblePollMs:
@@ -41,7 +52,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
     backgroundPollMs:
       Number(pluginSettings?.githubBackgroundPollSeconds ?? "300") * 1_000,
   });
-  const threadPullRequests = useSharedThreadPullRequestDirectory();
+  const pullRequestFacts = useSharedPullRequestFactDirectory();
   const sidebarAppearance = useSidebarAppearance();
   const githubHealthQuery = useGitHubApiHealth(rpc, { poll: false });
   const githubApiHealth = githubHealthQuery.data ?? {
@@ -93,18 +104,27 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
     changesQuery.data?.stack || (githubStack?.branches.length ?? 0) > 1
       ? githubStack
       : null;
-  const directoryPullRequest = threadPullRequests.data?.[threadId] ?? null;
   const projectedPullRequest = changesQuery.data?.currentPullRequest ?? null;
-  // The directory gives all panes one normalized PR fact immediately. The
-  // Changes projection remains authoritative once it identifies its branch,
-  // preventing a previous branch from flashing during a switch.
+  useEffect(() => {
+    const changes = changesQuery.data;
+    if (!changes) return;
+    const facts = [
+      ...(changes.currentPullRequest
+        ? [factFromPullRequest(changes.currentPullRequest)]
+        : []),
+      ...(changes.stack?.pullRequests.map(factFromSidebarStackLayer) ?? []),
+    ];
+    hydratePullRequestFacts(
+      queryClient,
+      facts,
+    );
+  }, [changesQuery.data, queryClient]);
   const currentPullRequest = projectedPullRequest
-    ? directoryPullRequest &&
-      directoryPullRequest.number === projectedPullRequest.number &&
-      directoryPullRequest.url === projectedPullRequest.url
-      ? directoryPullRequest
-      : projectedPullRequest
-    : directoryPullRequest;
+    ? resolvePullRequestFact(projectedPullRequest, pullRequestFacts.data)
+    : (() => {
+        const fact = pullRequestFactForThread(pullRequestFacts.data, threadId);
+        return fact ? pullRequestFromFact(fact) : null;
+      })();
   const externalOnModifier =
     sidebarAppearance.data?.openPrLinksExternallyWithModifier ??
     DEFAULT_OPEN_PR_LINKS_EXTERNALLY_WITH_MODIFIER;
@@ -204,6 +224,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
                   branch,
                   changesQuery.data!,
                   currentPullRequest,
+                  pullRequestFacts.data,
                 )}
                 expanded={expandedStackBranches.has(branch.name)}
                 externalOnModifier={externalOnModifier}

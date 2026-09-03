@@ -75,6 +75,44 @@ export const pullRequest = z.object({
   signal: pullRequestSignal,
 });
 
+/**
+ * Browser-safe normalized PR fact. Relationship records for authored rows,
+ * thread rows, and stack layers retain only their local layout information;
+ * this schema owns the GitHub state they present.
+ */
+export const pullRequestFact = z
+  .object({
+    key: z.string().min(1),
+    number: z.number().int().positive(),
+    title: z.string(),
+    url: z.string().url(),
+    state: z.enum(["closed", "draft", "merged", "open"]),
+    draft: z.boolean(),
+    head: z.string(),
+    base: z.string(),
+    attention: z
+      .enum([
+        "approved",
+        "blocked",
+        "changes_requested",
+        "checks_failed",
+        "checks_pending",
+        "closed",
+        "conflicts",
+        "draft",
+        "merged",
+        "none",
+        "ready_to_merge",
+        "review_requested",
+      ])
+      .nullable(),
+    signal: pullRequestSignal,
+    checks: pullRequest.shape.checks.nullable(),
+    review: pullRequest.shape.review.nullable(),
+    mergeability: pullRequest.shape.mergeability.nullable(),
+  })
+  .strict();
+
 /** A normalized PR fact plus the thread-local stack position that discovered it. */
 export const threadPullRequest = pullRequest.extend({
   stackNumber: z.number().int().positive().nullable(),
@@ -172,6 +210,7 @@ export const pullRequestReviewerRpcSchemas = {
 } as const;
 
 export type PullRequestContract = z.infer<typeof pullRequest>;
+export type PullRequestFactContract = z.infer<typeof pullRequestFact>;
 export type ThreadPullRequestContract = z.infer<typeof threadPullRequest>;
 export type AuthoredPullRequestContract = z.infer<typeof authoredPullRequest>;
 export type PullRequestReviewerContract = z.infer<typeof pullRequestReviewer>;

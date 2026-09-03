@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { agentRpcSchemas } from "./features/agents/schemas.js";
-import { authoredPullRequest, githubApiHealth, pullRequestReviewerRpcSchemas, sidebarStack, sidebarStackLayer, threadPullRequest } from "./features/pull-requests/schemas.js";
+import { authoredPullRequest, githubApiHealth, pullRequestReviewerRpcSchemas, sidebarStackLayer, threadPullRequest } from "./features/pull-requests/schemas.js";
 import { executionTaskSummarySchema, sidebarTaskProjectSchema, sidebarTaskSchema, taskLinkSchema, taskPrioritySchema, taskStatusSchema, taskSummarySchema } from "./features/tasks/schemas.js";
 import { threadArchiveSchemas, threadHierarchySchemas, threadPreferenceSchemas } from "./features/threads/schemas.js";
 import { trackerRpcSchemas } from "./features/tracker/schemas.js";
@@ -42,13 +42,6 @@ export const rpcSchemas = {
       links: z.record(z.string(), z.array(taskLink)),
       error: z.string().nullable(),
     }),
-  },
-  sidebarPullRequestStacks: {
-    input: z.object({ threadIds: z.array(z.string().startsWith("thr_")).max(200) }).strict(),
-    output: z.object({
-      available: z.boolean(), stacks: z.record(z.string(), sidebarStack),
-      mergeTargets: z.record(z.string(), z.string()), error: z.string().nullable(),
-    }).strict(),
   },
   sidebarThreadPullRequests: {
     input: z.object({ threadIds: z.array(z.string().startsWith("thr_")).max(200) }).strict(),

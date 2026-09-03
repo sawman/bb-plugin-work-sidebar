@@ -9,35 +9,14 @@ import {
 import { createThreadStackService } from "../../features/pull-requests/server-thread-stack.js";
 import { fetchGitHubStack as serverEntrypointFetchGitHubStack } from "../../server.js";
 import { createServerLifecycle } from "../../server-lifecycle.js";
+import { reviewLifecycleCorpus } from "../../features/pull-requests/tests/review-lifecycle-fixtures.js";
 
 describe("GitHub Stack enrichment ownership", () => {
-  it.each([
-    {
-      name: "#1402 re-requests the same change requester after a later comment",
-      decision: "CHANGES_REQUESTED",
-      requested: ["yojo-se"],
-      reviews: [["yojo-se", "CHANGES_REQUESTED"]],
-      expected: "review_required",
-    },
-    {
-      name: "does not mistake another reviewer request for a re-request",
-      decision: "CHANGES_REQUESTED",
-      requested: ["someone-else"],
-      reviews: [["yojo-se", "CHANGES_REQUESTED"]],
-      expected: "changes_requested",
-    },
-    {
-      name: "#1408 retains its named approval",
-      decision: "APPROVED",
-      requested: [],
-      reviews: [["hendra-systemearth", "APPROVED"]],
-      expected: "approved",
-    },
-  ] as const)("classifies the recorded GitHub corpus: $name", ({ decision, requested, reviews, expected }) => {
+  it.each(reviewLifecycleCorpus)("classifies the recorded GitHub corpus: $name", ({ decision, requested, reviewerStates, expected }) => {
     expect(resolveReviewState({
       reviewDecision: decision,
       requestedReviewers: requested,
-      reviewerStates: new Map(reviews),
+      reviewerStates: new Map(reviewerStates),
     })).toBe(expected);
   });
 
@@ -74,6 +53,12 @@ describe("GitHub Stack enrichment ownership", () => {
                     author: { login: "hendra-systemearth" },
                     state: "APPROVED",
                     submittedAt: "2026-09-03T08:00:22Z",
+                  }, {
+                    // #1221 shape: a later comment is not a new review
+                    // decision and must not erase the earlier approval.
+                    author: { login: "hendra-systemearth" },
+                    state: "COMMENTED",
+                    submittedAt: "2026-09-03T09:00:22Z",
                   }],
                 },
                 commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },

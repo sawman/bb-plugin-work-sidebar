@@ -10,7 +10,7 @@ import {
   useSetAuthoredPullRequestDraft,
   useGitHubApiHealth,
   usePullRequestReviewers,
-  useSidebarPullRequestStacks,
+  useSharedPullRequestFactDirectory,
   useSharedThreadPullRequestDirectory,
   useThreadPullRequestDirectory,
   useUpdatePullRequestReviewers,
@@ -52,58 +52,6 @@ function deferred<T>() {
 
 describe("R5 pull-request queries", () => {
   afterEach(() => vi.useRealTimers());
-
-  it("normalizes one bounded thread-roster stack read and keeps it inactive off the Work view", async () => {
-    const rpc = {
-      call: vi.fn(async (method: string, input: unknown) => {
-        if (method !== "sidebarPullRequestStacks")
-          throw new Error(`unexpected ${method}`);
-        expect(input).toEqual({ threadIds: ["thr_a", "thr_b"] });
-        return {
-          available: true,
-          stacks: {
-            thr_a: {
-              id: "github-stack:thr_a:17",
-              number: 17,
-              base: "main",
-              currentPullRequest: 42,
-              pullRequests: [],
-            },
-          },
-          mergeTargets: {},
-          error: null,
-        };
-      }),
-    } as unknown as PullRequestRpc;
-    const client = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    const inactive = renderHook(
-      () =>
-        useSidebarPullRequestStacks(rpc, ["thr_b", "thr_a", "thr_a"], false),
-      { wrapper: wrapper(client) },
-    );
-    await act(async () => Promise.resolve());
-    expect(rpc.call).not.toHaveBeenCalled();
-
-    inactive.rerender();
-    const active = renderHook(
-      () => useSidebarPullRequestStacks(rpc, ["thr_b", "thr_a", "thr_a"], true),
-      { wrapper: wrapper(client) },
-    );
-    await waitFor(() =>
-      expect(active.result.current.data?.thr_a?.number).toBe(17),
-    );
-    expect(rpc.call).toHaveBeenCalledTimes(1);
-    expect(pullRequestPolicies.sidebarStacks).toMatchObject({
-      staleTime: 60_000,
-      gcTime: 15 * 60_000,
-      retry: false,
-    });
-    inactive.unmount();
-    active.unmount();
-    client.clear();
-  });
 
   it("owns one normalized roster directory that passive consumers reuse", async () => {
     const directory = {
@@ -163,8 +111,86 @@ describe("R5 pull-request queries", () => {
     expect(consumer.result.current.data).toEqual(directory);
     expect(rpc.call).toHaveBeenCalledTimes(1);
     expect(owner.result.current.data?.thr_a?.stackNumber).toBe(17);
+    const facts = renderHook(() => useSharedPullRequestFactDirectory(), {
+      wrapper: wrapper(client),
+    });
+    await waitFor(() =>
+      expect(
+        facts.result.current.data?.facts["acme/sidebar#42"]?.signal.review,
+      ).toBe("review_required"),
+    );
     owner.unmount();
     consumer.unmount();
+    facts.unmount();
+    client.clear();
+  });
+
+  it("publishes a refreshed thread fact into the authored-row cache", async () => {
+    const threadFact = {
+      number: 12,
+      title: "Query ownership",
+      url: "https://github.com/acme/sidebar/pull/12",
+      state: "open" as const,
+      head: "r5",
+      base: "main",
+      checks: {
+        failedCount: 0,
+        passedCount: 2,
+        pendingCount: 0,
+        state: "passing" as const,
+        totalCount: 2,
+      },
+      review: { reviewRequestCount: 1, state: "review_required" as const },
+      attention: "review_requested" as const,
+      mergeability: {
+        mergeStateStatus: "CLEAN" as const,
+        mergeable: "MERGEABLE" as const,
+        state: "mergeable" as const,
+      },
+      signal: {
+        checks: "passing" as const,
+        review: "review_required" as const,
+        requestedReviewers: ["octocat"],
+        reviewCommentCount: 0,
+      },
+      stackNumber: null,
+    };
+    const rpc = {
+      call: vi.fn(async (method: string) => {
+        if (method === "sidebarAuthoredPullRequests")
+          return { available: true, pullRequests: authored, error: null };
+        if (method === "sidebarAuthoredPullRequestStacks")
+          return { available: true, pullRequests: authored, error: null };
+        if (method === "sidebarThreadPullRequests")
+          return {
+            available: true,
+            pullRequests: { thr_a: threadFact },
+            error: null,
+          };
+        throw new Error(`unexpected ${method}`);
+      }),
+    } as unknown as PullRequestRpc;
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const authoredView = renderHook(() => useAuthoredPullRequests(rpc), {
+      wrapper: wrapper(client),
+    });
+    await waitFor(() =>
+      expect(authoredView.result.current.data?.[0]?.review).toBe("approved"),
+    );
+    const directory = renderHook(
+      () => useThreadPullRequestDirectory(rpc, ["thr_a"], true),
+      { wrapper: wrapper(client) },
+    );
+    await waitFor(() =>
+      expect(authoredView.result.current.data?.[0]).toMatchObject({
+        review: "review_required",
+        requestedReviewers: ["octocat"],
+      }),
+    );
+    directory.unmount();
+    authoredView.unmount();
     client.clear();
   });
 
@@ -292,6 +318,27 @@ describe("R5 pull-request queries", () => {
       client
         .getQueryCache()
         .find({ queryKey: pullRequestKeys.threadDirectory() }),
+    ).toBeUndefined();
+    client.clear();
+  });
+
+  it("garbage-collects unobserved normalized facts after their handoff window", async () => {
+    vi.useFakeTimers();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    await client.fetchQuery({
+      queryKey: pullRequestKeys.factDirectory(),
+      queryFn: async () => ({ facts: {}, threadFactKeys: {} }),
+      ...pullRequestPolicies.factDirectory,
+    });
+
+    await vi.advanceTimersByTimeAsync(15 * 60_000);
+
+    expect(
+      client
+        .getQueryCache()
+        .find({ queryKey: pullRequestKeys.factDirectory() }),
     ).toBeUndefined();
     client.clear();
   });

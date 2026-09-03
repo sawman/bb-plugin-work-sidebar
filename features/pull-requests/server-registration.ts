@@ -11,7 +11,6 @@ type PullRequestHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
   | "getGitHubPollingPolicy"
   | "getGitHubApiHealth"
-  | "sidebarPullRequestStacks"
   | "sidebarThreadPullRequests"
   | "sidebarAuthoredPullRequests"
   | "sidebarAuthoredPullRequestStacks"

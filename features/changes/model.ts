@@ -1,5 +1,9 @@
 import type { GitHubStackBranch, GitHubStackSignal } from "../../contracts.js";
 import type { Changes, Repository } from "./schemas.js";
+import {
+  pullRequestFactKey,
+  type PullRequestFactDirectory,
+} from "../pull-requests/facts";
 
 export type StackBranchSignals = Pick<
   GitHubStackSignal,
@@ -19,7 +23,18 @@ export function mergeStackBranchSignals(
   branch: GitHubStackBranch,
   changes: Changes,
   currentPullRequest = changes.currentPullRequest,
+  facts?: PullRequestFactDirectory,
 ): StackBranchSignals | undefined {
+  const sharedFact = branch.pr
+    ? facts?.facts[pullRequestFactKey(branch.pr)]
+    : undefined;
+  if (sharedFact)
+    return {
+      state: sharedFact.state,
+      draft: sharedFact.draft,
+      attention: sharedFact.attention,
+      ...sharedFact.signal,
+    };
   const stackPullRequest = changes.stack?.pullRequests.find(
     (pullRequest) =>
       pullRequest.number === branch.pr?.number ||

@@ -4,6 +4,11 @@ import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getPluginQueryClient } from "../../../query-runtime";
 import { pullRequestKeys } from "../../pull-requests/queries";
+import {
+  factFromPullRequest,
+  mergePullRequestFacts,
+  pullRequestFactKey,
+} from "../../pull-requests/facts";
 import { changesInteractionStore } from "../store";
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
@@ -192,8 +197,21 @@ async function changesSlot(fixture: ChangesFixture) {
   getPluginQueryClient().clear();
   if (fixture.threadPullRequests)
     getPluginQueryClient().setQueryData(
-      pullRequestKeys.threadDirectory(),
-      fixture.threadPullRequests,
+      pullRequestKeys.factDirectory(),
+      mergePullRequestFacts(
+        undefined,
+        Object.values(fixture.threadPullRequests).flatMap((pullRequest) =>
+          pullRequest ? [factFromPullRequest(pullRequest as never)] : [],
+        ),
+        Object.fromEntries(
+          Object.entries(fixture.threadPullRequests).flatMap(
+            ([threadId, pullRequest]) =>
+              pullRequest
+                ? [[threadId, pullRequestFactKey(pullRequest as never)] as const]
+                : [],
+          ),
+        ),
+      ),
     );
   const app = await loadPluginApp(() => import("../../../app"));
   const slot = renderSlot(

@@ -9,10 +9,7 @@ import { TasksLeftSidebar } from "@/features/tasks/left-sidebar";
 import { invalidateTaskQueries } from "@/features/tasks/mutations";
 import { useTaskLinksRead } from "@/features/tasks/queries";
 import { PullRequestsLeftSidebar } from "@/features/pull-requests/left-sidebar";
-import {
-  invalidateSidebarPullRequestStacks,
-  invalidateThreadPullRequestDirectory,
-} from "@/features/pull-requests/queries";
+import { invalidateThreadPullRequestDirectory } from "@/features/pull-requests/queries";
 import { useSidebarThreadPullRequestDirectory } from "@/features/pull-requests/sidebar-directory";
 import type { PullRequestThreadReference } from "@/features/pull-requests/thread-link";
 import {
@@ -186,7 +183,6 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
       threadPreferences.order.refetch(),
       threadPreferences.groups.refetch(),
       refetchTaskLinks(),
-      invalidateSidebarPullRequestStacks(queryClient),
       invalidateThreadPullRequestDirectory(queryClient),
       queryClient.invalidateQueries({
         queryKey: threadQueryKeys.archived(),

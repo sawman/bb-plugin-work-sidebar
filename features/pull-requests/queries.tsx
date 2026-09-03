@@ -6,6 +6,15 @@ import type { z } from "zod";
 import type { rpcContract } from "../../contracts";
 import { queryPolicies } from "../../query-runtime";
 import type { PullRequestReviewerContract, threadPullRequest } from "./schemas";
+import {
+  factFromAuthoredPullRequest,
+  factFromThreadPullRequest,
+  mergePullRequestFacts,
+  pullRequestFactKey,
+  reconcileThreadPullRequestFactReferences,
+  resolvePullRequestFact,
+  type PullRequestFactDirectory,
+} from "./facts";
 
 // This remains type-only: the app bundle sees neither the server contract
 // composer nor the root SDK runtime.
@@ -25,12 +34,8 @@ export const pullRequestKeys = {
     "stacks",
     ...(baseRevision == null ? [] : [baseRevision]),
   ],
-  sidebarStacks: (threadIds: readonly string[]): QueryKey => [
-    ...root,
-    "sidebar-stacks",
-    ...threadIds,
-  ],
   threadDirectory: (): QueryKey => [...root, "thread-directory"],
+  factDirectory: (): QueryKey => [...root, "fact-directory"],
   health: (): QueryKey => [...root, "health"],
   reviewers: (repository?: string): QueryKey => [
     ...root,
@@ -54,18 +59,22 @@ export const pullRequestPolicies = {
     retry: 1,
     refetchOnWindowFocus: false,
   },
-  sidebarStacks: {
-    staleTime: 60_000,
-    gcTime: 15 * 60_000,
-    retry: false,
-    refetchOnWindowFocus: false,
-  },
   threadDirectory: {
     // One directory can contain an entire active project roster. Retain it
     // only long enough to bridge a brief slot remount; the owner compacts it
     // synchronously whenever that roster changes or disappears.
     staleTime: 60_000,
     gcTime: 5 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  },
+  factDirectory: {
+    // Facts are hydrated by the owned authored/thread/Changes reads. They are
+    // never fetched independently, so their lifecycle follows the shared
+    // Query cache rather than a second client-side GitHub request.
+    staleTime: Infinity,
+    gcTime: 15 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -82,6 +91,94 @@ export const pullRequestPolicies = {
     refetchOnReconnect: false,
   },
 } as const;
+
+export function hydratePullRequestFacts(
+  client: QueryClient,
+  facts: readonly ReturnType<typeof factFromAuthoredPullRequest>[],
+  threadFactKeys?: Readonly<Record<string, string>>,
+) {
+  if (facts.length === 0 && threadFactKeys === undefined) return;
+  client.setQueryData<PullRequestFactDirectory>(
+    pullRequestKeys.factDirectory(),
+    (current) => {
+      const merged = mergePullRequestFacts(current, facts);
+      return threadFactKeys === undefined
+        ? merged
+        : reconcileThreadPullRequestFactReferences(merged, threadFactKeys);
+    },
+  );
+}
+
+function resolveThreadPullRequestDirectory(
+  threadDirectory: ThreadPullRequestDirectory | undefined,
+  facts: PullRequestFactDirectory | undefined,
+): ThreadPullRequestDirectory | undefined {
+  if (!threadDirectory) return threadDirectory;
+  return Object.fromEntries(
+    Object.entries(threadDirectory).map(([threadId, pullRequest]) => {
+      if (!pullRequest) return [threadId, null];
+      const fact = resolvePullRequestFact(pullRequest, facts);
+      return [
+        threadId,
+        {
+          ...pullRequest,
+          state: fact.state,
+          title: fact.title,
+          url: fact.url,
+          head: fact.head,
+          base: fact.base,
+          attention: fact.attention ?? pullRequest.attention,
+          signal: fact.signal,
+        },
+      ];
+    }),
+  );
+}
+
+function resolveAuthoredPullRequests<T extends {
+  number: number;
+  title: string;
+  url: string;
+  state: "open" | "draft";
+  draft: boolean;
+  head: string;
+  base: string;
+  checks: ReturnType<typeof factFromAuthoredPullRequest>["signal"]["checks"];
+  review: ReturnType<typeof factFromAuthoredPullRequest>["signal"]["review"];
+  approvers?: string[];
+  changeRequesters?: string[];
+  requestedReviewers?: string[];
+  reviewCommentCount: number;
+}>(
+  pullRequests: readonly T[] | undefined,
+  directory: PullRequestFactDirectory | undefined,
+): T[] | undefined {
+  if (!pullRequests) return pullRequests as T[] | undefined;
+  return pullRequests.map((pullRequest) => {
+    const fact = resolvePullRequestFact(pullRequest, directory);
+    const resolved = directory?.facts[pullRequestFactKey(pullRequest)] ?? null;
+    // An authored row seeds the directory with its own partial fact. Preserve
+    // that exact wire shape until a richer thread/Changes fact is available.
+    if (!resolved || (!resolved.checks && !resolved.review && !resolved.mergeability))
+      return pullRequest;
+    return {
+      ...pullRequest,
+      state: fact.state === "draft" ? "draft" : "open",
+      draft: fact.draft,
+      title: fact.title,
+      url: fact.url,
+      head: fact.head,
+      base: fact.base,
+      checks: fact.signal.checks,
+      review: fact.signal.review,
+      approvers: fact.signal.approvers,
+      changeRequesters: fact.signal.changeRequesters,
+      requestedReviewers: fact.signal.requestedReviewers,
+      reviewCommentCount: fact.signal.reviewCommentCount,
+      attention: fact.attention,
+    } as T;
+  });
+}
 
 async function authoredPullRequests(rpc: PullRequestRpc, force = false) {
   const base = await rpc.call(
@@ -102,20 +199,6 @@ async function authoredPullRequestStacks(rpc: PullRequestRpc) {
       stacks.error ?? "GitHub pull-request stacks are unavailable.",
     );
   return stacks.pullRequests;
-}
-
-async function sidebarPullRequestStacks(
-  rpc: PullRequestRpc,
-  threadIds: readonly string[],
-) {
-  const result = await rpc.call("sidebarPullRequestStacks", {
-    threadIds: [...threadIds],
-  });
-  if (!result.available)
-    throw new Error(
-      result.error ?? "GitHub pull-request stacks are unavailable.",
-    );
-  return result.stacks;
 }
 
 async function sidebarThreadPullRequests(
@@ -194,20 +277,6 @@ async function refreshLoadedReviewerDirectories(
   );
 }
 
-export function useSidebarPullRequestStacks(
-  rpc: PullRequestRpc,
-  threadIds: readonly string[],
-  enabled: boolean,
-) {
-  const normalizedThreadIds = [...new Set(threadIds)].sort().slice(0, 200);
-  return useQuery({
-    queryKey: pullRequestKeys.sidebarStacks(normalizedThreadIds),
-    queryFn: () => sidebarPullRequestStacks(rpc, normalizedThreadIds),
-    ...pullRequestPolicies.sidebarStacks,
-    enabled: enabled && normalizedThreadIds.length > 0,
-  });
-}
-
 /**
  * One roster-wide PR fact directory feeds thread rows and the other PR
  * surfaces through the shared QueryClient. Roster changes refetch in place so
@@ -219,6 +288,7 @@ export function useThreadPullRequestDirectory(
   enabled: boolean,
 ) {
   const queryClient = useQueryClient();
+  const facts = useSharedPullRequestFactDirectory();
   const unorderedThreadIds = [...new Set(threadIds)].sort();
   const fingerprint = unorderedThreadIds.join("|");
   // Sidebar callers often create a fresh roster array while rendering. Keep
@@ -236,6 +306,23 @@ export function useThreadPullRequestDirectory(
     enabled: active,
   });
   const { refetch } = query;
+  const rawDirectory = query.data;
+  useEffect(() => {
+    if (!rawDirectory) return;
+    hydratePullRequestFacts(
+      queryClient,
+      Object.values(rawDirectory)
+        .filter((pullRequest): pullRequest is ThreadPullRequest => Boolean(pullRequest))
+        .map(factFromThreadPullRequest),
+      Object.fromEntries(
+        Object.entries(rawDirectory).flatMap(([threadId, pullRequest]) =>
+          pullRequest
+            ? [[threadId, pullRequestFactKey(pullRequest)] as const]
+            : [],
+        ),
+      ),
+    );
+  }, [queryClient, rawDirectory]);
   useEffect(() => {
     if (!active) {
       previousFingerprint.current = null;
@@ -246,6 +333,7 @@ export function useThreadPullRequestDirectory(
         pullRequestKeys.threadDirectory(),
         {},
       );
+      hydratePullRequestFacts(queryClient, [], {});
       return;
     }
     if (previousFingerprint.current === null) {
@@ -269,7 +357,23 @@ export function useThreadPullRequestDirectory(
       void refetch();
     })();
   }, [active, fingerprint, normalizedThreadIds, queryClient, refetch]);
-  return query;
+  return {
+    ...query,
+    data: resolveThreadPullRequestDirectory(rawDirectory, facts.data),
+  };
+}
+
+/** Passive observer of the canonical project-scoped fact directory. */
+export function useSharedPullRequestFactDirectory() {
+  return useQuery<PullRequestFactDirectory>({
+    queryKey: pullRequestKeys.factDirectory(),
+    queryFn: async (): Promise<PullRequestFactDirectory> => ({
+      facts: {},
+      threadFactKeys: {},
+    }),
+    ...pullRequestPolicies.factDirectory,
+    enabled: false,
+  });
 }
 
 /** Subscribes to the global directory without issuing a second roster read. */
@@ -277,16 +381,6 @@ export function useSharedThreadPullRequestDirectory() {
   return useQuery<ThreadPullRequestDirectory>({
     queryKey: pullRequestKeys.threadDirectory(),
     enabled: false,
-  });
-}
-
-export function invalidateSidebarPullRequestStacks(client: {
-  invalidateQueries(filters: {
-    queryKey: QueryKey;
-  }): Promise<unknown> | unknown;
-}) {
-  return client.invalidateQueries({
-    queryKey: [...root, "sidebar-stacks"],
   });
 }
 
@@ -301,6 +395,7 @@ export function useAuthoredPullRequests(
   polling: AuthoredPullRequestPolling = { intervalMs: 300_000 },
 ) {
   const client = useQueryClient();
+  const facts = useSharedPullRequestFactDirectory();
   const forceRefresh = useRef(false);
   const base = useQuery({
     queryKey: pullRequestKeys.authored(),
@@ -318,6 +413,10 @@ export function useAuthoredPullRequests(
     ...pullRequestPolicies.authoredStacks,
   });
   const enriched = stacks.data ?? base.data;
+  useEffect(() => {
+    if (!enriched) return;
+    hydratePullRequestFacts(client, enriched.map(factFromAuthoredPullRequest));
+  }, [client, enriched]);
   const refresh = async () => {
     await Promise.all([
       client.cancelQueries({ queryKey: pullRequestKeys.authored() }),
@@ -341,7 +440,7 @@ export function useAuthoredPullRequests(
   };
   return {
     ...base,
-    data: enriched,
+    data: resolveAuthoredPullRequests(enriched, facts.data),
     isFetching: base.isFetching || stacks.isFetching,
     stackError: stacks.error,
     refresh,
