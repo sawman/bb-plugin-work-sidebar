@@ -28,6 +28,8 @@ export function WorkThreadTree({
   staleWorkingMinutes,
   queuedMessagesByThread,
   queuedMessageNow,
+  pullRequestsByThread,
+  pullRequestsLoading,
   depth = 0,
 }: WorkThreadTreeProps) {
   const children = childrenByThread.get(thread.id) ?? [];
@@ -62,6 +64,8 @@ export function WorkThreadTree({
         onMoveToRecycleBin={onMoveToRecycleBin}
         project={projectsById.get(thread.projectId)}
         provider={providersById.get(thread.providerId)}
+        pullRequest={pullRequestsByThread?.[thread.id] ?? null}
+        pullRequestLoading={pullRequestsLoading}
         onNavigate={onNavigate}
         reorderDisabled={reorderDisabled}
         dragThreadId={dragThreadId}
@@ -104,6 +108,8 @@ export function WorkThreadTree({
               staleWorkingMinutes={staleWorkingMinutes}
               queuedMessagesByThread={queuedMessagesByThread}
               queuedMessageNow={queuedMessageNow}
+              pullRequestsByThread={pullRequestsByThread}
+              pullRequestsLoading={pullRequestsLoading}
               depth={depth + 1}
             />
           </div>

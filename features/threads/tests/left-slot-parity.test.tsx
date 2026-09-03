@@ -807,31 +807,29 @@ describe("R18 registered left sidebar parity", () => {
   });
 
   it("shows a compact stack-number badge only for threads returned by the stack projection", async () => {
-    const stacks = vi.fn(() => ({
+    const directory = vi.fn(() => ({
       available: true,
-      stacks: {
+      pullRequests: {
         thr_one: {
-          id: "github-stack:thr_one:17",
           number: 17,
+          title: "Stacked pull request",
+          url: "https://github.com/acme/repo/pull/17",
+          state: "open",
+          head: "feature/stacked",
           base: "main",
-          currentPullRequest: 42,
-          pullRequests: [],
+          checks: { failedCount: 0, passedCount: 1, pendingCount: 0, state: "passing", totalCount: 1 },
+          review: { reviewRequestCount: 0, state: "approved" },
+          attention: "ready_to_merge",
+          mergeability: { mergeStateStatus: "CLEAN", mergeable: "MERGEABLE", state: "mergeable" },
+          signal: { checks: "passing", review: "approved", reviewCommentCount: 0 },
+          stackNumber: 17,
         },
+        thr_two: null,
       },
-      mergeTargets: {},
       error: null,
     }));
     const slot = await leftSlot({
-      sidebarPullRequests: {
-        thr_one: {
-          number: 42,
-          title: "Stacked pull request",
-          url: "https://github.com/acme/repo/pull/42",
-          state: "open",
-          attention: "none",
-        },
-      },
-      rpc: { sidebarPullRequestStacks: stacks },
+      rpc: { sidebarThreadPullRequests: directory },
     });
 
     await waitFor(() =>
@@ -839,7 +837,7 @@ describe("R18 registered left sidebar parity", () => {
         "#17",
       ),
     );
-    expect(stacks).toHaveBeenCalledWith({ threadIds: ["thr_one"] });
+    expect(directory).toHaveBeenCalledWith({ threadIds: ["thr_one", "thr_two"] });
     expect(
       slot.getByRole("link", { name: /Two/ }).querySelector(".ws-stack-number"),
     ).toBeNull();

@@ -12,8 +12,7 @@ import {
   ContextMenuTrigger,
 } from "../../components/ui/context-menu";
 import {
-  pullRequestAttentionFromSignal,
-  pullRequestPresentation,
+  pullRequestSummaryPresentation,
   pullRequestSignalPresentation,
   type PullRequestSignal,
 } from "./presentation";
@@ -27,7 +26,11 @@ import {
   type PullRequestThreadReference,
 } from "./thread-link";
 import { PullRequestReviewerPicker } from "./reviewer-picker";
-import type { PullRequestRpc } from "./queries";
+import type {
+  PullRequestRpc,
+  ThreadPullRequest,
+  ThreadPullRequestDirectory,
+} from "./queries";
 
 export type AuthoredPullRequest = {
   number: number;
@@ -53,6 +56,7 @@ export function AuthoredPullRequestRow({
   stackControl,
   stackNumber,
   linkedThread,
+  threadPullRequest,
   changingDraft,
   onOpenPullRequest,
   onOpenThread,
@@ -63,6 +67,7 @@ export function AuthoredPullRequestRow({
   stackControl?: ReactNode;
   stackNumber?: number | null;
   linkedThread?: PullRequestThreadReference;
+  threadPullRequest?: ThreadPullRequest | null;
   changingDraft: boolean;
   onOpenPullRequest?(url: string): void;
   onOpenThread?(threadId: string): void;
@@ -71,15 +76,21 @@ export function AuthoredPullRequestRow({
 }) {
   const reviewerTriggerRef = useRef<HTMLButtonElement>(null);
   const [reviewerPickerOpen, setReviewerPickerOpen] = useState(false);
-  const signal = pullRequestSignalPresentation(pullRequest);
-  const state = pullRequestPresentation({
-    state: pullRequest.state,
-    draft: pullRequest.draft,
-    attention:
-      pullRequest.attention ?? pullRequestAttentionFromSignal(pullRequest),
+  const signalSource = threadPullRequest?.signal ?? pullRequest;
+  const signal = pullRequestSignalPresentation(signalSource);
+  const state = pullRequestSummaryPresentation({
+    state: threadPullRequest?.state ?? pullRequest.state,
+    draft:
+      threadPullRequest?.state === "draft" ||
+      (!threadPullRequest && pullRequest.draft),
+    attention: threadPullRequest?.attention ?? pullRequest.attention,
+    signal: signalSource,
   });
   const stateAction = pullRequest.draft ? "Mark open" : "Mark draft";
-  const reviewers = pullRequest.requestedReviewers?.filter(Boolean) ?? [];
+  const reviewers =
+    threadPullRequest?.signal.requestedReviewers?.filter(Boolean) ??
+    pullRequest.requestedReviewers?.filter(Boolean) ??
+    [];
   return (
     <>
       <ContextMenu>
@@ -221,6 +232,7 @@ export function AuthoredPullRequestStack({
   onOpenThread,
   onToggleDraft,
   threadsByBranch,
+  threadPullRequests,
   repository = "",
   rpc,
 }: {
@@ -230,6 +242,7 @@ export function AuthoredPullRequestStack({
   onOpenThread?(threadId: string): void;
   onToggleDraft(pullRequest: AuthoredRow): void;
   threadsByBranch?: ReadonlyMap<string, PullRequestThreadReference>;
+  threadPullRequests?: ThreadPullRequestDirectory;
   repository?: string;
   rpc?: PullRequestRpc;
 }) {
@@ -251,6 +264,11 @@ export function AuthoredPullRequestStack({
       stackControl={stackControl}
       stackNumber={stackNumber}
       linkedThread={promotedThread}
+      threadPullRequest={
+        threadPullRequests?.[
+          threadsByBranch?.get(layer.head)?.id ?? ""
+        ]
+      }
       changingDraft={changingDraftUrl === layer.url}
       onOpenPullRequest={onOpenPullRequest}
       onOpenThread={onOpenThread}

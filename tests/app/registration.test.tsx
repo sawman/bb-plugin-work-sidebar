@@ -8,6 +8,7 @@ import {
 } from "../../query-runtime";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { changesKeys } from "../../features/changes/model";
+import { pullRequestKeys } from "../../features/pull-requests/queries";
 
 describe("R2 app registration and Query lifecycle", () => {
   it("preserves every current slot registration and routes both mounted slots through one module client", async () => {
@@ -154,9 +155,16 @@ describe("R2 app registration and Query lifecycle", () => {
     // selected, the file query remains hook-stable and disabled until opened.
     // Work-item queue is independently cacheable from the outcome and task
     // projections, so mounted Work now owns one additional query entry.
-    // The plugin-managed Recycle Bin and queued-message state are durable
-    // sidebar reads; queue changes arrive through realtime, not polling.
-    expect(client.getQueryCache().getAll()).toHaveLength(21);
+    // The plugin-managed Recycle Bin, queued-message state, and the single
+    // roster-wide PR directory are durable sidebar reads. Queue changes
+    // arrive through realtime; PR consumers observe this one Query entry.
+    expect(client.getQueryCache().getAll()).toHaveLength(22);
+    expect(
+      client
+        .getQueryCache()
+        .find({ queryKey: pullRequestKeys.threadDirectory() })
+        ?.getObserversCount(),
+    ).toBe(1);
     expect(
       client
         .getQueryCache()

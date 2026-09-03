@@ -8,6 +8,10 @@ import type {
 import type { ThreadDropTarget } from "./store";
 import type { QueuedMessage } from "./schemas";
 import type { ThreadAgentRollup } from "./thread-agent-rollup";
+import type {
+  ThreadPullRequest,
+  ThreadPullRequestDirectory,
+} from "../pull-requests/queries";
 
 export type { ThreadDropTarget } from "./store";
 
@@ -38,6 +42,8 @@ export type ThreadRowProps = {
   onMoveToRecycleBin?(threadId: string): void;
   project?: ThreadProject;
   provider?: ThreadProvider;
+  pullRequest?: ThreadPullRequest | null;
+  pullRequestLoading?: boolean;
   onNavigate(): void;
   reorderDisabled: boolean;
   dragThreadId: string | null;
@@ -78,4 +84,6 @@ export type WorkThreadTreeProps = Omit<
   staleWorkingMinutes: number;
   depth?: number;
   queuedMessagesByThread?: ReadonlyMap<string, QueuedMessage>;
+  pullRequestsByThread?: ThreadPullRequestDirectory;
+  pullRequestsLoading?: boolean;
 };

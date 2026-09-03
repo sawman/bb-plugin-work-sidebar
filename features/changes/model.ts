@@ -10,6 +10,7 @@ export type StackBranchSignals = Pick<
 export function mergeStackBranchSignals(
   branch: GitHubStackBranch,
   changes: Changes,
+  currentPullRequest = changes.currentPullRequest,
 ): StackBranchSignals | undefined {
   const stackPullRequest = changes.stack?.pullRequests.find(
     (pullRequest) =>
@@ -17,8 +18,8 @@ export function mergeStackBranchSignals(
       pullRequest.head === branch.name,
   );
   const current =
-    branch.pr?.number === changes.currentPullRequest?.number
-      ? changes.currentPullRequest
+    branch.pr?.number === currentPullRequest?.number
+      ? currentPullRequest
       : null;
 
   if (current) {

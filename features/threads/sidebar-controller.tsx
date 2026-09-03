@@ -1,18 +1,6 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type CSSProperties,
-} from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  experimental_useSidebarThreadActions,
-  experimental_useSidebarThreads,
-  experimental_useProviders,
-  type PluginThreadListProps,
-  useSettings,
-} from "@get-bb/plugin-sdk/app";
+import { experimental_useSidebarThreadActions, experimental_useSidebarThreads, experimental_useProviders, type PluginThreadListProps, useSettings } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { TabSelector } from "@/components/ui/tab-selector";
 import type { ThreadProvider } from "@/components/threads/thread-provider-logo";
@@ -21,7 +9,11 @@ import { TasksLeftSidebar } from "@/features/tasks/left-sidebar";
 import { invalidateTaskQueries } from "@/features/tasks/mutations";
 import { useTaskLinksRead } from "@/features/tasks/queries";
 import { PullRequestsLeftSidebar } from "@/features/pull-requests/left-sidebar";
-import { invalidateSidebarPullRequestStacks } from "@/features/pull-requests/queries";
+import {
+  invalidateSidebarPullRequestStacks,
+  invalidateThreadPullRequestDirectory,
+} from "@/features/pull-requests/queries";
+import { useSidebarThreadPullRequestDirectory } from "@/features/pull-requests/sidebar-directory";
 import type { PullRequestThreadReference } from "@/features/pull-requests/thread-link";
 import {
   DEFAULT_SIDEBAR_ROW_HEIGHT,
@@ -55,10 +47,7 @@ import { useGroupDisclosurePreference } from "./use-group-disclosure-preference"
 const SIDEBAR_TABS: readonly { id: SidebarView; label: string }[] = (
   ["work", "queue", "prs"] as const
 ).map((id) => ({ id, label: sidebarViewLabel(id) }));
-const EMPTY_TASK_OWNER_THREADS: ReadonlyMap<
-  string,
-  { title: string; providerId: string; provider?: ThreadProvider }
-> = new Map();
+const EMPTY_TASK_OWNER_THREADS: ReadonlyMap<string, { title: string; providerId: string; provider?: ThreadProvider }> = new Map();
 const EMPTY_PULL_REQUEST_THREADS: readonly PullRequestThreadReference[] = [];
 function EmptyOriginal() {
   return null;
@@ -80,12 +69,13 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     () => new Set((recycleBin.bin.data ?? []).map((entry) => entry.threadId)),
     [recycleBin.bin.data],
   );
-  const liveThreads = useMemo(
-    () =>
-      threads.filter(
-        (thread) => !thread.isArchived && !binnedIds.has(thread.id),
-      ),
-    [binnedIds, threads],
+  const liveThreads = useMemo(() => threads.filter((thread) => !thread.isArchived && !binnedIds.has(thread.id)), [binnedIds, threads]);
+  // One project-roster read owns the normalized PR facts for the entire
+  // frontend generation. Consumers only observe this cache; none issue
+  // per-row PR reads.
+  const threadPullRequests = useSidebarThreadPullRequestDirectory(
+    liveThreads.map((thread) => thread.id),
+    status === "ready",
   );
   // Sole task-links observer, including native mode: Agents and WorkThreadTree share one
   // cache and polling owner rather than creating per-consumer intervals.
@@ -196,6 +186,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
       threadPreferences.groups.refetch(),
       refetchTaskLinks(),
       invalidateSidebarPullRequestStacks(queryClient),
+      invalidateThreadPullRequestDirectory(queryClient),
       queryClient.invalidateQueries({
         queryKey: threadQueryKeys.archived(),
       }),
@@ -308,6 +299,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
           active={view === "prs"}
           searchQuery={props.searchQuery}
           threads={pullRequestThreads}
+          threadPullRequests={threadPullRequests.data}
           onOpenThread={navigateToThread}
           settingsControl={settings}
         />
@@ -340,6 +332,8 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
           disclosures={groupPreferences.disclosures ?? {}}
           onDisclosureChange={saveGroupDisclosure}
           disclosuresReady={threadPreferences.groups.isSuccess}
+          pullRequestsByThread={threadPullRequests.data}
+          pullRequestsLoading={threadPullRequests.isPending}
         />
             <ThreadHierarchyPickerHost />
           </ThreadHierarchyProvider>

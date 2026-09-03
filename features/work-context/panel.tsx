@@ -11,7 +11,10 @@ import { ChangesPanel } from "../changes/panel";
 import { invalidateChanges } from "../changes/queries";
 import { changesInteractionStore } from "../changes/store";
 import { AgentsView } from "../agents/views";
-import { invalidateGitHubApiHealth } from "../pull-requests/queries";
+import {
+  invalidateGitHubApiHealth,
+  invalidateThreadPullRequestDirectory,
+} from "../pull-requests/queries";
 import { threadInteractionStore, type WorkTab } from "../threads/store";
 import { invalidateTracker, useTracker } from "../tracker/queries";
 import {
@@ -114,7 +117,10 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
     if (event.family === "tracker")
       void invalidateTracker(queryClient, scope.threadId);
     if (event.family === "changes")
-      void invalidateChanges(queryClient, scope.threadId);
+      void Promise.all([
+        invalidateChanges(queryClient, scope.threadId),
+        invalidateThreadPullRequestDirectory(queryClient),
+      ]);
   });
   const selectTab = (next: WorkTab) =>
     threadInteractionStore.getState().setWorkTab(threadId, next);
@@ -151,6 +157,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
                 invalidateTracker(queryClient, threadId),
                 invalidateChanges(queryClient, threadId),
                 invalidateGitHubApiHealth(queryClient),
+                invalidateThreadPullRequestDirectory(queryClient),
               ])
             }
             disabled={tab === "work" && status.isPending}

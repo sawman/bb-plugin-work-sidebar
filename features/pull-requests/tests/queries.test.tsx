@@ -11,6 +11,8 @@ import {
   useGitHubApiHealth,
   usePullRequestReviewers,
   useSidebarPullRequestStacks,
+  useSharedThreadPullRequestDirectory,
+  useThreadPullRequestDirectory,
   useUpdatePullRequestReviewers,
   type PullRequestRpc,
 } from "../queries";
@@ -100,6 +102,103 @@ describe("R5 pull-request queries", () => {
     });
     inactive.unmount();
     active.unmount();
+    client.clear();
+  });
+
+  it("owns one normalized roster directory that passive consumers reuse", async () => {
+    const directory = {
+      thr_a: {
+        number: 42,
+        title: "Shared fact",
+        url: "https://github.com/acme/sidebar/pull/42",
+        state: "open" as const,
+        head: "feature/shared",
+        base: "main",
+        checks: {
+          failedCount: 0,
+          passedCount: 2,
+          pendingCount: 0,
+          state: "passing" as const,
+          totalCount: 2,
+        },
+        review: { reviewRequestCount: 1, state: "review_required" as const },
+        attention: "review_requested" as const,
+        mergeability: {
+          mergeStateStatus: "CLEAN" as const,
+          mergeable: "MERGEABLE" as const,
+          state: "mergeable" as const,
+        },
+        signal: {
+          checks: "passing" as const,
+          review: "review_required" as const,
+          requestedReviewers: ["octocat"],
+          reviewCommentCount: 0,
+        },
+        stackNumber: 17,
+      },
+      thr_b: null,
+    };
+    const rpc = {
+      call: vi.fn(async (method: string, input: unknown) => {
+        expect(method).toBe("sidebarThreadPullRequests");
+        expect(input).toEqual({ threadIds: ["thr_a", "thr_b"] });
+        return { available: true, pullRequests: directory, error: null };
+      }),
+    } as unknown as PullRequestRpc;
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const owner = renderHook(
+      () => useThreadPullRequestDirectory(rpc, ["thr_b", "thr_a", "thr_a"], true),
+      { wrapper: wrapper(client) },
+    );
+    await waitFor(() =>
+      expect(owner.result.current.data?.thr_a?.signal.review).toBe(
+        "review_required",
+      ),
+    );
+    const consumer = renderHook(() => useSharedThreadPullRequestDirectory(), {
+      wrapper: wrapper(client),
+    });
+    expect(consumer.result.current.data).toEqual(directory);
+    expect(rpc.call).toHaveBeenCalledTimes(1);
+    expect(owner.result.current.data?.thr_a?.stackNumber).toBe(17);
+    owner.unmount();
+    consumer.unmount();
+    client.clear();
+  });
+
+  it("covers a large roster in contract-bounded directory batches", async () => {
+    const threadIds = Array.from({ length: 201 }, (_, index) =>
+      `thr_${String(index).padStart(3, "0")}`,
+    );
+    const call = vi.fn(async (_method: string, input: { threadIds: string[] }) => ({
+        available: true,
+        pullRequests: Object.fromEntries(
+          input.threadIds.map((threadId) => [threadId, null]),
+        ),
+        error: null,
+      }));
+    const rpc = {
+      call,
+    } as unknown as PullRequestRpc;
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const view = renderHook(
+      () => useThreadPullRequestDirectory(rpc, [...threadIds].reverse(), true),
+      { wrapper: wrapper(client) },
+    );
+    await waitFor(() =>
+      expect(Object.keys(view.result.current.data ?? {})).toHaveLength(201),
+    );
+    expect(call).toHaveBeenCalledTimes(2);
+    expect(
+      call.mock.calls.map(
+        ([, input]) => (input as { threadIds: string[] }).threadIds.length,
+      ),
+    ).toEqual([200, 1]);
+    view.unmount();
     client.clear();
   });
 

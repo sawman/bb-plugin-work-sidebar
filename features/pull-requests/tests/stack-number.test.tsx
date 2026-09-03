@@ -382,6 +382,65 @@ describe("pull-request stack number presentation", () => {
     expect(screen.getByRole("menuitem", { name: "Mark draft" })).toBeTruthy();
   });
 
+  it("uses the shared thread fact when the authored aggregate is stale", () => {
+    render(
+      <AuthoredPullRequestRow
+        pullRequest={{
+          number: 97,
+          title: "Re-requested review",
+          url: "https://github.com/acme/repo/pull/97",
+          repository: "acme/repo",
+          state: "open",
+          draft: false,
+          // The authored aggregate can retain this earlier derived value while
+          // the review signal has already been refreshed.
+          attention: "changes_requested",
+          head: "feature/re-requested",
+          base: "main",
+          checks: "passing",
+          review: "changes_requested",
+          reviewCommentCount: 0,
+        }}
+        threadPullRequest={{
+          number: 97,
+          title: "Re-requested review",
+          url: "https://github.com/acme/repo/pull/97",
+          state: "open",
+          head: "feature/re-requested",
+          base: "main",
+          checks: {
+            failedCount: 0,
+            passedCount: 1,
+            pendingCount: 0,
+            state: "passing",
+            totalCount: 1,
+          },
+          review: { reviewRequestCount: 1, state: "review_required" },
+          attention: "review_requested",
+          mergeability: {
+            mergeStateStatus: "CLEAN",
+            mergeable: "MERGEABLE",
+            state: "mergeable",
+          },
+          signal: {
+            checks: "passing",
+            review: "review_required",
+            requestedReviewers: ["octocat"],
+            reviewCommentCount: 0,
+          },
+          stackNumber: null,
+        }}
+        changingDraft={false}
+        onToggleDraft={vi.fn()}
+      />,
+    );
+
+    const badge = screen.getByRole("button", { name: "Copy PR number #97" });
+    expect(badge.getAttribute("data-tone")).toBe("warning");
+    expect(tooltipLabel(badge)).toBe("PR #97 · Review requested");
+    expect(badge.querySelector("svg")?.getAttribute("data-icon")).toBe("Eye");
+  });
+
   it.each([
     ["Draft", "draft", "GitPullRequest", { draft: true, attention: "draft" }],
     ["Review requested", "warning", "Eye", { draft: false, attention: "review_requested" }],

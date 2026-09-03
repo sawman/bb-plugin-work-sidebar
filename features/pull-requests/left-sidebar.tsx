@@ -19,6 +19,7 @@ import {
   useAuthoredPullRequests,
   useGitHubApiHealth,
   useSetAuthoredPullRequestDraft,
+  type ThreadPullRequestDirectory,
 } from "./queries";
 import {
   uniqueThreadsByBranch,
@@ -37,6 +38,7 @@ export interface PullRequestsLeftSidebarProps {
   active: boolean;
   searchQuery: string;
   threads: readonly PullRequestThreadReference[];
+  threadPullRequests?: ThreadPullRequestDirectory;
   onOpenThread(threadId: string): void;
   settingsControl: ReactNode;
 }
@@ -46,6 +48,7 @@ export function PullRequestsLeftSidebar({
   active,
   searchQuery,
   threads,
+  threadPullRequests,
   onOpenThread,
   settingsControl,
 }: PullRequestsLeftSidebarProps) {
@@ -214,6 +217,7 @@ export function PullRequestsLeftSidebar({
                       onToggleDraft={toggleDraft}
                       onOpenThread={onOpenThread}
                       threadsByBranch={threadsByBranch}
+                      threadPullRequests={threadPullRequests}
                     />
                   ))}
                   {group.ordinary.map((pullRequest) => (
@@ -225,6 +229,11 @@ export function PullRequestsLeftSidebar({
                         rpc={rpc}
                         pullRequest={pullRequest}
                         linkedThread={threadsByBranch.get(pullRequest.head)}
+                        threadPullRequest={
+                          threadPullRequests?.[
+                            threadsByBranch.get(pullRequest.head)?.id ?? ""
+                          ]
+                        }
                         changingDraft={changingDraftUrl === pullRequest.url}
                         onOpenPullRequest={(url) => navigate.openUrl(url)}
                         onOpenThread={onOpenThread}

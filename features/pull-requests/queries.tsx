@@ -1,15 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { PluginRpcClient } from "@get-bb/plugin-sdk/app";
+import type { z } from "zod";
 import type { rpcContract } from "../../contracts";
 import { queryPolicies } from "../../query-runtime";
-import type { PullRequestReviewerContract } from "./schemas";
+import type { PullRequestReviewerContract, threadPullRequest } from "./schemas";
 
 // This remains type-only: the app bundle sees neither the server contract
 // composer nor the root SDK runtime.
 export type PullRequestRpc = PluginRpcClient<typeof rpcContract>;
 export type AuthoredPullRequestPolling = { intervalMs: number };
+export type ThreadPullRequest = z.infer<typeof threadPullRequest>;
+export type ThreadPullRequestDirectory = Record<string, ThreadPullRequest | null>;
 
 const root = ["work-sidebar", "pull-requests"] as const;
 
@@ -26,6 +29,7 @@ export const pullRequestKeys = {
     "sidebar-stacks",
     ...threadIds,
   ],
+  threadDirectory: (): QueryKey => [...root, "thread-directory"],
   health: (): QueryKey => [...root, "health"],
   reviewers: (repository?: string): QueryKey => [
     ...root,
@@ -50,6 +54,12 @@ export const pullRequestPolicies = {
     refetchOnWindowFocus: false,
   },
   sidebarStacks: {
+    staleTime: 60_000,
+    gcTime: 15 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  },
+  threadDirectory: {
     staleTime: 60_000,
     gcTime: 15 * 60_000,
     retry: false,
@@ -103,6 +113,27 @@ async function sidebarPullRequestStacks(
   return result.stacks;
 }
 
+async function sidebarThreadPullRequests(
+  rpc: PullRequestRpc,
+  threadIds: readonly string[],
+): Promise<ThreadPullRequestDirectory> {
+  const directory: ThreadPullRequestDirectory = {};
+  // The server contract validates one bounded roster chunk. Keep one client
+  // cache entry while covering every project thread instead of truncating
+  // large rosters at the transport boundary.
+  for (let start = 0; start < threadIds.length; start += 200) {
+    const result = await rpc.call("sidebarThreadPullRequests", {
+      threadIds: threadIds.slice(start, start + 200),
+    });
+    if (!result.available)
+      throw new Error(
+        result.error ?? "GitHub thread pull requests are unavailable.",
+      );
+    Object.assign(directory, result.pullRequests);
+  }
+  return directory;
+}
+
 async function pullRequestReviewers(
   rpc: PullRequestRpc,
   repository: string,
@@ -154,6 +185,46 @@ export function useSidebarPullRequestStacks(
   });
 }
 
+/**
+ * One roster-wide PR fact directory feeds thread rows and the other PR
+ * surfaces through the shared QueryClient. Roster changes refetch in place so
+ * consumers retain one stable project-scoped cache key.
+ */
+export function useThreadPullRequestDirectory(
+  rpc: PullRequestRpc,
+  threadIds: readonly string[],
+  enabled: boolean,
+) {
+  const normalizedThreadIds = [...new Set(threadIds)].sort();
+  const fingerprint = normalizedThreadIds.join("|");
+  const previousFingerprint = useRef<string | null>(null);
+  const query = useQuery({
+    queryKey: pullRequestKeys.threadDirectory(),
+    queryFn: () => sidebarThreadPullRequests(rpc, normalizedThreadIds),
+    ...pullRequestPolicies.threadDirectory,
+    enabled: enabled && normalizedThreadIds.length > 0,
+  });
+  useEffect(() => {
+    if (!enabled || !normalizedThreadIds.length) return;
+    if (previousFingerprint.current === null) {
+      previousFingerprint.current = fingerprint;
+      return;
+    }
+    if (previousFingerprint.current === fingerprint) return;
+    previousFingerprint.current = fingerprint;
+    void query.refetch();
+  }, [enabled, fingerprint, normalizedThreadIds.length, query]);
+  return query;
+}
+
+/** Subscribes to the global directory without issuing a second roster read. */
+export function useSharedThreadPullRequestDirectory() {
+  return useQuery<ThreadPullRequestDirectory>({
+    queryKey: pullRequestKeys.threadDirectory(),
+    enabled: false,
+  });
+}
+
 export function invalidateSidebarPullRequestStacks(client: {
   invalidateQueries(filters: {
     queryKey: QueryKey;
@@ -162,6 +233,12 @@ export function invalidateSidebarPullRequestStacks(client: {
   return client.invalidateQueries({
     queryKey: [...root, "sidebar-stacks"],
   });
+}
+
+export function invalidateThreadPullRequestDirectory(client: {
+  invalidateQueries(filters: { queryKey: QueryKey }): Promise<unknown> | unknown;
+}) {
+  return client.invalidateQueries({ queryKey: pullRequestKeys.threadDirectory() });
 }
 
 export function useAuthoredPullRequests(
@@ -201,6 +278,7 @@ export function useAuthoredPullRequests(
           ...pullRequestPolicies.authoredStacks,
         }),
         refreshLoadedReviewerDirectories(client, rpc),
+        invalidateThreadPullRequestDirectory(client),
       ]);
     } finally {
       forceRefresh.current = false;
@@ -251,6 +329,7 @@ export function useSetAuthoredPullRequestDraft(rpc: PullRequestRpc) {
         client.invalidateQueries({
           queryKey: pullRequestKeys.authoredStacks(),
         }),
+        invalidateThreadPullRequestDirectory(client),
       ]);
     },
   });
@@ -295,6 +374,7 @@ export function useUpdatePullRequestReviewers(
         client.invalidateQueries({
           queryKey: [...root, "sidebar-stacks"],
         }),
+        invalidateThreadPullRequestDirectory(client),
       ]);
     },
   });

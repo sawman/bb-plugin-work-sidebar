@@ -3,6 +3,7 @@ import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getPluginQueryClient } from "../../../query-runtime";
+import { pullRequestKeys } from "../../pull-requests/queries";
 import { changesInteractionStore } from "../store";
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
@@ -103,6 +104,7 @@ type ChangesFixture = {
     pullRequestNumber: number;
     path: string;
   }) => unknown;
+  threadPullRequests?: Record<string, unknown>;
 };
 function rpc({
   getChanges,
@@ -188,6 +190,11 @@ function rpc({
 }
 async function changesSlot(fixture: ChangesFixture) {
   getPluginQueryClient().clear();
+  if (fixture.threadPullRequests)
+    getPluginQueryClient().setQueryData(
+      pullRequestKeys.threadDirectory(),
+      fixture.threadPullRequests,
+    );
   const app = await loadPluginApp(() => import("../../../app"));
   const slot = renderSlot(
     app.threadPanelActions[0]!,
@@ -428,6 +435,64 @@ describe("R13 registered Changes Work slot", () => {
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
     stack.lifecycle.unmount();
+  });
+
+  it("uses the shared thread PR fact when the local Changes projection is stale", async () => {
+    const staleCurrentPullRequest = {
+      number: 44,
+      title: "Review state convergence",
+      url: "https://github.com/acme/repo/pull/44",
+      state: "open",
+      head: "feature/converged",
+      base: "main",
+      checks: {
+        failedCount: 0,
+        passedCount: 2,
+        pendingCount: 0,
+        state: "passing",
+        totalCount: 2,
+      },
+      review: { reviewRequestCount: 0, state: "changes_requested" },
+      attention: "changes_requested",
+      mergeability: {
+        mergeStateStatus: "CLEAN",
+        mergeable: "MERGEABLE",
+        state: "mergeable",
+      },
+      signal: {
+        checks: "passing",
+        review: "changes_requested",
+        reviewCommentCount: 0,
+      },
+    };
+    const slot = await changesSlot({
+      getChanges: () =>
+        changesResult(repository("available"), {
+          currentPullRequest: staleCurrentPullRequest,
+        }),
+      threadPullRequests: {
+        thr_changes: {
+          ...staleCurrentPullRequest,
+          review: { reviewRequestCount: 1, state: "review_required" },
+          signal: {
+            checks: "passing",
+            review: "review_required",
+            requestedReviewers: ["octocat"],
+            reviewCommentCount: 0,
+          },
+          attention: "review_requested",
+          stackNumber: null,
+        },
+      },
+    });
+    const disclosure = await slot.findByRole("button", {
+      name: "Show changed files for pull request #44",
+    });
+    fireEvent.click(disclosure);
+    expect(
+      slot.getByText("Review requested · 2 checks passed · Merge Mergeable"),
+    ).toBeTruthy();
+    slot.lifecycle.unmount();
   });
 
   it("treats a one-branch gh-stack projection as a standalone pull request with changed files", async () => {

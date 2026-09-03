@@ -133,6 +133,12 @@ function renderRow({
         groupId={groupId}
         groups={groups}
         project={{ name: "Project", isPersonal: false }}
+        pullRequest={
+          host.pullRequest
+            ? ({ ...host.pullRequest, stackNumber: host.stackNumber } as never)
+            : null
+        }
+        pullRequestLoading={host.pullRequestLoading}
         reorderDisabled={false}
         dragThreadId={null}
         dropTarget={null}

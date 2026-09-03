@@ -71,6 +71,34 @@ export function pullRequestPresentation(input: {
   return { icon: "Eye", label: "Review pending", tone: "open" };
 }
 
+/** Resolve a complete PR fact consistently, keeping non-signal blockers intact. */
+export function pullRequestSummaryPresentation(input: {
+  state: PullRequestState;
+  draft: boolean;
+  attention?: PullRequestAttention | string | null;
+  signal?: Pick<PullRequestSignal, "checks" | "review"> | null;
+  mergedLayer?: boolean;
+}): StatusPresentation {
+  const signalAttention = input.signal
+    ? pullRequestAttentionFromSignal(input.signal)
+    : null;
+  const attention =
+    // The authored aggregate can briefly retain changes_requested after a
+    // reviewer has been requested again. The review signal is the newer fact
+    // in that case; other explicit attention states still take precedence.
+    input.attention === "changes_requested" &&
+    (input.signal?.review === "review_requested" ||
+      input.signal?.review === "review_required")
+      ? (signalAttention ?? input.attention)
+      : (input.attention ?? signalAttention);
+  return pullRequestPresentation({
+    state: input.state,
+    draft: input.draft,
+    attention,
+    mergedLayer: input.mergedLayer,
+  });
+}
+
 export function pullRequestAttentionFromSignal(
   signal: Pick<PullRequestSignal, "checks" | "review">,
 ): PullRequestAttention {

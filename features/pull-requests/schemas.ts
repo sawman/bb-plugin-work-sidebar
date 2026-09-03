@@ -71,6 +71,11 @@ export const pullRequest = z.object({
   }),
   signal: pullRequestSignal,
 });
+
+/** A normalized PR fact plus the thread-local stack position that discovered it. */
+export const threadPullRequest = pullRequest.extend({
+  stackNumber: z.number().int().positive().nullable(),
+});
 export const sidebarStackLayer = pullRequestSignal.extend({
   number: z.number().int().positive(),
   title: z.string(),
@@ -164,5 +169,6 @@ export const pullRequestReviewerRpcSchemas = {
 } as const;
 
 export type PullRequestContract = z.infer<typeof pullRequest>;
+export type ThreadPullRequestContract = z.infer<typeof threadPullRequest>;
 export type AuthoredPullRequestContract = z.infer<typeof authoredPullRequest>;
 export type PullRequestReviewerContract = z.infer<typeof pullRequestReviewer>;

@@ -1,5 +1,4 @@
 import { useRef } from "react";
-import { experimental_useSidebarThreadPullRequest } from "@get-bb/plugin-sdk/app";
 import { Input } from "@/components/ui/input";
 import { ThreadRowContent } from "@/components/threads/thread-row-content";
 import { threadTitle } from "@/work-model";
@@ -39,6 +38,8 @@ export function ThreadRow({
   onMoveToRecycleBin,
   project,
   provider,
+  pullRequest = null,
+  pullRequestLoading = false,
   onNavigate,
   reorderDisabled,
   dragThreadId,
@@ -51,9 +52,6 @@ export function ThreadRow({
   const controlClick = useRef(false);
   const anchorRef = useRef<HTMLAnchorElement>(null);
   const hierarchy = useThreadHierarchy();
-  // Per-row opt-in: never turn this into a list-wide PR metadata read.
-  const { pullRequest, isLoading: pullRequestLoading } =
-    experimental_useSidebarThreadPullRequest(thread.id);
   const rowActions = useThreadRowActions({
     thread,
     groupId,
@@ -213,7 +211,7 @@ export function ThreadRow({
                   projectLabel={projectLabel}
                   stackNumber={
                     pullRequest ? (
-                      <ThreadRowStackNumber threadId={thread.id} />
+                      <ThreadRowStackNumber number={pullRequest.stackNumber} />
                     ) : null
                   }
                   pullRequest={pullRequest}

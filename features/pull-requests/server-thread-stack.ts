@@ -357,11 +357,31 @@ export function createThreadStackService(
     },
     async sidebarThreadPullRequests({ threadIds }) {
       try {
-        const pullRequests: Record<string, { number: number; title: string; url: string; state: "closed" | "draft" | "merged" | "open"; attention: CurrentPullRequest["attention"] } | null> = {};
-        for (const threadId of [...new Set(threadIds)]) {
-          const stack = await stackForThread(threadId);
-          const pullRequest = stack.currentPullRequest;
-          pullRequests[threadId] = pullRequest ? { number: pullRequest.number, title: pullRequest.title, url: pullRequest.url, state: pullRequest.state, attention: pullRequest.attention } : null;
+        const pullRequests: Record<
+          string,
+          (CurrentPullRequest & { stackNumber: number | null }) | null
+        > = {};
+        const uniqueThreadIds = [...new Set(threadIds)];
+        // The directory is a roster read, not a serial N-request waterfall.
+        // Keep concurrency bounded so its GitHub-backed entries still respect
+        // the lifecycle's shared rate-limit and dedupe policy.
+        for (let start = 0; start < uniqueThreadIds.length; start += 8) {
+          const entries = await Promise.all(
+            uniqueThreadIds.slice(start, start + 8).map(async (threadId) => {
+              const stack = await stackForThread(threadId);
+              return [
+                threadId,
+                stack.currentPullRequest
+                  ? {
+                      ...stack.currentPullRequest,
+                      stackNumber: stack.stack?.number ?? null,
+                    }
+                  : null,
+              ] as const;
+            }),
+          );
+          for (const [threadId, pullRequest] of entries)
+            pullRequests[threadId] = pullRequest;
         }
         return { available: true, pullRequests, error: null };
       } catch (error) {

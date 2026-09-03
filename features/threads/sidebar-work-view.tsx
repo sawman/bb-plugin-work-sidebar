@@ -6,6 +6,7 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import type { RecycleBinEntry } from "./recycle-bin";
 import type { QueuedMessage } from "./schemas";
 import type { GroupActivityPriority } from "./group-activity-priority";
+import type { ThreadPullRequestDirectory } from "../pull-requests/queries";
 
 type SidebarWorkViewProps = {
   toolbar: ReactNode;
@@ -24,6 +25,8 @@ type SidebarWorkViewProps = {
   disclosures: Readonly<Record<string, boolean>>;
   onDisclosureChange(id: string, open: boolean): void;
   disclosuresReady: boolean;
+  pullRequestsByThread?: ThreadPullRequestDirectory;
+  pullRequestsLoading: boolean;
 };
 
 function useQueuedMessageClock(messages: ReadonlyMap<string, QueuedMessage>) {
@@ -57,6 +60,8 @@ export function SidebarWorkView({
   disclosures,
   onDisclosureChange,
   disclosuresReady,
+  pullRequestsByThread,
+  pullRequestsLoading,
 }: SidebarWorkViewProps) {
   const queuedMessageNow = useQueuedMessageClock(queuedMessagesByThread);
   return (
@@ -80,6 +85,8 @@ export function SidebarWorkView({
           disclosures={disclosures}
           onDisclosureChange={onDisclosureChange}
           disclosuresReady={disclosuresReady}
+          pullRequestsByThread={pullRequestsByThread}
+          pullRequestsLoading={pullRequestsLoading}
         />
       </div>
     </>

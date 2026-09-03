@@ -11,6 +11,7 @@ import {
   type ThreadProvider,
 } from "@/components/threads/thread-provider-logo";
 import { pullRequestPresentation } from "@/features/pull-requests/presentation";
+import type { ThreadPullRequest } from "@/features/pull-requests/queries";
 import { PullRequestIdentifierBadge } from "@/features/pull-requests/identifier-badge";
 import {
   queuedMessageDisplay,
@@ -71,7 +72,7 @@ export function ThreadMetadata({
   project?: ThreadProject;
   projectLabel: string;
   stackNumber?: ReactNode;
-  pullRequest: PluginSidebarPullRequest | null;
+  pullRequest: PluginSidebarPullRequest | ThreadPullRequest | null;
   pullRequestLoading: boolean;
 }) {
   const pullRequestStatus = pullRequest

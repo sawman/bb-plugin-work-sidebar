@@ -5,7 +5,10 @@ import type { rpcContract } from "../../contracts";
 import { CopyBadge } from "../../components/ui/copy-badge";
 import { Icon } from "../../components/ui/icon";
 import { ActionTooltip } from "../../components/ui/action-tooltip";
-import { useGitHubApiHealth } from "../pull-requests/queries";
+import {
+  useGitHubApiHealth,
+  useSharedThreadPullRequestDirectory,
+} from "../pull-requests/queries";
 import { githubHealthPresentation } from "../pull-requests/presentation";
 import { StackNumberBadge } from "../pull-requests/stack-number";
 import { mergeStackBranchSignals } from "./model";
@@ -33,6 +36,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
     backgroundPollMs:
       Number(pluginSettings?.githubBackgroundPollSeconds ?? "300") * 1_000,
   });
+  const threadPullRequests = useSharedThreadPullRequestDirectory();
   const githubHealthQuery = useGitHubApiHealth(rpc, { poll: false });
   const githubApiHealth = githubHealthQuery.data ?? {
     state: "available" as const,
@@ -83,10 +87,19 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
     changesQuery.data?.stack || (githubStack?.branches.length ?? 0) > 1
       ? githubStack
       : null;
+  const directoryPullRequest = threadPullRequests.data?.[threadId] ?? null;
+  const projectedPullRequest = changesQuery.data?.currentPullRequest ?? null;
+  // A directory fact belongs to this projection only when its PR identity
+  // still matches. This keeps a branch switch from briefly painting an old PR.
+  const currentPullRequest =
+    directoryPullRequest &&
+    projectedPullRequest &&
+    directoryPullRequest.number === projectedPullRequest.number &&
+    directoryPullRequest.url === projectedPullRequest.url
+      ? directoryPullRequest
+      : projectedPullRequest;
   const currentPullRequestNumber =
-    changesQuery.data?.currentPullRequest?.number ??
-    changesQuery.data?.stack?.currentPullRequest;
-  const currentPullRequest = changesQuery.data?.currentPullRequest ?? null;
+    currentPullRequest?.number ?? changesQuery.data?.stack?.currentPullRequest;
   const selectedDiffPreview = selectedFilePath ? (
     <ChangesWorkingTreePreview
       path={selectedFilePath}
@@ -164,7 +177,11 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
               <ChangesStackBranchRow
                 key={branch.name}
                 branch={branch}
-                signals={mergeStackBranchSignals(branch, changesQuery.data!)}
+                signals={mergeStackBranchSignals(
+                  branch,
+                  changesQuery.data!,
+                  currentPullRequest,
+                )}
                 expanded={expandedStackBranches.has(branch.name)}
                 checkingOut={
                   checkout.isPending && checkout.variables === branch.name

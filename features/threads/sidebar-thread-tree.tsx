@@ -6,6 +6,7 @@ import type { SidebarThreadOrganization } from "./sidebar-organization";
 import { WorkThreadTree } from "./thread-tree";
 import { threadAgentRollups } from "./thread-agent-rollup";
 import type { QueuedMessage } from "./schemas";
+import type { ThreadPullRequestDirectory } from "../pull-requests/queries";
 
 type SidebarThreadTreeProps = {
   organization: SidebarThreadOrganization;
@@ -19,6 +20,8 @@ type SidebarThreadTreeProps = {
   queuedMessagesByThread: ReadonlyMap<string, QueuedMessage>;
   queuedMessageNow: number;
   label: string;
+  pullRequestsByThread?: ThreadPullRequestDirectory;
+  pullRequestsLoading: boolean;
 };
 
 /** Renders one group tree while keeping row interaction ownership in Threads. */
@@ -34,6 +37,8 @@ export function SidebarThreadTree({
   queuedMessagesByThread,
   queuedMessageNow,
   label,
+  pullRequestsByThread,
+  pullRequestsLoading,
 }: SidebarThreadTreeProps) {
   const agentRollups = useMemo(
     () => threadAgentRollups(roots, childrenByThread),
@@ -69,6 +74,8 @@ export function SidebarThreadTree({
             staleWorkingMinutes={staleWorkingMinutes}
             queuedMessagesByThread={queuedMessagesByThread}
             queuedMessageNow={queuedMessageNow}
+            pullRequestsByThread={pullRequestsByThread}
+            pullRequestsLoading={pullRequestsLoading}
           />
         ))}
       </SidebarTable>
