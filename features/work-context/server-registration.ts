@@ -231,7 +231,11 @@ export function createWorkContextRegistration(
     async getWorkGoal({ threadId }) { return cards.goal(threadId); },
     async getWorkPlan({ threadId }) { return cards.plan(threadId); },
     async getWorkBackgroundJobs({ threadId }) { return backgroundJobs.read(threadId); },
-    async getWorkProviderStatus({ threadId }) { return providerStatus.read(threadId); },
+    async getWorkProviderStatus(input) {
+      return "providerId" in input
+        ? providerStatus.readIdentity(input.providerId)
+        : providerStatus.read(input.threadId);
+    },
     async getLatestActivity({ threadId }) {
       const [thread, timeline, output] = await Promise.all([
         bb.sdk.threads.get({ threadId }),

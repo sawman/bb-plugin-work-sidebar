@@ -91,7 +91,13 @@ export const rpcSchemas = {
   ...workContextRpcSchemas,
   getGitHubPollingPolicy: { input: z.null(), output: z.object({ activePollMs: z.number().int().positive(), backgroundPollMs: z.number().int().positive(), maxRestPollsPerMinute: z.number().int().positive() }) },
   ...trackerRpcSchemas,
-  getWorkProviderStatus: { input: z.object({ threadId: z.string() }).strict(), output: workProviderStatusSchema },
+  getWorkProviderStatus: {
+    input: z.union([
+      z.object({ threadId: z.string() }).strict(),
+      z.object({ providerId: z.string().min(1) }).strict(),
+    ]),
+    output: workProviderStatusSchema,
+  },
   getGitHubApiHealth: { input: z.null(), output: githubApiHealth },
   getLatestActivity: {
     input: z.object({ threadId: z.string().startsWith("thr_") }).strict(),

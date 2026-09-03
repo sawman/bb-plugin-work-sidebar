@@ -85,12 +85,11 @@ export const queryKeys = {
       "plan",
       threadId,
     ],
-    providerHealth: (providerId: string, environmentId: string | null = null): QueryKey => [
+    providerHealth: (providerId: string): QueryKey => [
       ...queryRoot,
       "work",
       "provider-health",
       providerId,
-      environmentId ?? "global",
     ],
   },
 } as const;

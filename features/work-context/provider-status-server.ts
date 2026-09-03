@@ -45,9 +45,8 @@ type CacheEntry = {
 };
 
 /**
- * Provider state is environment-scoped and usage is provider-scoped. Cache
- * their combined projection once per provider/environment so switching among
- * matching threads does not repeat host health reads.
+ * Provider health and usage are provider-wide. Cache their combined projection
+ * once per provider so switching worktrees cannot create a cold duplicate.
  */
 export function createProviderStatusReadService({
   getThread,
@@ -57,18 +56,17 @@ export function createProviderStatusReadService({
 }: ProviderStatusDependencies) {
   const cache = new Map<string, CacheEntry>();
   const pending = new Map<string, Promise<WorkProviderStatus>>();
-  const keyFor = (providerId: string, environmentId: string | null) =>
-    JSON.stringify([providerId, environmentId]);
+  const keyFor = (providerId: string) => providerId;
 
-  const readScope = async (providerId: string, environmentId: string | null) => {
-    const key = keyFor(providerId, environmentId);
+  const readScope = async (providerId: string) => {
+    const key = keyFor(providerId);
     const cached = cache.get(key);
     if (cached && cached.expiresAt > now()) return cached.value;
     const inFlight = pending.get(key);
     if (inFlight) return inFlight;
 
     const request = Promise.allSettled([
-      providerStates(environmentId),
+      providerStates(null),
       usageLimits(providerId),
     ])
       .then(([statesResult, usageResult]) => {
@@ -98,9 +96,12 @@ export function createProviderStatusReadService({
   };
 
   return {
+    readIdentity(providerId: string) {
+      return readScope(providerId);
+    },
     async read(threadId: string) {
       const thread = await getThread(threadId);
-      return readScope(thread.providerId, thread.environmentId ?? null);
+      return readScope(thread.providerId);
     },
   };
 }

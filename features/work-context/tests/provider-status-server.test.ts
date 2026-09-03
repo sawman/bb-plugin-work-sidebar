@@ -49,10 +49,14 @@ describe("Work provider status server read", () => {
         windows: [{ label: "Weekly", usedPercent: 83 }],
       },
     });
-    expect(providerStates).toHaveBeenCalledExactlyOnceWith({
-      environmentId: "env_usage",
-    });
+    expect(providerStates).toHaveBeenCalledExactlyOnceWith({});
     expect(usageLimits).toHaveBeenCalledExactlyOnceWith({ providerId: "codex" });
+
+    await registration.getWorkProviderStatus({
+      providerId: "codex",
+    });
+    expect(providerStates).toHaveBeenCalledTimes(1);
+    expect(usageLimits).toHaveBeenCalledTimes(1);
 
     await registration.getWorkProviderStatus({ threadId: "thr_same_provider" });
     expect(providerStates).toHaveBeenCalledTimes(1);
@@ -61,7 +65,36 @@ describe("Work provider status server read", () => {
 });
 
 describe("provider status read cache", () => {
-  it("dedupes a provider/environment for one minute before refreshing it", async () => {
+  it("shares a provider across worktrees without another thread read", async () => {
+    const getThread = vi.fn();
+    const providerStates = vi.fn(async () => ({
+      providers: [{
+        providerId: "codex",
+        displayName: "Codex",
+        status: "ready" as const,
+        statusMessage: null,
+      }],
+    }));
+    const usageLimits = vi.fn(async () => ({
+      codex: { status: "ok" as const, planLabel: "Pro", windows: [] },
+    }));
+    const service = createProviderStatusReadService({
+      getThread,
+      providerStates,
+      usageLimits,
+    });
+
+    await Promise.all([
+      service.readIdentity("codex"),
+      service.readIdentity("codex"),
+    ]);
+
+    expect(getThread).not.toHaveBeenCalled();
+    expect(providerStates).toHaveBeenCalledOnce();
+    expect(usageLimits).toHaveBeenCalledOnce();
+  });
+
+  it("dedupes a provider for one minute before refreshing it", async () => {
     let clock = 1_000;
     const providerStates = vi.fn(async () => ({
       providers: [{

@@ -99,7 +99,6 @@ export const useWorkPlan = (threadId: string) =>
 
 type ProviderHealthIdentity = {
   providerId: string;
-  environmentId?: string | null;
 };
 
 export function invalidateWorkProviderHealth(
@@ -108,10 +107,7 @@ export function invalidateWorkProviderHealth(
 ) {
   if (!identity) return Promise.resolve();
   return queryClient.invalidateQueries({
-    queryKey: queryKeys.work.providerHealth(
-      identity.providerId,
-      identity.environmentId ?? null,
-    ),
+    queryKey: queryKeys.work.providerHealth(identity.providerId),
   });
 }
 
@@ -121,10 +117,12 @@ export function useWorkProviderHealth(
 ) {
   const rpc = useRpc<typeof rpcContract>();
   const providerId = identity?.providerId ?? threadId;
-  const environmentId = identity?.environmentId ?? null;
   return useQuery({
-    queryKey: queryKeys.work.providerHealth(providerId, environmentId),
-    queryFn: () => rpc.call("getWorkProviderStatus", { threadId }),
+    queryKey: queryKeys.work.providerHealth(providerId),
+    queryFn: () =>
+      rpc.call("getWorkProviderStatus", {
+        providerId,
+      }),
     // Wait for the status read to identify the provider/environment. Starting
     // with a thread-keyed fallback would create a cold duplicate on every
     // thread switch before the shared key becomes available.

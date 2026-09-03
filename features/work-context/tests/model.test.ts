@@ -65,12 +65,11 @@ describe("work-context card model", () => {
       retry: false,
       refetchOnWindowFocus: false,
     });
-    expect(queryKeys.work.providerHealth("codex", "env_one")).toEqual([
+    expect(queryKeys.work.providerHealth("codex")).toEqual([
       "work-sidebar",
       "work",
       "provider-health",
       "codex",
-      "env_one",
     ]);
   });
 

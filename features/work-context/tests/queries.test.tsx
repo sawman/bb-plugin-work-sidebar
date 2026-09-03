@@ -59,11 +59,9 @@ describe("work-context provider health query", () => {
     const view = renderHook(() => ({
       first: useWorkProviderHealth("thr_health", {
         providerId: "codex",
-        environmentId: "env_health",
       }),
       second: useWorkProviderHealth("thr_other", {
         providerId: "codex",
-        environmentId: "env_health",
       }),
     }), {
       wrapper: wrapper(client),
@@ -75,13 +73,12 @@ describe("work-context provider health query", () => {
     });
     expect(rpcClient.call).toHaveBeenCalledTimes(1);
     expect(rpcClient.call).toHaveBeenCalledWith("getWorkProviderStatus", {
-      threadId: "thr_health",
+      providerId: "codex",
     });
 
     await act(async () => {
       await invalidateWorkProviderHealth(client, {
         providerId: "codex",
-        environmentId: "env_health",
       });
       await vi.advanceTimersByTimeAsync(0);
     });
