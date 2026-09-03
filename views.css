@@ -2507,7 +2507,7 @@ button.ws-provider-health:focus-visible {
   column-gap: 0.08rem;
 }
 .ws-status-card .ws-activity-label {
-  padding-top: 0.01rem;
+  align-self: center;
   color: var(--muted-foreground);
   font: var(--ws-text-metadata);
   line-height: 1.25;
