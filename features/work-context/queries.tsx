@@ -19,6 +19,9 @@ import {
   hydrateTaskFacts,
   useSharedTaskFactDirectory,
 } from "../tasks/queries";
+import {
+  captureTaskFactHydrationRevision,
+} from "../tasks/fact-hydration-authority";
 
 type WorkStatus = z.infer<typeof rpcSchemas.getWorkStatus.output>;
 type WorkOutcome = z.infer<typeof rpcSchemas.getWorkOutcome.output>;
@@ -95,9 +98,10 @@ export function useWorkOutcome(
   const query = useQuery({
     queryKey: queryKeys.work.outcome(threadId),
     queryFn: async () => {
+      const revision = captureTaskFactHydrationRevision(queryClient);
       const result = await rpc.call("getWorkOutcome", { threadId });
       const adapted = adaptWorkOutcomeResponse(result);
-      hydrateTaskFacts(queryClient, projectId, adapted.facts);
+      hydrateTaskFacts(queryClient, projectId, adapted.facts, revision);
       return adapted.references;
     },
     ...queryPolicies.workContext,
@@ -108,10 +112,11 @@ export function useWorkOutcome(
   const data = useMemo(
     () =>
       query.data
-        ? (resolveWorkOutcome(query.data, directory.data) as WorkOutcome)
+        ? resolveWorkOutcome(query.data, directory.data)
         : undefined,
     [directory.data, query.data],
   );
+  data satisfies WorkOutcome | undefined;
   return {
     ...query,
     data,

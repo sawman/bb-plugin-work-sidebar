@@ -5,6 +5,7 @@ import type {
 } from "../../work-model";
 
 export type TaskFact = Omit<SidebarTask, "linkedThreadIds">;
+export type ExecutionTaskFact = TaskFact & { updatedAt: string };
 export type TaskFactDirectory = Readonly<{
   projectId: string | null;
   facts: Record<string, TaskFact>;
@@ -273,7 +274,8 @@ export function resolveWorkOutcome<Binding, Legacy>(
       : null,
     executionTasks: references.executionTaskIds.flatMap((taskId) => {
       const fact = directory?.facts[taskId];
-      return fact ? [fact] : [];
+      if (!fact?.updatedAt) return [];
+      return [{ ...fact, updatedAt: fact.updatedAt } satisfies ExecutionTaskFact];
     }),
     bindings: references.bindings,
     legacy: references.legacy,

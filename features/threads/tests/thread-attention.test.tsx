@@ -342,4 +342,30 @@ describe("thread attention presentation", () => {
       threadProviderStatusLabel(errored, false, 2, runtimeState, 30),
     ).toBe("Provider request failed");
   });
+
+  it("renders stale directly and keeps active pending work on the working provider mark", () => {
+    expect(threadProviderRuntimeState(thread(), true, 0)).toBe("stale");
+
+    const pendingWork = thread({
+      indicator: "approval" as PluginSidebarThread["indicator"],
+      hasPendingInteraction: true,
+      activity: {
+        workflows: 0,
+        backgroundAgents: 1,
+        backgroundCommands: 0,
+        planMode: 0,
+        goals: 0,
+      },
+    });
+    expect(threadProviderRuntimeState(pendingWork, false, 0)).toBe("working");
+
+    const view = render(
+      <ThreadRuntimeProvider thread={pendingWork} staleWorking={false} />,
+    );
+    const provider = view.container.querySelector(".ws-thread-provider");
+    expect(provider?.getAttribute("data-runtime-state")).toBe("working");
+    expect(provider?.getAttribute("data-thread-activity-state")).toBe(
+      "attention",
+    );
+  });
 });

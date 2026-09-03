@@ -44,7 +44,9 @@ function timelineFixture() {
 
 function registration() {
   const eventHandlers = new Map<string, (event: { thread: { id: string } }) => void>();
-  const timeline = vi.fn(async () => timelineFixture());
+  const timeline = vi.fn(async (_input: { threadId: string }) =>
+    timelineFixture(),
+  );
   const lifecycle = createServerLifecycle();
   const work = createWorkContextRegistration({
     bb: {
@@ -74,7 +76,7 @@ function registration() {
 }
 
 describe("registered Work timeline selectors", () => {
-  it("derives four existing RPC shapes from one exact child-thread timeline call", async () => {
+  it("shares full reads while keeping the five-second background read narrow", async () => {
     const { timeline, work } = registration();
 
     const [goal, plan, background, activity] = await Promise.all([
@@ -84,7 +86,13 @@ describe("registered Work timeline selectors", () => {
       work.getLatestActivity({ threadId: "thr_child" }),
     ]);
 
-    expect(timeline).toHaveBeenCalledExactlyOnceWith({ threadId: "thr_child" });
+    expect(timeline).toHaveBeenCalledTimes(2);
+    expect(timeline).toHaveBeenCalledWith({ threadId: "thr_child" });
+    expect(timeline).toHaveBeenCalledWith({
+      threadId: "thr_child",
+      summaryOnly: "true",
+      segmentLimit: "1",
+    });
     expect(goal).toMatchObject({ objective: "Ship the snapshot" });
     expect(plan).toEqual({
       items: [{ id: "one", text: "Add tests", status: "in_progress" }],
@@ -96,7 +104,7 @@ describe("registered Work timeline selectors", () => {
     });
 
     await work.getWorkGoal({ threadId: "thr_root" });
-    expect(timeline).toHaveBeenCalledTimes(2);
+    expect(timeline).toHaveBeenCalledTimes(3);
     expect(timeline).toHaveBeenLastCalledWith({ threadId: "thr_root" });
   });
 
@@ -104,21 +112,33 @@ describe("registered Work timeline selectors", () => {
     const { eventHandlers, lifecycle, timeline, work } = registration();
     await Promise.all([
       work.getWorkGoal({ threadId: "thr_one" }),
+      work.getWorkBackgroundJobs({ threadId: "thr_one" }),
       work.getWorkGoal({ threadId: "thr_two" }),
+      work.getWorkBackgroundJobs({ threadId: "thr_two" }),
     ]);
-    expect(timeline).toHaveBeenCalledTimes(2);
+    expect(timeline).toHaveBeenCalledTimes(4);
 
     eventHandlers.get("thread.idle")!({ thread: { id: "thr_one" } });
     await Promise.all([
       work.getWorkPlan({ threadId: "thr_one" }),
       work.getWorkPlan({ threadId: "thr_two" }),
+      work.getWorkBackgroundJobs({ threadId: "thr_one" }),
+      work.getWorkBackgroundJobs({ threadId: "thr_two" }),
     ]);
-    expect(timeline).toHaveBeenCalledTimes(3);
-    expect(timeline).toHaveBeenLastCalledWith({ threadId: "thr_one" });
+    expect(timeline).toHaveBeenCalledTimes(6);
+    expect(
+      timeline.mock.calls.filter(([input]) => input.threadId === "thr_one"),
+    ).toHaveLength(4);
+    expect(
+      timeline.mock.calls.filter(([input]) => input.threadId === "thr_two"),
+    ).toHaveLength(2);
 
     lifecycle.dispose();
     await expect(
       work.getWorkBackgroundJobs({ threadId: "thr_one" }),
     ).rejects.toThrow("Work timeline snapshot service is disposed.");
+
+    eventHandlers.get("thread.idle")!({ thread: { id: "thr_one" } });
+    expect(timeline).toHaveBeenCalledTimes(6);
   });
 });

@@ -4,6 +4,10 @@ import type { rpcContract } from "../../contracts";
 import { reorderTaskSiblings, type SidebarTask } from "../../work-model";
 import { queryKeys, workOutcomeQueryRoot } from "../../query-runtime";
 import type { TaskFactDirectory } from "./facts";
+import {
+  beginOptimisticTaskAssignment,
+  endOptimisticTaskAssignment,
+} from "./fact-hydration-authority";
 
 type TaskListReferences = { taskIds: string[] };
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
@@ -97,7 +101,7 @@ export const taskMutationPlan = {
   attach: { optimistic: false, rollback: false, cancel: ["list", "links"], invalidate: ["list", "links"] },
   detach: { optimistic: false, rollback: false, cancel: ["list", "links"], invalidate: ["list", "links"] },
   status: { optimistic: false, rollback: false, cancel: ["list"], invalidate: ["list", "outcome"] },
-  assignment: { optimistic: true, rollback: true, cancel: ["list"], invalidate: ["list", "outcome"] },
+  assignment: { optimistic: true, rollback: true, cancel: ["list", "outcome"], invalidate: ["list", "outcome"] },
   reorder: { optimistic: true, rollback: true, cancel: ["list"], invalidate: ["list"] },
 } as const satisfies Record<string, { optimistic: boolean; rollback: boolean; cancel: readonly TaskScope[]; invalidate: readonly TaskScope[] }>;
 
@@ -171,16 +175,33 @@ export function useTasksMutations(rpc: Rpc, projectId: string | null = null) {
     scope: taskAssignmentMutationScope,
     mutationFn: (input: { taskId: string; assignee: SidebarTask["assignee"] }) => rpc.call("updateTaskAssignee", input),
     onMutate: async ({ taskId, assignee }) => {
-      await cancel(taskMutationPlan.assignment.cancel);
-      const previous = snapshot();
-      const previousAssignee = previous?.facts[taskId]?.assignee;
-      patchFact(taskId, (task) => ({ ...task, assignee }));
-      return { previousAssignee };
+      const authorityToken = beginOptimisticTaskAssignment(
+        queryClient,
+        taskId,
+      );
+      try {
+        await cancel(taskMutationPlan.assignment.cancel);
+        const previous = snapshot();
+        const previousAssignee = previous?.facts[taskId]?.assignee;
+        patchFact(taskId, (task) => ({ ...task, assignee }));
+        return { previousAssignee, authorityToken };
+      } catch (error) {
+        endOptimisticTaskAssignment(queryClient, taskId, authorityToken);
+        throw error;
+      }
     },
     onError: (_error, { taskId }, context) => {
       rollbackAssignment(taskId, context?.previousAssignee);
     },
-    onSettled: () => settle(taskMutationPlan.assignment.invalidate, true),
+    onSettled: (_data, _error, { taskId }, context) => {
+      if (context)
+        endOptimisticTaskAssignment(
+          queryClient,
+          taskId,
+          context.authorityToken,
+        );
+      return settle(taskMutationPlan.assignment.invalidate, true);
+    },
   });
   const reorder = useMutation({
     mutationKey: taskOptimisticMutationKey,

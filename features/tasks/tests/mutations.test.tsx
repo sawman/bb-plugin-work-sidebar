@@ -9,7 +9,13 @@ import {
   useTasksMutations,
 } from "../mutations";
 import { queryKeys } from "../../../query-runtime";
-import type { TaskFact, TaskFactDirectory } from "../facts";
+import {
+  adaptWorkOutcomeResponse,
+  type TaskFact,
+  type TaskFactDirectory,
+} from "../facts";
+import { captureTaskFactHydrationRevision } from "../fact-hydration-authority";
+import { hydrateTaskFacts } from "../queries";
 import type { SidebarTask } from "../../../work-model";
 
 const projectScope = "project_scope";
@@ -46,17 +52,18 @@ function seedTasks(client: QueryClient, tasks: readonly SidebarTask[]) {
       linkedThreadIds,
     })),
   });
-  client.setQueryData<TaskFactDirectory>(
+  const directory: TaskFactDirectory = {
+    projectId: projectScope,
+    facts: Object.fromEntries(
+      tasks.map(({ linkedThreadIds: _linkedThreadIds, ...fact }) => [
+        fact.id,
+        fact,
+      ]),
+    ),
+  };
+  client.setQueryData(
     queryKeys.sidebar.tasks.facts(projectScope),
-    {
-      projectId: projectScope,
-      facts: Object.fromEntries(
-        tasks.map(({ linkedThreadIds: _linkedThreadIds, ...fact }) => [
-          fact.id,
-          fact,
-        ]),
-      ),
-    },
+    directory,
   );
 }
 
@@ -113,6 +120,41 @@ describe("Tasks mutations", () => {
     expect(invalidate).toHaveBeenCalledWith({
       queryKey: queryKeys.sidebar.tasks.list(projectScope),
     });
+  });
+
+  it("rejects racing Work hydration throughout optimistic assignment and still rolls back", async () => {
+    const pending = deferred<unknown>();
+    const rpc = { call: vi.fn(() => pending.promise) };
+    const { client, hook } = setup(rpc);
+    const beforeMutation = captureTaskFactHydrationRevision(client);
+    const staleWorkFacts = adaptWorkOutcomeResponse({
+      rootThreadId: "thr_root",
+      tasksAvailable: true,
+      outcome: null,
+      executionTasks: [{ ...task, assignee: "human" as const }],
+      bindings: [],
+      legacy: { state: "none" as const, taskIds: [], message: null },
+    }).facts;
+
+    const run = hook.result.current.assignment.mutateAsync({
+      taskId: task.id,
+      assignee: "agent",
+    });
+    await waitFor(() => expect(readFact(client, task.id)?.assignee).toBe("agent"));
+
+    hydrateTaskFacts(client, projectScope, staleWorkFacts, beforeMutation);
+    expect(readFact(client, task.id)?.assignee).toBe("agent");
+
+    const duringMutation = captureTaskFactHydrationRevision(client);
+    hydrateTaskFacts(client, projectScope, staleWorkFacts, duringMutation);
+    expect(readFact(client, task.id)?.assignee).toBe("agent");
+
+    pending.reject(new Error("assignment failed"));
+    await expect(run).rejects.toThrow("assignment failed");
+    expect(readFact(client, task.id)?.assignee).toBe("human");
+
+    hydrateTaskFacts(client, projectScope, staleWorkFacts, duringMutation);
+    expect(readFact(client, task.id)?.assignee).toBe("human");
   });
 
   it("keeps invalidation client-local and never projects non-reversible mutations", async () => {

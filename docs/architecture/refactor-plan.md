@@ -913,6 +913,27 @@ readable; BB Tasks, not either document, is the executable work queue.
   `git diff --check`; commit the isolated task branch locally without reload or
   push.
 
+#### Loop R36 — consolidated-state review remediation
+
+- **Red:** preserve the BBPLUG-326 typecheck failure and add direct regressions
+  for stale and concurrent provider states, summary-only Background timeline
+  reads, optimistic assignment versus in-flight Work hydration, the Agents
+  200-entry boundary, exact resolved Work outcome types, and timeline event
+  callback disposal.
+- **Green:** give provider marks an explicit precedence over the canonical
+  multi-state fact, split full and summary timeline snapshot modes, guard task
+  hydration with client-local revisions plus optimistic assignee authority,
+  fetch only the deterministic bounded Agents roster, resolve execution task
+  facts only when their required revision exists, and lifecycle-own the event
+  subscription gate required by the SDK's void-returning `events.on` contract.
+- **Refactor/removal:** retain one canonical task and thread fact model, one
+  shared full-timeline service, one separately keyed narrow Background
+  snapshot, and no remote records in Zustand or component-local caches.
+- **Validation/evidence:** run the affected focused suites twice, the full
+  serial suite twice, typecheck, SDK compatibility, production build, and
+  `git diff --check`; commit BBPLUG-327 locally from the isolated managed
+  worktree without reload or push.
+
 ### BB child execution protocol
 
 G0 is complete. Each new code-editing loop receives one direct BB execution

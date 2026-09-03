@@ -127,7 +127,47 @@ describe("Agents detail query lifecycle", () => {
       );
       expect(Object.keys(directory?.facts ?? {})).toHaveLength(AGENT_DETAIL_DIRECTORY_MAX);
     });
+    expect(rpcClient.call).toHaveBeenCalledTimes(2);
+    expect(
+      rpcClient.call.mock.calls.flatMap(([, input]) => input.threadIds),
+    ).toEqual(roster.slice(0, AGENT_DETAIL_DIRECTORY_MAX));
+    view.rerender();
+    await waitFor(() => expect(view.result.current.fetchStatus).toBe("idle"));
+    expect(rpcClient.call).toHaveBeenCalledTimes(2);
     view.unmount();
+    client.clear();
+  });
+
+  it("does not fetch and discard panel rows outside the shared cap", async () => {
+    const retained = Array.from(
+      { length: AGENT_DETAIL_DIRECTORY_MAX },
+      (_, index) => `thr_${String(index).padStart(3, "0")}`,
+    );
+    const outside = ["thr_900", "thr_901"];
+    rpcClient.call.mockImplementation(async (_method, { threadIds }) => ({
+      agents: threadIds.map((threadId: string) => ({ threadId, model: "terra" })),
+    }));
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const first = renderHook(() => useAgentDetails(retained), {
+      wrapper: wrapper(client),
+    });
+    await waitFor(() => expect(rpcClient.call).toHaveBeenCalledTimes(2));
+    const second = renderHook(() => useAgentDetails(outside), {
+      wrapper: wrapper(client),
+    });
+    await waitFor(() => expect(second.result.current.fetchStatus).toBe("idle"));
+    second.rerender();
+    expect(rpcClient.call).toHaveBeenCalledTimes(2);
+    expect(client.getQueryData(queryKeys.agents.directory())).toMatchObject({
+      facts: Object.fromEntries(
+        retained.map((threadId) => [threadId, { model: "terra" }]),
+      ),
+    });
+
+    second.unmount();
+    first.unmount();
     client.clear();
   });
 

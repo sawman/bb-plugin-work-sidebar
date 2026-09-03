@@ -211,11 +211,16 @@ export function threadActivityPresentation(fact: ThreadActivityFact) {
 /** Queue state remains visible in trailing UI without repainting the provider. */
 export function threadActivityProviderState(
   fact: ThreadActivityFact,
-): "idle" | "working" | "waiting" | "error" | "complete" {
-  if (fact.state === "error" || fact.state === "blocked") return "error";
-  if (fact.state === "attention") return "waiting";
-  if (fact.state === "working") return "working";
-  if (fact.state === "done") return "complete";
+): "idle" | "working" | "waiting" | "error" | "complete" | "stale" {
+  const states = new Set(fact.states);
+  if (states.has("error") || states.has("blocked")) return "error";
+  // A pending interaction is an attention fact, but it must not repaint a
+  // provider that is still doing work. The trailing UI remains responsible
+  // for showing the concurrent attention state.
+  if (states.has("working")) return "working";
+  if (states.has("attention")) return "waiting";
+  if (states.has("done")) return "complete";
+  if (fact.stale) return "stale";
   return "idle";
 }
 

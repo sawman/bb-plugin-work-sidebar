@@ -28,6 +28,14 @@ function activeRoster(queryClient: QueryClient) {
   );
 }
 
+function boundedPanelRoster(
+  queryClient: QueryClient,
+  roster: readonly string[],
+) {
+  const allowed = new Set(activeRoster(queryClient));
+  return roster.filter((threadId) => allowed.has(threadId));
+}
+
 /** Keep only facts still needed by one mounted Agents panel, up to one cap. */
 export function reconcileAgentDetailDirectory(
   directory: AgentDetailDirectory | undefined,
@@ -106,7 +114,10 @@ export function useAgentDetails(threadIds: readonly string[]) {
       const current = queryClient.getQueryData<AgentDetailDirectory>(
         queryKeys.agents.directory(),
       );
-      const missing = missingThreadIds(current, roster);
+      const missing = missingThreadIds(
+        current,
+        boundedPanelRoster(queryClient, roster),
+      );
       if (missing.length === 0)
         return reconcileAgentDetailDirectory(current, activeRoster(queryClient));
       const results = await Promise.all(
@@ -123,17 +134,29 @@ export function useAgentDetails(threadIds: readonly string[]) {
     enabled: false,
     ...queryPolicies.agentDetails,
   });
-  const missing = missingThreadIds(query.data, roster);
+  const missing = missingThreadIds(
+    query.data,
+    boundedPanelRoster(queryClient, roster),
+  );
   const missingKey = missing.join("\u0000");
 
   useEffect(() => {
     updateActiveRoster(queryClient, rosterOwner.current, roster);
     return () => unregisterActiveRoster(queryClient, rosterOwner.current);
   }, [queryClient]);
-  useEffect(
-    () => updateActiveRoster(queryClient, rosterOwner.current, roster),
-    [queryClient, rosterKey],
-  );
+  useEffect(() => {
+    updateActiveRoster(queryClient, rosterOwner.current, roster);
+    const current = queryClient.getQueryData<AgentDetailDirectory>(
+      queryKeys.agents.directory(),
+    );
+    if (
+      missingThreadIds(
+        current,
+        boundedPanelRoster(queryClient, roster),
+      ).length > 0
+    )
+      void query.refetch();
+  }, [queryClient, query.refetch, rosterKey]);
   useEffect(() => {
     if (missing.length > 0) void query.refetch();
   }, [missingKey, query.refetch]);

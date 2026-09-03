@@ -17,16 +17,40 @@ import {
   resolveTaskLinks,
   type TaskFactDirectory,
 } from "./facts";
+import {
+  captureTaskFactHydrationRevision,
+  isCurrentTaskFactHydration,
+  optimisticTaskAssigneeIds,
+} from "./fact-hydration-authority";
 
 export function hydrateTaskFacts(
   queryClient: QueryClient,
   projectId: string | null,
   facts: Parameters<typeof mergeTaskFacts>[2],
+  revision = captureTaskFactHydrationRevision(queryClient),
 ) {
   if (facts.length === 0) return;
+  if (!isCurrentTaskFactHydration(queryClient, revision)) return;
   queryClient.setQueryData<TaskFactDirectory>(
     queryKeys.sidebar.tasks.facts(projectId),
-    (previous) => mergeTaskFacts(previous, projectId, facts),
+    (previous) => {
+      if (!isCurrentTaskFactHydration(queryClient, revision)) return previous;
+      const merged = mergeTaskFacts(previous, projectId, facts);
+      if (!previous) return merged;
+      const optimisticIds = new Set(optimisticTaskAssigneeIds(queryClient));
+      if (optimisticIds.size === 0) return merged;
+      const mergedFacts = { ...merged.facts };
+      for (const taskId of optimisticIds) {
+        const previousFact = previous.facts[taskId];
+        const mergedFact = mergedFacts[taskId];
+        if (previousFact && mergedFact)
+          mergedFacts[taskId] = {
+            ...mergedFact,
+            assignee: previousFact.assignee,
+          };
+      }
+      return { ...merged, facts: mergedFacts };
+    },
   );
 }
 
@@ -52,11 +76,12 @@ export function useTasksRead({
   const query = useQuery({
     queryKey: queryKeys.sidebar.tasks.list(projectId),
     queryFn: async () => {
+      const revision = captureTaskFactHydrationRevision(queryClient);
       const result = await rpc.call("sidebarTasks", null);
       if (!result.available)
         throw new Error(result.error ?? "Tasks are unavailable.");
       const adapted = adaptSidebarTaskResponse(projectId, result);
-      hydrateTaskFacts(queryClient, projectId, adapted.facts);
+      hydrateTaskFacts(queryClient, projectId, adapted.facts, revision);
       return {
         ...adapted.references,
         relationships: adapted.relationships,
@@ -96,11 +121,12 @@ export function useTaskLinksRead({
   const query = useQuery({
     queryKey: queryKeys.sidebar.tasks.links(projectId),
     queryFn: async () => {
+      const revision = captureTaskFactHydrationRevision(queryClient);
       const result = await rpc.call("sidebarTaskLinks", null);
       if (!result.available)
         throw new Error(result.error ?? "Task links are unavailable.");
       const adapted = adaptTaskLinkResponse(result);
-      hydrateTaskFacts(queryClient, projectId, adapted.facts);
+      hydrateTaskFacts(queryClient, projectId, adapted.facts, revision);
       return adapted.references;
     },
     ...queryPolicies.sidebarTaskLinks,

@@ -6,6 +6,7 @@ import {
   adaptRuntimeThreadActivity,
   adaptSidebarThreadActivity,
   rollupThreadActivityFacts,
+  threadActivityProviderState,
 } from "./thread-activity";
 
 function thread(
@@ -118,6 +119,46 @@ describe("canonical thread activity facts", () => {
     expect(
       adaptRuntimeThreadActivity({ status: "idle", runtimeStatus: "complete" }),
     ).toMatchObject({ state: "done", ownWorking: false });
+  });
+
+  it("keeps provider precedence distinct from the canonical fact precedence", () => {
+    const workingWithAttention = adaptSidebarThreadActivity(
+      thread("thr_pending_work", {
+        indicator: "approval" as PluginSidebarThread["indicator"],
+        hasPendingInteraction: true,
+        activity: {
+          workflows: 1,
+          backgroundAgents: 0,
+          backgroundCommands: 0,
+          planMode: 0,
+          goals: 0,
+        },
+      }),
+    );
+    expect(workingWithAttention.state).toBe("attention");
+    expect(threadActivityProviderState(workingWithAttention)).toBe("working");
+
+    expect(
+      threadActivityProviderState(
+        adaptSidebarThreadActivity(thread("thr_stale"), { stale: true }),
+      ),
+    ).toBe("stale");
+    expect(
+      threadActivityProviderState(
+        adaptSidebarThreadActivity(
+          thread("thr_blocked_work", {
+            indicator: "blocked" as PluginSidebarThread["indicator"],
+            activity: {
+              workflows: 1,
+              backgroundAgents: 0,
+              backgroundCommands: 0,
+              planMode: 0,
+              goals: 0,
+            },
+          }),
+        ),
+      ),
+    ).toBe("error");
   });
 
   it("rolls descendant facts up once with the same precedence", () => {

@@ -11,6 +11,39 @@ type PendingEntry<T> = { generation: number; promise: Promise<T> };
 export const WORK_TIMELINE_SNAPSHOT_TTL_MS = 1_000;
 export const MAX_WORK_TIMELINE_SNAPSHOTS = 64;
 
+const WORK_TIMELINE_INVALIDATION_EVENTS = [
+  "thread.active",
+  "thread.idle",
+  "thread.failed",
+  "thread.archived",
+  "thread.deleted",
+] as const;
+
+/**
+ * Register through the SDK's void-returning event contract while keeping the
+ * captured snapshot services releasable as soon as plugin lifecycle disposal
+ * begins. The host removes its registrations when the plugin is disposed.
+ */
+export function createWorkTimelineEventSubscription({
+  subscribe,
+  invalidate,
+}: {
+  subscribe(
+    event: (typeof WORK_TIMELINE_INVALIDATION_EVENTS)[number],
+    handler: (event: { thread: { id: string } }) => void,
+  ): void;
+  invalidate(threadId: string): void;
+}) {
+  let current: ((threadId: string) => void) | null = invalidate;
+  for (const event of WORK_TIMELINE_INVALIDATION_EVENTS)
+    subscribe(event, ({ thread }) => current?.(thread.id));
+  return {
+    dispose() {
+      current = null;
+    },
+  };
+}
+
 export function selectWorkGoal(timeline: WorkTimeline) {
   return timeline.goal
     ? {

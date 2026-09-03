@@ -11,6 +11,7 @@ import {
 import { createProviderStatusReadService } from "./provider-status-server.js";
 import {
   createWorkTimelineSnapshotService,
+  createWorkTimelineEventSubscription,
   selectLatestActivity,
   selectWorkBackgroundJobs,
   selectWorkGoal,
@@ -58,14 +59,25 @@ export function createWorkContextRegistration(
       timeline: ({ threadId }) => bb.sdk.threads.timeline({ threadId }),
     }),
   );
-  for (const event of [
-    "thread.active",
-    "thread.idle",
-    "thread.failed",
-    "thread.archived",
-    "thread.deleted",
-  ] as const)
-    bb.events.on(event, ({ thread }) => timelineSnapshots.invalidate(thread.id));
+  const backgroundTimelineSnapshots = lifecycle.own(
+    createWorkTimelineSnapshotService({
+      timeline: ({ threadId }) =>
+        bb.sdk.threads.timeline({
+          threadId,
+          summaryOnly: "true",
+          segmentLimit: "1",
+        }),
+    }),
+  );
+  lifecycle.own(
+    createWorkTimelineEventSubscription({
+      subscribe: (event, handler) => bb.events.on(event, handler),
+      invalidate: (threadId) => {
+        timelineSnapshots.invalidate(threadId);
+        backgroundTimelineSnapshots.invalidate(threadId);
+      },
+    }),
+  );
   const providerStatus = createProviderStatusReadService({
     getThread: (threadId) => bb.sdk.threads.get({ threadId }),
     providerStates: (environmentId) =>
@@ -241,7 +253,9 @@ export function createWorkContextRegistration(
     async getWorkGoal({ threadId }) { return cards.goal(threadId); },
     async getWorkPlan({ threadId }) { return cards.plan(threadId); },
     async getWorkBackgroundJobs({ threadId }) {
-      return selectWorkBackgroundJobs(await timelineSnapshots.read(threadId));
+      return selectWorkBackgroundJobs(
+        await backgroundTimelineSnapshots.read(threadId),
+      );
     },
     async getWorkProviderStatus(input) {
       return "providerId" in input

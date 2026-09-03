@@ -1,12 +1,29 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   MAX_WORK_TIMELINE_SNAPSHOTS,
+  createWorkTimelineEventSubscription,
   createWorkTimelineSnapshotService,
 } from "../timeline-snapshot-server";
 
 type Snapshot = { version: number };
 
 describe("work timeline snapshot service", () => {
+  it("releases every SDK event callback on lifecycle disposal", () => {
+    const handlers: Array<(event: { thread: { id: string } }) => void> = [];
+    const invalidate = vi.fn();
+    const subscription = createWorkTimelineEventSubscription({
+      subscribe: vi.fn((_event, handler) => handlers.push(handler)),
+      invalidate,
+    });
+
+    expect(handlers).toHaveLength(5);
+    handlers.forEach((handler) => handler({ thread: { id: "thr_live" } }));
+    expect(invalidate).toHaveBeenCalledTimes(5);
+    subscription.dispose();
+    handlers.forEach((handler) => handler({ thread: { id: "thr_retired" } }));
+    expect(invalidate).toHaveBeenCalledTimes(5);
+  });
+
   it("deduplicates concurrent reads and reuses the exact snapshot inside its TTL", async () => {
     let resolve!: (value: Snapshot) => void;
     const timeline = vi.fn(
