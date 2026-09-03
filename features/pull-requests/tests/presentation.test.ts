@@ -96,7 +96,7 @@ describe("pull-request presentation semantics", () => {
     },
   );
 
-  it("makes a re-requested review override an earlier changes request", () => {
+  it("does not infer a re-request from an anonymous request count", () => {
     expect(
       normalizePullRequestSignal({
         checks: "passing",
@@ -105,20 +105,20 @@ describe("pull-request presentation semantics", () => {
       }),
     ).toEqual({
       checks: "passing",
-      review: "review_required",
+      review: "changes_requested",
       reviewCommentCount: 1,
     });
     expect(
       pullRequestSignalPresentation({
         checks: "passing",
-        review: "review_required",
+        review: "changes_requested",
         requestedReviewers: ["octocat", "platform-team"],
         reviewCommentCount: 1,
       }).review,
     ).toEqual({
-      icon: "Eye",
-      label: "Review requested",
-      tone: "warning",
+      icon: "Wrench",
+      label: "Changes requested",
+      tone: "closed",
       count: 1,
     });
     expect(
@@ -127,10 +127,10 @@ describe("pull-request presentation semantics", () => {
         draft: false,
         attention: pullRequestAttentionFromSignal({
           checks: "passing",
-          review: "review_required",
+          review: "changes_requested",
         }),
       }),
-    ).toEqual({ icon: "Eye", label: "Review requested", tone: "warning" });
+    ).toEqual({ icon: "Wrench", label: "Changes requested", tone: "closed" });
   });
 
   it("keeps comment counts, merged layers, archived repositories, and GitHub health semantic", () => {

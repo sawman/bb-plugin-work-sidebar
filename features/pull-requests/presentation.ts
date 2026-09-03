@@ -204,13 +204,10 @@ export function normalizePullRequestSignal(input: {
             : input.checks.state === "unknown"
               ? "unknown"
               : "none";
-  const review =
-    typeof input.review === "string"
-      ? input.review
-      : input.review.state === "changes_requested" &&
-          input.review.reviewRequestCount > 0
-        ? "review_required"
-        : input.review.state;
+  // Identity-aware coercion happens on the GitHub-reading server. The client
+  // sees only a count, which must never turn another reviewer's request into
+  // a re-request for the person who asked for changes.
+  const review = typeof input.review === "string" ? input.review : input.review.state;
   return {
     checks,
     review,

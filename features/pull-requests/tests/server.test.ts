@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createPullRequestService } from "../server";
+import { resolveReviewState } from "../server-stack";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -9,6 +10,33 @@ function deferred<T>() {
 }
 
 describe("R5 pull-request server ownership", () => {
+  it("only treats changes as re-requested for the same reviewer", () => {
+    expect(
+      resolveReviewState({
+        reviewDecision: "CHANGES_REQUESTED",
+        requestedReviewers: ["octocat"],
+        reviewerStates: new Map([["octocat", "CHANGES_REQUESTED"]]),
+      }),
+    ).toBe("review_required");
+    expect(
+      resolveReviewState({
+        reviewDecision: "CHANGES_REQUESTED",
+        requestedReviewers: ["hubot"],
+        reviewerStates: new Map([["octocat", "CHANGES_REQUESTED"]]),
+      }),
+    ).toBe("changes_requested");
+    expect(
+      resolveReviewState({
+        reviewDecision: "CHANGES_REQUESTED",
+        requestedReviewers: ["octocat"],
+        reviewerStates: new Map([
+          ["octocat", "CHANGES_REQUESTED"],
+          ["hubot", "CHANGES_REQUESTED"],
+        ]),
+      }),
+    ).toBe("changes_requested");
+  });
+
   it("deduplicates authored list and stack reads, filters archived repositories, and classifies rate limits without retrying", async () => {
     let now = 100;
     const readAuthored = vi.fn(async () => [

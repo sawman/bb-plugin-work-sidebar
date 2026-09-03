@@ -28,10 +28,12 @@ review/check signal.
 | 11 | No current review request or signal | Review pending |
 
 GitHub may report a historical changes-requested review alongside a new review
-request. `normalizePullRequestSignal` turns that combination into
-`review_required`, and the matrix therefore shows **Review requested** rather
-than **Changes requested**. An `attention: "none"` aggregate is never allowed
-to hide a current approved signal.
+request. The server upgrades that to `review_required` only when every person
+whose latest effective review requests changes is explicitly re-requested.
+Another person's request, a team request, or a count without reviewer identity
+does not qualify. The matrix then shows **Review requested** rather than
+**Changes requested**. An `attention: "none"` aggregate is never allowed to
+hide a current approved signal.
 
 ## Verification rule
 

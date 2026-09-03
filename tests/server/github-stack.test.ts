@@ -78,6 +78,15 @@ describe("GitHub Stack enrichment ownership", () => {
                   { requestedReviewer: { slug: "platform-team" } },
                 ],
               },
+              latestReviews: {
+                nodes: [
+                  {
+                    author: { login: "octocat" },
+                    state: "CHANGES_REQUESTED",
+                    submittedAt: "2026-09-04T00:00:00Z",
+                  },
+                ],
+              },
               commits: {
                 nodes: [
                   { commit: { statusCheckRollup: { state: "SUCCESS" } } },
@@ -111,6 +120,7 @@ describe("GitHub Stack enrichment ownership", () => {
     expect(run.mock.calls[0]?.[0].join(" ")).toContain(
       "requestedReviewer",
     );
+    expect(run.mock.calls[0]?.[0].join(" ")).toContain("latestReviews");
   });
 
   it("retains branch metadata when authored PR signals fall back to REST", async () => {

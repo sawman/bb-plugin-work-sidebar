@@ -57,6 +57,59 @@ function restRequestedReviewerNames(pullRequest: Record<string, unknown>): strin
   return [...new Set([...users, ...teams])];
 }
 
+type ReviewSource = "graphql" | "rest";
+
+/** Returns one latest review state per person, ignoring malformed entries. */
+function latestReviewerStates(value: unknown, source: ReviewSource) {
+  const reviews = source === "graphql"
+    ? isRecord(value) && Array.isArray(value.nodes) ? value.nodes : []
+    : Array.isArray(value) ? value : [];
+  const latest = new Map<string, { state: string; submittedAt: number }>();
+  for (const review of reviews) {
+    if (!isRecord(review)) continue;
+    const author = source === "graphql" ? review.author : review.user;
+    const login = isRecord(author) && typeof author.login === "string"
+      ? author.login
+      : null;
+    if (!login || typeof review.state !== "string") continue;
+    const submitted = source === "graphql" ? review.submittedAt : review.submitted_at;
+    const submittedAt = typeof submitted === "string" ? Date.parse(submitted) : 0;
+    const previous = latest.get(login);
+    if (!previous || submittedAt >= previous.submittedAt)
+      latest.set(login, { state: review.state, submittedAt });
+  }
+  return new Map([...latest].map(([login, review]) => [login, review.state]));
+}
+
+/**
+ * A change request becomes a re-request only when every reviewer currently
+ * blocking with changes is explicitly requested again. A bare request count
+ * is insufficient: it may name somebody else or a team.
+ */
+export function resolveReviewState({
+  reviewDecision,
+  requestedReviewers,
+  reviewerStates,
+}: {
+  reviewDecision: string;
+  requestedReviewers: readonly string[];
+  reviewerStates: ReadonlyMap<string, string>;
+}): GitHubSignal["review"] {
+  const changeRequesters = [...reviewerStates]
+    .filter(([, state]) => state === "CHANGES_REQUESTED")
+    .map(([reviewer]) => reviewer);
+  const requested = new Set(requestedReviewers);
+  const reRequested =
+    changeRequesters.length > 0 &&
+    changeRequesters.every((reviewer) => requested.has(reviewer));
+  if (reviewDecision === "CHANGES_REQUESTED" || changeRequesters.length > 0)
+    return reRequested ? "review_required" : "changes_requested";
+  if (reviewDecision === "APPROVED" || [...reviewerStates.values()].includes("APPROVED"))
+    return "approved";
+  if (requested.size > 0) return "review_requested";
+  return reviewDecision === "REVIEW_REQUIRED" ? "review_required" : "none";
+}
+
 export function githubStackApiArgs(owner: string, repo: string, pullRequest: number): string[] {
   return [
     "api", "--method", "GET", `repos/${owner}/${repo}/stacks`,
@@ -216,9 +269,11 @@ function signalFromGraphql(value: unknown): GitHubSignal | null {
   const reviewRequests = isRecord(value.reviewRequests) && typeof value.reviewRequests.totalCount === "number"
     ? value.reviewRequests.totalCount : 0;
   const requestedReviewers = requestedReviewerNames(value.reviewRequests);
-  const review = reviewDecision === "APPROVED" ? "approved"
-    : reviewDecision === "CHANGES_REQUESTED" ? reviewRequests > 0 ? "review_required" : "changes_requested"
-      : reviewRequests > 0 ? "review_requested" : reviewDecision === "REVIEW_REQUIRED" ? "review_required" : "none";
+  const review = resolveReviewState({
+    reviewDecision,
+    requestedReviewers,
+    reviewerStates: latestReviewerStates(value.latestReviews, "graphql"),
+  });
   const commits = isRecord(value.commits) && Array.isArray(value.commits.nodes) ? value.commits.nodes : [];
   const commit = commits[commits.length - 1];
   const rollup = isRecord(commit) && isRecord(commit.commit) && isRecord(commit.commit.statusCheckRollup)
@@ -281,6 +336,7 @@ export async function readGitHubSignals(
           `p${index}: pullRequest(number: ${number}) {`,
           "headRefName baseRefName reviewDecision",
           "reviewRequests(first: 20) { totalCount nodes { requestedReviewer { ... on User { login } ... on Team { slug } } } }",
+          "latestReviews(first: 100) { nodes { author { login } state submittedAt } }",
           "commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }",
           "}",
         ].join(" "),
@@ -342,19 +398,18 @@ export async function readGitHubPullRequestRest(
       ...(base ? { base } : {}),
       ...(requestedReviewerList.length ? { requestedReviewers: requestedReviewerList } : {}),
     };
-    const requestedReviewers = Array.isArray(pullRequest.requested_reviewers) ? pullRequest.requested_reviewers.length : 0;
-    const requestedTeams = Array.isArray(pullRequest.requested_teams) ? pullRequest.requested_teams.length : 0;
-    const latestReviewByUser = new Map<string, string>();
-    if (Array.isArray(reviews)) for (const review of reviews) {
-      if (!isRecord(review) || !isRecord(review.user) || typeof review.user.login !== "string" || typeof review.state !== "string") continue;
-      latestReviewByUser.set(review.user.login, review.state);
-    }
-    const reviewStates = [...latestReviewByUser.values()];
+    const requestedReviewers = Array.isArray(pullRequest.requested_reviewers)
+      ? pullRequest.requested_reviewers.length
+      : 0;
+    const requestedTeams = Array.isArray(pullRequest.requested_teams)
+      ? pullRequest.requested_teams.length
+      : 0;
     const requests = requestedReviewers + requestedTeams;
-    const review = reviewStates.includes("CHANGES_REQUESTED")
-      ? requests > 0 ? "review_required" : "changes_requested"
-      : reviewStates.includes("APPROVED") ? "approved"
-        : requests > 0 ? "review_requested" : "none";
+    const review = resolveReviewState({
+      reviewDecision: "",
+      requestedReviewers: requestedReviewerList,
+      reviewerStates: latestReviewerStates(reviews, "rest"),
+    });
     const sha = isRecord(pullRequest.head) && typeof pullRequest.head.sha === "string" ? pullRequest.head.sha : null;
     const recoveredPullRequest: GitHubPullRequest = {
       number,
