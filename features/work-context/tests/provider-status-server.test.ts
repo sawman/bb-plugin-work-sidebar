@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createWorkContextRegistration } from "../server-registration";
 import { createProviderStatusReadService } from "../provider-status-server";
+import { createServerLifecycle } from "../../../server-lifecycle";
 
 describe("Work provider status server read", () => {
   it("reads provider state and subscription usage for the selected provider", async () => {
@@ -22,6 +23,7 @@ describe("Work provider status server read", () => {
     }));
     const registration = createWorkContextRegistration({
       bb: {
+        events: { on: vi.fn() },
         storage: { kv: { get: vi.fn(), set: vi.fn() } },
         realtime: { publish: vi.fn() },
         sdk: {
@@ -35,6 +37,7 @@ describe("Work provider status server read", () => {
           system: { providerStates, usageLimits },
         },
       } as never,
+      lifecycle: createServerLifecycle(),
       tasks: {} as never,
     });
 

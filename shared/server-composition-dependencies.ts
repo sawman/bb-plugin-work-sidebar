@@ -18,7 +18,7 @@ export type ChangesCompositionDependencies = Pick<
 >;
 export type WorkContextCompositionDependencies = Pick<
   ServerCompositionDependencies,
-  "bb" | "tasks"
+  "bb" | "lifecycle" | "tasks"
 >;
 export type TrackerCompositionDependencies = Pick<
   ServerCompositionDependencies,

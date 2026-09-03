@@ -28,14 +28,6 @@ type BackgroundTimeline = {
   activeWorkflows: readonly TimelineBackgroundItem[];
 };
 
-export type BackgroundJobsDependencies = {
-  timeline(input: {
-    threadId: string;
-    summaryOnly: "true";
-    segmentLimit: "1";
-  }): Promise<BackgroundTimeline>;
-};
-
 function nonEmpty(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
@@ -86,19 +78,4 @@ export function projectBackgroundJobs(timeline: BackgroundTimeline) {
     items.set(item.id, projectItem(item, "workflow"));
   }
   return { items: [...items.values()] };
-}
-
-export function createBackgroundJobsReadService(
-  dependencies: BackgroundJobsDependencies,
-) {
-  return {
-    async read(threadId: string) {
-      const timeline = await dependencies.timeline({
-        threadId,
-        summaryOnly: "true",
-        segmentLimit: "1",
-      });
-      return projectBackgroundJobs(timeline);
-    },
-  };
 }

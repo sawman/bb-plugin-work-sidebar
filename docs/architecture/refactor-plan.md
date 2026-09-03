@@ -893,6 +893,26 @@ The durable execution tasks are `BBPLUG-158`, `BBPLUG-160`, and `BBPLUG-161`.
 The detailed plan is kept separate so this historical refactor plan remains
 readable; BB Tasks, not either document, is the executable work queue.
 
+#### Loop R35 — shared Work timeline snapshots
+
+- **Red:** add exact host timeline call-count coverage for concurrent Goal,
+  Plan, latest activity, and Background RPCs; add service tests for TTL expiry,
+  per-thread scope, invalidation during in-flight work, bounded LRU cleanup,
+  and factory disposal. Retain mounted tests for the cards' independent
+  2-second, 5-second, and 30-second refresh cadences.
+- **Green:** keep the four typed RPC/query boundaries and derive their existing
+  response shapes through Work-owned selectors over one short-lived,
+  lifecycle-owned server timeline snapshot keyed by the requested thread.
+  Invalidate only the affected thread on BB lifecycle events.
+- **Refactor/removal:** remove the Background-only timeline reader, prevent
+  invalidated late reads from repopulating the cache, and clear every cached,
+  pending, and generation record on lifecycle disposal. Do not add a combined
+  frontend RPC or alter Query polling/realtime ownership.
+- **Validation/evidence:** run the focused Work server/card suites twice, the
+  full serial suite twice, typecheck, SDK compatibility, production build, and
+  `git diff --check`; commit the isolated task branch locally without reload or
+  push.
+
 ### BB child execution protocol
 
 G0 is complete. Each new code-editing loop receives one direct BB execution

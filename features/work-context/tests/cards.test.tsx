@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, waitFor, within } from "@testing-library/react";
 import { configureAxe } from "vitest-axe";
 import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
@@ -279,6 +279,71 @@ describe("registered Work context cards", () => {
       expect(method).toHaveBeenCalledWith({ threadId: "thr_one" });
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();
+  });
+
+  it("preserves each mounted timeline card's independent refresh cadence", async () => {
+    vi.useFakeTimers();
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const getWorkGoal = vi.fn(() => null);
+    const getWorkPlan = vi.fn(() => ({ items: [] }));
+    const getWorkBackgroundJobs = vi.fn(() => ({ items: [] }));
+    const getLatestActivity = vi.fn(() => ({
+      currentThread: { status: "active" as const, runtimeStatus: "active" },
+      latest: null,
+      lastUser: null,
+      current: null,
+    }));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_cadence", params: null },
+      {
+        rpc: fixture({
+          getWorkStatus: () => ({
+            ...status,
+            rootThreadId: "thr_cadence",
+            currentThread: {
+              ...status.currentThread,
+              status: "active",
+              runtimeStatus: "active",
+            },
+          }),
+          getWorkGoal,
+          getWorkPlan,
+          getWorkBackgroundJobs,
+          getLatestActivity,
+        }),
+      },
+    );
+    try {
+      await act(async () => vi.advanceTimersByTimeAsync(0));
+      for (const method of [
+        getWorkGoal,
+        getWorkPlan,
+        getWorkBackgroundJobs,
+        getLatestActivity,
+      ])
+        expect(method).toHaveBeenCalledTimes(1);
+
+      await act(async () => vi.advanceTimersByTimeAsync(2_000));
+      expect(getLatestActivity).toHaveBeenCalledTimes(2);
+      expect(getWorkBackgroundJobs).toHaveBeenCalledTimes(1);
+      expect(getWorkGoal).toHaveBeenCalledTimes(1);
+      expect(getWorkPlan).toHaveBeenCalledTimes(1);
+
+      await act(async () => vi.advanceTimersByTimeAsync(3_000));
+      expect(getWorkBackgroundJobs).toHaveBeenCalledTimes(2);
+      expect(getWorkGoal).toHaveBeenCalledTimes(1);
+      expect(getWorkPlan).toHaveBeenCalledTimes(1);
+
+      await act(async () => vi.advanceTimersByTimeAsync(25_000));
+      expect(getWorkGoal).toHaveBeenCalledTimes(2);
+      expect(getWorkPlan).toHaveBeenCalledTimes(2);
+    } finally {
+      slot.lifecycle.unmount();
+      getPluginQueryClient().clear();
+      vi.useRealTimers();
+    }
   });
 
   it("invalidates every card on realtime and manual Work refresh", async () => {

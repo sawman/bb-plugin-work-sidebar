@@ -2,15 +2,20 @@ import type { PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { rpcContract } from "../../contracts.js";
 import type { WorkContextCompositionDependencies } from "../../shared/server-composition-dependencies.js";
 import { createWorkContextReadService } from "./server-reads.js";
-import { createBackgroundJobsReadService } from "./background-jobs-server.js";
 import { projectWorkBindingOwner } from "./server-owner-projection.js";
 import {
   createSqliteWorkItemQueueStore,
   createWorkItemQueueService,
   normalizeWorkItemQueue,
 } from "./work-item-queue-server.js";
-import { projectLatestActivity } from "./latest-activity.js";
 import { createProviderStatusReadService } from "./provider-status-server.js";
+import {
+  createWorkTimelineSnapshotService,
+  selectLatestActivity,
+  selectWorkBackgroundJobs,
+  selectWorkGoal,
+  selectWorkPlan,
+} from "./timeline-snapshot-server.js";
 
 type WorkContextHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
@@ -38,7 +43,7 @@ const emptyLegacyContext = () => ({
 export function createWorkContextRegistration(
   dependencies: WorkContextCompositionDependencies,
 ): WorkContextHandlers {
-  const { bb, tasks } = dependencies;
+  const { bb, lifecycle, tasks } = dependencies;
   const queueService = createWorkItemQueueService({
     ...createSqliteWorkItemQueueStore(bb),
     publish: (rootThreadId) => {
@@ -48,9 +53,19 @@ export function createWorkContextRegistration(
     ensureOutcome: tasks.ensureOutcomeContext,
     createExecution: tasks.createExecutionTask,
   });
-  const backgroundJobs = createBackgroundJobsReadService({
-    timeline: (input) => bb.sdk.threads.timeline(input),
-  });
+  const timelineSnapshots = lifecycle.own(
+    createWorkTimelineSnapshotService({
+      timeline: ({ threadId }) => bb.sdk.threads.timeline({ threadId }),
+    }),
+  );
+  for (const event of [
+    "thread.active",
+    "thread.idle",
+    "thread.failed",
+    "thread.archived",
+    "thread.deleted",
+  ] as const)
+    bb.events.on(event, ({ thread }) => timelineSnapshots.invalidate(thread.id));
   const providerStatus = createProviderStatusReadService({
     getThread: (threadId) => bb.sdk.threads.get({ threadId }),
     providerStates: (environmentId) =>
@@ -128,25 +143,17 @@ export function createWorkContextRegistration(
     };
   };
   const readGoal = async (threadId: string) => {
-    const timeline = await bb.sdk.threads.timeline({ threadId });
-    return timeline.goal ? {
-      objective: timeline.goal.objective,
-      status: timeline.goal.status,
-      tokensUsed: timeline.goal.tokensUsed,
-      tokenBudget: timeline.goal.tokenBudget,
-      timeUsedSeconds: timeline.goal.timeUsedSeconds,
-    } : null;
+    return selectWorkGoal(await timelineSnapshots.read(threadId));
   };
   const readPlan = async (threadId: string) => {
-    const timeline = await bb.sdk.threads.timeline({ threadId });
-    return { items: timeline.pendingTodos?.items ?? [] };
+    return selectWorkPlan(await timelineSnapshots.read(threadId));
   };
   const cards = createWorkContextReadService({ readStatus, readOutcome, readGoal, readPlan });
   const getContext = async (threadId: string) => {
     const [thread, available, timeline, children, root] = await Promise.all([
       bb.sdk.threads.get({ threadId }),
       tasks.available(),
-      bb.sdk.threads.timeline({ threadId }),
+      timelineSnapshots.read(threadId),
       tasks.descendants(threadId),
       tasks.rootThread(threadId),
     ]);
@@ -233,7 +240,9 @@ export function createWorkContextRegistration(
     async getWorkOutcome({ threadId }) { return cards.outcome(threadId); },
     async getWorkGoal({ threadId }) { return cards.goal(threadId); },
     async getWorkPlan({ threadId }) { return cards.plan(threadId); },
-    async getWorkBackgroundJobs({ threadId }) { return backgroundJobs.read(threadId); },
+    async getWorkBackgroundJobs({ threadId }) {
+      return selectWorkBackgroundJobs(await timelineSnapshots.read(threadId));
+    },
     async getWorkProviderStatus(input) {
       return "providerId" in input
         ? providerStatus.readIdentity(input.providerId)
@@ -242,12 +251,12 @@ export function createWorkContextRegistration(
     async getLatestActivity({ threadId }) {
       const [thread, timeline, output] = await Promise.all([
         bb.sdk.threads.get({ threadId }),
-        bb.sdk.threads.timeline({ threadId }),
+        timelineSnapshots.read(threadId),
         bb.sdk.threads.output({ threadId }),
       ]);
       return {
         currentThread: { status: thread.status, runtimeStatus: thread.runtime.displayStatus },
-        ...projectLatestActivity(timeline.rows, output.output, thread.status === "active" || thread.status === "starting"),
+        ...selectLatestActivity(timeline, output.output, thread.status === "active" || thread.status === "starting"),
       };
     },
   };

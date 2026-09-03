@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  createBackgroundJobsReadService,
   projectBackgroundJobs,
 } from "../background-jobs-server";
 
@@ -94,25 +93,5 @@ describe("provider background jobs projection", () => {
         },
       ],
     });
-  });
-
-  it("reads one summary timeline for the selected thread", async () => {
-    const calls: unknown[] = [];
-    const service = createBackgroundJobsReadService({
-      timeline: async (input) => {
-        calls.push(input);
-        return {
-          activeBackgroundCommands: [backgroundItem("daemon")],
-          activeWorkflows: [],
-        };
-      },
-    });
-
-    await expect(service.read("thr_jobs")).resolves.toMatchObject({
-      items: [{ id: "daemon", kind: "command", status: "running" }],
-    });
-    expect(calls).toEqual([
-      { threadId: "thr_jobs", summaryOnly: "true", segmentLimit: "1" },
-    ]);
   });
 });

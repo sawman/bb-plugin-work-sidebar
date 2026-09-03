@@ -28,6 +28,8 @@ type LegacyWorkPending = {
 const MAX_GITHUB_PULL_REQUEST_SIGNALS = 300;
 export const MAX_LEGACY_WORK_CACHE = 128;
 
+type DisposableService = { dispose(): void };
+
 export class ServerLifecycle {
   readonly githubReadCache = new Map<
     string,
@@ -65,9 +67,19 @@ export class ServerLifecycle {
   };
   githubGraphqlBackoffUntil = 0;
   private disposed = false;
+  private readonly ownedServices = new Set<DisposableService>();
 
   get isDisposed(): boolean {
     return this.disposed;
+  }
+
+  own<T extends DisposableService>(service: T): T {
+    if (this.disposed) {
+      service.dispose();
+      throw new Error("Server lifecycle is disposed.");
+    }
+    this.ownedServices.add(service);
+    return service;
   }
 
   cacheGitHubRead(key: string, value: string, expiresAt: number): void {
@@ -200,6 +212,8 @@ export class ServerLifecycle {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    for (const service of this.ownedServices) service.dispose();
+    this.ownedServices.clear();
     this.githubReadCache.clear();
     this.githubReadPending.clear();
     this.githubPullRequestSignalCache.clear();
