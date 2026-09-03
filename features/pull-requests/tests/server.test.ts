@@ -35,6 +35,13 @@ describe("R5 pull-request server ownership", () => {
         ]),
       }),
     ).toBe("changes_requested");
+    expect(
+      resolveReviewState({
+        reviewDecision: "CHANGES_REQUESTED",
+        requestedReviewers: ["OctoCat"],
+        reviewerStates: new Map([["octocat", "CHANGES_REQUESTED"]]),
+      }),
+    ).toBe("review_required");
   });
 
   it("deduplicates authored list and stack reads, filters archived repositories, and classifies rate limits without retrying", async () => {

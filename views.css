@@ -1408,6 +1408,10 @@
 .ws-pr-number-badge[data-tone="closed"] {
   color: var(--diff-removed);
 }
+.ws-thread-pr-token[data-tone="warning"],
+.ws-pr-number-badge[data-tone="warning"] {
+  color: var(--warning);
+}
 .ws-thread-pr-token[data-tone="merged"],
 .ws-pr-number-badge[data-tone="merged"] {
   color: var(--primary);

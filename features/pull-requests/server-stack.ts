@@ -59,6 +59,10 @@ function restRequestedReviewerNames(pullRequest: Record<string, unknown>): strin
 
 type ReviewSource = "graphql" | "rest";
 
+function reviewerIdentity(value: string) {
+  return value.trim().toLowerCase();
+}
+
 /** Returns one latest review state per person, ignoring malformed entries. */
 function latestReviewerStates(value: unknown, source: ReviewSource) {
   const reviews = source === "graphql"
@@ -98,10 +102,13 @@ export function resolveReviewState({
   const changeRequesters = [...reviewerStates]
     .filter(([, state]) => state === "CHANGES_REQUESTED")
     .map(([reviewer]) => reviewer);
-  const requested = new Set(requestedReviewers);
+  // GitHub logins are case-insensitive. Keep the matching strict to the same
+  // identity while avoiding a casing difference between review and request
+  // payloads leaving an already re-requested reviewer as blocking.
+  const requested = new Set(requestedReviewers.map(reviewerIdentity));
   const reRequested =
     changeRequesters.length > 0 &&
-    changeRequesters.every((reviewer) => requested.has(reviewer));
+    changeRequesters.every((reviewer) => requested.has(reviewerIdentity(reviewer)));
   if (reviewDecision === "CHANGES_REQUESTED" || changeRequesters.length > 0)
     return reRequested ? "review_required" : "changes_requested";
   if (reviewDecision === "APPROVED" || [...reviewerStates.values()].includes("APPROVED"))
