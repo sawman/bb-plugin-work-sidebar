@@ -59,27 +59,60 @@ describe("R9 Threads server preferences", () => {
       rowHeight: 47.5,
       textScale: 0.9,
       workingProviderAnimation: "slow-spin",
+      groupActivityPriority: ["error", "attention", "completed", "working"],
     });
     await expect(service.saveAppearance(52.5)).resolves.toEqual({
       rowHeight: 52.5,
       textScale: 0.9,
       workingProviderAnimation: "slow-spin",
+      groupActivityPriority: ["error", "attention", "completed", "working"],
     });
     expect(saved.get(THREAD_PREFERENCE_KEYS.appearance)).toBe(52.5);
     await expect(service.saveTextScale(1.1)).resolves.toEqual({
       rowHeight: 52.5,
       textScale: 1.1,
       workingProviderAnimation: "slow-spin",
+      groupActivityPriority: ["error", "attention", "completed", "working"],
     });
     expect(saved.get(THREAD_PREFERENCE_KEYS.textScale)).toBe(1.1);
     await expect(service.saveWorkingProviderAnimation("fast-spin")).resolves.toEqual({
       rowHeight: 52.5,
       textScale: 1.1,
       workingProviderAnimation: "fast-spin",
+      groupActivityPriority: ["error", "attention", "completed", "working"],
     });
     expect(saved.get(THREAD_PREFERENCE_KEYS.workingProviderAnimation)).toBe(
       "fast-spin",
     );
+    await expect(
+      service.saveGroupActivityPriority([
+        "working",
+        "completed",
+        "attention",
+        "error",
+      ]),
+    ).resolves.toMatchObject({
+      groupActivityPriority: [
+        "working",
+        "completed",
+        "attention",
+        "error",
+      ],
+    });
+    expect(saved.get(THREAD_PREFERENCE_KEYS.groupActivityPriority)).toEqual([
+      "working",
+      "completed",
+      "attention",
+      "error",
+    ]);
+    await expect(
+      service.saveGroupActivityPriority([
+        "error",
+        "error",
+        "completed",
+        "working",
+      ]),
+    ).rejects.toThrow("Choose each group marker state exactly once.");
     await expect(service.saveWorkingProviderAnimation("invalid")).rejects.toThrow(
       "Choose a supported working-provider animation.",
     );
@@ -125,7 +158,20 @@ describe("R9 Threads server preferences", () => {
       channel: "sidebar-order:changed",
       payload: { appearance: { workingProviderAnimation: "fast-spin" } },
     });
-    expect(published).toHaveLength(7);
+    expect(published[5]).toEqual({
+      channel: "sidebar-order:changed",
+      payload: {
+        appearance: {
+          groupActivityPriority: [
+            "working",
+            "completed",
+            "attention",
+            "error",
+          ],
+        },
+      },
+    });
+    expect(published).toHaveLength(8);
     expect(published.slice(-2)).toEqual([
       expect.objectContaining({ channel: "sidebar-order:changed", payload: expect.objectContaining({ recycleBin: expect.any(Array) }) }),
       expect.objectContaining({ channel: "sidebar-order:changed", payload: expect.objectContaining({ recycleBin: [] }) }),

@@ -3452,6 +3452,60 @@ button.ws-provider-health:focus-visible {
 .ws-sidebar-appearance-field .ws-settings-error {
   color: var(--destructive);
 }
+.ws-group-activity-priority {
+  gap: 0.3rem;
+}
+.ws-group-activity-list {
+  display: grid;
+  gap: 0.14rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ws-group-activity-row {
+  display: grid;
+  grid-template-columns: 0.45rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.38rem;
+  min-height: 1.7rem;
+  padding: 0 0.26rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 3px);
+  color: var(--foreground);
+  font: var(--ws-text-subtext);
+  line-height: inherit;
+}
+.ws-group-activity-actions {
+  display: flex;
+  gap: 0.08rem;
+}
+.ws-group-activity-actions > .ws-action-tooltip {
+  display: grid;
+}
+.ws-group-activity-actions button {
+  display: grid;
+  width: 1.3rem;
+  height: 1.3rem;
+  place-items: center;
+  border: 0;
+  border-radius: calc(var(--radius) - 4px);
+  padding: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.ws-group-activity-actions button:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--foreground);
+}
+.ws-group-activity-actions button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+.ws-group-activity-actions svg {
+  width: 0.68rem;
+  height: 0.68rem;
+}
 .ws-thread-appearance-settings {
   display: grid;
   padding: 0.25rem 0.45rem;

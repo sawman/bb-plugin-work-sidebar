@@ -268,6 +268,7 @@ describe("R2 server registration and disposal", () => {
       rowHeight: 40,
       textScale: 1,
       workingProviderAnimation: "slow-spin",
+      groupActivityPriority: ["error", "attention", "completed", "working"],
     });
     await expect(
       host.harness.behavior.callRpc("saveSidebarAppearance", {
@@ -277,6 +278,7 @@ describe("R2 server registration and disposal", () => {
       rowHeight: 40,
       textScale: 0.9,
       workingProviderAnimation: "slow-spin",
+      groupActivityPriority: ["error", "attention", "completed", "working"],
     });
     await expect(
       host.harness.behavior.callRpc("saveSidebarAppearance", {
@@ -286,6 +288,7 @@ describe("R2 server registration and disposal", () => {
       rowHeight: 40,
       textScale: 0.9,
       workingProviderAnimation: "sheen",
+      groupActivityPriority: ["error", "attention", "completed", "working"],
     });
     await expect(
       host.harness.behavior.callRpc("saveSidebarAppearance", {

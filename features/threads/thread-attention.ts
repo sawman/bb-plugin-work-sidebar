@@ -2,21 +2,16 @@ import { useEffect, useReducer } from "react";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
 import { normalizeIndicator } from "@/work-model";
+import {
+  DEFAULT_GROUP_ACTIVITY_PRIORITY,
+  prioritizeGroupActivity,
+  type GroupActivityPriority,
+  type ThreadGroupActivity,
+} from "./group-activity-priority";
 
 export const DEFAULT_STALE_WORKING_MINUTES = 30;
 export const STALE_WORKING_MS = DEFAULT_STALE_WORKING_MINUTES * 60 * 1_000;
-export type ThreadGroupActivity =
-  | "error"
-  | "attention"
-  | "completed"
-  | "working";
-
-const GROUP_ACTIVITY_PRIORITY: Record<ThreadGroupActivity, number> = {
-  error: 4,
-  attention: 3,
-  completed: 2,
-  working: 1,
-};
+export type { ThreadGroupActivity } from "./group-activity-priority";
 
 export function threadGroupActivity(
   thread: PluginSidebarThread,
@@ -56,6 +51,7 @@ export function threadTreeNeedsAttention(
 export function threadTreeGroupActivity(
   roots: readonly PluginSidebarThread[],
   childrenByThread: ReadonlyMap<string, readonly PluginSidebarThread[]>,
+  priority: GroupActivityPriority = DEFAULT_GROUP_ACTIVITY_PRIORITY,
 ): ThreadGroupActivity | null {
   const pending = [...roots];
   const visited = new Set<string>();
@@ -65,14 +61,7 @@ export function threadTreeGroupActivity(
     if (!thread || visited.has(thread.id)) continue;
     visited.add(thread.id);
     const candidate = threadGroupActivity(thread);
-    if (
-      candidate &&
-      (!activity ||
-        GROUP_ACTIVITY_PRIORITY[candidate] > GROUP_ACTIVITY_PRIORITY[activity])
-    ) {
-      activity = candidate;
-      if (activity === "error") return activity;
-    }
+    activity = prioritizeGroupActivity(activity, candidate, priority);
     pending.push(...(childrenByThread.get(thread.id) ?? []));
   }
   return activity;

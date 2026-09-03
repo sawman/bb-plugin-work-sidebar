@@ -5,6 +5,7 @@ import type { ThreadProviderDirectory } from "@/components/threads/thread-provid
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import type { RecycleBinEntry } from "./recycle-bin";
 import type { QueuedMessage } from "./schemas";
+import type { GroupActivityPriority } from "./group-activity-priority";
 
 type SidebarWorkViewProps = {
   toolbar: ReactNode;
@@ -15,6 +16,7 @@ type SidebarWorkViewProps = {
   subtextRefreshKey: number;
   staleWorkingMinutes: number;
   queuedMessagesByThread: ReadonlyMap<string, QueuedMessage>;
+  groupActivityPriority: GroupActivityPriority;
   searchQuery: string;
   emptyMessage: string;
   recycleBinEntries: readonly RecycleBinEntry[];
@@ -47,6 +49,7 @@ export function SidebarWorkView({
   subtextRefreshKey,
   staleWorkingMinutes,
   queuedMessagesByThread,
+  groupActivityPriority,
   searchQuery,
   emptyMessage,
   recycleBinEntries,
@@ -68,6 +71,7 @@ export function SidebarWorkView({
           subtextRefreshKey={subtextRefreshKey}
           staleWorkingMinutes={staleWorkingMinutes}
           queuedMessagesByThread={queuedMessagesByThread}
+          groupActivityPriority={groupActivityPriority}
           queuedMessageNow={queuedMessageNow}
           searchQuery={searchQuery}
           emptyMessage={emptyMessage}

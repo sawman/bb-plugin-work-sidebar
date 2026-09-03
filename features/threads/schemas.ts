@@ -6,6 +6,7 @@ import {
   MIN_TEXT_SCALE,
   WORKING_PROVIDER_ANIMATIONS,
 } from "./sidebar-appearance";
+import { GROUP_ACTIVITY_STATES } from "./group-activity-priority";
 
 const sidebarThreadGroup = z.object({
   id: z.string().regex(/^group_[a-z0-9_-]{1,48}$/),
@@ -16,6 +17,13 @@ const threadGroupDisclosures = z.record(z.string(), z.boolean()).refine(
   (disclosures) => Object.keys(disclosures).length <= 15,
   "At most 15 thread-group disclosure settings are supported.",
 );
+const groupActivityPriority = z
+  .array(z.enum(GROUP_ACTIVITY_STATES))
+  .length(GROUP_ACTIVITY_STATES.length)
+  .refine(
+    (items) => new Set(items).size === GROUP_ACTIVITY_STATES.length,
+    "Each group marker state must appear exactly once.",
+  );
 
 const archivedThread = z.object({
   id: z.string().startsWith("thr_"),
@@ -121,6 +129,7 @@ export const threadPreferenceSchemas = {
         workingProviderAnimation: z
           .enum(WORKING_PROVIDER_ANIMATIONS)
           .optional(),
+        groupActivityPriority: groupActivityPriority.optional(),
       })
       .strict(),
   },
@@ -139,6 +148,9 @@ export const threadPreferenceSchemas = {
         .object({
           workingProviderAnimation: z.enum(WORKING_PROVIDER_ANIMATIONS),
         })
+        .strict(),
+      z
+        .object({ groupActivityPriority })
         .strict(),
       z
         .object({
@@ -160,6 +172,7 @@ export const threadPreferenceSchemas = {
         workingProviderAnimation: z
           .enum(WORKING_PROVIDER_ANIMATIONS)
           .optional(),
+        groupActivityPriority: groupActivityPriority.optional(),
       })
       .strict(),
   },

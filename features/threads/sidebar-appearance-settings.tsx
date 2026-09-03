@@ -24,7 +24,7 @@ import {
   validateSidebarRowHeight,
   validateTextScale,
 } from "./sidebar-appearance";
-
+import { GroupActivityPriorityEditor } from "./group-activity-priority-editor";
 const ROW_HEIGHT_SETTING: NumericSettingDescriptor = {
   label: "Row height",
   min: MIN_SIDEBAR_ROW_HEIGHT,
@@ -35,7 +35,6 @@ const ROW_HEIGHT_SETTING: NumericSettingDescriptor = {
   successMessage: (value) => `Sidebar rows set to ${value}px`,
   initialValue: DEFAULT_SIDEBAR_ROW_HEIGHT,
 };
-
 const TEXT_SCALE_SETTING: NumericSettingDescriptor = {
   label: "Text scale",
   min: MIN_TEXT_SCALE,
@@ -46,7 +45,6 @@ const TEXT_SCALE_SETTING: NumericSettingDescriptor = {
   successMessage: (value) => `Text scale set to ${value}`,
   initialValue: DEFAULT_TEXT_SCALE,
 };
-
 type SidebarRowHeightEditorProps = {
   saved: number | undefined;
   savedVersion?: number;
@@ -55,7 +53,6 @@ type SidebarRowHeightEditorProps = {
   layout?: SettingsRowLayout;
   onSave(rowHeight: number): Promise<{ rowHeight: number }>;
 };
-
 function SidebarNumericEditor({
   setting,
   saved,
@@ -98,7 +95,6 @@ function SidebarNumericEditor({
     </SettingsCard>
   );
 }
-
 export function SidebarRowHeightEditor({
   saved,
   savedVersion,
@@ -131,7 +127,6 @@ type SidebarTextScaleEditorProps = {
   layout?: SettingsRowLayout;
   onSave(value: number): Promise<{ textScale: number }>;
 };
-
 export function SidebarTextScaleEditor({
   saved,
   savedVersion,
@@ -154,7 +149,6 @@ export function SidebarTextScaleEditor({
     />
   );
 }
-
 export function SidebarAppearanceSettings() {
   const preferences = useSidebarAppearancePreferences();
   const rowHeightVersion = useFieldSavedVersion(preferences.appearance.data?.rowHeight);
@@ -181,6 +175,15 @@ export function SidebarAppearanceSettings() {
         onSave={(workingProviderAnimation) =>
           preferences.saveWorkingProviderAnimation.mutateAsync(
             workingProviderAnimation,
+          )
+        }
+      />
+      <GroupActivityPriorityEditor
+        saved={preferences.appearance.data?.groupActivityPriority}
+        pending={preferences.saveGroupActivityPriority.isPending}
+        onSave={(groupActivityPriority) =>
+          preferences.saveGroupActivityPriority.mutateAsync(
+            groupActivityPriority,
           )
         }
       />

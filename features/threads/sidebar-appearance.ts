@@ -1,4 +1,9 @@
 import { DEFAULT_TEXT_SCALE } from "../../shared/text-scale";
+import {
+  DEFAULT_GROUP_ACTIVITY_PRIORITY,
+  normalizeGroupActivityPriority,
+  type GroupActivityPriority,
+} from "./group-activity-priority";
 
 export { DEFAULT_TEXT_SCALE } from "../../shared/text-scale";
 
@@ -28,6 +33,11 @@ export type WorkingProviderAnimation =
   (typeof WORKING_PROVIDER_ANIMATIONS)[number];
 export const DEFAULT_WORKING_PROVIDER_ANIMATION: WorkingProviderAnimation =
   "slow-spin";
+export {
+  DEFAULT_GROUP_ACTIVITY_PRIORITY,
+  normalizeGroupActivityPriority,
+  type GroupActivityPriority,
+} from "./group-activity-priority";
 
 export function splitWorkingProviderAnimation(value: WorkingProviderAnimation): {
   style: WorkingProviderAnimationStyle;

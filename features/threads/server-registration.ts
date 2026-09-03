@@ -51,7 +51,9 @@ export function createThreadRegistration(
     async saveSidebarAppearance(input) {
       if ("rowHeight" in input) return preferences.saveAppearance(input.rowHeight);
       if ("textScale" in input) return preferences.saveTextScale(input.textScale);
-      return preferences.saveWorkingProviderAnimation(input.workingProviderAnimation);
+      if ("workingProviderAnimation" in input)
+        return preferences.saveWorkingProviderAnimation(input.workingProviderAnimation);
+      return preferences.saveGroupActivityPriority(input.groupActivityPriority);
     },
     async moveSidebarThread(input) {
       return hierarchy.move(input);

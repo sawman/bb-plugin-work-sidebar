@@ -21,11 +21,13 @@ import { archiveDurationLabel } from "./model";
 import type { RecycleBinEntry } from "./recycle-bin";
 import { ThreadGroupSummary } from "./thread-group-summary";
 import { threadTreeGroupActivity } from "./thread-attention";
+import type { GroupActivityPriority } from "./group-activity-priority";
 
 type Project = { id: string; name: string; isPersonal: boolean };
 
 export function RecycleBinView({
   entries,
+  groupActivityPriority,
   threads,
   projectsById,
   providersById,
@@ -35,6 +37,7 @@ export function RecycleBinView({
   onOpenChange,
 }: {
   entries: readonly RecycleBinEntry[];
+  groupActivityPriority: GroupActivityPriority;
   threads: readonly PluginSidebarThread[];
   projectsById: ReadonlyMap<string, Project>;
   providersById: ThreadProviderDirectory;
@@ -79,6 +82,7 @@ export function RecycleBinView({
       return thread ? [thread] : [];
     }),
     new Map(),
+    groupActivityPriority,
   );
   return (
     <details

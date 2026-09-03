@@ -907,6 +907,42 @@ describe("R18 registered left sidebar parity", () => {
     slot.lifecycle.unmount();
   });
 
+  it("uses the saved marker order for a group with multiple states", async () => {
+    const working = thread("thr_working", "Working");
+    working.indicator = "runtime";
+    const completed = thread("thr_completed", "Completed");
+    completed.indicator = "unread-success";
+    const slot = await leftSlot({
+      threads: [working, completed],
+      groups: [
+        {
+          id: "group_later",
+          name: "Later",
+          threadIds: [working.id, completed.id],
+        },
+      ],
+      rpc: {
+        getSidebarAppearance: () => ({
+          rowHeight: 40,
+          groupActivityPriority: [
+            "working",
+            "completed",
+            "attention",
+            "error",
+          ],
+        }),
+      },
+    });
+    await waitFor(() => expect(slot.getByText("Later")).toBeTruthy());
+    const group = slot.getByText("Later").closest("summary")!;
+    expect(
+      within(group)
+        .getByRole("img", { name: "Group working" })
+        .getAttribute("data-tone"),
+    ).toBe("working");
+    slot.lifecycle.unmount();
+  });
+
   it("creates a custom group through the settings dialog without a browser prompt", async () => {
     const saveGroups = vi.fn(({ groups }: { groups: unknown[] }) => ({
       groups,

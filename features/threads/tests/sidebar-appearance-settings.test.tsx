@@ -250,6 +250,50 @@ describe("sidebar appearance settings", () => {
     );
   });
 
+  it("orders group activity markers with a persistent, accessible control", async () => {
+    const save = vi.fn(async () => ({
+      rowHeight: 40,
+      textScale: 1,
+      groupActivityPriority: [
+        "error",
+        "attention",
+        "working",
+        "completed",
+      ],
+    }));
+    const app = await loadPluginApp(() => import("../../../app"));
+    const section = app.settingsSections.find(
+      ({ id }) => id === "sidebar-appearance",
+    )!;
+    const slot = renderSlot(
+      section,
+      {},
+      {
+        rpc: {
+          getSidebarAppearance: () => ({ rowHeight: 40, textScale: 1 }),
+          saveSidebarAppearance: save,
+        } as never,
+      },
+    );
+    const list = await slot.findByRole("list", {
+      name: "Group marker priority",
+    });
+    expect(list.textContent).toContain("Error");
+    expect(list.textContent).toContain("Working");
+    fireEvent.click(slot.getByRole("button", { name: "Move Working up" }));
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith({
+        groupActivityPriority: [
+          "error",
+          "attention",
+          "working",
+          "completed",
+        ],
+      }),
+    );
+    expect(toast.success).toHaveBeenCalledWith("Group marker priority saved");
+  });
+
   it("does not let a row-height update restart the text-scale debounce", async () => {
     const save = vi.fn(async (update: { textScale?: number }) => ({
       rowHeight: 47,

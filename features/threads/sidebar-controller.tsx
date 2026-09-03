@@ -23,9 +23,12 @@ import { useTaskLinksRead } from "@/features/tasks/queries";
 import { PullRequestsLeftSidebar } from "@/features/pull-requests/left-sidebar";
 import { invalidateSidebarPullRequestStacks } from "@/features/pull-requests/queries";
 import type { PullRequestThreadReference } from "@/features/pull-requests/thread-link";
-import { DEFAULT_SIDEBAR_ROW_HEIGHT } from "./sidebar-appearance";
-import { DEFAULT_TEXT_SCALE } from "./sidebar-appearance";
-import { DEFAULT_WORKING_PROVIDER_ANIMATION } from "./sidebar-appearance";
+import {
+  DEFAULT_SIDEBAR_ROW_HEIGHT,
+  DEFAULT_TEXT_SCALE,
+  DEFAULT_WORKING_PROVIDER_ANIMATION,
+} from "./sidebar-appearance";
+import { DEFAULT_GROUP_ACTIVITY_PRIORITY } from "./group-activity-priority";
 import "../../app.css";
 import "../../scrollbar.css";
 import "../../views.css";
@@ -49,7 +52,6 @@ import { ThreadHierarchyProvider } from "./thread-hierarchy-context";
 import { ThreadHierarchyPickerHost } from "./thread-hierarchy-picker-host";
 import { TextScaleProvider, textScaleStyle } from "../../shared/text-scale";
 import { useGroupDisclosurePreference } from "./use-group-disclosure-preference";
-
 const SIDEBAR_TABS: readonly { id: SidebarView; label: string }[] = (
   ["work", "queue", "prs"] as const
 ).map((id) => ({ id, label: sidebarViewLabel(id) }));
@@ -58,7 +60,6 @@ const EMPTY_TASK_OWNER_THREADS: ReadonlyMap<
   { title: string; providerId: string; provider?: ThreadProvider }
 > = new Map();
 const EMPTY_PULL_REQUEST_THREADS: readonly PullRequestThreadReference[] = [];
-
 function EmptyOriginal() {
   return null;
 }
@@ -227,11 +228,9 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   if (status !== "ready") return <Original />;
 
   const taskLinks = taskLinksData?.links ?? {};
-  const textScale =
-    threadPreferences.appearance.data?.textScale ?? DEFAULT_TEXT_SCALE;
-  const workingProviderAnimation =
-    threadPreferences.appearance.data?.workingProviderAnimation ??
-    DEFAULT_WORKING_PROVIDER_ANIMATION;
+  const textScale = threadPreferences.appearance.data?.textScale ?? DEFAULT_TEXT_SCALE;
+  const workingProviderAnimation = threadPreferences.appearance.data?.workingProviderAnimation ?? DEFAULT_WORKING_PROVIDER_ANIMATION;
+  const groupActivityPriority = threadPreferences.appearance.data?.groupActivityPriority ?? DEFAULT_GROUP_ACTIVITY_PRIORITY;
   const settings = (
     <ThreadListSettings
       rowHeight={threadPreferences.appearance.data?.rowHeight}
@@ -329,6 +328,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
                 pluginSettings.values?.stuckThreadMinutes ?? "30",
               )}
               queuedMessagesByThread={queuedMessagesByThread}
+              groupActivityPriority={groupActivityPriority}
               searchQuery={effectiveThreadSearchQuery}
               emptyMessage={
                 effectiveThreadSearchQuery

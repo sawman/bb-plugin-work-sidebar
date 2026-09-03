@@ -14,6 +14,10 @@ import {
   useStaleWorking,
 } from "../thread-attention";
 import {
+  normalizeGroupActivityPriority,
+  type GroupActivityPriority,
+} from "../group-activity-priority";
+import {
   ThreadRuntimeProvider,
   ThreadStatus,
 } from "../thread-row-presentation";
@@ -143,6 +147,31 @@ describe("thread attention presentation", () => {
         new Map([[root.id, [completed, waiting, errored]]]),
       ),
     ).toBe("error");
+  });
+
+  it("uses the saved marker ordering while rejecting incomplete orders", () => {
+    const root = thread({ id: "root", indicator: "runtime" });
+    const completed = thread({
+      id: "completed",
+      parentThreadId: root.id,
+      indicator: "unread-success",
+    });
+    const priority: GroupActivityPriority = [
+      "working",
+      "completed",
+      "attention",
+      "error",
+    ];
+    expect(
+      threadTreeGroupActivity(
+        [root],
+        new Map([[root.id, [completed]]]),
+        priority,
+      ),
+    ).toBe("working");
+    expect(
+      normalizeGroupActivityPriority(["error", "error", "working"]),
+    ).toEqual(["error", "attention", "completed", "working"]);
   });
 
   it("does not paint an unread or completion dot", () => {

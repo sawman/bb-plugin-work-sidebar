@@ -10,6 +10,7 @@ import type { QueuedMessage } from "./schemas";
 import { threadTreeGroupActivity } from "./thread-attention";
 import { SidebarThreadTree } from "./sidebar-thread-tree";
 import { ThreadGroupSummary } from "./thread-group-summary";
+import type { GroupActivityPriority } from "./group-activity-priority";
 type SidebarGroupTreeProps = {
   organization: SidebarThreadOrganization;
   activeThreadId: string | null;
@@ -18,6 +19,7 @@ type SidebarGroupTreeProps = {
   subtextRefreshKey: number;
   staleWorkingMinutes: number;
   queuedMessagesByThread: ReadonlyMap<string, QueuedMessage>;
+  groupActivityPriority: GroupActivityPriority;
   queuedMessageNow: number;
   searchQuery: string;
   emptyMessage: string;
@@ -36,6 +38,7 @@ export function SidebarThreadGroups({
   subtextRefreshKey,
   staleWorkingMinutes,
   queuedMessagesByThread,
+  groupActivityPriority,
   queuedMessageNow,
   searchQuery,
   emptyMessage,
@@ -110,6 +113,7 @@ export function SidebarThreadGroups({
                   activity={threadTreeGroupActivity(
                     organization.activeRoots,
                     organization.activeChildren,
+                    groupActivityPriority,
                   )}
                 />
                 <SidebarThreadTree
@@ -146,6 +150,7 @@ export function SidebarThreadGroups({
                 activity={threadTreeGroupActivity(
                   roots,
                   tree?.children ?? new Map(),
+                  groupActivityPriority,
                 )}
               />
               {roots.length > 0 ? (
@@ -167,6 +172,7 @@ export function SidebarThreadGroups({
         })}
         <RecycleBinView
           entries={recycleBinEntries}
+          groupActivityPriority={groupActivityPriority}
           threads={allThreads}
           projectsById={organization.projectsById}
           providersById={providersById}

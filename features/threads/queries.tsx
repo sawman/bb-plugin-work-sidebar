@@ -19,6 +19,7 @@ import {
   type SidebarThreadGroupPreferences,
 } from "./model";
 import type { WorkingProviderAnimation } from "./sidebar-appearance";
+import type { GroupActivityPriority } from "./group-activity-priority";
 import { invalidateTaskQueries } from "../tasks/mutations";
 import { invalidateTracker } from "../tracker/queries";
 import { invalidateWorkContextCards } from "../work-context/queries";
@@ -45,11 +46,13 @@ export type SidebarAppearance = {
   rowHeight: number;
   textScale: number;
   workingProviderAnimation?: WorkingProviderAnimation;
+  groupActivityPriority?: GroupActivityPriority;
 };
 export type SidebarAppearanceUpdate =
   | { rowHeight: number }
   | { textScale: number }
-  | { workingProviderAnimation: WorkingProviderAnimation };
+  | { workingProviderAnimation: WorkingProviderAnimation }
+  | { groupActivityPriority: GroupActivityPriority };
 
 export function useThreadHierarchyMutation(rpc: ThreadsRpc) {
   const client = useQueryClient();
@@ -94,18 +97,29 @@ export async function saveSidebarAppearance(
 function useSaveSidebarAppearance(
   rpc: ThreadsRpc,
   client: QueryClient,
-  field: "rowHeight" | "textScale" | "workingProviderAnimation",
+  field:
+    | "rowHeight"
+    | "textScale"
+    | "workingProviderAnimation"
+    | "groupActivityPriority",
 ) {
   return useMutation({
-    mutationFn: (value: number | WorkingProviderAnimation) =>
+    mutationFn: (
+      value: number | WorkingProviderAnimation | GroupActivityPriority,
+    ) =>
       saveSidebarAppearance(
         client,
         rpc,
         field === "rowHeight"
           ? { rowHeight: value as number }
           : field === "textScale"
-            ? { textScale: value as number }
-            : { workingProviderAnimation: value as WorkingProviderAnimation },
+          ? { textScale: value as number }
+            : field === "workingProviderAnimation"
+              ? {
+                  workingProviderAnimation:
+                    value as WorkingProviderAnimation,
+                }
+              : { groupActivityPriority: value as GroupActivityPriority },
       ),
   });
 }
@@ -121,11 +135,17 @@ export function useSidebarAppearancePreferences() {
     client,
     "workingProviderAnimation",
   );
+  const saveGroupActivityPriority = useSaveSidebarAppearance(
+    rpc,
+    client,
+    "groupActivityPriority",
+  );
   return {
     appearance,
     saveRowHeight,
     saveTextScale,
     saveWorkingProviderAnimation,
+    saveGroupActivityPriority,
   };
 }
 
@@ -182,6 +202,8 @@ export function useThreadPreferences() {
   const saveTextScale = appearancePreferences.saveTextScale;
   const saveWorkingProviderAnimation =
     appearancePreferences.saveWorkingProviderAnimation;
+  const saveGroupActivityPriority =
+    appearancePreferences.saveGroupActivityPriority;
   useRealtime("sidebar-order:changed", () => {
     for (const key of [
       threadQueryKeys.order(),
@@ -217,6 +239,7 @@ export function useThreadPreferences() {
     saveRowHeight,
     saveTextScale,
     saveWorkingProviderAnimation,
+    saveGroupActivityPriority,
     saveGroups,
     saveOrder,
   };

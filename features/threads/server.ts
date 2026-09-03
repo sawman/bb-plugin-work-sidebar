@@ -7,6 +7,7 @@ import {
 } from "./model";
 import {
   normalizeSidebarRowHeight,
+  normalizeGroupActivityPriority,
   validateSidebarRowHeight,
   normalizeTextScale,
   normalizeWorkingProviderAnimation,
@@ -27,6 +28,7 @@ export const THREAD_PREFERENCE_KEYS = {
   appearance: "sidebar-appearance:v1",
   textScale: "sidebar-text-scale:v1",
   workingProviderAnimation: "sidebar-working-provider-animation:v1",
+  groupActivityPriority: "sidebar-group-activity-priority:v1",
   recycleBin: "sidebar-recycle-bin:v1",
 } as const;
 
@@ -155,6 +157,9 @@ export function createThreadPreferencesService(
       ),
       workingProviderAnimation: normalizeWorkingProviderAnimation(
         await adapter.get(THREAD_PREFERENCE_KEYS.workingProviderAnimation),
+      ),
+      groupActivityPriority: normalizeGroupActivityPriority(
+        await adapter.get(THREAD_PREFERENCE_KEYS.groupActivityPriority),
       ),
     };
   }
@@ -292,6 +297,21 @@ export function createThreadPreferencesService(
       await adapter.set(THREAD_PREFERENCE_KEYS.workingProviderAnimation, value);
       adapter.publish(THREAD_PREFERENCE_CHANNEL, {
         appearance: { workingProviderAnimation: value },
+      });
+      return appearance();
+    },
+    async saveGroupActivityPriority(groupActivityPriority: unknown) {
+      const value = normalizeGroupActivityPriority(groupActivityPriority);
+      if (
+        !Array.isArray(groupActivityPriority) ||
+        groupActivityPriority.length !== value.length ||
+        groupActivityPriority.some((item, index) => item !== value[index])
+      ) {
+        throw new Error("Choose each group marker state exactly once.");
+      }
+      await adapter.set(THREAD_PREFERENCE_KEYS.groupActivityPriority, value);
+      adapter.publish(THREAD_PREFERENCE_CHANNEL, {
+        appearance: { groupActivityPriority: value },
       });
       return appearance();
     },
