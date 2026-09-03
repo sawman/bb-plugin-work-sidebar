@@ -245,6 +245,47 @@ describe("R13 registered Changes Work slot", () => {
     expect(getChanges).toHaveBeenCalledTimes(2);
     slot.lifecycle.unmount();
   });
+  it("shows the shared PR fact while thread-specific Changes data is loading", async () => {
+    const pending = deferred<ChangesResult>();
+    const sharedPullRequest = {
+      number: 42,
+      title: "Shared current PR",
+      url: "https://github.com/acme/repo/pull/42",
+      state: "open",
+      head: "feature/shared",
+      base: "main",
+      checks: {
+        failedCount: 0,
+        passedCount: 2,
+        pendingCount: 0,
+        state: "passing",
+        totalCount: 2,
+      },
+      review: { reviewRequestCount: 0, state: "approved" },
+      attention: "none",
+      mergeability: {
+        mergeStateStatus: "CLEAN",
+        mergeable: "MERGEABLE",
+        state: "mergeable",
+      },
+      signal: { checks: "passing", review: "approved", reviewCommentCount: 0 },
+    };
+    const slot = await changesSlot({
+      getChanges: () => pending.promise,
+      threadPullRequests: { thr_changes: sharedPullRequest },
+    });
+    await waitFor(() =>
+      expect(slot.getByText(/#42 Shared current PR/)).toBeTruthy(),
+    );
+    expect(
+      slot.getByText("Loading pull requests and working-tree changes…"),
+    ).toBeTruthy();
+    pending.resolve(changesResult(repository("available"), {
+      currentPullRequest: sharedPullRequest,
+    }));
+    await waitFor(() => expect(slot.getByText("Clean")).toBeTruthy());
+    slot.lifecycle.unmount();
+  });
   it("renders the non-stack Current PR and discloses stack branch files through the PR row", async () => {
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,

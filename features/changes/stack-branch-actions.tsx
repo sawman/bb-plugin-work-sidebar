@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import type { GitHubStackBranch } from "../../contracts.js";
 import { Icon } from "../../components/ui/icon.js";
 import { ActionTooltip } from "../../components/ui/action-tooltip.js";
-import { BbUrlLink } from "../../components/ui/url-link.js";
+import { PullRequestUrlLink } from "../pull-requests/pull-request-url-link.js";
 
 type StackBranchActionsProps = {
   pullRequest: GitHubStackBranch["pr"];
@@ -13,6 +13,7 @@ type StackBranchActionsProps = {
   hasDisclosure: boolean;
   expanded: boolean;
   filesLabel: string;
+  externalOnModifier: boolean;
   onCheckout(): void;
   onToggle(): void;
 };
@@ -26,6 +27,7 @@ export function StackBranchActions({
   hasDisclosure,
   expanded,
   filesLabel,
+  externalOnModifier,
   onCheckout,
   onToggle,
 }: StackBranchActionsProps): ReactElement {
@@ -42,13 +44,14 @@ export function StackBranchActions({
         {pullRequest && (
           <ActionTooltip label="GitHub">
             {(tooltipId) => (
-              <BbUrlLink
+              <PullRequestUrlLink
                 href={pullRequest.url}
+                externalOnModifier={externalOnModifier}
                 aria-label={`Open pull request #${pullRequest.number} on GitHub`}
                 aria-describedby={tooltipId}
               >
                 ↗
-              </BbUrlLink>
+              </PullRequestUrlLink>
             )}
           </ActionTooltip>
         )}

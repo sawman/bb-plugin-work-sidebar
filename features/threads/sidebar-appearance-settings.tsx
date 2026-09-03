@@ -1,10 +1,7 @@
-import { useId } from "react";
-import { toast } from "sonner";
 import { useSidebarAppearancePreferences } from "./queries";
 import {
   NumericAutosaveEditor,
   SettingsCard,
-  SettingsLabel,
   useFieldSavedVersion,
   type NumericSettingDescriptor,
   type SettingsRowLayout,
@@ -16,15 +13,12 @@ import {
   MAX_TEXT_SCALE,
   MIN_SIDEBAR_ROW_HEIGHT,
   MIN_TEXT_SCALE,
-  DEFAULT_WORKING_PROVIDER_ANIMATION,
-  WORKING_PROVIDER_ANIMATION_SPEEDS,
-  WORKING_PROVIDER_ANIMATION_STYLES,
-  splitWorkingProviderAnimation,
-  type WorkingProviderAnimation,
   validateSidebarRowHeight,
   validateTextScale,
 } from "./sidebar-appearance";
 import { GroupActivityPriorityEditor } from "./group-activity-priority-editor";
+import { ExternalPrModifierEditor } from "./external-pr-modifier-editor";
+import { WorkingProviderAnimationEditor } from "./working-provider-animation-editor";
 const ROW_HEIGHT_SETTING: NumericSettingDescriptor = {
   label: "Row height",
   min: MIN_SIDEBAR_ROW_HEIGHT,
@@ -112,7 +106,9 @@ export function SidebarRowHeightEditor({
       compact={compact}
       layout={layout}
       onSave={async (value) => (await onSave(value)).rowHeight}
-      className={compact ? "ws-sidebar-row-height-editor" : "ws-sidebar-appearance-field"}
+      className={
+        compact ? "ws-sidebar-row-height-editor" : "ws-sidebar-appearance-field"
+      }
       cardClassName="ws-sidebar-appearance-settings"
       cardTitle="Sidebar appearance"
     />
@@ -144,17 +140,26 @@ export function SidebarTextScaleEditor({
       compact={compact}
       layout={layout}
       onSave={async (value) => (await onSave(value)).textScale}
-      className={compact ? "ws-sidebar-text-scale-editor" : "ws-sidebar-appearance-field"}
+      className={
+        compact ? "ws-sidebar-text-scale-editor" : "ws-sidebar-appearance-field"
+      }
       cardClassName="ws-sidebar-text-scale-editor"
     />
   );
 }
 export function SidebarAppearanceSettings() {
   const preferences = useSidebarAppearancePreferences();
-  const rowHeightVersion = useFieldSavedVersion(preferences.appearance.data?.rowHeight);
-  const textScaleVersion = useFieldSavedVersion(preferences.appearance.data?.textScale);
+  const rowHeightVersion = useFieldSavedVersion(
+    preferences.appearance.data?.rowHeight,
+  );
+  const textScaleVersion = useFieldSavedVersion(
+    preferences.appearance.data?.textScale,
+  );
   return (
-    <SettingsCard className="ws-sidebar-appearance-settings" title="Sidebar appearance">
+    <SettingsCard
+      className="ws-sidebar-appearance-settings"
+      title="Sidebar appearance"
+    >
       <SidebarRowHeightEditor
         saved={preferences.appearance.data?.rowHeight}
         savedVersion={rowHeightVersion}
@@ -187,93 +192,13 @@ export function SidebarAppearanceSettings() {
           )
         }
       />
+      <ExternalPrModifierEditor
+        saved={preferences.appearance.data?.openPrLinksExternallyWithModifier}
+        pending={preferences.saveOpenPrLinksExternallyWithModifier.isPending}
+        onSave={(value) =>
+          preferences.saveOpenPrLinksExternallyWithModifier.mutateAsync(value)
+        }
+      />
     </SettingsCard>
-  );
-}
-
-const workingProviderAnimationLabels: Record<WorkingProviderAnimation, string> =
-  {
-    none: "No motion",
-    ...Object.fromEntries(
-      WORKING_PROVIDER_ANIMATION_STYLES.filter(
-        (style) => style !== "none",
-      ).flatMap((style) =>
-        WORKING_PROVIDER_ANIMATION_SPEEDS.map((speed) => [
-          `${speed}-${style}`,
-          `${speed[0]!.toUpperCase()}${speed.slice(1)} ${style}`,
-        ]),
-      ),
-    ),
-  } as Record<WorkingProviderAnimation, string>;
-
-function WorkingProviderAnimationEditor({
-  saved,
-  pending,
-  onSave,
-}: {
-  saved: WorkingProviderAnimation | undefined;
-  pending: boolean;
-  onSave(value: WorkingProviderAnimation): Promise<unknown>;
-}) {
-  const id = useId();
-  const value = saved ?? DEFAULT_WORKING_PROVIDER_ANIMATION;
-  const { style, speed } = splitWorkingProviderAnimation(value);
-  const save = (nextStyle: typeof style, nextSpeed: typeof speed) => {
-    const next =
-      nextStyle === "none"
-        ? "none"
-        : (`${nextSpeed}-${nextStyle}` as WorkingProviderAnimation);
-    void onSave(next)
-      .then(() =>
-        toast.success(
-          `Working animation set to ${workingProviderAnimationLabels[next]}`,
-        ),
-      )
-      .catch((error: unknown) =>
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Could not save working provider animation",
-        ),
-      );
-  };
-  return (
-    <fieldset className="ws-sidebar-appearance-field ws-working-animation-field">
-      <legend>Working provider animation</legend>
-      <div className="ws-working-animation-controls">
-        <SettingsLabel htmlFor={`${id}-style`}>Style</SettingsLabel>
-        <select
-          id={`${id}-style`}
-          value={style}
-          disabled={pending}
-          onChange={(event) =>
-            save(event.currentTarget.value as typeof style, speed)
-          }
-        >
-          {WORKING_PROVIDER_ANIMATION_STYLES.map((item) => (
-            <option key={item} value={item}>
-              {item === "none"
-                ? "None"
-                : item[0]!.toUpperCase() + item.slice(1)}
-            </option>
-          ))}
-        </select>
-        <SettingsLabel htmlFor={`${id}-speed`}>Speed</SettingsLabel>
-        <select
-          id={`${id}-speed`}
-          value={speed}
-          disabled={pending || style === "none"}
-          onChange={(event) =>
-            save(style, event.currentTarget.value as typeof speed)
-          }
-        >
-          {WORKING_PROVIDER_ANIMATION_SPEEDS.map((item) => (
-            <option key={item} value={item}>
-              {item[0]!.toUpperCase() + item.slice(1)}
-            </option>
-          ))}
-        </select>
-      </div>
-    </fieldset>
   );
 }

@@ -48,6 +48,44 @@ beforeEach(() => {
 });
 
 describe("sidebar appearance settings", () => {
+  it("persists whether modified PR links open externally", async () => {
+    const save = vi.fn(async () => ({
+      rowHeight: 40,
+      textScale: 1,
+      openPrLinksExternallyWithModifier: true,
+    }));
+    const app = await loadPluginApp(() => import("../../../app"));
+    const section = app.settingsSections.find(
+      ({ id }) => id === "sidebar-appearance",
+    )!;
+    const slot = renderSlot(
+      section,
+      {},
+      {
+        rpc: {
+          getSidebarAppearance: () => ({
+            rowHeight: 40,
+            textScale: 1,
+            openPrLinksExternallyWithModifier: false,
+          }),
+          saveSidebarAppearance: save,
+        } as never,
+      },
+    );
+    const toggle = await slot.findByRole("checkbox", {
+      name: "Open PRs externally with ⌘/Ctrl-click",
+    });
+    await waitFor(() =>
+      expect((toggle as HTMLInputElement).checked).toBe(false),
+    );
+    fireEvent.click(toggle);
+    await waitFor(() =>
+      expect(save).toHaveBeenCalledWith({
+        openPrLinksExternallyWithModifier: true,
+      }),
+    );
+  });
+
   it("validates the bounded compact/default/comfortable text scale", () => {
     expect(validateTextScale("0.9")).toEqual({ value: 0.9, error: null });
     expect(validateTextScale("1")).toEqual({ value: 1, error: null });

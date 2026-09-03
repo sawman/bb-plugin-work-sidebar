@@ -25,6 +25,7 @@ import {
   uniqueThreadsByBranch,
   type PullRequestThreadReference,
 } from "./thread-link";
+import { DEFAULT_OPEN_PR_LINKS_EXTERNALLY_WITH_MODIFIER } from "../threads/sidebar-appearance";
 
 const EMPTY_PULL_REQUESTS: AuthoredPullRequest[] = [];
 const EMPTY_THREADS_BY_BRANCH = new Map<string, PullRequestThreadReference>();
@@ -41,6 +42,7 @@ export interface PullRequestsLeftSidebarProps {
   threadPullRequests?: ThreadPullRequestDirectory;
   onOpenThread(threadId: string): void;
   settingsControl: ReactNode;
+  externalOnModifier?: boolean;
 }
 
 /** The Pull Requests slice owns authored-PR loading, drafting, grouping and selection. */
@@ -51,6 +53,7 @@ export function PullRequestsLeftSidebar({
   threadPullRequests,
   onOpenThread,
   settingsControl,
+  externalOnModifier = DEFAULT_OPEN_PR_LINKS_EXTERNALLY_WITH_MODIFIER,
 }: PullRequestsLeftSidebarProps) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
@@ -160,13 +163,15 @@ export function PullRequestsLeftSidebar({
           context={
             health ? (
               <ActionTooltip label={health.detail}>
-                {(tooltipId) => <span
-                className={`ws-github-api-indicator ws-github-api-${health.tone}`}
-                aria-describedby={tooltipId}
-                >
-                <Icon name={health.icon} aria-hidden />
-                {health.label}
-                </span>}
+                {(tooltipId) => (
+                  <span
+                    className={`ws-github-api-indicator ws-github-api-${health.tone}`}
+                    aria-describedby={tooltipId}
+                  >
+                    <Icon name={health.icon} aria-hidden />
+                    {health.label}
+                  </span>
+                )}
               </ActionTooltip>
             ) : undefined
           }
@@ -213,6 +218,7 @@ export function PullRequestsLeftSidebar({
                       repository={group.repository}
                       rpc={rpc}
                       changingDraftUrl={changingDraftUrl}
+                      externalOnModifier={externalOnModifier}
                       onOpenPullRequest={(url) => navigate.openUrl(url)}
                       onToggleDraft={toggleDraft}
                       onOpenThread={onOpenThread}
@@ -235,6 +241,7 @@ export function PullRequestsLeftSidebar({
                           ]
                         }
                         changingDraft={changingDraftUrl === pullRequest.url}
+                        externalOnModifier={externalOnModifier}
                         onOpenPullRequest={(url) => navigate.openUrl(url)}
                         onOpenThread={onOpenThread}
                         onToggleDraft={toggleDraft}

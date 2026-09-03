@@ -14,6 +14,8 @@ import {
   pullRequestSummaryPresentation,
 } from "../pull-requests/presentation";
 import { StackNumberBadge } from "../pull-requests/stack-number";
+import { useSidebarAppearance } from "../threads/queries";
+import { DEFAULT_OPEN_PR_LINKS_EXTERNALLY_WITH_MODIFIER } from "../threads/sidebar-appearance";
 import { mergeStackBranchSignals } from "./model";
 import {
   useChanges,
@@ -40,6 +42,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
       Number(pluginSettings?.githubBackgroundPollSeconds ?? "300") * 1_000,
   });
   const threadPullRequests = useSharedThreadPullRequestDirectory();
+  const sidebarAppearance = useSidebarAppearance();
   const githubHealthQuery = useGitHubApiHealth(rpc, { poll: false });
   const githubApiHealth = githubHealthQuery.data ?? {
     state: "available" as const,
@@ -92,15 +95,19 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
       : null;
   const directoryPullRequest = threadPullRequests.data?.[threadId] ?? null;
   const projectedPullRequest = changesQuery.data?.currentPullRequest ?? null;
-  // A directory fact belongs to this projection only when its PR identity
-  // still matches. This keeps a branch switch from briefly painting an old PR.
-  const currentPullRequest =
-    directoryPullRequest &&
-    projectedPullRequest &&
-    directoryPullRequest.number === projectedPullRequest.number &&
-    directoryPullRequest.url === projectedPullRequest.url
+  // The directory gives all panes one normalized PR fact immediately. The
+  // Changes projection remains authoritative once it identifies its branch,
+  // preventing a previous branch from flashing during a switch.
+  const currentPullRequest = projectedPullRequest
+    ? directoryPullRequest &&
+      directoryPullRequest.number === projectedPullRequest.number &&
+      directoryPullRequest.url === projectedPullRequest.url
       ? directoryPullRequest
-      : projectedPullRequest;
+      : projectedPullRequest
+    : directoryPullRequest;
+  const externalOnModifier =
+    sidebarAppearance.data?.openPrLinksExternallyWithModifier ??
+    DEFAULT_OPEN_PR_LINKS_EXTERNALLY_WITH_MODIFIER;
   const currentPullRequestNumber =
     currentPullRequest?.number ?? changesQuery.data?.stack?.currentPullRequest;
   const currentPullRequestStatus = currentPullRequest
@@ -122,9 +129,9 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
   ) : null;
   const standaloneBranch = changesQuery.data?.stack
     ? null
-    : githubStack?.branches.find(
+    : (githubStack?.branches.find(
         (branch) => branch.pr?.number === currentPullRequestNumber,
-      ) ?? null;
+      ) ?? null);
   const githubHealth = githubHealthPresentation(githubApiHealth);
   const contextMeta = (
     <>
@@ -150,7 +157,10 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
           title={currentPullRequestStatus?.label ?? "Pull request"}
           tone={currentPullRequestStatus?.tone}
         >
-          <Icon name={currentPullRequestStatus?.icon ?? "GitPullRequest"} aria-hidden />
+          <Icon
+            name={currentPullRequestStatus?.icon ?? "GitPullRequest"}
+            aria-hidden
+          />
           <span aria-hidden>#{currentPullRequestNumber}</span>
         </CopyBadge>
       ) : null}
@@ -170,7 +180,9 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
           changesInteractionStore.getState().toggleRepository(threadId)
         }
         onOpenFile={openWorkingTreeDiff}
-        preview={selectedPullRequestNumber === null ? selectedDiffPreview : null}
+        preview={
+          selectedPullRequestNumber === null ? selectedDiffPreview : null
+        }
       />
       {changesQuery.isError && (
         <ChangesError
@@ -178,8 +190,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
           onRetry={() => void changesQuery.refetch()}
         />
       )}
-      {!changesQuery.isPending &&
-        !changesQuery.isError &&
+      {!changesQuery.isError &&
         (stack ? (
           <ol
             className="ws-stack-rail"
@@ -195,6 +206,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
                   currentPullRequest,
                 )}
                 expanded={expandedStackBranches.has(branch.name)}
+                externalOnModifier={externalOnModifier}
                 checkingOut={
                   checkout.isPending && checkout.variables === branch.name
                 }
@@ -220,14 +232,12 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
             pullRequest={currentPullRequest}
             branch={standaloneBranch}
             expanded={presentation?.currentPullRequestExpanded ?? false}
+            externalOnModifier={externalOnModifier}
             onToggle={() =>
               changesInteractionStore.getState().togglePullRequest(threadId)
             }
             onOpenFile={(path) =>
-              openPullRequestDiff(
-                currentPullRequest.number,
-                path,
-              )
+              openPullRequestDiff(currentPullRequest.number, path)
             }
             preview={
               currentPullRequest.number === selectedPullRequestNumber
@@ -235,11 +245,11 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
                 : null
             }
           />
-        ) : (
+        ) : !changesQuery.isPending ? (
           <div className="ws-empty">
             No pull request is linked to this thread.
           </div>
-        ))}
+        ) : null)}
     </div>
   );
 }

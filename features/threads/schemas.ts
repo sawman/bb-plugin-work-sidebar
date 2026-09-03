@@ -130,6 +130,7 @@ export const threadPreferenceSchemas = {
           .enum(WORKING_PROVIDER_ANIMATIONS)
           .optional(),
         groupActivityPriority: groupActivityPriority.optional(),
+        openPrLinksExternallyWithModifier: z.boolean().optional(),
       })
       .strict(),
   },
@@ -153,6 +154,9 @@ export const threadPreferenceSchemas = {
         .object({ groupActivityPriority })
         .strict(),
       z
+        .object({ openPrLinksExternallyWithModifier: z.boolean() })
+        .strict(),
+      z
         .object({
           textScale: z
             .number()
@@ -173,6 +177,7 @@ export const threadPreferenceSchemas = {
           .enum(WORKING_PROVIDER_ANIMATIONS)
           .optional(),
         groupActivityPriority: groupActivityPriority.optional(),
+        openPrLinksExternallyWithModifier: z.boolean().optional(),
       })
       .strict(),
   },

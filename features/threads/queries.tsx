@@ -47,12 +47,14 @@ export type SidebarAppearance = {
   textScale: number;
   workingProviderAnimation?: WorkingProviderAnimation;
   groupActivityPriority?: GroupActivityPriority;
+  openPrLinksExternallyWithModifier?: boolean;
 };
 export type SidebarAppearanceUpdate =
   | { rowHeight: number }
   | { textScale: number }
   | { workingProviderAnimation: WorkingProviderAnimation }
-  | { groupActivityPriority: GroupActivityPriority };
+  | { groupActivityPriority: GroupActivityPriority }
+  | { openPrLinksExternallyWithModifier: boolean };
 
 export function useThreadHierarchyMutation(rpc: ThreadsRpc) {
   const client = useQueryClient();
@@ -84,6 +86,12 @@ function sidebarAppearanceQuery(rpc: ThreadsRpc) {
   } as const;
 }
 
+/** Shared, durable plugin appearance preference. Consumers only observe it. */
+export function useSidebarAppearance() {
+  const rpc = useRpc<typeof rpcContract>();
+  return useQuery(sidebarAppearanceQuery(rpc));
+}
+
 export async function saveSidebarAppearance(
   client: QueryClient,
   rpc: ThreadsRpc,
@@ -101,11 +109,16 @@ function useSaveSidebarAppearance(
     | "rowHeight"
     | "textScale"
     | "workingProviderAnimation"
-    | "groupActivityPriority",
+    | "groupActivityPriority"
+    | "openPrLinksExternallyWithModifier",
 ) {
   return useMutation({
     mutationFn: (
-      value: number | WorkingProviderAnimation | GroupActivityPriority,
+      value:
+        | number
+        | boolean
+        | WorkingProviderAnimation
+        | GroupActivityPriority,
     ) =>
       saveSidebarAppearance(
         client,
@@ -119,7 +132,11 @@ function useSaveSidebarAppearance(
                   workingProviderAnimation:
                     value as WorkingProviderAnimation,
                 }
-              : { groupActivityPriority: value as GroupActivityPriority },
+              : field === "openPrLinksExternallyWithModifier"
+                ? {
+                    openPrLinksExternallyWithModifier: value as boolean,
+                  }
+                : { groupActivityPriority: value as GroupActivityPriority },
       ),
   });
 }
@@ -127,7 +144,7 @@ function useSaveSidebarAppearance(
 export function useSidebarAppearancePreferences() {
   const rpc = useRpc<typeof rpcContract>();
   const client = useQueryClient();
-  const appearance = useQuery(sidebarAppearanceQuery(rpc));
+  const appearance = useSidebarAppearance();
   const saveRowHeight = useSaveSidebarAppearance(rpc, client, "rowHeight");
   const saveTextScale = useSaveSidebarAppearance(rpc, client, "textScale");
   const saveWorkingProviderAnimation = useSaveSidebarAppearance(
@@ -140,12 +157,18 @@ export function useSidebarAppearancePreferences() {
     client,
     "groupActivityPriority",
   );
+  const saveOpenPrLinksExternallyWithModifier = useSaveSidebarAppearance(
+    rpc,
+    client,
+    "openPrLinksExternallyWithModifier",
+  );
   return {
     appearance,
     saveRowHeight,
     saveTextScale,
     saveWorkingProviderAnimation,
     saveGroupActivityPriority,
+    saveOpenPrLinksExternallyWithModifier,
   };
 }
 

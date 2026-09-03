@@ -1546,6 +1546,10 @@ describe("R18 registered left sidebar parity", () => {
           pullRequests,
           error: null,
         }),
+        getSidebarAppearance: () => ({
+          rowHeight: 40,
+          openPrLinksExternallyWithModifier: false,
+        }),
         setAuthoredPullRequestDraft: setDraft,
       },
     });
@@ -1591,7 +1595,7 @@ describe("R18 registered left sidebar parity", () => {
       method: "openUrl",
       url: "https://github.com/acme/repo/pull/1",
     });
-    fireEvent.click(baseLink);
+    expect(dispatchHrefClickWithoutJsdomNavigation(baseLink)).toBe(false);
     expect(slot.inspection.navigateCalls).toContainEqual({
       method: "openUrl",
       url: "https://github.com/acme/repo/pull/1",

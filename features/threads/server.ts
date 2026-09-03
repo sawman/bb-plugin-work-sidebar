@@ -11,6 +11,7 @@ import {
   validateSidebarRowHeight,
   normalizeTextScale,
   normalizeWorkingProviderAnimation,
+  normalizeOpenPrLinksExternallyWithModifier,
   validateTextScale,
 } from "./sidebar-appearance.js";
 import {
@@ -29,6 +30,8 @@ export const THREAD_PREFERENCE_KEYS = {
   textScale: "sidebar-text-scale:v1",
   workingProviderAnimation: "sidebar-working-provider-animation:v1",
   groupActivityPriority: "sidebar-group-activity-priority:v1",
+  openPrLinksExternallyWithModifier:
+    "sidebar-open-pr-links-externally-with-modifier:v1",
   recycleBin: "sidebar-recycle-bin:v1",
 } as const;
 
@@ -161,6 +164,12 @@ export function createThreadPreferencesService(
       groupActivityPriority: normalizeGroupActivityPriority(
         await adapter.get(THREAD_PREFERENCE_KEYS.groupActivityPriority),
       ),
+      openPrLinksExternallyWithModifier:
+        normalizeOpenPrLinksExternallyWithModifier(
+          await adapter.get(
+            THREAD_PREFERENCE_KEYS.openPrLinksExternallyWithModifier,
+          ),
+        ),
     };
   }
   async function recycleBin(): Promise<RecycleBinEntry[]> {
@@ -312,6 +321,16 @@ export function createThreadPreferencesService(
       await adapter.set(THREAD_PREFERENCE_KEYS.groupActivityPriority, value);
       adapter.publish(THREAD_PREFERENCE_CHANNEL, {
         appearance: { groupActivityPriority: value },
+      });
+      return appearance();
+    },
+    async saveOpenPrLinksExternallyWithModifier(value: boolean) {
+      await adapter.set(
+        THREAD_PREFERENCE_KEYS.openPrLinksExternallyWithModifier,
+        value,
+      );
+      adapter.publish(THREAD_PREFERENCE_CHANNEL, {
+        appearance: { openPrLinksExternallyWithModifier: value },
       });
       return appearance();
     },

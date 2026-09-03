@@ -44,10 +44,8 @@ Last checked: 2026-09-04 against BB Tasks 0.1.2 / SDK 0.4.34.
   [#2200](https://github.com/get-bb/bb/issues/2200) improve composer input and
   draft creation, respectively, but neither currently exposes row-level durable
   draft state to plugins.
-- [ ] **Explicit external HTTP navigation.** `UrlLink` and
-  `useBbNavigate().openUrl(url)` both honor the current BB browser preference;
-  the SDK exposes no explicit external target for HTTP(S) URLs. This prevents a
-  plugin from safely offering “Cmd-click opens externally” while an ordinary
-  click follows the preference. Add that behavior only when BB exposes distinct
-  in-app and external URL destinations. Do not emulate it by transiently
-  changing the global browser preference or using a raw browser API.
+- [ ] **Explicit external HTTP navigation.** Ordinary plugin `UrlLink`s honor
+  BB's browser preference. The plugin currently uses the host's new-window
+  route for its optional Cmd/Ctrl-click external-link preference. Revisit this
+  when BB exposes an explicit external HTTP navigation API, so this bridge can
+  be replaced with a documented destination.

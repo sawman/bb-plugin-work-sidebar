@@ -18,6 +18,7 @@ import type { PullRequestThreadReference } from "@/features/pull-requests/thread
 import {
   DEFAULT_SIDEBAR_ROW_HEIGHT,
   DEFAULT_TEXT_SCALE,
+  DEFAULT_OPEN_PR_LINKS_EXTERNALLY_WITH_MODIFIER,
   DEFAULT_WORKING_PROVIDER_ANIMATION,
 } from "./sidebar-appearance";
 import { DEFAULT_GROUP_ACTIVITY_PRIORITY } from "./group-activity-priority";
@@ -302,6 +303,11 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
           threadPullRequests={threadPullRequests.data}
           onOpenThread={navigateToThread}
           settingsControl={settings}
+          externalOnModifier={
+            threadPreferences.appearance.data
+              ?.openPrLinksExternallyWithModifier ??
+            DEFAULT_OPEN_PR_LINKS_EXTERNALLY_WITH_MODIFIER
+          }
         />
         {view === "work" && (
           <ThreadHierarchyProvider

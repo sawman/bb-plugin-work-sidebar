@@ -516,6 +516,7 @@ describe("pull-request stack number presentation", () => {
   it("keeps title navigation while the whole row owns an informative context menu", () => {
     const openPullRequest = vi.fn();
     const openThread = vi.fn();
+    const openExternal = vi.spyOn(window, "open").mockImplementation(() => null);
     render(
       <AuthoredPullRequestRow
         pullRequest={{
@@ -540,6 +541,7 @@ describe("pull-request stack number presentation", () => {
           parentThreadId: null,
         }}
         changingDraft={false}
+        externalOnModifier
         onOpenPullRequest={openPullRequest}
         onOpenThread={openThread}
         onToggleDraft={vi.fn()}
@@ -556,22 +558,18 @@ describe("pull-request stack number presentation", () => {
     expect(dispatchHrefClickWithoutJsdomNavigation(title)).toBe(false);
     expect(openPullRequest).not.toHaveBeenCalled();
 
-    for (const modifier of [
-      { metaKey: true },
-      { ctrlKey: true },
-      { shiftKey: true },
-      { altKey: true },
-    ]) {
-      const modifiedClick = new MouseEvent("click", {
-        bubbles: true,
-        cancelable: true,
-        button: 0,
-        ...modifier,
-      });
-      expect(dispatchHrefClickWithoutJsdomNavigation(title, modifiedClick)).toBe(
-        false,
-      );
-    }
+    const modifiedClick = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      metaKey: true,
+    });
+    expect(title.dispatchEvent(modifiedClick)).toBe(false);
+    expect(openExternal).toHaveBeenCalledWith(
+      "https://github.com/acme/repo/pull/95",
+      "_blank",
+      "noopener,noreferrer",
+    );
     expect(openPullRequest).not.toHaveBeenCalled();
     fireEvent.contextMenu(title, { clientX: 12, clientY: 18 });
     expect(screen.getByRole("menu").getAttribute("data-portalled")).toBe(

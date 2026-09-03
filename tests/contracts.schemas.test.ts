@@ -152,6 +152,11 @@ describe("R37.2 bounded text-scale RPC schema", () => {
     ).toBe(true);
     expect(
       rpcSchemas.saveSidebarAppearance.input.safeParse({
+        openPrLinksExternallyWithModifier: false,
+      }).success,
+    ).toBe(true);
+    expect(
+      rpcSchemas.saveSidebarAppearance.input.safeParse({
         textScale: 1.11,
       }).success,
     ).toBe(false);

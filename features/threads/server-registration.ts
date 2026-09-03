@@ -12,17 +12,10 @@ type ThreadHandlers = Pick<
 >;
 
 /** Thread preference and archive RPC handlers stay with the Threads slice. */
-export function createThreadRegistration(
-  bb: BbPluginApi,
-  work: WorkBindingReader,
-): ThreadHandlers {
+export function createThreadRegistration(bb: BbPluginApi, work: WorkBindingReader): ThreadHandlers {
   registerThreadSettings(bb);
   const archived = createArchivedThreadService(bb.sdk.threads);
-  const preferences = createThreadPreferencesService({
-    get: (key) => bb.storage.kv.get<unknown>(key),
-    set: (key, value) => bb.storage.kv.set(key, value),
-    publish: (channel, payload) => bb.realtime.publish(channel, payload),
-  });
+  const preferences = createThreadPreferencesService({ get: (key) => bb.storage.kv.get<unknown>(key), set: (key, value) => bb.storage.kv.set(key, value), publish: (channel, payload) => bb.realtime.publish(channel, payload) });
   const hierarchy = createSdkThreadHierarchyService(bb, work, preferences);
   const queuedMessages = createQueuedMessageRegistration(bb);
   return {
@@ -52,7 +45,10 @@ export function createThreadRegistration(
       if ("rowHeight" in input) return preferences.saveAppearance(input.rowHeight);
       if ("textScale" in input) return preferences.saveTextScale(input.textScale);
       if ("workingProviderAnimation" in input)
-        return preferences.saveWorkingProviderAnimation(input.workingProviderAnimation);
+        return preferences.saveWorkingProviderAnimation(
+          input.workingProviderAnimation,
+        );
+      if ("openPrLinksExternallyWithModifier" in input) return preferences.saveOpenPrLinksExternallyWithModifier(input.openPrLinksExternallyWithModifier);
       return preferences.saveGroupActivityPriority(input.groupActivityPriority);
     },
     async moveSidebarThread(input) {

@@ -33,6 +33,9 @@ export type WorkingProviderAnimation =
   (typeof WORKING_PROVIDER_ANIMATIONS)[number];
 export const DEFAULT_WORKING_PROVIDER_ANIMATION: WorkingProviderAnimation =
   "slow-spin";
+/** Cmd-click (or Ctrl-click off macOS) keeps ordinary PR navigation intact
+ * while requesting the desktop host's external-browser route. */
+export const DEFAULT_OPEN_PR_LINKS_EXTERNALLY_WITH_MODIFIER = true;
 export {
   DEFAULT_GROUP_ACTIVITY_PRIORITY,
   normalizeGroupActivityPriority,
@@ -121,4 +124,12 @@ export function normalizeWorkingProviderAnimation(
     (WORKING_PROVIDER_ANIMATIONS as readonly string[]).includes(value)
     ? (value as WorkingProviderAnimation)
     : DEFAULT_WORKING_PROVIDER_ANIMATION;
+}
+
+export function normalizeOpenPrLinksExternallyWithModifier(
+  value: unknown,
+): boolean {
+  return typeof value === "boolean"
+    ? value
+    : DEFAULT_OPEN_PR_LINKS_EXTERNALLY_WITH_MODIFIER;
 }

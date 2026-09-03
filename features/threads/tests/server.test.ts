@@ -60,12 +60,14 @@ describe("R9 Threads server preferences", () => {
       textScale: 0.9,
       workingProviderAnimation: "slow-spin",
       groupActivityPriority: ["error", "attention", "completed", "working"],
+      openPrLinksExternallyWithModifier: true,
     });
     await expect(service.saveAppearance(52.5)).resolves.toEqual({
       rowHeight: 52.5,
       textScale: 0.9,
       workingProviderAnimation: "slow-spin",
       groupActivityPriority: ["error", "attention", "completed", "working"],
+      openPrLinksExternallyWithModifier: true,
     });
     expect(saved.get(THREAD_PREFERENCE_KEYS.appearance)).toBe(52.5);
     await expect(service.saveTextScale(1.1)).resolves.toEqual({
@@ -73,6 +75,7 @@ describe("R9 Threads server preferences", () => {
       textScale: 1.1,
       workingProviderAnimation: "slow-spin",
       groupActivityPriority: ["error", "attention", "completed", "working"],
+      openPrLinksExternallyWithModifier: true,
     });
     expect(saved.get(THREAD_PREFERENCE_KEYS.textScale)).toBe(1.1);
     await expect(service.saveWorkingProviderAnimation("fast-spin")).resolves.toEqual({
@@ -80,10 +83,17 @@ describe("R9 Threads server preferences", () => {
       textScale: 1.1,
       workingProviderAnimation: "fast-spin",
       groupActivityPriority: ["error", "attention", "completed", "working"],
+      openPrLinksExternallyWithModifier: true,
     });
     expect(saved.get(THREAD_PREFERENCE_KEYS.workingProviderAnimation)).toBe(
       "fast-spin",
     );
+    await expect(
+      service.saveOpenPrLinksExternallyWithModifier(false),
+    ).resolves.toMatchObject({ openPrLinksExternallyWithModifier: false });
+    expect(
+      saved.get(THREAD_PREFERENCE_KEYS.openPrLinksExternallyWithModifier),
+    ).toBe(false);
     await expect(
       service.saveGroupActivityPriority([
         "working",
@@ -160,6 +170,10 @@ describe("R9 Threads server preferences", () => {
     });
     expect(published[5]).toEqual({
       channel: "sidebar-order:changed",
+      payload: { appearance: { openPrLinksExternallyWithModifier: false } },
+    });
+    expect(published[6]).toEqual({
+      channel: "sidebar-order:changed",
       payload: {
         appearance: {
           groupActivityPriority: [
@@ -171,7 +185,7 @@ describe("R9 Threads server preferences", () => {
         },
       },
     });
-    expect(published).toHaveLength(8);
+    expect(published).toHaveLength(9);
     expect(published.slice(-2)).toEqual([
       expect.objectContaining({ channel: "sidebar-order:changed", payload: expect.objectContaining({ recycleBin: expect.any(Array) }) }),
       expect.objectContaining({ channel: "sidebar-order:changed", payload: expect.objectContaining({ recycleBin: [] }) }),

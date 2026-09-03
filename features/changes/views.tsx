@@ -305,6 +305,7 @@ export function ChangesCurrentPullRequestRow({
   pullRequest,
   branch,
   expanded,
+  externalOnModifier = false,
   onToggle,
   onOpenFile,
   preview,
@@ -312,6 +313,7 @@ export function ChangesCurrentPullRequestRow({
   pullRequest: CurrentPullRequestView;
   branch?: GitHubStackBranch | null;
   expanded: boolean;
+  externalOnModifier?: boolean;
   onToggle(): void;
   onOpenFile(path: string): void;
   preview?: ReactNode;
@@ -333,6 +335,7 @@ export function ChangesCurrentPullRequestRow({
           reviewCommentCount: pullRequest.signal.reviewCommentCount,
         }}
         expanded={expanded}
+        externalOnModifier={externalOnModifier}
         checkingOut={false}
         onToggle={onToggle}
         onCheckout={() => undefined}
@@ -367,6 +370,7 @@ export function ChangesStackBranchRow({
   branch,
   signals,
   expanded,
+  externalOnModifier = false,
   checkingOut,
   onToggle,
   onCheckout,
@@ -377,6 +381,7 @@ export function ChangesStackBranchRow({
   branch: GitHubStackBranch;
   signals?: StackBranchSignals;
   expanded: boolean;
+  externalOnModifier?: boolean;
   checkingOut: boolean;
   onToggle(): void;
   onCheckout(): void;
@@ -409,10 +414,10 @@ export function ChangesStackBranchRow({
   const presented = signal ? pullRequestSignalPresentation(signal) : null;
   const attention = branch.needsRebase
     ? "blocked"
-    // The signal is the current per-PR GitHub fact. Its aggregate attention
-    // counterpart can arrive from an older stack projection, so it must not
-    // turn an already-approved PR back into "Review pending".
-    : signal
+    : // The signal is the current per-PR GitHub fact. Its aggregate attention
+      // counterpart can arrive from an older stack projection, so it must not
+      // turn an already-approved PR back into "Review pending".
+      signal
       ? pullRequestAttentionFromSignal(signal)
       : signals?.attention && signals.attention !== "none"
         ? signals.attention
@@ -477,6 +482,7 @@ export function ChangesStackBranchRow({
           hasDisclosure={hasDisclosure}
           expanded={expanded}
           filesLabel={filesLabel}
+          externalOnModifier={externalOnModifier}
           onCheckout={onCheckout}
           onToggle={onToggle}
         />

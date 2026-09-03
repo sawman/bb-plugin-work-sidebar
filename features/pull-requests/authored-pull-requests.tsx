@@ -1,6 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Icon } from "../../components/ui/icon";
-import { BbUrlLink } from "../../components/ui/url-link";
 import { Status } from "../../components/ui/status";
 import {
   ContextMenu,
@@ -26,6 +25,7 @@ import {
   type PullRequestThreadReference,
 } from "./thread-link";
 import { PullRequestReviewerPicker } from "./reviewer-picker";
+import { PullRequestUrlLink } from "./pull-request-url-link";
 import type {
   PullRequestRpc,
   ThreadPullRequest,
@@ -58,6 +58,7 @@ export function AuthoredPullRequestRow({
   linkedThread,
   threadPullRequest,
   changingDraft,
+  externalOnModifier,
   onOpenPullRequest,
   onOpenThread,
   onToggleDraft,
@@ -69,6 +70,7 @@ export function AuthoredPullRequestRow({
   linkedThread?: PullRequestThreadReference;
   threadPullRequest?: ThreadPullRequest | null;
   changingDraft: boolean;
+  externalOnModifier?: boolean;
   onOpenPullRequest?(url: string): void;
   onOpenThread?(threadId: string): void;
   onToggleDraft(pullRequest: AuthoredRow): void;
@@ -98,13 +100,14 @@ export function AuthoredPullRequestRow({
         <article className="ws-pr-row ws-pr-compact-row ws-sidebar-row">
           <span className="ws-pr-stack-slot">{stackControl}</span>
           <div className="ws-pr-target ws-sidebar-row-main">
-            <BbUrlLink
+            <PullRequestUrlLink
               className="ws-pr-target-title ws-sidebar-row-title"
               href={pullRequest.url}
+              externalOnModifier={externalOnModifier}
               aria-label={`Open pull request #${pullRequest.number}: ${pullRequest.title}`}
             >
               {pullRequest.title}
-            </BbUrlLink>
+            </PullRequestUrlLink>
             <span className="ws-pr-context ws-pr-target-context ws-sidebar-row-meta">
               <ContextMenuTrigger asChild>
                 <PullRequestIdentifierBadge
@@ -214,6 +217,7 @@ export function AuthoredPullRequestRow({
 export function AuthoredPullRequestStack({
   stack,
   changingDraftUrl,
+  externalOnModifier,
   onOpenPullRequest,
   onOpenThread,
   onToggleDraft,
@@ -224,6 +228,7 @@ export function AuthoredPullRequestStack({
 }: {
   stack: SidebarStack;
   changingDraftUrl: string | null;
+  externalOnModifier?: boolean;
   onOpenPullRequest?(url: string): void;
   onOpenThread?(threadId: string): void;
   onToggleDraft(pullRequest: AuthoredRow): void;
@@ -256,6 +261,7 @@ export function AuthoredPullRequestStack({
         ]
       }
       changingDraft={changingDraftUrl === layer.url}
+      externalOnModifier={externalOnModifier}
       onOpenPullRequest={onOpenPullRequest}
       onOpenThread={onOpenThread}
       onToggleDraft={onToggleDraft}
