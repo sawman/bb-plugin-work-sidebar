@@ -126,6 +126,7 @@ function renderRow({
         thread={renderedThread}
         active={false}
         children={children}
+        childAgentCount={children}
         activeChildren={activeChildren}
         childrenExpanded={false}
         selected={false}
@@ -290,7 +291,7 @@ describe("R21D ThreadRow characterization", () => {
     expect(
       (await view.findByLabelText("Copy stack number #17")).textContent,
     ).toBe("#17");
-    expect(document.querySelector('[aria-label="PR #42 · Review pending"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="PR #42 · Review requested"]')).toBeTruthy();
     const provider = view.getByRole("img", {
       name: "codex provider status: Thread is running; 1 child agent working",
     });

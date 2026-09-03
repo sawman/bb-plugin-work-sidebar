@@ -8,18 +8,15 @@ export function threadProviderRuntimeState(
   staleWorking: boolean,
   activeChildren: number,
 ): ThreadProviderRuntimeState {
+  if (normalizeIndicator(String(thread.indicator)) === "unread-error")
+    return "error";
+  if (normalizeIndicator(String(thread.indicator)) === "waiting-for-input")
+    return "waiting";
+  if (normalizeIndicator(String(thread.indicator)) === "unread-success")
+    return "complete";
   if (threadIsWorking(thread) || activeChildren > 0) return "working";
   if (staleWorking) return "stale";
-  switch (normalizeIndicator(String(thread.indicator))) {
-    case "waiting-for-input":
-      return "waiting";
-    case "unread-error":
-      return "error";
-    case "unread-success":
-      return "complete";
-    default:
-      return "idle";
-  }
+  return "idle";
 }
 
 export function threadProviderStatusLabel(
@@ -29,6 +26,9 @@ export function threadProviderStatusLabel(
   runtimeState: ThreadProviderRuntimeState,
   staleWorkingMinutes: number,
 ): string | null {
+  if (runtimeState === "error") return thread.indicatorLabel ?? "Thread failed";
+  if (runtimeState === "waiting") return "Waiting for input";
+  if (runtimeState === "complete") return "Thread completed";
   const childActivity = activeChildren
     ? `${activeChildren} child agent${activeChildren === 1 ? "" : "s"} working`
     : null;
@@ -43,8 +43,5 @@ export function threadProviderStatusLabel(
     return `${activity ?? "Thread is working"}; no agent update for ${staleWorkingMinutes} minutes`;
   if (activity || thread.indicatorLabel)
     return activity ?? thread.indicatorLabel;
-  if (runtimeState === "waiting") return "Waiting for input";
-  if (runtimeState === "error") return "Thread failed";
-  if (runtimeState === "complete") return "Thread completed";
   return null;
 }

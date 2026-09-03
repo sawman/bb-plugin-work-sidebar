@@ -1,8 +1,10 @@
+import { useMemo } from "react";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import type { ThreadProviderDirectory } from "@/components/threads/thread-provider-logo";
 import { SidebarTable } from "@/components/ui/sidebar-table";
 import type { SidebarThreadOrganization } from "./sidebar-organization";
 import { WorkThreadTree } from "./thread-tree";
+import { threadAgentRollups } from "./thread-agent-rollup";
 import type { QueuedMessage } from "./schemas";
 
 type SidebarThreadTreeProps = {
@@ -33,6 +35,10 @@ export function SidebarThreadTree({
   queuedMessageNow,
   label,
 }: SidebarThreadTreeProps) {
+  const agentRollups = useMemo(
+    () => threadAgentRollups(roots, childrenByThread),
+    [childrenByThread, roots],
+  );
   return (
     <section className="ws-hierarchy" aria-label={label}>
       <SidebarTable>
@@ -41,6 +47,7 @@ export function SidebarThreadTree({
             key={thread.id}
             thread={thread}
             childrenByThread={childrenByThread}
+            agentRollups={agentRollups}
             activeThreadId={activeThreadId}
             selectedThreadIds={organization.selectedThreadIds}
             groupIds={organization.groupIds}

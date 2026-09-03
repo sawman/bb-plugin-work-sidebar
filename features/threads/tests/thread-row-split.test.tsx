@@ -59,6 +59,7 @@ function renderRow(
       thread={thread}
       active={false}
       children={0}
+      childAgentCount={0}
       activeChildren={0}
       childrenExpanded={false}
       selected={false}

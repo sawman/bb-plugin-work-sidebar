@@ -7,6 +7,7 @@ import type {
 } from "@/components/threads/thread-provider-logo";
 import type { ThreadDropTarget } from "./store";
 import type { QueuedMessage } from "./schemas";
+import type { ThreadAgentRollup } from "./thread-agent-rollup";
 
 export type { ThreadDropTarget } from "./store";
 
@@ -19,6 +20,7 @@ export type ThreadRowProps = {
   thread: PluginSidebarThread;
   active: boolean;
   children: number;
+  childAgentCount: number;
   activeChildren: number;
   staleWorkingMinutes?: number;
   queuedMessage?: QueuedMessage;
@@ -54,6 +56,7 @@ export type WorkThreadTreeProps = Omit<
   ThreadRowProps,
   | "active"
   | "children"
+  | "childAgentCount"
   | "activeChildren"
   | "staleWorkingMinutes"
   | "childrenExpanded"
@@ -64,6 +67,7 @@ export type WorkThreadTreeProps = Omit<
   | "provider"
 > & {
   childrenByThread: ReadonlyMap<string, PluginSidebarThread[]>;
+  agentRollups: ReadonlyMap<string, ThreadAgentRollup>;
   activeThreadId: string | null;
   selectedThreadIds: ReadonlySet<string>;
   groupIds: ReadonlyMap<string, string>;

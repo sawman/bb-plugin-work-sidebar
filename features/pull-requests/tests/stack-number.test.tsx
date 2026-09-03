@@ -384,9 +384,9 @@ describe("pull-request stack number presentation", () => {
 
   it.each([
     ["Draft", "draft", "GitPullRequest", { draft: true, attention: "draft" }],
-    ["Review pending", "open", "Eye", { draft: false, attention: "review_requested" }],
+    ["Review requested", "warning", "Eye", { draft: false, attention: "review_requested" }],
     ["CI failure", "destructive", "X", { draft: false, attention: "checks_failed" }],
-    ["Changes requested", "destructive", "X", { draft: false, attention: "changes_requested" }],
+    ["Changes requested", "closed", "Wrench", { draft: false, attention: "changes_requested" }],
     ["Conflicts", "destructive", "X", { draft: false, attention: "conflicts" }],
     ["Ready to merge", "success", "Check", { draft: false, attention: "ready_to_merge" }],
   ])(
@@ -504,7 +504,7 @@ describe("pull-request stack number presentation", () => {
     expect(
       screen
         .getByRole("menuitem", {
-          name: "Review: Review required",
+          name: "Review: Review requested",
         })
         .getAttribute("aria-disabled"),
     ).toBe("true");

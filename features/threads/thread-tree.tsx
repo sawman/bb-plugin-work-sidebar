@@ -1,12 +1,12 @@
 import { useStore } from "zustand";
 import { threadInteractionStore } from "./store";
 import { ThreadRow } from "./thread-row";
-import { threadIsWorking } from "./thread-attention";
 import type { WorkThreadTreeProps } from "./thread-row-types";
 
 export function WorkThreadTree({
   thread,
   childrenByThread,
+  agentRollups,
   activeThreadId,
   selectedThreadIds,
   groupIds,
@@ -31,7 +31,10 @@ export function WorkThreadTree({
   depth = 0,
 }: WorkThreadTreeProps) {
   const children = childrenByThread.get(thread.id) ?? [];
-  const activeChildren = children.filter(threadIsWorking).length;
+  const rollup = agentRollups.get(thread.id) ?? {
+    childCount: children.length,
+    activeChildCount: 0,
+  };
   const childrenExpanded = useStore(threadInteractionStore, (state) =>
     state.expandedThreadIds.has(thread.id),
   );
@@ -42,7 +45,8 @@ export function WorkThreadTree({
         thread={thread}
         active={thread.id === activeThreadId}
         children={children.length}
-        activeChildren={activeChildren}
+        childAgentCount={rollup.childCount}
+        activeChildren={rollup.activeChildCount}
         staleWorkingMinutes={staleWorkingMinutes}
         queuedMessage={queuedMessagesByThread?.get(thread.id)}
         queuedMessageNow={queuedMessageNow}
@@ -78,6 +82,7 @@ export function WorkThreadTree({
             <WorkThreadTree
               thread={child}
               childrenByThread={childrenByThread}
+              agentRollups={agentRollups}
               activeThreadId={activeThreadId}
               selectedThreadIds={selectedThreadIds}
               groupIds={groupIds}

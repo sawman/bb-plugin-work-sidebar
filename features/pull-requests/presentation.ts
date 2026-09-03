@@ -65,7 +65,9 @@ export function pullRequestPresentation(input: {
   if (input.attention === "checks_pending")
     return { icon: "LoaderCircle", label: "Checks pending", tone: "muted" };
   if (input.attention === "changes_requested")
-    return { icon: "X", label: "Changes requested", tone: "destructive" };
+    return { icon: "Wrench", label: "Changes requested", tone: "closed" };
+  if (input.attention === "review_requested")
+    return { icon: "Eye", label: "Review requested", tone: "warning" };
   return { icon: "Eye", label: "Review pending", tone: "open" };
 }
 
@@ -113,7 +115,7 @@ export function pullRequestSignalPresentation(signal: PullRequestSignal): {
     changes_requested: {
       icon: "Wrench",
       label: "Changes requested",
-      tone: "destructive",
+      tone: "closed",
     },
     review_requested: {
       icon: "Eye",
@@ -122,7 +124,7 @@ export function pullRequestSignalPresentation(signal: PullRequestSignal): {
     },
     review_required: {
       icon: "Eye",
-      label: "Review required",
+      label: "Review requested",
       tone: "warning",
     },
     none: { icon: "UserClock", label: "No reviewer requested", tone: "muted" },

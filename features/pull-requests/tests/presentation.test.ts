@@ -68,7 +68,7 @@ describe("pull-request presentation semantics", () => {
     ["approved", { icon: "Check", label: "Approved", tone: "success" }],
     [
       "changes_requested",
-      { icon: "Wrench", label: "Changes requested", tone: "destructive" },
+      { icon: "Wrench", label: "Changes requested", tone: "closed" },
     ],
     [
       "review_requested",
@@ -76,7 +76,7 @@ describe("pull-request presentation semantics", () => {
     ],
     [
       "review_required",
-      { icon: "Eye", label: "Review required", tone: "warning" },
+      { icon: "Eye", label: "Review requested", tone: "warning" },
     ],
     [
       "none",
@@ -95,7 +95,7 @@ describe("pull-request presentation semantics", () => {
     },
   );
 
-  it("normalizes a dismissed changes request with re-review into review required", () => {
+  it("makes a re-requested review override an earlier changes request", () => {
     expect(
       normalizePullRequestSignal({
         checks: "passing",
@@ -116,10 +116,20 @@ describe("pull-request presentation semantics", () => {
       }).review,
     ).toEqual({
       icon: "Eye",
-      label: "Review required",
+      label: "Review requested",
       tone: "warning",
       count: 1,
     });
+    expect(
+      pullRequestPresentation({
+        state: "open",
+        draft: false,
+        attention: pullRequestAttentionFromSignal({
+          checks: "passing",
+          review: "review_required",
+        }),
+      }),
+    ).toEqual({ icon: "Eye", label: "Review requested", tone: "warning" });
   });
 
   it("keeps comment counts, merged layers, archived repositories, and GitHub health semantic", () => {
@@ -203,7 +213,7 @@ describe("pull-request presentation semantics", () => {
     ["conflicts", { icon: "X", label: "Conflicts", tone: "destructive" }],
     [
       "changes_requested",
-      { icon: "X", label: "Changes requested", tone: "destructive" },
+      { icon: "Wrench", label: "Changes requested", tone: "closed" },
     ],
     ["blocked", { icon: "Eye", label: "Review pending", tone: "open" }],
     [
@@ -212,7 +222,7 @@ describe("pull-request presentation semantics", () => {
     ],
     [
       "review_requested",
-      { icon: "Eye", label: "Review pending", tone: "open" },
+      { icon: "Eye", label: "Review requested", tone: "warning" },
     ],
     ["none", { icon: "Eye", label: "Review pending", tone: "open" }],
   ] as const)(

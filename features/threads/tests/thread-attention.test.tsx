@@ -21,6 +21,10 @@ import {
   ThreadRuntimeProvider,
   ThreadStatus,
 } from "../thread-row-presentation";
+import {
+  threadProviderRuntimeState,
+  threadProviderStatusLabel,
+} from "../thread-runtime";
 
 const NOW = Date.UTC(2026, 7, 28, 6);
 
@@ -317,5 +321,25 @@ describe("thread attention presentation", () => {
         name: /Thread is running; 2 child agents working/i,
       }),
     ).toBeTruthy();
+  });
+
+  it("lets a provider error override active thread and child work", () => {
+    const errored = thread({
+      indicator: "unread-error",
+      indicatorLabel: "Provider request failed",
+      activity: {
+        workflows: 0,
+        backgroundAgents: 1,
+        backgroundCommands: 0,
+        planMode: 0,
+        goals: 0,
+      },
+    });
+    const runtimeState = threadProviderRuntimeState(errored, false, 2);
+
+    expect(runtimeState).toBe("error");
+    expect(
+      threadProviderStatusLabel(errored, false, 2, runtimeState, 30),
+    ).toBe("Provider request failed");
   });
 });

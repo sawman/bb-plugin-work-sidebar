@@ -24,6 +24,7 @@ export function ThreadRow({
   thread,
   active,
   children,
+  childAgentCount,
   activeChildren,
   staleWorkingMinutes = 30,
   queuedMessage,
@@ -193,7 +194,7 @@ export function ThreadRow({
                 <ThreadAgentControl
                   thread={thread}
                   provider={provider}
-                  childCount={children}
+                  childCount={childAgentCount}
                   activeChildren={activeChildren}
                   expanded={childrenExpanded}
                   staleWorking={staleWorking}
