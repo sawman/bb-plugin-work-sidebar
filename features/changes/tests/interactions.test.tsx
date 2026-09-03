@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { changesKeys } from "../model";
 import { useCheckoutStackBranch, useWorkingTreeFileDiff } from "../queries";
+import type { Changes } from "../schemas";
 import { createChangesInteractionStore } from "../store";
 import { ChangesRepositoryCard, ChangesWorkingTreePreview } from "../views";
 
@@ -233,6 +234,86 @@ describe("R14 Changes interactions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Check out feature/one" }));
     await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("Cannot check out"));
   });
+
+  it("moves the checked-out stack highlight immediately and restores it when checkout is rejected", async () => {
+    let resolve!: (value: { ok: boolean; message: string; tone?: "success" | "warning" | "error"; detail: null }) => void;
+    const pending = new Promise<{ ok: boolean; message: string; tone?: "success" | "warning" | "error"; detail: null }>((next) => {
+      resolve = next;
+    });
+    const rpc = { call: vi.fn(() => pending) };
+    const client = new QueryClient();
+    const projection: Changes = {
+      currentPullRequest: null,
+      stack: null,
+      stackUnavailableReason: null,
+      githubStack: {
+        stack: {
+          trunk: "main",
+          currentBranch: "feature/one",
+          branches: [
+            {
+              name: "feature/one",
+              isCurrent: true,
+              isMerged: false,
+              isQueued: false,
+              needsRebase: false,
+              hasStash: false,
+              stashCount: null,
+              pr: null,
+              diff: null,
+              aheadOfRemote: null,
+              behindRemote: null,
+            },
+            {
+              name: "feature/two",
+              isCurrent: false,
+              isMerged: false,
+              isQueued: false,
+              needsRebase: false,
+              hasStash: false,
+              stashCount: null,
+              pr: null,
+              diff: null,
+              aheadOfRemote: null,
+              behindRemote: null,
+            },
+          ],
+          trunkBehind: null,
+          prunableBranchCount: null,
+        },
+        pending: null,
+        error: null,
+      },
+      repository: {
+        outcome: "available",
+        message: null,
+        branch: "feature/one",
+        base: "main",
+        ahead: 0,
+        behind: 0,
+        worktreeState: "clean",
+        hasUncommittedChanges: false,
+        changedFileCount: 0,
+        changedInsertions: 0,
+        changedDeletions: 0,
+        changedFiles: [],
+      },
+    };
+    client.setQueryData(changesKeys.projection("thr_one"), projection);
+    render(<CheckoutHarness rpc={rpc} threadId="thr_one" branch="feature/two" />, { wrapper: wrapper(client) });
+    fireEvent.click(screen.getByRole("button", { name: "Check out feature/two" }));
+    await waitFor(() => {
+      const current = client.getQueryData<Changes>(changesKeys.projection("thr_one"));
+      expect(current?.repository.branch).toBe("feature/two");
+      expect(current?.githubStack?.stack?.branches.map((entry) => entry.isCurrent)).toEqual([false, true]);
+    });
+    await act(async () => resolve({ ok: false, message: "Checkout blocked", detail: null }));
+    await waitFor(() => {
+      const current = client.getQueryData<Changes>(changesKeys.projection("thr_one"));
+      expect(current?.repository.branch).toBe("feature/one");
+      expect(current?.githubStack?.stack?.branches.map((entry) => entry.isCurrent)).toEqual([true, false]);
+    });
+  });
 });
 
 function PreviewHarness({
@@ -252,14 +333,22 @@ function PreviewHarness({
   return path ? <ChangesWorkingTreePreview path={path} query={query} onClose={onClose} /> : null;
 }
 
-function CheckoutHarness({ rpc, threadId }: { rpc: { call: ReturnType<typeof vi.fn> }; threadId: string }) {
+function CheckoutHarness({
+  rpc,
+  threadId,
+  branch = "feature/one",
+}: {
+  rpc: { call: ReturnType<typeof vi.fn> };
+  threadId: string;
+  branch?: string;
+}) {
   const checkout = useCheckoutStackBranch(rpc as never, threadId);
   return <>
     <button
       type="button"
-      aria-label={checkout.isPending ? "Checking out feature/one" : "Check out feature/one"}
+      aria-label={checkout.isPending ? `Checking out ${branch}` : `Check out ${branch}`}
       disabled={checkout.isPending}
-      onClick={() => checkout.mutate("feature/one")}
+      onClick={() => checkout.mutate(branch)}
     >
       Check out
     </button>

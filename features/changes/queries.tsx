@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PluginRpcClient } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
 import { changesKeys, changesPolicies } from "./model";
+import type { Changes } from "./schemas";
 
 type ChangesRpc = PluginRpcClient<typeof rpcContract>;
 export type ChangesPolling = {
@@ -116,8 +117,39 @@ export function usePullRequestFileDiff(
 
 export function useCheckoutStackBranch(rpc: ChangesRpc, threadId: string) {
   const client = useQueryClient();
+  const queryKey = changesKeys.projection(threadId);
   return useMutation({
     mutationFn: (branch: string) => rpc.call("checkoutStackBranch", { threadId, branch }),
-    onSuccess: () => invalidateChanges(client, threadId),
+    onMutate: async (branch) => {
+      await client.cancelQueries({ queryKey });
+      const previous = client.getQueryData<Changes>(queryKey);
+      client.setQueryData<Changes>(queryKey, (current) => {
+        if (!current?.githubStack?.stack) return current;
+        return {
+          ...current,
+          repository: { ...current.repository, branch },
+          githubStack: {
+            ...current.githubStack,
+            stack: {
+              ...current.githubStack.stack,
+              currentBranch: branch,
+              branches: current.githubStack.stack.branches.map((entry) => ({
+                ...entry,
+                isCurrent: entry.name === branch,
+              })),
+            },
+          },
+        };
+      });
+      return { previous };
+    },
+    onError: (_error, _branch, context) => {
+      if (context?.previous) client.setQueryData(queryKey, context.previous);
+    },
+    onSuccess: async (result, _branch, context) => {
+      if (!result.ok && context?.previous)
+        client.setQueryData(queryKey, context.previous);
+      await invalidateChanges(client, threadId);
+    },
   });
 }
