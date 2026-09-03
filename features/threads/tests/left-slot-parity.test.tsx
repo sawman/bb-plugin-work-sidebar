@@ -1040,6 +1040,16 @@ describe("R18 registered left sidebar parity", () => {
       ).toBeLessThan(labels.findIndex((label) => label.startsWith("Active")));
       expect(labels.at(-2)?.startsWith("Recycle Bin")).toBe(true);
       expect(labels.at(-1)?.startsWith("Archive")).toBe(true);
+      for (const summary of slot.container.querySelectorAll(
+        ".ws-thread-statuses > details > summary",
+      )) {
+        expect(
+          summary.querySelector(":scope > .ws-thread-group-summary-label"),
+        ).toBeTruthy();
+        expect(
+          summary.querySelector(":scope > .ws-thread-group-summary-meta"),
+        ).toBeTruthy();
+      }
     });
     slot.lifecycle.unmount();
   });
@@ -1370,7 +1380,11 @@ describe("R18 registered left sidebar parity", () => {
       slot.container.querySelector<HTMLDetailsElement>(".ws-archived")!;
     expect(archiveDisclosure.open).toBe(false);
     await waitFor(() =>
-      expect(archiveDisclosure.querySelector("summary span")?.textContent).toBe(
+      expect(
+        archiveDisclosure.querySelector(
+          "summary > .ws-thread-group-summary-meta > span",
+        )?.textContent,
+      ).toBe(
         "2",
       ),
     );

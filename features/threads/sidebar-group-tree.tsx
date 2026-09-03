@@ -8,34 +8,8 @@ import { RecycleBinView } from "./recycle-bin-view";
 import type { RecycleBinEntry } from "./recycle-bin";
 import type { QueuedMessage } from "./schemas";
 import { threadTreeNeedsAttention } from "./thread-attention";
-import { Icon } from "@/components/ui/icon";
 import { SidebarThreadTree } from "./sidebar-thread-tree";
-
-function ThreadGroupSummary({
-  label,
-  count,
-  needsAttention,
-}: {
-  label: string;
-  count: number;
-  needsAttention: boolean;
-}) {
-  return (
-    <summary>
-      <span className="ws-thread-group-summary-label">{label}</span>
-      <span className="ws-thread-group-summary-meta">
-        <span>{count}</span>
-        {needsAttention ? (
-          <Icon
-            name="AlertCircle"
-            className="ws-thread-group-attention"
-            aria-label="Attention needed"
-          />
-        ) : null}
-      </span>
-    </summary>
-  );
-}
+import { ThreadGroupSummary } from "./thread-group-summary";
 type SidebarGroupTreeProps = {
   organization: SidebarThreadOrganization;
   activeThreadId: string | null;

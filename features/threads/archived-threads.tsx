@@ -9,6 +9,7 @@ import { archiveDurationLabel } from "./model";
 import { useArchivedThreads } from "./queries";
 import { SidebarTable } from "@/components/ui/sidebar-table";
 import type { ThreadProviderDirectory } from "@/components/threads/thread-provider-logo";
+import { ThreadGroupSummary } from "./thread-group-summary";
 
 type Project = { id: string; name: string; isPersonal: boolean };
 const EMPTY_ARCHIVED_THREADS: ArchivedThread[] = [];
@@ -84,9 +85,10 @@ export function ArchivedThreads({
         if (!searching) onOpenChange(event.currentTarget.open);
       }}
     >
-      <summary>
-        Archive <span>{query.archive.data ? visibleArchived.length : ""}</span>
-      </summary>
+      <ThreadGroupSummary
+        label="Archive"
+        count={query.archive.data ? visibleArchived.length : ""}
+      />
       {state === "idle" || state === "loading" ? (
         <div className="ws-thread-group-empty">Loading archive threads…</div>
       ) : state === "error" ? (
