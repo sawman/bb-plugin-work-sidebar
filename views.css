@@ -2126,6 +2126,7 @@ button.ws-change-file-row:hover {
   display: grid;
   width: 0.72rem;
   height: 0.72rem;
+  align-self: center;
   place-items: center;
 }
 .ws-agent-state svg {
