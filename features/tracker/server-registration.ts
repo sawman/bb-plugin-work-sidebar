@@ -6,7 +6,7 @@ import {
   type PluginRpcInput,
 } from "../../shared/server-plugin-rpc.js";
 import type { TrackerCompositionDependencies } from "../../shared/server-composition-dependencies.js";
-import { createTrackerService, TRACKER_LINKS_KEY } from "./server.js";
+import { createSqliteTrackerLinkStore, createTrackerService } from "./server.js";
 
 type TrackerHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
@@ -34,8 +34,7 @@ export function createTrackerRegistration(
       input: PluginRpcInput,
       outputSchema: z.ZodType<T>,
     ) => callPluginRpc("taskboard", method, input, outputSchema),
-    getStorage: (key) => bb.storage.kv.get<unknown>(key),
-    setStorage: (value) => bb.storage.kv.set(TRACKER_LINKS_KEY, value),
+    links: createSqliteTrackerLinkStore(bb),
     rootThread: tasks.rootThread,
     threadTitle: async (threadId) => {
       const thread = await bb.sdk.threads.get({ threadId });

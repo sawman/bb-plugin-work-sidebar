@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createTrackerService } from "../server";
+import { createTrackerService, type LinkState } from "../server";
 import { taskboardItemSchema } from "../schemas";
 
 const item = {
@@ -26,10 +26,33 @@ const secondItem = {
   url: "https://linear.app/issue/LIN-2",
 };
 function setup(call = vi.fn(), initialStorage: unknown = {}) {
-  let v2: unknown = undefined;
+  const links = new Map<string, LinkState>();
+  const legacy = new Map<string, LinkState>(
+    Object.entries(initialStorage as Record<string, unknown>).flatMap(
+      ([rootThreadId, value]) => {
+        if (!value || typeof value !== "object") return [];
+        if (Array.isArray((value as LinkState).keys))
+          return [[rootThreadId, value as LinkState] as const];
+        const candidate = value as { projectId?: unknown; locator?: unknown; key?: unknown };
+        return typeof candidate.projectId === "string" &&
+          typeof candidate.locator === "string" &&
+          typeof candidate.key === "string"
+          ? [[rootThreadId, {
+              keys: [{
+                projectId: candidate.projectId,
+                locator: candidate.locator,
+                key: candidate.key,
+              }],
+              primaryKey: candidate.key,
+            }] as const]
+          : [];
+      },
+    ),
+  );
   const publish = vi.fn();
-  const setStorage = vi.fn(async (value) => {
-    v2 = value;
+  const setStorage = vi.fn(async (rootThreadId: string, value: LinkState | null) => {
+    if (value === null) links.delete(rootThreadId);
+    else links.set(rootThreadId, value);
   });
   return {
     call,
@@ -37,9 +60,10 @@ function setup(call = vi.fn(), initialStorage: unknown = {}) {
     setStorage,
     service: createTrackerService({
       call: call as never,
-      getStorage: async (key) =>
-        key === "work-linear-links:v2" ? v2 : initialStorage,
-      setStorage,
+      links: {
+        get: async (rootThreadId) => links.get(rootThreadId) ?? legacy.get(rootThreadId),
+        set: setStorage,
+      },
       rootThread: async () => ({ id: "thr_root", projectId: "proj_1" }),
       threadTitle: async () => "Tracker work",
       publish,
@@ -48,6 +72,24 @@ function setup(call = vi.fn(), initialStorage: unknown = {}) {
 }
 
 describe("Taskboard tracker adapter", () => {
+  it("limits one root to 100 linked issues", async () => {
+    const { service } = setup(vi.fn(async () => ({
+      items: [{ ...item, key: "LIN-101", locator: "issue-101" }],
+    })), {
+      thr_root: {
+        keys: Array.from({ length: 101 }, (_, index) => ({
+          projectId: "proj_1",
+          locator: `issue-${index}`,
+          key: `LIN-${index}`,
+        })).slice(0, 100),
+        primaryKey: "LIN-0",
+      },
+    });
+    await expect(service.link("thr_child", "LIN-101")).rejects.toThrow(
+      "at most 100",
+    );
+  });
+
   it("rejects unknown fields at the strict Taskboard wire boundary", () => {
     expect(() =>
       taskboardItemSchema.parse({ ...item, unexpected: true }),
@@ -134,11 +176,9 @@ describe("Taskboard tracker adapter", () => {
       key: "LIN-1",
       title: "Tracker work",
     });
-    expect(setStorage).toHaveBeenLastCalledWith({
-      thr_root: {
+    expect(setStorage).toHaveBeenLastCalledWith("thr_root", {
         keys: [{ projectId: "proj_1", locator: "issue-1", key: "LIN-1" }],
         primaryKey: "LIN-1",
-      },
     });
     expect(publish).toHaveBeenLastCalledWith("thr_root");
     await expect(
@@ -155,7 +195,7 @@ describe("Taskboard tracker adapter", () => {
       expect.anything(),
     );
     await service.unlink("thr_child", "LIN-1");
-    expect(setStorage).toHaveBeenLastCalledWith({});
+    expect(setStorage).toHaveBeenLastCalledWith("thr_root", null);
     await expect(
       service.updateStatus("thr_child", "LIN-1", "done"),
     ).rejects.toThrow("LIN-1 is not linked");
@@ -332,14 +372,12 @@ describe("Taskboard tracker adapter", () => {
     await service.link("thr_child", "LIN-2");
     await service.link("thr_child", "LIN-1");
 
-    expect(setStorage).toHaveBeenLastCalledWith({
-      thr_root: {
+    expect(setStorage).toHaveBeenLastCalledWith("thr_root", {
         keys: [
           { projectId: "proj_1", locator: "issue-1", key: "LIN-1" },
           { projectId: "proj_1", locator: "issue-2", key: "LIN-2" },
         ],
         primaryKey: "LIN-1",
-      },
     });
     expect(setStorage).toHaveBeenCalledTimes(2);
     expect(publish).toHaveBeenCalledTimes(2);
@@ -357,28 +395,24 @@ describe("Taskboard tracker adapter", () => {
     );
 
     await service.unlink("thr_child", "LIN-1");
-    expect(setStorage).toHaveBeenLastCalledWith({
-      thr_root: {
+    expect(setStorage).toHaveBeenLastCalledWith("thr_root", {
         keys: [{ projectId: "proj_1", locator: "issue-2", key: "LIN-2" }],
         primaryKey: "LIN-2",
-      },
     });
     expect(publish).toHaveBeenCalledTimes(4);
   });
 
-  it("reads v1 links forward, preserves their order, and writes the selected primary into v2", async () => {
-    const v1 = {
-      thr_root: [
+  it("preserves link order and writes the selected primary", async () => {
+    const links = new Map<string, LinkState>([["thr_root", {
+      keys: [
         { projectId: "proj_1", locator: "issue-1", key: "LIN-1" },
         { projectId: "proj_1", locator: "issue-2", key: "LIN-2" },
       ],
-    };
-    let v2: unknown = undefined;
-    const getStorage = vi.fn(async (key?: string) =>
-      key === "work-linear-links:v2" ? v2 : v1,
-    );
-    const setStorage = vi.fn(async (value: unknown) => {
-      v2 = value;
+      primaryKey: "LIN-1",
+    }]]);
+    const setStorage = vi.fn(async (rootThreadId: string, value: LinkState | null) => {
+      if (value) links.set(rootThreadId, value);
+      else links.delete(rootThreadId);
     });
     const call = vi.fn(
       async (method: string, input: Record<string, unknown>) => {
@@ -401,8 +435,7 @@ describe("Taskboard tracker adapter", () => {
     const publish = vi.fn();
     const service = createTrackerService({
       call: call as never,
-      getStorage,
-      setStorage,
+      links: { get: async (rootThreadId) => links.get(rootThreadId), set: setStorage },
       rootThread: async () => ({ id: "thr_root", projectId: "proj_1" }),
       threadTitle: async () => "Tracker work",
       publish,
@@ -415,42 +448,27 @@ describe("Taskboard tracker adapter", () => {
     await expect(service.setPrimary("thr_child", "lin-2")).resolves.toEqual({
       key: "LIN-2",
     });
-    expect(getStorage).toHaveBeenCalledWith("work-linear-links:v2");
-    expect(setStorage).toHaveBeenLastCalledWith({
-      thr_root: {
+    expect(setStorage).toHaveBeenLastCalledWith("thr_root", {
         keys: [
           { projectId: "proj_1", locator: "issue-1", key: "LIN-1" },
           { projectId: "proj_1", locator: "issue-2", key: "LIN-2" },
         ],
         primaryKey: "LIN-2",
-      },
     });
     expect(publish).toHaveBeenCalledWith("thr_root");
 
     await service.unlink("thr_child", "LIN-2");
-    expect(setStorage).toHaveBeenLastCalledWith({
-      thr_root: {
+    expect(setStorage).toHaveBeenLastCalledWith("thr_root", {
         keys: [{ projectId: "proj_1", locator: "issue-1", key: "LIN-1" }],
         primaryKey: "LIN-1",
-      },
     });
   });
 
-  it("recovers valid v2 links from malformed storage without reviving a stale primary", async () => {
-    const v2 = {
-      thr_root: {
-        keys: [
-          { projectId: "proj_1", locator: "issue-1", key: "LIN-1" },
-          { projectId: "proj_1", locator: 4, key: "LIN-bad" },
-          { projectId: "proj_1", locator: "issue-1-copy", key: "lin-1" },
-        ],
-        primaryKey: "LIN-missing",
-      },
-      thr_bad: { keys: "not-an-array", primaryKey: "LIN-9" },
-    };
-    const getStorage = vi.fn(async (key?: string) =>
-      key === "work-linear-links:v2" ? v2 : undefined,
-    );
+  it("uses a normalized stored primary", async () => {
+    const links = new Map<string, LinkState>([["thr_root", {
+      keys: [{ projectId: "proj_1", locator: "issue-1", key: "LIN-1" }],
+      primaryKey: "LIN-1",
+    }]]);
     const setStorage = vi.fn();
     const service = createTrackerService({
       call: vi.fn(async (method: string) => {
@@ -468,8 +486,7 @@ describe("Taskboard tracker adapter", () => {
           };
         return { items: [item] };
       }) as never,
-      getStorage,
-      setStorage,
+      links: { get: async (rootThreadId) => links.get(rootThreadId), set: setStorage },
       rootThread: async () => ({ id: "thr_root", projectId: "proj_1" }),
       threadTitle: async () => "Tracker work",
       publish: vi.fn(),

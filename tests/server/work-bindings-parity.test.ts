@@ -3,6 +3,8 @@ import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import plugin, { createServerLifecycle } from "../../server";
 import { WORK_BINDINGS_KEY } from "../../features/tasks/server-work-bindings";
 import { TASK_ASSIGNEES_KEY } from "../../features/tasks/server-task-adapter";
+import { WORK_ITEM_QUEUE_KEY } from "../../features/work-context/work-item-queue-server";
+import { TRACKER_LINKS_KEY } from "../../features/tracker/server";
 
 const TASK_PROJECT_ID = "01M12DCYYGDB0WT05RXEQ2K3XA";
 const OUTCOME_TASK_ID = "01M12DCYZ0W87MD2SENEPDWMV8";
@@ -222,6 +224,73 @@ async function createDelegatedExecution(
 }
 
 describe("durable Work/Tasks binding parity", () => {
+  it("migrates root records and task annotations out of shared KV documents", async () => {
+    const { host } = createBindingsFixture();
+    await host.bb.storage.kv.set(WORK_ITEM_QUEUE_KEY, {
+      [ROOT_THREAD_ID]: {
+        current: { source: "bb_task", id: OUTCOME_TASK_ID },
+        backlog: [],
+      },
+    });
+    await host.bb.storage.kv.set(TRACKER_LINKS_KEY, {
+      [ROOT_THREAD_ID]: {
+        keys: [{ projectId: BB_PROJECT_ID, locator: "issue-1", key: "LIN-1" }],
+        primaryKey: "LIN-1",
+      },
+    });
+    await host.bb.storage.kv.set(TASK_ASSIGNEES_KEY, {
+      [OUTCOME_TASK_ID]: "agent",
+    });
+    await plugin(host.bb);
+
+    await host.harness.behavior.callRpc("getWorkItemQueue", {
+      threadId: ROOT_THREAD_ID,
+    });
+    await host.harness.behavior.callRpc("getWorkTracker", {
+      threadId: ROOT_THREAD_ID,
+    });
+    host.bb.storage.database()
+      .prepare(
+        `INSERT INTO sidebar_task_assignee_state (task_id, assignee, updated_at)
+         VALUES (?, ?, ?)`,
+      )
+      .run(CREATED_EXECUTION_TASK_ID, "human", "2026-09-04T00:00:00.000Z");
+    await host.harness.behavior.callRpc("sidebarTasks", undefined);
+
+    const database = host.bb.storage.database();
+    expect(
+      database
+        .prepare<[string], { queue_json: string }>(
+          "SELECT queue_json FROM work_item_queue_state WHERE root_thread_id = ?",
+        )
+        .get(ROOT_THREAD_ID),
+    ).toMatchObject({ queue_json: expect.stringContaining(OUTCOME_TASK_ID) });
+    expect(
+      database
+        .prepare<[string], { links_json: string }>(
+          "SELECT links_json FROM tracker_link_state WHERE root_thread_id = ?",
+        )
+        .get(ROOT_THREAD_ID),
+    ).toMatchObject({ links_json: expect.stringContaining("LIN-1") });
+    expect(
+      database
+        .prepare<[string], { assignee: string }>(
+          "SELECT assignee FROM sidebar_task_assignee_state WHERE task_id = ?",
+        )
+        .get(OUTCOME_TASK_ID),
+    ).toEqual({ assignee: "agent" });
+    await expect(host.bb.storage.kv.get(WORK_ITEM_QUEUE_KEY)).resolves.toBeUndefined();
+    await expect(host.bb.storage.kv.get(TRACKER_LINKS_KEY)).resolves.toBeUndefined();
+    await expect(host.bb.storage.kv.get(TASK_ASSIGNEES_KEY)).resolves.toBeUndefined();
+    expect(
+      database
+        .prepare<[string], { assignee: string }>(
+          "SELECT assignee FROM sidebar_task_assignee_state WHERE task_id = ?",
+        )
+        .get(CREATED_EXECUTION_TASK_ID),
+    ).toBeUndefined();
+  });
+
   it("migrates legacy bindings into SQLite and compacts terminal execution history there", async () => {
     const { host, tasks } = createBindingsFixture();
     const terminal = tasks.get(DELEGATED_TASK_ID)!;
@@ -363,6 +432,47 @@ describe("durable Work/Tasks binding parity", () => {
       outcomes: [{ outcomeTaskId: OUTCOME_TASK_ID }],
       executions: [],
     });
+  });
+
+  it("bounds terminal outcome history while retaining the newest completed roots", async () => {
+    const { host, tasks } = createBindingsFixture();
+    tasks.get(OUTCOME_TASK_ID)!.status = "done";
+    await plugin(host.bb);
+    const database = host.bb.storage.database();
+    const outcomes = Array.from({ length: 80 }, (_, index) => ({
+      kind: "outcome" as const,
+      rootThreadId:
+        index === 79 ? ROOT_THREAD_ID : `thr_completed_${String(index).padStart(3, "0")}`,
+      outcomeTaskId: OUTCOME_TASK_ID,
+      taskProjectId: TASK_PROJECT_ID,
+      createdAt: `2026-08-28T00:00:${String(index).padStart(2, "0")}.000Z`,
+      updatedAt: `2026-08-28T00:00:${String(index).padStart(2, "0")}.000Z`,
+    }));
+    database
+      .prepare(
+        `INSERT INTO work_binding_state (singleton, bindings_json, updated_at)
+         VALUES (1, ?, ?)
+         ON CONFLICT(singleton) DO UPDATE SET
+           bindings_json = excluded.bindings_json,
+           updated_at = excluded.updated_at`,
+      )
+      .run(JSON.stringify({ outcomes, executions: [] }), "2026-08-28T01:00:00.000Z");
+
+    await host.harness.behavior.callRpc("getWorkContext", {
+      threadId: ROOT_THREAD_ID,
+    });
+
+    const stored = JSON.parse(
+      database
+        .prepare<[], { bindings_json: string }>(
+          "SELECT bindings_json FROM work_binding_state WHERE singleton = 1",
+        )
+        .get()!.bindings_json,
+    );
+    expect(stored.outcomes).toHaveLength(64);
+    expect(stored.outcomes).toContainEqual(
+      expect.objectContaining({ rootThreadId: ROOT_THREAD_ID }),
+    );
   });
 
   it("resolves an ordinary link root before mutation so a lookup failure changes neither links nor cache", async () => {
@@ -886,8 +996,13 @@ describe("durable Work/Tasks binding parity", () => {
     );
     expect(host.harness.inspection.realtimeSignals).toHaveLength(2);
     expect(
-      await host.bb.storage.kv.get<Record<string, "agent" | "human">>(
-        TASK_ASSIGNEES_KEY,
+      Object.fromEntries(
+        host.bb.storage.database()
+          .prepare<[], { task_id: string; assignee: "agent" | "human" }>(
+            "SELECT task_id, assignee FROM sidebar_task_assignee_state",
+          )
+          .all()
+          .map((row) => [row.task_id, row.assignee]),
       ),
     ).toMatchObject({ [CREATED_OUTCOME_TASK_ID]: "agent" });
 
@@ -908,8 +1023,13 @@ describe("durable Work/Tasks binding parity", () => {
       { channel: "work-sidebar:changed", payload: { family: "tasks", threadId: ROOT_THREAD_ID } },
     ]);
     expect(
-      await host.bb.storage.kv.get<Record<string, "agent" | "human">>(
-        TASK_ASSIGNEES_KEY,
+      Object.fromEntries(
+        host.bb.storage.database()
+          .prepare<[], { task_id: string; assignee: "agent" | "human" }>(
+            "SELECT task_id, assignee FROM sidebar_task_assignee_state",
+          )
+          .all()
+          .map((row) => [row.task_id, row.assignee]),
       ),
     ).toMatchObject({
       [CREATED_OUTCOME_TASK_ID]: "agent",

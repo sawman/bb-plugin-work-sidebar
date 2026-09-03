@@ -26,25 +26,17 @@ import {
   taskThreadSchema,
 } from "./server-task-adapter.js";
 import type { LegacyWorkContext, ServerLifecycle } from "../../server-lifecycle.js";
+import { pluginStorageDatabase } from "../../shared/server-storage.js";
 
 export const WORK_BINDINGS_KEY = "work-bindings:v2";
 export const LEGACY_DISCOVERY_TTL_MS = 5_000;
 export const LEGACY_DISCOVERY_CONCURRENCY = 8;
 const WORK_BINDINGS_MIGRATION_KEY = "legacy-kv-v2-imported";
-// Terminal executions belong to BB Tasks, not the small dispatch-recovery
-// sidecar. Compact an old import once it grows beyond a practical recovery set.
+// Terminal dispatch records and completed root outcomes belong to BB Tasks,
+// not this recovery sidecar. Keep a small recent outcome window for the Work
+// panel, then compact historical bindings instead of retaining every root.
 const WORK_BINDINGS_COMPACTION_THRESHOLD = 64;
-const workBindingsMigrations = [
-  `CREATE TABLE IF NOT EXISTS work_binding_state (
-     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-     bindings_json TEXT NOT NULL,
-     updated_at TEXT NOT NULL
-   );
-   CREATE TABLE IF NOT EXISTS work_binding_metadata (
-     key TEXT PRIMARY KEY,
-     value TEXT NOT NULL
-   );`,
-];
+const TERMINAL_OUTCOME_HISTORY_LIMIT = 64;
 type TasksPluginAdapter = ReturnType<typeof createTasksPluginAdapter>;
 export type WorkBindingsState = Pick<WorkBindings, "outcomes" | "executions">;
 export type StableLegacyContext = {
@@ -154,8 +146,7 @@ export function createWorkBindingsService(
   tasks: TasksPluginAdapter,
   lifecycle: ServerLifecycle,
 ) {
-  const database = bb.storage.database();
-  bb.storage.migrate(database, workBindingsMigrations);
+  const database = pluginStorageDatabase(bb);
   let compaction: Promise<WorkBindings> | null = null;
   let migration: Promise<void> | null = null;
   const readDatabase = (): WorkBindings => {
@@ -211,8 +202,11 @@ export function createWorkBindingsService(
     }
     await migration;
   };
-  const compactTerminalExecutions = async (saved: WorkBindings) => {
-    if (saved.executions.length < WORK_BINDINGS_COMPACTION_THRESHOLD) return saved;
+  const compactTerminalBindings = async (saved: WorkBindings) => {
+    if (
+      saved.executions.length < WORK_BINDINGS_COMPACTION_THRESHOLD &&
+      saved.outcomes.length < WORK_BINDINGS_COMPACTION_THRESHOLD
+    ) return saved;
 
     const tasksById = await tasks.allTasksById();
     const executions = saved.executions.filter((binding) => {
@@ -225,9 +219,44 @@ export function createWorkBindingsService(
         (task.status !== "done" && task.status !== "canceled")
       );
     });
-    if (executions.length === saved.executions.length) return saved;
+    const unresolvedOutcomeTaskIds = new Set(
+      executions.map((binding) => binding.outcomeTaskId),
+    );
+    const terminalOutcomes = saved.outcomes
+      .filter((binding) => {
+        const task = tasksById.get(binding.outcomeTaskId);
+        return Boolean(
+          task &&
+            !unresolvedOutcomeTaskIds.has(binding.outcomeTaskId) &&
+            (task.status === "done" || task.status === "canceled"),
+        );
+      })
+      .sort((left, right) =>
+        right.updatedAt.localeCompare(left.updatedAt) ||
+        right.rootThreadId.localeCompare(left.rootThreadId),
+      );
+    const retainedTerminalOutcomes = new Set(
+      terminalOutcomes
+        .slice(0, TERMINAL_OUTCOME_HISTORY_LIMIT)
+        .map((binding) => `${binding.rootThreadId}\u0000${binding.outcomeTaskId}`),
+    );
+    const outcomes = saved.outcomes.filter((binding) => {
+      const task = tasksById.get(binding.outcomeTaskId);
+      const terminal = Boolean(
+        task &&
+          !unresolvedOutcomeTaskIds.has(binding.outcomeTaskId) &&
+          (task.status === "done" || task.status === "canceled"),
+      );
+      return !terminal || retainedTerminalOutcomes.has(
+        `${binding.rootThreadId}\u0000${binding.outcomeTaskId}`,
+      );
+    });
+    if (
+      executions.length === saved.executions.length &&
+      outcomes.length === saved.outcomes.length
+    ) return saved;
     const compacted = {
-      outcomes: saved.outcomes,
+      outcomes,
       executions,
     };
     writeDatabase(compacted);
@@ -236,11 +265,14 @@ export function createWorkBindingsService(
   const read = async (): Promise<WorkBindings> => {
     await ensureMigrated();
     const saved = readDatabase();
-    if (saved.executions.length < WORK_BINDINGS_COMPACTION_THRESHOLD)
+    if (
+      saved.executions.length < WORK_BINDINGS_COMPACTION_THRESHOLD &&
+      saved.outcomes.length < WORK_BINDINGS_COMPACTION_THRESHOLD
+    )
       return saved;
 
     if (!compaction) {
-      compaction = compactTerminalExecutions(saved).finally(() => {
+      compaction = compactTerminalBindings(saved).finally(() => {
         compaction = null;
       });
     }

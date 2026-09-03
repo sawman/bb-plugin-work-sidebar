@@ -3,9 +3,11 @@ import { z } from "zod";
 import { createPluginRpcCaller, type PluginRpcInput } from "../../shared/server-plugin-rpc.js";
 import { projectSidebarTask, summarizeTask } from "./server-model.js";
 import { readSidebarTasks } from "./server-read.js";
+import { pluginStorageDatabase } from "../../shared/server-storage.js";
 
 const TASKS_PLUGIN_ID = "tasks";
 export const TASK_ASSIGNEES_KEY = "sidebar-task-assignees:v1";
+const TASK_ASSIGNEES_MIGRATION_KEY = "sidebar-task-assignees-v1-imported";
 const taskIdSchema = z.string().regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/);
 export const taskThreadIdSchema = z.string().startsWith("thr_");
 export const taskSchema = z.object({
@@ -66,6 +68,44 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** Validated bridge to the Tasks plugin; no durable work-binding policy lives here. */
 export function createTasksPluginAdapter(bb: BbPluginApi) {
+  const database = pluginStorageDatabase(bb);
+  let assigneeMigration: Promise<void> | null = null;
+  const assigneeMigrationComplete = () => Boolean(
+    database
+      .prepare<[string], { value: string }>(
+        "SELECT value FROM sidebar_task_assignee_metadata WHERE key = ?",
+      )
+      .get(TASK_ASSIGNEES_MIGRATION_KEY),
+  );
+  const ensureAssigneeMigration = async () => {
+    if (!assigneeMigration) {
+      assigneeMigration = (async () => {
+        if (assigneeMigrationComplete()) return;
+        const legacy = await bb.storage.kv.get<unknown>(TASK_ASSIGNEES_KEY);
+        if (isRecord(legacy)) {
+          const insert = database.prepare(
+            `INSERT INTO sidebar_task_assignee_state (task_id, assignee, updated_at)
+             VALUES (?, ?, ?)
+             ON CONFLICT(task_id) DO NOTHING`,
+          );
+          const now = new Date().toISOString();
+          for (const [taskId, assignee] of Object.entries(legacy)) {
+            if (assignee === "agent" || assignee === "human")
+              insert.run(taskId, assignee, now);
+          }
+        }
+        database
+          .prepare(
+            `INSERT INTO sidebar_task_assignee_metadata (key, value)
+             VALUES (?, ?)
+             ON CONFLICT(key) DO NOTHING`,
+          )
+          .run(TASK_ASSIGNEES_MIGRATION_KEY, new Date().toISOString());
+        await bb.storage.kv.delete(TASK_ASSIGNEES_KEY);
+      })();
+    }
+    await assigneeMigration;
+  };
   const callPluginRpc = createPluginRpcCaller(bb);
   const call = <T>(method: string, input: PluginRpcInput, outputSchema: z.ZodType<T>) =>
     callPluginRpc(TASKS_PLUGIN_ID, method, input, outputSchema);
@@ -104,20 +144,47 @@ export function createTasksPluginAdapter(bb: BbPluginApi) {
     (await listAll({ activeOnly: false, sort: "manual" })).map((task) => [task.id, task]),
   );
   const readAssignees = async (): Promise<Record<string, TaskAssignee>> => {
-    const value = await bb.storage.kv.get<unknown>(TASK_ASSIGNEES_KEY);
-    if (!isRecord(value)) return {};
-    return Object.fromEntries(Object.entries(value).flatMap(([taskId, assignee]) =>
-      typeof taskId === "string" && (assignee === "agent" || assignee === "human")
-        ? [[taskId, assignee]]
-        : [],
-    ));
+    await ensureAssigneeMigration();
+    return Object.fromEntries(
+      database
+        .prepare<[], { task_id: string; assignee: TaskAssignee }>(
+          "SELECT task_id, assignee FROM sidebar_task_assignee_state",
+        )
+        .all()
+        .map((row) => [row.task_id, row.assignee]),
+    );
   };
   const writeAssignee = async (taskId: string, assignee: TaskAssignee) => {
-    await bb.storage.kv.set(TASK_ASSIGNEES_KEY, { ...(await readAssignees()), [taskId]: assignee });
+    await ensureAssigneeMigration();
+    database
+      .prepare(
+        `INSERT INTO sidebar_task_assignee_state (task_id, assignee, updated_at)
+         VALUES (?, ?, ?)
+         ON CONFLICT(task_id) DO UPDATE SET
+           assignee = excluded.assignee,
+           updated_at = excluded.updated_at`,
+      )
+      .run(taskId, assignee, new Date().toISOString());
     return { taskId, assignee };
   };
-  const sidebar = async () => readSidebarTasks({
-    listTasks: () => listAll({ activeOnly: true, sort: "priority" }),
+  const pruneInactiveAssignees = async (activeTaskIds: ReadonlySet<string>) => {
+    await ensureAssigneeMigration();
+    const stale = database
+      .prepare<[], { task_id: string }>(
+        "SELECT task_id FROM sidebar_task_assignee_state",
+      )
+      .all()
+      .filter((row) => !activeTaskIds.has(row.task_id));
+    const remove = database.prepare<[string]>(
+      "DELETE FROM sidebar_task_assignee_state WHERE task_id = ?",
+    );
+    for (const row of stale) remove.run(row.task_id);
+  };
+  const sidebar = async () => {
+    const activeTasks = await listAll({ activeOnly: true, sort: "priority" });
+    await pruneInactiveAssignees(new Set(activeTasks.map((task) => task.id)));
+    return readSidebarTasks({
+    listTasks: async () => activeTasks,
     readAssignees,
     listProjects: projects,
     listTaskThreads: async (taskId) => (await call("listTaskThreads", { taskId }, z.object({ taskThreads: z.array(taskThreadSchema) }))).taskThreads,
@@ -127,7 +194,8 @@ export function createTasksPluginAdapter(bb: BbPluginApi) {
     projectName: (project) => project.name,
     threadId: (thread) => thread.threadId,
     projectTask: projectSidebarTask,
-  });
+    });
+  };
   const update = async (taskId: string, status: TaskStatus) => {
     const result = await call("updateTask", { taskId, status, authorName: "Work Sidebar" }, taskMutationSchema);
     if (!result.ok) throw new Error(result.error.message);
@@ -161,11 +229,10 @@ export function createTasksPluginAdapter(bb: BbPluginApi) {
   const deleteSidebar = async (taskId: string) => {
     const result = await call("deleteTask", { taskId }, z.object({ deleted: z.boolean() }));
     if (!result.deleted) return result;
-    const assignees = await readAssignees();
-    if (taskId in assignees) {
-      const { [taskId]: _removed, ...remaining } = assignees;
-      await bb.storage.kv.set(TASK_ASSIGNEES_KEY, remaining);
-    }
+    await ensureAssigneeMigration();
+    database
+      .prepare<[string]>("DELETE FROM sidebar_task_assignee_state WHERE task_id = ?")
+      .run(taskId);
     return result;
   };
   const reorder = async (taskId: string, beforeTaskId: string | null, afterTaskId: string | null) => {

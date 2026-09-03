@@ -1,5 +1,7 @@
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import type { PluginRpcInput } from "../../shared/server-plugin-rpc.js";
+import { pluginStorageDatabase } from "../../shared/server-storage.js";
 import {
   taskboardDetailSchema,
   taskboardItemSchema,
@@ -12,9 +14,17 @@ import {
 export const TRACKER_LINKS_KEY = "work-linear-links:v2";
 export const LEGACY_TRACKER_LINKS_KEY = "work-linear-links:v1";
 export const TASKBOARD_PLUGIN_ID = "taskboard";
+const TRACKER_LINKS_MIGRATION_KEY = "work-linear-links-v2-imported";
+const MAX_STORED_TRACKER_LINKS = 500;
+const MAX_LINKS_PER_ROOT = 100;
 type Link = { projectId: string; locator: string; key: string };
-type LinkState = { keys: Link[]; primaryKey: string | null };
+export type LinkState = { keys: Link[]; primaryKey: string | null };
 type Links = Record<string, LinkState>;
+
+export type TrackerLinkStore = {
+  get(rootThreadId: string): Promise<LinkState | undefined>;
+  set(rootThreadId: string, state: LinkState | null): Promise<void>;
+};
 
 export type TrackerServiceDependencies = {
   call<T>(
@@ -22,8 +32,7 @@ export type TrackerServiceDependencies = {
     input: PluginRpcInput,
     outputSchema: z.ZodType<T>,
   ): Promise<T>;
-  getStorage(key: string): Promise<unknown>;
-  setStorage(value: Links): Promise<void>;
+  links: TrackerLinkStore;
   rootThread(threadId: string): Promise<{ id: string; projectId: string }>;
   threadTitle(threadId: string): Promise<string>;
   publish(rootThreadId: string): void;
@@ -66,7 +75,8 @@ function linksFrom(value: unknown, version: "v1" | "v2"): Links {
               (candidate) =>
                 candidate.key.toUpperCase() === link.key.toUpperCase(),
             ) === index,
-        );
+        )
+        .slice(0, MAX_LINKS_PER_ROOT);
       if (!links.length) return [];
       const storedPrimary = v2State?.primaryKey;
       const primary =
@@ -80,6 +90,115 @@ function linksFrom(value: unknown, version: "v1" | "v2"): Links {
       ];
     }),
   );
+}
+
+/** Stores each root's Linear links independently and imports the old KV map once. */
+export function createSqliteTrackerLinkStore(
+  bb: Pick<BbPluginApi, "storage">,
+): TrackerLinkStore {
+  let database: ReturnType<typeof pluginStorageDatabase> | null = null;
+  const openDatabase = () => (database ??= pluginStorageDatabase(bb));
+  let migration: Promise<void> | null = null;
+  const migrated = () => Boolean(
+    openDatabase()
+      .prepare<[string], { value: string }>(
+        "SELECT value FROM tracker_link_metadata WHERE key = ?",
+      )
+      .get(TRACKER_LINKS_MIGRATION_KEY),
+  );
+  const ensureMigrated = async () => {
+    if (!migration) {
+      migration = (async () => {
+        if (migrated()) return;
+        const database = openDatabase();
+        const v2 = await bb.storage.kv.get<unknown>(TRACKER_LINKS_KEY);
+        const recovered = v2 === undefined || v2 === null
+          ? linksFrom(
+              await bb.storage.kv.get<unknown>(LEGACY_TRACKER_LINKS_KEY),
+              "v1",
+            )
+          : linksFrom(v2, "v2");
+        const insert = database.prepare(
+          `INSERT INTO tracker_link_state (root_thread_id, links_json, updated_at)
+           VALUES (?, ?, ?)
+           ON CONFLICT(root_thread_id) DO NOTHING`,
+        );
+        const now = new Date().toISOString();
+        for (const [rootThreadId, state] of Object.entries(recovered))
+          insert.run(rootThreadId, JSON.stringify(state), now);
+        database
+          .prepare(
+            `INSERT INTO tracker_link_metadata (key, value)
+             VALUES (?, ?)
+             ON CONFLICT(key) DO NOTHING`,
+          )
+          .run(TRACKER_LINKS_MIGRATION_KEY, new Date().toISOString());
+        await Promise.all([
+          bb.storage.kv.delete(TRACKER_LINKS_KEY),
+          bb.storage.kv.delete(LEGACY_TRACKER_LINKS_KEY),
+        ]);
+      })();
+    }
+    await migration;
+  };
+  const trim = (excluding: string) => {
+    const database = openDatabase();
+    const count = database
+      .prepare<[], { count: number }>(
+        "SELECT COUNT(*) AS count FROM tracker_link_state",
+      )
+      .get()?.count ?? 0;
+    const excess = count - MAX_STORED_TRACKER_LINKS;
+    if (excess <= 0) return;
+    const stale = database
+      .prepare<[string, number], { root_thread_id: string }>(
+        `SELECT root_thread_id FROM tracker_link_state
+         WHERE root_thread_id <> ?
+         ORDER BY updated_at ASC, root_thread_id ASC
+         LIMIT ?`,
+      )
+      .all(excluding, excess);
+    const remove = database.prepare<[string]>(
+      "DELETE FROM tracker_link_state WHERE root_thread_id = ?",
+    );
+    for (const row of stale) remove.run(row.root_thread_id);
+  };
+
+  return {
+    async get(rootThreadId) {
+      await ensureMigrated();
+      const row = openDatabase()
+        .prepare<[string], { links_json: string }>(
+          "SELECT links_json FROM tracker_link_state WHERE root_thread_id = ?",
+        )
+        .get(rootThreadId);
+      if (!row) return undefined;
+      try {
+        return linksFrom({ [rootThreadId]: JSON.parse(row.links_json) }, "v2")[rootThreadId];
+      } catch {
+        return undefined;
+      }
+    },
+    async set(rootThreadId, state) {
+      await ensureMigrated();
+      if (!state) {
+        openDatabase()
+          .prepare<[string]>("DELETE FROM tracker_link_state WHERE root_thread_id = ?")
+          .run(rootThreadId);
+        return;
+      }
+      openDatabase()
+        .prepare(
+          `INSERT INTO tracker_link_state (root_thread_id, links_json, updated_at)
+           VALUES (?, ?, ?)
+           ON CONFLICT(root_thread_id) DO UPDATE SET
+             links_json = excluded.links_json,
+             updated_at = excluded.updated_at`,
+        )
+        .run(rootThreadId, JSON.stringify(state), new Date().toISOString());
+      trim(rootThreadId);
+    },
+  };
 }
 
 function unavailable(error: unknown): TrackerContext {
@@ -143,15 +262,6 @@ export function createTrackerService(dependencies: TrackerServiceDependencies) {
       }
     }
   };
-  const links = async () => {
-    const current = await dependencies.getStorage(TRACKER_LINKS_KEY);
-    if (current !== undefined && current !== null)
-      return linksFrom(current, "v2");
-    return linksFrom(
-      await dependencies.getStorage(LEGACY_TRACKER_LINKS_KEY),
-      "v1",
-    );
-  };
   const list = (projectId: string, query: string, limit: number) =>
     dependencies.call(
       "listItems",
@@ -166,14 +276,16 @@ export function createTrackerService(dependencies: TrackerServiceDependencies) {
   };
   return {
     async context(threadId: string): Promise<TrackerContext> {
-      const [root, title, stored] = await Promise.all([
+      const [root, title] = await Promise.all([
         dependencies.rootThread(threadId),
         dependencies.threadTitle(threadId),
-        links(),
       ]);
       try {
         const suggested = suggestions(root.projectId, title);
-        const rootLinks = stored[root.id] ?? { keys: [], primaryKey: null };
+        const rootLinks = await dependencies.links.get(root.id) ?? {
+          keys: [],
+          primaryKey: null,
+        };
         const [linkedItems, { items: suggestedItems }] = await Promise.all([
           Promise.all(
             rootLinks.keys.map(async (link) => {
@@ -261,17 +373,19 @@ export function createTrackerService(dependencies: TrackerServiceDependencies) {
         throw new Error(
           `No Linear issue matching ${normalized} was found in this BB project.`,
         );
-      const stored = await links();
-      const rootLinks = stored[root.id] ?? { keys: [], primaryKey: null };
+      const rootLinks = await dependencies.links.get(root.id) ?? {
+        keys: [],
+        primaryKey: null,
+      };
       if (
         rootLinks.keys.some(
           (link) => link.key.toUpperCase() === item.key.toUpperCase(),
         )
       )
         return { key: item.key, title: item.title };
-      await dependencies.setStorage({
-        ...stored,
-        [root.id]: {
+      if (rootLinks.keys.length >= MAX_LINKS_PER_ROOT)
+        throw new Error("A work thread can link at most 100 Linear issues.");
+      await dependencies.links.set(root.id, {
           keys: [
             ...rootLinks.keys,
             {
@@ -281,56 +395,55 @@ export function createTrackerService(dependencies: TrackerServiceDependencies) {
             },
           ],
           primaryKey: rootLinks.primaryKey ?? item.key,
-        },
       });
       dependencies.publish(root.id);
       return { key: item.key, title: item.title };
     },
     async unlink(threadId: string, key: string) {
       const root = await dependencies.rootThread(threadId);
-      const stored = await links();
       const normalized = key.trim().toUpperCase();
-      const rootLinks = stored[root.id] ?? { keys: [], primaryKey: null };
+      const rootLinks = await dependencies.links.get(root.id) ?? {
+        keys: [],
+        primaryKey: null,
+      };
       const nextLinks = rootLinks.keys.filter(
         (link) => link.key.toUpperCase() !== normalized,
       );
       if (nextLinks.length === rootLinks.keys.length)
         throw new Error(`${normalized} is not linked to this work thread.`);
       if (nextLinks.length)
-        stored[root.id] = {
+        await dependencies.links.set(root.id, {
           keys: nextLinks,
           primaryKey:
             rootLinks.primaryKey?.toUpperCase() === normalized
               ? nextLinks[0]!.key
               : (rootLinks.primaryKey ?? nextLinks[0]!.key),
-        };
-      else delete stored[root.id];
-      await dependencies.setStorage(stored);
+        });
+      else await dependencies.links.set(root.id, null);
       dependencies.publish(root.id);
       return { ok: true as const };
     },
     async setPrimary(threadId: string, key: string) {
       const root = await dependencies.rootThread(threadId);
-      const stored = await links();
       const normalized = key.trim().toUpperCase();
-      const rootLinks = stored[root.id] ?? { keys: [], primaryKey: null };
+      const rootLinks = await dependencies.links.get(root.id) ?? {
+        keys: [],
+        primaryKey: null,
+      };
       const primary = rootLinks.keys.find(
         (link) => link.key.toUpperCase() === normalized,
       );
       if (!primary)
         throw new Error(`${normalized} is not linked to this work thread.`);
       if (rootLinks.primaryKey === primary.key) return { key: primary.key };
-      await dependencies.setStorage({
-        ...stored,
-        [root.id]: { ...rootLinks, primaryKey: primary.key },
-      });
+      await dependencies.links.set(root.id, { ...rootLinks, primaryKey: primary.key });
       dependencies.publish(root.id);
       return { key: primary.key };
     },
     async updateStatus(threadId: string, key: string, statusId: string) {
       const root = await dependencies.rootThread(threadId);
       const normalized = key.trim().toUpperCase();
-      const link = (await links())[root.id]?.keys.find(
+      const link = (await dependencies.links.get(root.id))?.keys.find(
         (candidate) => candidate.key.toUpperCase() === normalized,
       );
       if (!link)

@@ -5,11 +5,23 @@ import {
 } from "../work-item-queue-server";
 
 describe("durable work-item queue", () => {
+  it("caps recovered backlog history", () => {
+    const queue = normalizeWorkItemQueue({
+      current: null,
+      backlog: Array.from({ length: 101 }, (_, index) => ({
+        source: "bb_task",
+        id: `task-${index}`,
+      })),
+    });
+    expect(queue.backlog).toHaveLength(100);
+    expect(queue.backlog.at(-1)).toEqual({ source: "bb_task", id: "task-99" });
+  });
+
   it("distinguishes an absent queue from a deliberately empty queue", async () => {
-    let stored: unknown = {};
+    const stored = new Map<string, unknown>();
     const service = createWorkItemQueueService({
-      get: async () => stored,
-      set: async (next) => { stored = next; },
+      get: async (rootThreadId) => stored.get(rootThreadId),
+      set: async (rootThreadId, next) => { stored.set(rootThreadId, next); },
       publish: vi.fn(),
       ensureOutcome: vi.fn(),
       createExecution: vi.fn(),
@@ -30,17 +42,17 @@ describe("durable work-item queue", () => {
   });
 
   it("creates one execution record, preserves provenance, and promotes the next goal", async () => {
-    let stored: unknown = {
-      thr_root: {
+    const stored = new Map<string, unknown>([
+      ["thr_root", {
         current: { source: "linear", id: "LIN-1" },
         backlog: [{ source: "bb_task", id: "task-2" }],
-      },
-    };
+      }],
+    ]);
     const createExecution = vi.fn(async () => ({ task: { id: "task-execution" } }));
     const publish = vi.fn();
     const service = createWorkItemQueueService({
-      get: async () => stored,
-      set: async (next) => { stored = next; },
+      get: async (rootThreadId) => stored.get(rootThreadId),
+      set: async (rootThreadId, next) => { stored.set(rootThreadId, next); },
       publish,
       ensureOutcome: vi.fn(),
       createExecution,
@@ -64,7 +76,7 @@ describe("durable work-item queue", () => {
       description: "External goal\n\nWork-item source: linear:LIN-1",
     }));
     expect(publish).toHaveBeenCalledExactlyOnceWith("thr_root");
-    expect(normalizeWorkItemQueue((stored as Record<string, unknown>).thr_root)).toEqual({
+    expect(normalizeWorkItemQueue(stored.get("thr_root"))).toEqual({
       current: { source: "bb_task", id: "task-2" },
       backlog: [],
     });
@@ -74,7 +86,9 @@ describe("durable work-item queue", () => {
     const createExecution = vi.fn(async () => ({ task: { id: "task-execution" } }));
     const publish = vi.fn();
     const service = createWorkItemQueueService({
-      get: async () => ({ thr_root: { current: { source: "linear", id: "LIN-1" }, backlog: [] } }),
+      get: async (rootThreadId) => rootThreadId === "thr_root"
+        ? { current: { source: "linear", id: "LIN-1" }, backlog: [] }
+        : undefined,
       set: vi.fn(),
       publish,
       ensureOutcome: vi.fn(),

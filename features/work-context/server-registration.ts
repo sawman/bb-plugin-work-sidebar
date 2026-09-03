@@ -4,7 +4,11 @@ import type { WorkContextCompositionDependencies } from "../../shared/server-com
 import { createWorkContextReadService } from "./server-reads.js";
 import { createBackgroundJobsReadService } from "./background-jobs-server.js";
 import { projectWorkBindingOwner } from "./server-owner-projection.js";
-import { createWorkItemQueueService, normalizeWorkItemQueue, WORK_ITEM_QUEUE_KEY } from "./work-item-queue-server.js";
+import {
+  createSqliteWorkItemQueueStore,
+  createWorkItemQueueService,
+  normalizeWorkItemQueue,
+} from "./work-item-queue-server.js";
 import { projectLatestActivity } from "./latest-activity.js";
 import { createProviderStatusReadService } from "./provider-status-server.js";
 
@@ -36,8 +40,7 @@ export function createWorkContextRegistration(
 ): WorkContextHandlers {
   const { bb, tasks } = dependencies;
   const queueService = createWorkItemQueueService({
-    get: () => bb.storage.kv.get<unknown>(WORK_ITEM_QUEUE_KEY),
-    set: (value) => bb.storage.kv.set(WORK_ITEM_QUEUE_KEY, value),
+    ...createSqliteWorkItemQueueStore(bb),
     publish: (rootThreadId) => {
       bb.realtime.publish("work-sidebar:changed", { family: "work", rootThreadId });
       bb.realtime.publish("work-sidebar:changed", { family: "tasks", threadId: rootThreadId });
