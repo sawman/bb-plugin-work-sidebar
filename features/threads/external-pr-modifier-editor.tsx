@@ -15,11 +15,15 @@ export function ExternalPrModifierEditor({
   const id = useId();
   const enabled = saved ?? DEFAULT_OPEN_PR_LINKS_EXTERNALLY_WITH_MODIFIER;
   return (
-    <SettingsRow className="ws-sidebar-appearance-field">
+    <SettingsRow
+      layout="inline-toggle"
+      className="ws-sidebar-appearance-field"
+    >
       <SettingsLabel htmlFor={id}>
         Open PRs externally with ⌘/Ctrl-click
       </SettingsLabel>
       <input
+        className="ws-settings-toggle"
         id={id}
         type="checkbox"
         checked={enabled}

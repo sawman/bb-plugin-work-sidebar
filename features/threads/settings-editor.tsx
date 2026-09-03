@@ -12,7 +12,7 @@ export type NumericSettingDescriptor = Readonly<{
   initialValue: number;
 }>;
 
-export type SettingsRowLayout = "thread-popup";
+export type SettingsRowLayout = "inline-toggle" | "thread-popup";
 
 export function SettingsCard({
   title,

@@ -54,3 +54,12 @@ Last checked: 2026-09-04 against BB Tasks 0.1.2 / SDK 0.4.34.
   live result. Do not read or transiently mutate BB's private local-storage
   preference as a workaround. Upstream source as of SDK 0.4.34 stores this as
   `bb.openLinksInAppBrowser`; it is not a plugin contract.
+- [ ] **Browser-capable left-sidebar URL host.** The enhanced thread-list
+  slot is mounted beneath BB's app-wide `AppNavigationUrlHost`, whose
+  `openInAppBrowser` callback is `null`; its otherwise identical `UrlLink`
+  therefore opens HTTP URLs externally. The right Work/Changes panel is
+  mounted beneath `UrlOpenRoutingProvider` with `openBrowser`, so it honors
+  BB's in-app-browser preference. The plugin already uses the same
+  `PullRequestUrlLink` wrapper on both surfaces. Revisit when BB gives the
+  thread-list slot an in-app HTTP destination or exposes one through the SDK;
+  do not use `window.open` as a normal-click workaround.

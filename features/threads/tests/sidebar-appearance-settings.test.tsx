@@ -75,6 +75,10 @@ describe("sidebar appearance settings", () => {
     const toggle = await slot.findByRole("checkbox", {
       name: "Open PRs externally with ⌘/Ctrl-click",
     });
+    expect(toggle.closest(".ws-settings-row")?.getAttribute("data-layout")).toBe(
+      "inline-toggle",
+    );
+    expect(toggle.classList.contains("ws-settings-toggle")).toBe(true);
     await waitFor(() =>
       expect((toggle as HTMLInputElement).checked).toBe(false),
     );

@@ -265,6 +265,21 @@ describe("stylesheet policy", () => {
     expect(search).toContain("flex: none");
   });
 
+  test("keeps inline setting toggles left-labelled and right-aligned", () => {
+    const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    const row = source.match(
+      /\.ws-settings-row\[data-layout="inline-toggle"\]\s*\{([\s\S]*?)\}/,
+    )?.[1];
+    const toggle = source.match(
+      /\.ws-settings-row\[data-layout="inline-toggle"\]\s+\.ws-settings-toggle\s*\{([\s\S]*?)\}/,
+    )?.[1];
+
+    expect(row).toContain("grid-template-columns: minmax(0, 1fr) auto");
+    expect(row).toContain("align-items: center");
+    expect(toggle).toContain("justify-self: end");
+    expect(toggle).toContain("margin: 0");
+  });
+
   test("keeps every thread-location presentation in one shrinkable inline flow", () => {
     const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
     const location = source.match(

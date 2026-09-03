@@ -3562,6 +3562,15 @@ button.ws-provider-health:focus-visible {
   font: var(--ws-text-subtext);
   line-height: inherit;
 }
+.ws-settings-row[data-layout="inline-toggle"] {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ws-settings-row[data-layout="inline-toggle"] .ws-settings-toggle {
+  justify-self: end;
+  margin: 0;
+}
 .ws-settings-row[data-layout="thread-popup"] > .ws-settings-label {
   font: inherit;
   line-height: inherit;
