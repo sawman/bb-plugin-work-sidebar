@@ -285,6 +285,9 @@ describe("sidebar appearance settings", () => {
       });
     });
     await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
       await vi.advanceTimersByTimeAsync(50);
     });
 

@@ -109,6 +109,15 @@ const paths: Record<string, React.ReactNode> = {
       <path d="m4 6 1.5 1.5L8 4.5M11 6h9M4 12l1.5 1.5L8 10.5M11 12h9M4 18l1.5 1.5L8 16.5M11 18h9" />
     </>
   ),
+  MessageSquare: (
+    <>
+      <path
+        d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 3v-3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
+        data-message-bubble="true"
+      />
+      <path d="M7 9h10M7 13h7" />
+    </>
+  ),
   LoaderCircle: <path d="M12 3a9 9 0 1 0 9 9" />,
   Plus: <path d="M12 5v14M5 12h14" />,
   PriorityHigh: (

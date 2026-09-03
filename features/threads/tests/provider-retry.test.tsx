@@ -71,6 +71,7 @@ describe("queued message presentation and read contract", () => {
     });
     expect(status.textContent).toBe("2 · 65m");
     expect(status.querySelector('[data-icon="MessageSquare"]')).toBeTruthy();
+    expect(status.querySelector("[data-message-bubble]")).toBeTruthy();
     expect(status.getAttribute("aria-describedby")).toBeTruthy();
     expect(
       document
