@@ -2,6 +2,7 @@ import { useEffect, useReducer } from "react";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 
 import { normalizeIndicator } from "@/work-model";
+import { adaptSidebarThreadActivity } from "@/shared/thread-activity";
 import {
   DEFAULT_GROUP_ACTIVITY_PRIORITY,
   prioritizeGroupActivity,
@@ -16,13 +17,11 @@ export type { ThreadGroupActivity } from "./group-activity-priority";
 export function threadGroupActivity(
   thread: PluginSidebarThread,
 ): ThreadGroupActivity | null {
-  const indicator = normalizeIndicator(String(thread.indicator));
-  if (indicator === "unread-error") return "error";
-  if (thread.hasPendingInteraction || indicator === "waiting-for-input") {
-    return "attention";
-  }
-  if (indicator === "unread-success") return "completed";
-  return threadIsWorking(thread) ? "working" : null;
+  const state = adaptSidebarThreadActivity(thread).state;
+  if (state === "error" || state === "blocked") return "error";
+  if (state === "attention") return "attention";
+  if (state === "done") return "completed";
+  return state === "working" ? "working" : null;
 }
 
 export function threadNeedsAttention(thread: PluginSidebarThread): boolean {
@@ -68,17 +67,7 @@ export function threadTreeGroupActivity(
 }
 
 export function threadIsWorking(thread: PluginSidebarThread): boolean {
-  const indicator = normalizeIndicator(String(thread.indicator));
-  return (
-    Object.values(thread.activity ?? {}).some((count) => count > 0) ||
-    indicator === "runtime" ||
-    indicator === "workflow" ||
-    indicator === "background-agent" ||
-    indicator === "background-command" ||
-    indicator === "goal" ||
-    indicator === "plan-mode" ||
-    indicator === "working-draft"
-  );
+  return adaptSidebarThreadActivity(thread).ownWorking;
 }
 
 export function threadReportsComposerDraft(

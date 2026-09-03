@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { queryKeys, queryPolicies } from "@/query-runtime";
 import { Icon } from "../ui/icon";
 import { ActionTooltip } from "../ui/action-tooltip";
+import type { ThreadActivityState } from "@/shared/thread-activity";
 
 export type ThreadProvider = Pick<
   PluginProvidersState["providers"][number],
@@ -61,6 +62,7 @@ export function ThreadProviderLogo({
   title,
   runtimeState = "idle",
   statusLabel,
+  activityState,
   tooltip = true,
 }: {
   providerId: string;
@@ -68,6 +70,7 @@ export function ThreadProviderLogo({
   title?: string | null;
   runtimeState?: ThreadProviderRuntimeState;
   statusLabel?: string | null;
+  activityState?: ThreadActivityState;
   /** The enclosing interactive control owns the tooltip when false. */
   tooltip?: boolean;
 }) {
@@ -83,6 +86,7 @@ export function ThreadProviderLogo({
       className="ws-thread-provider"
       data-provider-id={providerId}
       data-runtime-state={runtimeState}
+      data-thread-activity-state={activityState}
       role="img"
       aria-label={accessibleLabel}
       aria-describedby={tooltipId}

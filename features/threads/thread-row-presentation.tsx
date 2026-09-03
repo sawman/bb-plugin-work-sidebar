@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
-import { ActionTooltip } from "@/components/ui/action-tooltip";
 import { ThreadWorkspaceBadge } from "@/components/threads/thread-workspace-badge";
 import {
   ThreadProviderLogo,
@@ -10,17 +9,14 @@ import {
 import { pullRequestReviewDetail, pullRequestSummaryPresentation } from "@/features/pull-requests/presentation";
 import type { ThreadPullRequest } from "@/features/pull-requests/queries";
 import { PullRequestIdentifierBadge } from "@/features/pull-requests/identifier-badge";
-import {
-  queuedMessageDisplay,
-  queuedMessageLabel,
-  queuedMessageReason,
-} from "./queued-messages";
 import type { QueuedMessage } from "./schemas";
 import type { ThreadProject } from "./thread-row-types";
 import {
   threadProviderRuntimeState,
   threadProviderStatusLabel,
 } from "./thread-runtime";
+import { adaptSidebarThreadActivity } from "@/shared/thread-activity";
+import { ThreadQueuedStatus } from "./thread-queued-status";
 
 export function ThreadRuntimeProvider({
   thread,
@@ -47,12 +43,17 @@ export function ThreadRuntimeProvider({
     runtimeState,
     staleWorkingMinutes,
   );
+  const activity = adaptSidebarThreadActivity(thread, {
+    activeChildCount: activeChildren,
+    stale: staleWorking,
+  });
   return (
     <ThreadProviderLogo
       providerId={thread.providerId}
       provider={provider}
       runtimeState={runtimeState}
       statusLabel={statusLabel}
+      activityState={activity.state}
     />
   );
 }
@@ -146,25 +147,9 @@ export function ThreadStatus({
           aria-label={`${thread.indicatorLabel ?? "Thread activity"}; no agent update for ${staleWorkingMinutes} minutes`}
         />
       )}
-      {queuedMessage && (
-        <ActionTooltip label={queuedMessageReason(queuedMessage)}>
-          {(tooltipId) => (
-            <span
-              className="ws-queued-message"
-              role="status"
-              aria-label={queuedMessageLabel(queuedMessage, queuedMessageNow)}
-              aria-describedby={tooltipId}
-            >
-              <Icon name="MessageSquare" aria-hidden />
-              {queuedMessageDisplay(queuedMessage, queuedMessageNow) && (
-                <span aria-hidden>
-                  {queuedMessageDisplay(queuedMessage, queuedMessageNow)}
-                </span>
-              )}
-            </span>
-          )}
-        </ActionTooltip>
-      )}
+      {queuedMessage ? (
+        <ThreadQueuedStatus message={queuedMessage} now={queuedMessageNow} />
+      ) : null}
     </span>
   );
 }

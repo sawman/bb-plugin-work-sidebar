@@ -4,6 +4,7 @@ import {
   providerHealthTooltip,
   providerLimitHeading,
 } from "../provider-status";
+import { adaptRuntimeThreadActivity } from "../../../shared/thread-activity";
 
 const provider = {
   providerId: "codex",
@@ -21,6 +22,21 @@ function usage(usedPercent: number) {
 }
 
 describe("Work provider status projection", () => {
+  it("keeps provider health distinct from thread runtime activity", () => {
+    const health = projectProviderStatus({
+      providerId: "codex",
+      provider,
+      usage: usage(12),
+    });
+    const activity = adaptRuntimeThreadActivity({
+      status: "error",
+      runtimeStatus: "failed",
+    });
+
+    expect(health).toMatchObject({ tone: "green", status: "ready" });
+    expect(activity).toMatchObject({ state: "blocked", label: "Blocked" });
+  });
+
   it("escalates a healthy provider icon as usage approaches its limit", () => {
     expect(projectProviderStatus({ providerId: "codex", provider, usage: usage(79) }).tone).toBe("green");
     expect(projectProviderStatus({ providerId: "codex", provider, usage: usage(80) }).tone).toBe("amber");

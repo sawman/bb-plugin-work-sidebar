@@ -1,4 +1,8 @@
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
+import {
+  adaptSidebarThreadActivity,
+  threadActivityPresentation,
+} from "../../shared/thread-activity";
 
 export type AgentProjectionChild = {
   thread: PluginSidebarThread;
@@ -31,7 +35,7 @@ export function projectAgentChildren(
 }
 
 export type AgentRuntimePresentation = {
-  label: "Working" | "Waiting" | "Blocked" | "Complete" | "Idle";
+  label: "Working" | "Waiting" | "Queued" | "Blocked" | "Complete" | "Idle";
   tone: "working" | "waiting" | "blocked" | "complete" | "idle";
 };
 
@@ -112,25 +116,8 @@ export function agentDurationLabel(
 export function agentRuntimePresentation(
   thread: PluginSidebarThread,
 ): AgentRuntimePresentation {
-  if (thread.indicator === "unread-error")
-    return { label: "Blocked", tone: "blocked" };
-  if (thread.hasPendingInteraction || thread.indicator === "waiting-for-input")
-    return { label: "Waiting", tone: "waiting" };
-  if (thread.indicator === "unread-success")
-    return { label: "Complete", tone: "complete" };
-  if (
-    thread.indicator === "background-agent" ||
-    thread.indicator === "background-command" ||
-    thread.indicator === "goal" ||
-    thread.indicator === "runtime" ||
-    thread.indicator === "workflow" ||
-    thread.indicator === "plan-mode" ||
-    thread.activity.workflows > 0 ||
-    thread.activity.backgroundAgents > 0 ||
-    thread.activity.backgroundCommands > 0 ||
-    thread.activity.planMode > 0 ||
-    thread.activity.goals > 0
-  )
-    return { label: "Working", tone: "working" };
-  return { label: "Idle", tone: "idle" };
+  const presentation = threadActivityPresentation(
+    adaptSidebarThreadActivity(thread),
+  );
+  return { label: presentation.label, tone: presentation.tone };
 }

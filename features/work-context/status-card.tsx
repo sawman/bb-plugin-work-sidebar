@@ -1,23 +1,19 @@
 import { useEffect, useState } from "react";
 import { experimental_useProviders } from "@get-bb/plugin-sdk/app";
 import { useStore } from "zustand";
-import { Icon, type IconName } from "../../components/ui/icon";
+import { Icon } from "../../components/ui/icon";
 import { ThreadProviderLogo } from "../../components/threads/thread-provider-logo";
 import { ActionTooltip } from "../../components/ui/action-tooltip";
-import { runtimeStatusPresentation } from "../../work-model";
 import { useLatestActivity, useWorkProviderHealth, useWorkStatus } from "./queries";
 import { CardState } from "./card-state";
 import { ProviderHealth, ProviderStatusSection } from "./provider-status-section";
 import { formatActivityAge } from "./latest-activity";
 import { threadInteractionStore } from "../threads/store";
-
-const runtimeIcons = {
-  working: "LoaderCircle",
-  waiting: "UserClock",
-  blocked: "AlertCircle",
-  complete: "Check",
-  idle: "Zzz",
-} satisfies Record<ReturnType<typeof runtimeStatusPresentation>["tone"], IconName>;
+import {
+  adaptRuntimeThreadActivity,
+  threadActivityPresentation,
+  type ThreadActivityFact,
+} from "../../shared/thread-activity";
 
 function countLabel(count: number, description: string) {
   return `${count} ${description}${count === 1 ? "" : "s"}`;
@@ -34,11 +30,16 @@ export function StatusCard({ threadId }: { threadId: string }) {
   const providerDirectory = experimental_useProviders();
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const data = query.data;
-  const runtime = data ? runtimeStatusPresentation(data.currentThread) : null;
   const total = data?.children.filter((child) => !child.isArchived).length ?? 0;
   const active = data?.children.filter(
     (child) => !child.isArchived && ["active", "starting"].includes(child.status),
   ).length ?? 0;
+  const activity = data
+    ? adaptRuntimeThreadActivity(data.currentThread, {
+        childCount: total,
+        activeChildCount: active,
+      })
+    : null;
   const toggle = (key: string) =>
     setExpanded((current) => {
       const next = new Set(current);
@@ -50,9 +51,9 @@ export function StatusCard({ threadId }: { threadId: string }) {
       title="Status"
       className="ws-status-card"
       trailing={
-        data && runtime ? (
+        data && activity ? (
           <StatusHeading
-            runtime={runtime}
+            activity={activity}
             total={total}
             active={active}
             provider={provider.data ?? null}
@@ -99,13 +100,13 @@ export function StatusCard({ threadId }: { threadId: string }) {
 }
 
 function StatusHeading({
-  runtime,
+  activity,
   total,
   active,
   provider,
   providerLogo,
 }: {
-  runtime: ReturnType<typeof runtimeStatusPresentation>;
+  activity: ThreadActivityFact;
   total: number;
   active: number;
   provider: Parameters<typeof ProviderHealth>[0]["provider"] | null;
@@ -113,14 +114,7 @@ function StatusHeading({
 }) {
   return (
     <span className="ws-status-heading-meta">
-      <ActionTooltip label={runtime.label}>
-        {(tooltipId) => <span
-        className={`ws-runtime-state ws-runtime-state-${runtime.tone}`}
-        aria-describedby={tooltipId}
-      >
-        <Icon name={runtimeIcons[runtime.tone]} aria-label={runtime.label} />
-        </span>}
-      </ActionTooltip>
+      <WorkRuntimeIndicator fact={activity} />
       <span className="ws-total-agent-count">
         <Icon name="Bot" aria-hidden />
         <span aria-hidden>{total}</span>
@@ -135,6 +129,26 @@ function StatusHeading({
       </span>
       {provider ? <ProviderHealth provider={provider} providerLogo={providerLogo} /> : null}
     </span>
+  );
+}
+
+export function WorkRuntimeIndicator({ fact }: { fact: ThreadActivityFact }) {
+  const presentation = threadActivityPresentation(fact);
+  return (
+    <ActionTooltip label={presentation.label}>
+      {(tooltipId) => (
+        <span
+          className={`ws-runtime-state ws-runtime-state-${presentation.tone}`}
+          data-thread-activity-state={fact.state}
+          aria-describedby={tooltipId}
+        >
+          <Icon
+            name={presentation.icon}
+            aria-label={presentation.label}
+          />
+        </span>
+      )}
+    </ActionTooltip>
   );
 }
 

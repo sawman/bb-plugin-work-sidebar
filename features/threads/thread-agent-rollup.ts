@@ -1,5 +1,8 @@
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
-import { threadIsWorking } from "./thread-attention";
+import {
+  adaptSidebarThreadActivity,
+  rollupThreadActivityFactDirectory,
+} from "@/shared/thread-activity";
 
 export type ThreadAgentRollup = {
   childCount: number;
@@ -11,26 +14,36 @@ export function threadAgentRollups(
   roots: readonly PluginSidebarThread[],
   childrenByThread: ReadonlyMap<string, readonly PluginSidebarThread[]>,
 ): ReadonlyMap<string, ThreadAgentRollup> {
+  const all = new Map<string, PluginSidebarThread>();
+  const pending = [...roots];
+  while (pending.length > 0) {
+    const thread = pending.pop();
+    if (!thread || all.has(thread.id)) continue;
+    all.set(thread.id, thread);
+    pending.push(...(childrenByThread.get(thread.id) ?? []));
+  }
+  const facts = new Map(
+    [...all].map(([id, thread]) => [id, adaptSidebarThreadActivity(thread)]),
+  );
+  const childIds = new Map(
+    [...childrenByThread].map(([id, children]) => [
+      id,
+      children.map((child) => child.id),
+    ]),
+  );
   const rollups = new Map<string, ThreadAgentRollup>();
-  const visiting = new Set<string>();
-  const visit = (thread: PluginSidebarThread): ThreadAgentRollup => {
-    const cached = rollups.get(thread.id);
-    if (cached) return cached;
-    if (visiting.has(thread.id)) return { childCount: 0, activeChildCount: 0 };
-    visiting.add(thread.id);
-    let childCount = 0;
-    let activeChildCount = 0;
-    for (const child of childrenByThread.get(thread.id) ?? []) {
-      const childRollup = visit(child);
-      childCount += 1 + childRollup.childCount;
-      activeChildCount +=
-        (threadIsWorking(child) ? 1 : 0) + childRollup.activeChildCount;
-    }
-    visiting.delete(thread.id);
-    const rollup = { childCount, activeChildCount };
-    rollups.set(thread.id, rollup);
-    return rollup;
-  };
-  for (const root of roots) visit(root);
+  const activityRollups = rollupThreadActivityFactDirectory(
+    all.keys(),
+    facts,
+    childIds,
+  );
+  for (const id of all.keys()) {
+    const fact = activityRollups.get(id);
+    if (!fact) continue;
+    rollups.set(id, {
+      childCount: fact.childCount,
+      activeChildCount: fact.activeChildCount,
+    });
+  }
   return rollups;
 }

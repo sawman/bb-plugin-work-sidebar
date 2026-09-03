@@ -3,6 +3,10 @@ import type {
   PluginSidebarThread,
   PluginSidebarThreadIndicator,
 } from "@get-bb/plugin-sdk/app";
+import {
+  adaptRuntimeThreadActivity,
+  threadActivityPresentation,
+} from "./shared/thread-activity";
 
 export type WorkGroupId =
   | "attention"
@@ -467,12 +471,10 @@ export function readableStatus(status: string): string {
 }
 
 export function runtimeStatusPresentation(thread: { status: string; runtimeStatus: string }): RuntimePresentation {
-  const value = `${thread.status} ${thread.runtimeStatus}`.toLowerCase();
-  if (thread.status === "error" || /blocked|error|failed/.test(value)) return { label: "Blocked", tone: "blocked" };
-  if (/waiting|input|approval|paused/.test(value)) return { label: "Waiting", tone: "waiting" };
-  if (/working|running|starting|active/.test(value)) return { label: "Working", tone: "working" };
-  if (/complete|done|finished/.test(value)) return { label: "Complete", tone: "complete" };
-  return { label: "Idle", tone: "idle" };
+  const presentation = threadActivityPresentation(
+    adaptRuntimeThreadActivity(thread),
+  );
+  return { label: presentation.label, tone: presentation.tone };
 }
 
 export function orderStackLayers(

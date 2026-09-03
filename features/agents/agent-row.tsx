@@ -14,10 +14,14 @@ import { Icon, type IconName } from "../../components/ui/icon";
 import { ActionTooltip } from "../../components/ui/action-tooltip";
 import {
   agentDurationLabel,
-  agentRuntimePresentation,
   agentWorkspacePresentation,
   type AgentProjectionChild,
 } from "./model";
+import {
+  adaptSidebarThreadActivity,
+  threadActivityPresentation,
+  type ThreadActivityFact,
+} from "../../shared/thread-activity";
 
 export type AgentAnnotation = {
   taskKey: string | null;
@@ -63,16 +67,25 @@ function AgentDuration({ createdAt }: { createdAt: number }) {
   ) : null;
 }
 
-const runtimeIcons: Record<
-  ReturnType<typeof agentRuntimePresentation>["tone"],
-  IconName
-> = {
-  working: "Bot",
-  waiting: "UserClock",
-  blocked: "AlertCircle",
-  complete: "Check",
-  idle: "Zzz",
-};
+export function AgentRuntimeIndicator({
+  fact,
+  label,
+}: {
+  fact: ThreadActivityFact;
+  label?: string | null;
+}) {
+  const presentation = threadActivityPresentation(fact);
+  return (
+    <span
+      className={`ws-agent-state ws-agent-state-${presentation.tone}`}
+      data-thread-activity-state={fact.state}
+      aria-label={label ?? presentation.label}
+      role="img"
+    >
+      <Icon name={presentation.icon} aria-hidden />
+    </span>
+  );
+}
 
 const workspaceIcons: Record<
   NonNullable<ReturnType<typeof agentWorkspacePresentation>>["kind"],
@@ -97,7 +110,8 @@ export function AgentRow({
   const { splitProps, isAvailable } = experimental_useSidebarThreadSplit(
     child.thread.id,
   );
-  const runtime = agentRuntimePresentation(child.thread);
+  const activity = adaptSidebarThreadActivity(child.thread);
+  const runtime = threadActivityPresentation(activity);
   const workspace = agentWorkspacePresentation(child.thread);
   const title =
     child.thread.title ?? child.thread.titleFallback ?? "Untitled agent";
@@ -108,13 +122,10 @@ export function AgentRow({
       data-agent-state={runtime.tone}
       style={{ marginLeft: `${Math.min(child.depth - 1, 4) * 0.65}rem` }}
     >
-      <span
-        className={`ws-agent-state ws-agent-state-${runtime.tone}`}
-        aria-label={child.thread.indicatorLabel ?? runtime.label}
-        role="img"
-      >
-        <Icon name={runtimeIcons[runtime.tone]} aria-hidden />
-      </span>
+      <AgentRuntimeIndicator
+        fact={activity}
+        label={child.thread.indicatorLabel}
+      />
       <a
         {...splitProps}
         href="#"

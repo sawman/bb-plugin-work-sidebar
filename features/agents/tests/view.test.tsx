@@ -173,7 +173,7 @@ describe("R15 registered Agents Work slot", () => {
     await waitFor(() => expect(slot.getByRole("link", { name: "Open thr_direct" })).toBeTruthy());
     expect(slot.getByRole("link", { name: "Open thr_grandchild" })).toBeTruthy();
     expect(slot.queryByText("thr_archived")).toBeNull();
-    expect(slot.getByRole("img", { name: "Working" }).querySelector("rect")).toBeTruthy();
+    expect(slot.getByRole("img", { name: "Working" }).querySelector("path")).toBeTruthy();
     expect(slot.getByRole("img", { name: "Waiting for input" })).toBeTruthy();
     expect(slot.queryByText("Working")).toBeNull();
     expect(slot.queryByText("Waiting")).toBeNull();
