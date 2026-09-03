@@ -224,11 +224,15 @@ export function useThreadPreferences() {
 
 /** A single Work-tab observer reads durable queue rows; event ownership stays
  * in the sidebar controller so remounting a row can never add listeners. */
+export const QUEUED_MESSAGE_REFRESH_MS = 2_000;
+
 export function useQueuedMessagesQuery(rpc: ThreadsRpc, active: boolean) {
   return useQuery({
     queryKey: threadQueryKeys.queuedMessages(),
     queryFn: async () => (await rpc.call("sidebarQueuedMessages", null)).messages,
     ...threadQueryPolicies.queuedMessages,
+    refetchInterval: active ? QUEUED_MESSAGE_REFRESH_MS : false,
+    refetchIntervalInBackground: false,
     enabled: active,
   });
 }

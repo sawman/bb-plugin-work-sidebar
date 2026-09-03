@@ -134,8 +134,8 @@ export const queryPolicies = {
     refetchOnWindowFocus: false,
   },
   queuedMessages: {
-    // Queue changes publish exact realtime signals. A queue schedule never
-    // needs background polling; its visible countdown is client-local.
+    // Queue changes publish exact realtime signals. The active sidebar adds a
+    // short foreground safety poll in case a host event is delayed or missed.
     staleTime: Infinity,
     gcTime: 5 * 60_000,
     retry: 1,

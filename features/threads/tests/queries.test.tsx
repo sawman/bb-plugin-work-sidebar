@@ -8,6 +8,7 @@ import { queryKeys } from "../../../query-runtime";
 import { trackerKeys } from "../../tracker/model";
 import { normalizeThreadGroups } from "../model";
 import {
+  QUEUED_MESSAGE_REFRESH_MS,
   threadQueryKeys,
   threadQueryPolicies,
   saveThreadGroups,
@@ -69,6 +70,35 @@ describe("R9 Threads query ownership", () => {
     );
     view.unmount();
     client.clear();
+  });
+
+  it("safety-refreshes queued messages every two seconds only while active", async () => {
+    vi.useFakeTimers();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const rpc = {
+      call: vi.fn().mockResolvedValue({ messages: [] }),
+    };
+    const view = renderHook(
+      ({ active }: { active: boolean }) =>
+        useQueuedMessagesQuery(rpc as unknown as ThreadsRpc, active),
+      { initialProps: { active: true }, wrapper: queryWrapper(client) },
+    );
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(rpc.call).toHaveBeenCalledTimes(1);
+    await act(async () =>
+      vi.advanceTimersByTimeAsync(QUEUED_MESSAGE_REFRESH_MS),
+    );
+    expect(rpc.call).toHaveBeenCalledTimes(2);
+    view.rerender({ active: false });
+    await act(async () =>
+      vi.advanceTimersByTimeAsync(QUEUED_MESSAGE_REFRESH_MS * 2),
+    );
+    expect(rpc.call).toHaveBeenCalledTimes(2);
+    view.unmount();
+    client.clear();
+    vi.useRealTimers();
   });
   it("round-trips text scale through the shared typed appearance query", async () => {
     const client = new QueryClient();
