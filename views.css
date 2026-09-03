@@ -666,6 +666,9 @@
 .ws-task-row:hover {
   background: var(--accent);
 }
+.ws-task-row:not(.ws-task-row-selected):has(> .ws-task-children:hover) {
+  background: transparent;
+}
 .ws-task-row:active {
   cursor: grabbing;
 }
@@ -745,6 +748,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 0.2rem;
+  padding-right: 0.32rem;
 }
 .ws-task-row-primary-info {
   display: inline-flex;
@@ -816,10 +820,13 @@
   left: calc((var(--ws-task-hierarchy-gutter) - 1px) / 2);
   width: 1px;
   background: color-mix(in srgb, var(--primary) 72%, var(--border));
+  z-index: 1;
+  pointer-events: none;
   content: "";
 }
 .ws-task-children > .ws-task-row {
   width: 100%;
+  z-index: 0;
 }
 .ws-callout button {
   font: var(--ws-text-subtext);

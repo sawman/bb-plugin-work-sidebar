@@ -794,6 +794,7 @@ describe("Tasks registered controls", () => {
     const disclosure = rendered.getByRole("button", {
       name: "Expand subtasks for WORK-1",
     });
+    expect(disclosure.getAttribute("aria-describedby")).toBeNull();
     const children = rendered.container.querySelector<HTMLElement>(
       "#ws-task-children-task_1",
     );

@@ -191,24 +191,17 @@ export function TaskRow(props: TaskRowProps) {
         >
           <span className="ws-task-hierarchy-slot">
             {node.children.length > 0 ? (
-              <ActionTooltip
-                label={`${childrenOpen ? "Collapse" : "Expand"} ${node.children.length} subtask${node.children.length === 1 ? "" : "s"}`}
+              <button
+                type="button"
+                className="ws-task-children-disclosure ws-pr-stack-disclosure"
+                data-state={childrenOpen ? "open" : "closed"}
+                aria-controls={`ws-task-children-${task.id}`}
+                aria-expanded={childrenOpen}
+                aria-label={`${childrenOpen ? "Collapse" : "Expand"} subtasks for ${task.key}`}
+                onClick={() => setChildrenOpen((current) => !current)}
               >
-                {(tooltipId) => (
-                  <button
-                    type="button"
-                    className="ws-task-children-disclosure ws-pr-stack-disclosure"
-                    data-state={childrenOpen ? "open" : "closed"}
-                    aria-describedby={tooltipId}
-                    aria-controls={`ws-task-children-${task.id}`}
-                    aria-expanded={childrenOpen}
-                    aria-label={`${childrenOpen ? "Collapse" : "Expand"} subtasks for ${task.key}`}
-                    onClick={() => setChildrenOpen((current) => !current)}
-                  >
-                    <Icon name="ChevronRight" aria-hidden />
-                  </button>
-                )}
-              </ActionTooltip>
+                <Icon name="ChevronRight" aria-hidden />
+              </button>
             ) : null}
           </span>
           <div className="ws-sidebar-row-main">
