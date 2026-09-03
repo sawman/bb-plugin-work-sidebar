@@ -86,6 +86,7 @@ export function ThreadMetadata({
         <PullRequestIdentifierBadge
           kind="pull-request"
           number={pullRequest.number}
+          url={pullRequest.url}
           presentation={pullRequestStatus}
         />
       )}

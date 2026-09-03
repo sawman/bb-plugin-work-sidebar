@@ -113,6 +113,7 @@ export function AuthoredPullRequestRow({
                 <PullRequestIdentifierBadge
                   kind="pull-request"
                   number={pullRequest.number}
+                  url={pullRequest.url}
                   presentation={state}
                 />
               </ContextMenuTrigger>

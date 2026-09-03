@@ -8,6 +8,7 @@ type PullRequestIdentifier =
   | {
       kind: "pull-request";
       number: number;
+      url: string;
       presentation?: StatusPresentation;
     }
   | { kind: "branch"; name: string };
@@ -31,7 +32,7 @@ export function PullRequestIdentifierBadge(
   return (
     <CopyBadge
       value={value}
-      copyValue={`PR ${value}`}
+      copyValue={identifier.url}
       label="PR number"
       className="ws-pr-identifier-badge ws-pr-number-badge"
       title={stateLabel ?? "Pull request"}

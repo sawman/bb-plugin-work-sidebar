@@ -201,7 +201,7 @@ describe("R21D ThreadRow characterization", () => {
 
     await waitFor(() =>
       expect(clipboardWrite.mock.calls).toEqual([
-        ["PR #42"],
+        ["https://example.test/pull/42"],
         ["Stack #17"],
         ["Branch feature/m7"],
       ]),

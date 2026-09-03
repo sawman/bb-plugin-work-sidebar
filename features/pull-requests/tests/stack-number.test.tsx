@@ -163,7 +163,7 @@ describe("pull-request stack number presentation", () => {
 
     await waitFor(() =>
       expect(clipboardWrite.mock.calls).toEqual([
-        ["PR #42"],
+        ["https://github.com/acme/repo/pull/42"],
         ["Stack #17"],
         ["Branch feature/stack-number"],
         ["Branch feature/stack-number"],
@@ -207,6 +207,7 @@ describe("pull-request stack number presentation", () => {
         <PullRequestIdentifierBadge
           kind="pull-request"
           number={42}
+          url="https://github.com/acme/repo/pull/42"
           presentation={{ icon: "Eye", label: "Review requested", tone: "warning" }}
         />
         <StackNumberBadge number={17} />
@@ -234,6 +235,7 @@ describe("pull-request stack number presentation", () => {
       <PullRequestIdentifierBadge
         kind="pull-request"
         number={42}
+        url="https://github.com/acme/repo/pull/42"
         presentation={{ icon: "LoaderCircle", label: "Checks pending", tone: "muted" }}
       />,
     );
