@@ -15,6 +15,9 @@ describe("AssigneePicker", () => {
     const control = screen.getByRole("switch", {
       name: "Human assigned to WORK-1",
     });
+    expect(screen.getByRole("tooltip").getAttribute("aria-label")).toBe(
+      "Assign to Agent",
+    );
     expect(control.getAttribute("data-assignee")).toBe("human");
     expect(control.textContent).toBe("");
     expect(control.querySelectorAll("svg")).toHaveLength(2);
@@ -24,6 +27,9 @@ describe("AssigneePicker", () => {
     expect(
       screen.getByRole("switch", { name: /Agent assignment pending/ }),
     ).toBeTruthy();
+    expect(screen.getByRole("tooltip").getAttribute("aria-label")).toBe(
+      "Assigning to Agent",
+    );
     expect(control.getAttribute("data-assignee")).toBe("agent");
     act(() => vi.advanceTimersByTime(1_999));
     expect(onChange).not.toHaveBeenCalled();

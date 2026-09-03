@@ -260,14 +260,16 @@ export function TaskRow(props: TaskRowProps) {
             </div>
           </div>
           <div className="ws-task-row-actions ws-sidebar-row-trailing">
-            <AssigneePicker
-              value={task.assignee}
-              taskKey={task.key}
-              disabled={updatingAssigneeTaskId === task.id}
-              onChange={(assignee) => {
-                void onUpdateAssignee(task.id, assignee).catch(() => undefined);
-              }}
-            />
+            {node.role === "execution" && (
+              <AssigneePicker
+                value={task.assignee}
+                taskKey={task.key}
+                disabled={updatingAssigneeTaskId === task.id}
+                onChange={(assignee) => {
+                  void onUpdateAssignee(task.id, assignee).catch(() => undefined);
+                }}
+              />
+            )}
             <TaskStatusControl
               taskKey={task.key}
               status={task.status}

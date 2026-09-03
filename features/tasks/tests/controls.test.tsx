@@ -544,7 +544,7 @@ describe("Tasks registered controls", () => {
     rendered.lifecycle.unmount();
   });
 
-  it("edits one searchable left-row owner thread alongside the shared assignment switch", async () => {
+  it("edits one searchable goal-row owner thread without an assignment switch", async () => {
     const pending = deferred<unknown>();
     const { rendered, call } = await leftSlot(
       [{ ...task, priority: "high" }],
@@ -575,9 +575,9 @@ describe("Tasks registered controls", () => {
       trailing.querySelector('[aria-label="Change status for WORK-1: To do"]'),
     ).toBeTruthy();
     expect(
-      rendered.getByRole("switch", { name: "Human assigned to WORK-1" }),
-    ).toBeTruthy();
-    expect(trailing.querySelector('[role="switch"]')).toBeTruthy();
+      rendered.queryByRole("switch", { name: "Human assigned to WORK-1" }),
+    ).toBeNull();
+    expect(trailing.querySelector('[role="switch"]')).toBeNull();
     expect(
       rendered.queryByRole("button", { name: "Manage threads for WORK-1" }),
     ).toBeNull();
@@ -766,18 +766,32 @@ describe("Tasks registered controls", () => {
     rendered.lifecycle.unmount();
   });
 
-  it("uses the shared delayed assignment switch for every left Task row", async () => {
+  it("uses the shared delayed assignment switch only for Queue rows", async () => {
+    const child = {
+      ...task,
+      id: "task_child",
+      key: "WORK-2",
+      title: "Nested execution task",
+      parentTaskId: task.id,
+      position: 2048,
+    };
     const { rendered, call } = await leftSlot(
-      [task],
+      [task, child],
       vi.fn(() => Promise.resolve({})),
     );
+    expect(
+      rendered.queryByRole("switch", { name: "Human assigned to WORK-1" }),
+    ).toBeNull();
+    fireEvent.click(rendered.getByRole("button", {
+      name: "Expand subtasks for WORK-1",
+    }));
     const control = rendered.getByRole("switch", {
-      name: "Human assigned to WORK-1",
+      name: "Human assigned to WORK-2",
     });
     fireEvent.keyDown(control, { key: "ArrowRight" });
     await waitFor(
       () => expect(call).toHaveBeenCalledWith("updateTaskAssignee", {
-        taskId: "task_1",
+        taskId: "task_child",
         assignee: "agent",
       }),
       { timeout: 2_500 },
@@ -785,9 +799,15 @@ describe("Tasks registered controls", () => {
     rendered.lifecycle.unmount();
     getPluginQueryClient().clear();
 
-    const owned = await leftSlot([{ ...task, linkedThreadIds: ["thr_test"] }]);
+    const owned = await leftSlot([
+      { ...task, linkedThreadIds: ["thr_test"] },
+      { ...child, linkedThreadIds: ["thr_test"] },
+    ]);
+    fireEvent.click(owned.rendered.getByRole("button", {
+      name: "Expand subtasks for WORK-1",
+    }));
     expect(
-      owned.rendered.getByRole("switch", { name: "Human assigned to WORK-1" }),
+      owned.rendered.getByRole("switch", { name: "Human assigned to WORK-2" }),
     ).toBeTruthy();
     owned.rendered.lifecycle.unmount();
   });

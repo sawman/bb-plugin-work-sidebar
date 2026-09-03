@@ -58,9 +58,10 @@ export function AssigneePicker({
     if (pending && pending === value) clearPending();
   }, [pending, value]);
 
+  const target = pending ?? (current === "agent" ? "human" : "agent");
   const tooltipLabel = pending
-    ? `Switching to ${pending === "agent" ? "Agent" : "Human"} in 2 seconds. Click again or press Escape to cancel.`
-    : "Swipe left for Human, right for Agent";
+    ? `Assigning to ${target === "agent" ? "Agent" : "Human"}`
+    : `Assign to ${target === "agent" ? "Agent" : "Human"}`;
   return (
     <ActionTooltip label={tooltipLabel}>
       {(tooltipId) => <button
