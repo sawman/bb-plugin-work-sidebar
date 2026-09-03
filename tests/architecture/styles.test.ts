@@ -221,6 +221,10 @@ describe("stylesheet policy", () => {
 
   test("keeps left Task titles and child disclosures shrinkable and single-line", () => {
     const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    const row = source.match(/\.ws-task-row\s*\{([\s\S]*?)\}/)?.[1];
+    const main = source.match(
+      /\.ws-task-row > \.ws-sidebar-row-main\s*\{([\s\S]*?)\}/,
+    )?.[1];
     const title = source.match(/\.ws-task-title\s*\{([\s\S]*?)\}/)?.[1];
     const line = source.match(/\.ws-task-title-line\s*\{([\s\S]*?)\}/)?.[1];
     const tooltip = source.match(
@@ -230,9 +234,16 @@ describe("stylesheet policy", () => {
     expect(title).toContain("overflow: hidden");
     expect(title).toContain("text-overflow: ellipsis");
     expect(title).toContain("white-space: nowrap");
+    expect(row).toContain("grid-template-columns: minmax(0, 1fr) auto");
+    expect(row).toContain("align-items: center");
+    expect(main).toContain("overflow: hidden");
     expect(line).toContain("min-width: 0");
     expect(tooltip).toContain("min-width: 0");
     expect(tooltip).toContain("flex: 1 1 auto");
+    const assign = source.match(/\.ws-task-assign\s*\{([\s\S]*?)\}/)?.[1];
+    expect(assign).toContain("display: block");
+    expect(assign).toContain("width: 100%");
+    expect(assign).toContain("overflow: hidden");
   });
 
   test("keeps plugin tooltips flat instead of adding a bright underglow", () => {

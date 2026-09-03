@@ -644,9 +644,14 @@
   position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 0.45rem;
   padding-inline: 0.4rem;
   cursor: grab;
+}
+.ws-task-row > .ws-sidebar-row-main {
+  align-self: center;
+  overflow: hidden;
 }
 .ws-task-row:hover {
   background: var(--accent);
@@ -3348,7 +3353,11 @@ button.ws-provider-health:focus-visible {
   color: var(--destructive);
 }
 .ws-task-assign {
+  display: block;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
+  overflow: hidden;
   border: 0;
   padding: 0;
   background: transparent;
