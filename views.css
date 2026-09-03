@@ -2306,7 +2306,6 @@ button.ws-change-file-row:hover {
 }
 .ws-provider-status-section {
   border-bottom: 1px solid var(--border);
-  padding-bottom: 0.4rem;
 }
 .ws-provider-status-section > summary {
   display: flex;
@@ -2349,7 +2348,7 @@ button.ws-change-file-row:hover {
 .ws-provider-status-content {
   display: grid;
   gap: 0.34rem;
-  padding: 0.2rem 0 0.08rem 0.84rem;
+  padding: 0.2rem 0 0.4rem;
 }
 .ws-provider-status-message {
   margin: 0;
