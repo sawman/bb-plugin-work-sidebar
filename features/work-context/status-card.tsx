@@ -106,18 +106,32 @@ function StatusHeading({
         </span>}
       </ActionTooltip>
       <ActionTooltip label={countLabel(total, "child agent")}>
-        {(tooltipId) => <span aria-describedby={tooltipId}>
-        <Icon name="Bot" aria-hidden />
-        <span aria-hidden>{total}</span>
-        <span className="ws-sr-only">{countLabel(total, "child agent")}</span>
-        </span>}
+        {(tooltipId) => (
+          <span
+            className="ws-total-agent-count"
+            aria-describedby={tooltipId}
+          >
+            <Icon name="Bot" aria-hidden />
+            <span aria-hidden>{total}</span>
+            <span className="ws-sr-only">
+              {countLabel(total, "child agent")}
+            </span>
+          </span>
+        )}
       </ActionTooltip>
       <ActionTooltip label={countLabel(active, "active child agent")}>
-        {(tooltipId) => <span className="ws-active-agent-count" aria-describedby={tooltipId}>
-        <Icon name="Wrench" aria-hidden />
-        <span aria-hidden>{active}</span>
-        <span className="ws-sr-only">{countLabel(active, "active child agent")}</span>
-        </span>}
+        {(tooltipId) => (
+          <span
+            className="ws-active-agent-count"
+            aria-describedby={tooltipId}
+          >
+            <Icon name="Wrench" aria-hidden />
+            <span aria-hidden>{active}</span>
+            <span className="ws-sr-only">
+              {countLabel(active, "active child agent")}
+            </span>
+          </span>
+        )}
       </ActionTooltip>
       {provider ? <ProviderHealth provider={provider} providerLogo={providerLogo} /> : null}
     </span>

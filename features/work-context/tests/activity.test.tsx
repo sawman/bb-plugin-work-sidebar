@@ -130,6 +130,12 @@ describe("registered Status activity lifecycle", () => {
     );
     expect(within(heading!).getByText("2 child agents")).toBeTruthy();
     expect(within(heading!).getByText("1 active child agent")).toBeTruthy();
+    expect(
+      heading?.querySelector(".ws-total-agent-count > svg + span"),
+    ).not.toBeNull();
+    expect(
+      heading?.querySelector(".ws-active-agent-count > svg + span"),
+    ).not.toBeNull();
     expect(slot.queryByRole("heading", { name: "Working" })).toBeNull();
     await waitFor(() => expect(slot.getByText(agentText)).toBeTruthy());
     expect(slot.getByText(userText)).toBeTruthy();

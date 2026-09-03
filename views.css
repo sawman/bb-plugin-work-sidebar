@@ -2315,14 +2315,22 @@ button.ws-provider-health:focus-visible {
   align-items: center;
 }
 .ws-status-heading-meta {
+  flex: none;
+  flex-wrap: nowrap;
   gap: 0.36rem;
   color: var(--muted-foreground);
   font: var(--ws-text-label);
   line-height: inherit;
   white-space: nowrap;
 }
-.ws-status-heading-meta > span {
+.ws-status-heading-meta > .ws-action-tooltip,
+.ws-total-agent-count,
+.ws-active-agent-count {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
   gap: 0.1rem;
+  line-height: 1;
 }
 .ws-status-heading-meta svg {
   width: 0.62rem;
