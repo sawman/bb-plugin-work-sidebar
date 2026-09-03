@@ -8,14 +8,13 @@ export function StackNumberBadge({
   number: number;
   compact?: boolean;
 }) {
-  const label = `Stack #${number}`;
   return (
     <CopyBadge
       value={`#${number}`}
       copyValue={`Stack #${number}`}
       label="stack number"
       className={`ws-stack-number${compact ? " ws-stack-number-compact" : ""}`}
-      title={label}
+      tooltip={false}
     >
       <Icon name="Layers" aria-hidden />
       <span aria-hidden>{`#${number}`}</span>

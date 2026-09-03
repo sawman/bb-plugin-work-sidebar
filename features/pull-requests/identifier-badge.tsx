@@ -34,7 +34,7 @@ export function PullRequestIdentifierBadge(
       copyValue={`PR ${value}`}
       label="PR number"
       className="ws-pr-identifier-badge ws-pr-number-badge"
-      title={`PR ${value}${stateLabel ? ` · ${stateLabel}` : ""}`}
+      title={stateLabel ?? "Pull request"}
       tone={identifier.presentation?.tone}
       aria-haspopup={identifier.onContextMenu ? "menu" : undefined}
       onContextMenu={identifier.onContextMenu}

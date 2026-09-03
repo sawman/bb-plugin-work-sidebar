@@ -1,7 +1,6 @@
 import { CopyBadge } from "../ui/copy-badge";
 import { BranchName } from "../ui/branch-name";
 import { Icon } from "../ui/icon";
-import { ActionTooltip } from "../ui/action-tooltip";
 
 export type ThreadWorkspaceProject = {
   name: string;
@@ -68,7 +67,6 @@ export function ThreadWorkspaceBadge({
 }) {
   const branch = branchName?.trim() || null;
   const workspace = environmentName?.trim() || null;
-  const contextTitle = `${projectLabel} ${project?.isPersonal ? "work" : "project"}`;
   if (branch) {
     return (
       <span className="ws-thread-location" data-location-kind="branch">
@@ -76,7 +74,6 @@ export function ThreadWorkspaceBadge({
           name={branch}
           className="ws-thread-location-content"
           icon="GitBranch"
-          title={`${contextTitle} · ${branch}`}
         />
       </span>
     );
@@ -87,7 +84,6 @@ export function ThreadWorkspaceBadge({
     workspace,
     workspaceDisplayKind,
   });
-  const tooltipLabel = `${contextTitle} · ${location.value}`;
   return (
     <span
       className="ws-thread-location"
@@ -99,7 +95,7 @@ export function ThreadWorkspaceBadge({
           copyValue={location.copyValue}
           label={location.copyLabel}
           className="ws-thread-location-content"
-          title={tooltipLabel}
+          tooltip={false}
           typography="context"
           variant="text"
         >
@@ -107,15 +103,10 @@ export function ThreadWorkspaceBadge({
           <span className="ws-thread-location-label">{location.value}</span>
         </CopyBadge>
       ) : (
-        <ActionTooltip label={tooltipLabel}>
-          {(tooltipId) => <span
-            className="ws-thread-location-content"
-            aria-describedby={tooltipId}
-          >
-            <Icon name={location.icon} aria-hidden />
-            <span className="ws-thread-location-label">{location.value}</span>
-          </span>}
-        </ActionTooltip>
+        <span className="ws-thread-location-content">
+          <Icon name={location.icon} aria-hidden />
+          <span className="ws-thread-location-label">{location.value}</span>
+        </span>
       )}
     </span>
   );

@@ -15,6 +15,8 @@ type CopyBadgeProps = {
   className?: string;
   children: ReactNode;
   title?: string;
+  /** Some compact badges already display all useful context. */
+  tooltip?: boolean;
   tone?: string;
   typography?: "context";
   variant?: "badge" | "text";
@@ -40,6 +42,7 @@ export function CopyBadge({
   className,
   children,
   title,
+  tooltip = true,
   tone,
   typography,
   variant = "badge",
@@ -67,9 +70,8 @@ export function CopyBadge({
     copy();
   };
 
-  return (
-    <ActionTooltip label={title ?? `Copy ${value}`}>
-      {(tooltipId) => <span
+  const badge = (tooltipId?: string) => (
+    <span
       {...spanProps}
       className={`ws-copy-badge ws-identifier-badge${className ? ` ${className}` : ""}`}
       role="button"
@@ -98,7 +100,13 @@ export function CopyBadge({
       }}
     >
       {children}
-      </span>}
+    </span>
+  );
+  return tooltip ? (
+    <ActionTooltip label={title ?? `Copy ${value}`}>
+      {(tooltipId) => badge(tooltipId)}
     </ActionTooltip>
+  ) : (
+    badge()
   );
 }

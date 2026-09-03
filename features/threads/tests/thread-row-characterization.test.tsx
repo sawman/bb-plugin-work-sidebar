@@ -237,7 +237,7 @@ describe("R21D ThreadRow characterization", () => {
     expect(pullRequest.classList).not.toContain("ws-thread-pr-token");
     expect(pullRequest.getAttribute("aria-haspopup")).toBeNull();
     expect(document.getElementById(pullRequest.getAttribute("aria-describedby") ?? "")?.getAttribute("aria-label")).toBe(
-      "PR #42 · Review pending",
+      "Review pending",
     );
     const location = view.container.querySelector<HTMLElement>(
       '.ws-thread-location[data-location-kind="worktree"]',
@@ -297,7 +297,7 @@ describe("R21D ThreadRow characterization", () => {
     expect(
       (await view.findByLabelText("Copy stack number #17")).textContent,
     ).toBe("#17");
-    expect(document.querySelector('[aria-label="PR #42 · Review requested"]')).toBeTruthy();
+    expect(document.querySelector('[aria-label="Review requested"]')).toBeTruthy();
     const provider = view.getByRole("img", {
       name: "codex provider status: Thread is running; 1 child agent working",
     });

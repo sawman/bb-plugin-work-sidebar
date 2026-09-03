@@ -196,6 +196,37 @@ describe("pull-request stack number presentation", () => {
     expect(branches[1]?.querySelector("svg")?.getAttribute("data-icon")).toBe(
       "GitBranch",
     );
+    for (const branch of branches) {
+      expect(branch.getAttribute("aria-describedby")).toBeNull();
+    }
+  });
+
+  it("keeps branch and stack badges tooltip-free while PR badges name only status", () => {
+    render(
+      <>
+        <PullRequestIdentifierBadge
+          kind="pull-request"
+          number={42}
+          presentation={{ icon: "Eye", label: "Review requested", tone: "warning" }}
+        />
+        <StackNumberBadge number={17} />
+        <ThreadWorkspaceBadge
+          branchName={null}
+          environmentName="checkout"
+          workspaceDisplayKind="managed-worktree"
+          projectLabel="Work sidebar"
+        />
+      </>,
+    );
+
+    const pullRequest = screen.getByRole("button", { name: "Copy PR number #42" });
+    expect(tooltipLabel(pullRequest)).toBe("Review requested");
+    expect(screen.getByRole("button", { name: "Copy stack number #17" }).getAttribute("aria-describedby")).toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: "Copy worktree name checkout" })
+        .getAttribute("aria-describedby"),
+    ).toBeNull();
   });
 
   it("opens a uniquely linked thread from its provider in the trailing rail", () => {
@@ -437,7 +468,7 @@ describe("pull-request stack number presentation", () => {
 
     const badge = screen.getByRole("button", { name: "Copy PR number #97" });
     expect(badge.getAttribute("data-tone")).toBe("warning");
-    expect(tooltipLabel(badge)).toBe("PR #97 · Review requested");
+    expect(tooltipLabel(badge)).toBe("Review requested");
     expect(badge.querySelector("svg")?.getAttribute("data-icon")).toBe("Eye");
   });
 
@@ -476,7 +507,7 @@ describe("pull-request stack number presentation", () => {
         name: "Copy PR number #96",
       });
       expect(badge.getAttribute("data-tone")).toBe(tone);
-      expect(tooltipLabel(badge)).toBe(`PR #96 · ${label}`);
+      expect(tooltipLabel(badge)).toBe(label);
       expect(badge.querySelector("svg")?.getAttribute("data-icon")).toBe(icon);
       unmount();
     },
@@ -734,6 +765,6 @@ describe("pull-request stack number presentation", () => {
 
     expect(
       tooltipLabel(screen.getByRole("button", { name: "Copy PR number #93" })),
-    ).toBe("PR #93 · Ready to merge");
+    ).toBe("Ready to merge");
   });
 });

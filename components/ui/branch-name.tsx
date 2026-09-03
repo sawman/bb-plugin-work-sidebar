@@ -5,12 +5,10 @@ export function BranchName({
   name,
   className,
   icon,
-  title,
 }: {
   name: string | null;
   className?: string;
   icon?: IconName;
-  title?: string;
 }) {
   const branch = name?.trim() || null;
   if (!branch) {
@@ -29,7 +27,7 @@ export function BranchName({
       label="branch name"
       className={`ws-branch-name${className ? ` ${className}` : ""}`}
       variant="text"
-      title={title ?? `Branch ${branch}`}
+      tooltip={false}
     >
       {icon ? <Icon name={icon} aria-hidden /> : null}
       <span>{branch}</span>

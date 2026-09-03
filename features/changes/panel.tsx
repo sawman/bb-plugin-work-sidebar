@@ -9,7 +9,10 @@ import {
   useGitHubApiHealth,
   useSharedThreadPullRequestDirectory,
 } from "../pull-requests/queries";
-import { githubHealthPresentation } from "../pull-requests/presentation";
+import {
+  githubHealthPresentation,
+  pullRequestSummaryPresentation,
+} from "../pull-requests/presentation";
 import { StackNumberBadge } from "../pull-requests/stack-number";
 import { mergeStackBranchSignals } from "./model";
 import {
@@ -100,6 +103,14 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
       : projectedPullRequest;
   const currentPullRequestNumber =
     currentPullRequest?.number ?? changesQuery.data?.stack?.currentPullRequest;
+  const currentPullRequestStatus = currentPullRequest
+    ? pullRequestSummaryPresentation({
+        state: currentPullRequest.state,
+        draft: currentPullRequest.state === "draft",
+        attention: currentPullRequest.attention,
+        signal: currentPullRequest.signal,
+      })
+    : null;
   const selectedDiffPreview = selectedFilePath ? (
     <ChangesWorkingTreePreview
       path={selectedFilePath}
@@ -136,9 +147,10 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
           copyValue={`PR #${currentPullRequestNumber}`}
           label="PR number"
           className="ws-pr-number-badge"
-          title={`PR #${currentPullRequestNumber}`}
+          title={currentPullRequestStatus?.label ?? "Pull request"}
+          tone={currentPullRequestStatus?.tone}
         >
-          <Icon name="GitPullRequest" aria-hidden />
+          <Icon name={currentPullRequestStatus?.icon ?? "GitPullRequest"} aria-hidden />
           <span aria-hidden>#{currentPullRequestNumber}</span>
         </CopyBadge>
       ) : null}
