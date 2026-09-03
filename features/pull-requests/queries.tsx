@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { PluginRpcClient } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../../contracts";
@@ -15,6 +15,7 @@ export type ThreadPullRequest = z.infer<typeof threadPullRequest>;
 export type ThreadPullRequestDirectory = Record<string, ThreadPullRequest | null>;
 
 const root = ["work-sidebar", "pull-requests"] as const;
+const THREAD_DIRECTORY_BATCH_SIZE = 200;
 
 export const pullRequestKeys = {
   authored: (): QueryKey => [...root, "authored"],
@@ -60,10 +61,14 @@ export const pullRequestPolicies = {
     refetchOnWindowFocus: false,
   },
   threadDirectory: {
+    // One directory can contain an entire active project roster. Retain it
+    // only long enough to bridge a brief slot remount; the owner compacts it
+    // synchronously whenever that roster changes or disappears.
     staleTime: 60_000,
-    gcTime: 15 * 60_000,
+    gcTime: 5 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   },
   health: {
     ...queryPolicies.health,
@@ -121,9 +126,13 @@ async function sidebarThreadPullRequests(
   // The server contract validates one bounded roster chunk. Keep one client
   // cache entry while covering every project thread instead of truncating
   // large rosters at the transport boundary.
-  for (let start = 0; start < threadIds.length; start += 200) {
+  for (
+    let start = 0;
+    start < threadIds.length;
+    start += THREAD_DIRECTORY_BATCH_SIZE
+  ) {
     const result = await rpc.call("sidebarThreadPullRequests", {
-      threadIds: threadIds.slice(start, start + 200),
+      threadIds: threadIds.slice(start, start + THREAD_DIRECTORY_BATCH_SIZE),
     });
     if (!result.available)
       throw new Error(
@@ -132,6 +141,20 @@ async function sidebarThreadPullRequests(
     Object.assign(directory, result.pullRequests);
   }
   return directory;
+}
+
+function compactThreadPullRequestDirectory(
+  directory: ThreadPullRequestDirectory | undefined,
+  threadIds: readonly string[],
+): ThreadPullRequestDirectory {
+  if (!directory) return {};
+  return Object.fromEntries(
+    threadIds.flatMap((threadId) =>
+      Object.hasOwn(directory, threadId)
+        ? [[threadId, directory[threadId]] as const]
+        : [],
+    ),
+  );
 }
 
 async function pullRequestReviewers(
@@ -195,25 +218,57 @@ export function useThreadPullRequestDirectory(
   threadIds: readonly string[],
   enabled: boolean,
 ) {
-  const normalizedThreadIds = [...new Set(threadIds)].sort();
-  const fingerprint = normalizedThreadIds.join("|");
+  const queryClient = useQueryClient();
+  const unorderedThreadIds = [...new Set(threadIds)].sort();
+  const fingerprint = unorderedThreadIds.join("|");
+  // Sidebar callers often create a fresh roster array while rendering. Keep
+  // the effect's roster identity stable unless its actual membership changed.
+  const normalizedThreadIds = useMemo(
+    () => unorderedThreadIds,
+    [fingerprint],
+  );
+  const active = enabled && normalizedThreadIds.length > 0;
   const previousFingerprint = useRef<string | null>(null);
   const query = useQuery({
     queryKey: pullRequestKeys.threadDirectory(),
     queryFn: () => sidebarThreadPullRequests(rpc, normalizedThreadIds),
     ...pullRequestPolicies.threadDirectory,
-    enabled: enabled && normalizedThreadIds.length > 0,
+    enabled: active,
   });
+  const { refetch } = query;
   useEffect(() => {
-    if (!enabled || !normalizedThreadIds.length) return;
+    if (!active) {
+      previousFingerprint.current = null;
+      void queryClient.cancelQueries({
+        queryKey: pullRequestKeys.threadDirectory(),
+      });
+      queryClient.setQueryData<ThreadPullRequestDirectory>(
+        pullRequestKeys.threadDirectory(),
+        {},
+      );
+      return;
+    }
     if (previousFingerprint.current === null) {
       previousFingerprint.current = fingerprint;
       return;
     }
     if (previousFingerprint.current === fingerprint) return;
     previousFingerprint.current = fingerprint;
-    void query.refetch();
-  }, [enabled, fingerprint, normalizedThreadIds.length, query]);
+    void (async () => {
+      // The transport does not expose an AbortSignal. Cancel Query ownership
+      // first so a late prior-roster response cannot publish over this
+      // generation, then retain only facts that still belong to the roster.
+      await queryClient.cancelQueries({
+        queryKey: pullRequestKeys.threadDirectory(),
+      });
+      queryClient.setQueryData<ThreadPullRequestDirectory>(
+        pullRequestKeys.threadDirectory(),
+        (current) =>
+          compactThreadPullRequestDirectory(current, normalizedThreadIds),
+      );
+      void refetch();
+    })();
+  }, [active, fingerprint, normalizedThreadIds, queryClient, refetch]);
   return query;
 }
 

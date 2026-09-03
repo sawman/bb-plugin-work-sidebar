@@ -319,6 +319,12 @@ describe("sidebar appearance settings", () => {
 
     vi.useFakeTimers();
     fireEvent.change(textScale, { target: { value: "1.05" } });
+    // Commit the input effect before advancing fake time. Under a loaded
+    // serial suite, React may otherwise schedule this debounce just after
+    // the first advance and make the assertion depend on file order.
+    await act(async () => {
+      await Promise.resolve();
+    });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(200);
     });

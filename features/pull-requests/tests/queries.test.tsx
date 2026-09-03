@@ -202,6 +202,100 @@ describe("R5 pull-request queries", () => {
     client.clear();
   });
 
+  it("compacts, cancels, and eventually releases the directory with its roster", async () => {
+    const oldRoster = deferred<{
+      available: boolean;
+      pullRequests: Record<string, null>;
+      error: null;
+    }>();
+    const nextRoster = deferred<{
+      available: boolean;
+      pullRequests: Record<string, null>;
+      error: null;
+    }>();
+    const rpc = {
+      call: vi.fn((_method: string, input: { threadIds: string[] }) =>
+        input.threadIds[0] === "thr_old" ? oldRoster.promise : nextRoster.promise,
+      ),
+    } as unknown as PullRequestRpc;
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const view = renderHook(
+      ({ threadIds, enabled }: { threadIds: string[]; enabled: boolean }) =>
+        useThreadPullRequestDirectory(rpc, threadIds, enabled),
+      {
+        wrapper: wrapper(client),
+        initialProps: { threadIds: ["thr_old"], enabled: true },
+      },
+    );
+    await waitFor(() => expect(rpc.call).toHaveBeenCalledTimes(1));
+
+    view.rerender({ threadIds: ["thr_next"], enabled: true });
+    await waitFor(() => expect(rpc.call).toHaveBeenCalledTimes(2));
+    expect(view.result.current.data?.thr_old).toBeUndefined();
+
+    oldRoster.resolve({
+      available: true,
+      pullRequests: { thr_old: null },
+      error: null,
+    });
+    await act(async () => Promise.resolve());
+    expect(view.result.current.data?.thr_old).toBeUndefined();
+
+    nextRoster.resolve({
+      available: true,
+      pullRequests: { thr_next: null },
+      error: null,
+    });
+    await waitFor(() =>
+      expect(view.result.current.data).toEqual({ thr_next: null }),
+    );
+
+    view.rerender({ threadIds: [], enabled: true });
+    await waitFor(() => expect(view.result.current.data).toEqual({}));
+    expect(rpc.call).toHaveBeenCalledTimes(2);
+    expect(pullRequestPolicies.threadDirectory).toMatchObject({
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      retry: false,
+      refetchOnReconnect: false,
+    });
+    view.unmount();
+    expect(
+      client
+        .getQueryCache()
+        .find({ queryKey: pullRequestKeys.threadDirectory() })
+        ?.getObserversCount(),
+    ).toBe(0);
+    client.clear();
+  });
+
+  it("garbage-collects an unobserved directory after the short remount window", async () => {
+    vi.useFakeTimers();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    await client.fetchQuery({
+      queryKey: pullRequestKeys.threadDirectory(),
+      queryFn: async () => ({ thr_a: null }),
+      ...pullRequestPolicies.threadDirectory,
+    });
+    expect(
+      client
+        .getQueryCache()
+        .find({ queryKey: pullRequestKeys.threadDirectory() }),
+    ).toBeDefined();
+
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(
+      client
+        .getQueryCache()
+        .find({ queryKey: pullRequestKeys.threadDirectory() }),
+    ).toBeUndefined();
+    client.clear();
+  });
+
   it("progressively paints the shared authored list before deferred stack enrichment settles", async () => {
     const stacks = deferred<{
       available: boolean;
