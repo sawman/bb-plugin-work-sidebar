@@ -130,7 +130,10 @@ export function AgentRow({
         <strong>{title}</strong>
         <span className="ws-agent-facts">
           <ActionTooltip label="Model">
-            {(tooltipId) => <span className="ws-agent-fact" aria-describedby={tooltipId}>
+            {(tooltipId) => <span
+              className="ws-agent-fact ws-agent-model-fact"
+              aria-describedby={tooltipId}
+            >
             <Icon name="Bot" aria-hidden />
             <span>{model ?? "Model unavailable"}</span>
             </span>}
@@ -142,12 +145,16 @@ export function AgentRow({
               label="agent workspace"
               className="ws-agent-workspace-badge"
               variant="text"
-              title={`${workspace.detail}: ${workspace.label}`}
+              title="Copy workspace"
               data-workspace-kind={workspace.kind}
             >
               <Icon name={workspaceIcons[workspace.kind]} aria-hidden />
-              <span>{workspace.label}</span>
-              <small>{workspace.detail}</small>
+              <span className="ws-agent-workspace-label">
+                {workspace.label}
+              </span>
+              <small className="ws-agent-workspace-detail">
+                {workspace.detail}
+              </small>
             </CopyBadge>
           ) : null}
           {annotation.taskKey ? (
@@ -159,7 +166,9 @@ export function AgentRow({
               <Icon name="ListTodo" aria-hidden />
               <b>{annotation.taskKey}</b>
               {annotation.taskTitle ? (
-                <span>{annotation.taskTitle}</span>
+                <span className="ws-agent-task-title">
+                  {annotation.taskTitle}
+                </span>
               ) : null}
               </span>}
             </ActionTooltip>

@@ -227,6 +227,25 @@ describe("stylesheet policy", () => {
     expect(content).toContain("overflow: hidden");
   });
 
+  test("keeps all Agents metadata variants inside their shrinkable row rail", () => {
+    const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    const facts = source.match(/\.ws-agent-facts\s*\{([\s\S]*?)\}/)?.[1];
+    const model = source.match(/\.ws-agent-model-fact\s*\{([\s\S]*?)\}/)?.[1];
+    const workspace = source.match(
+      /\.ws-agent-workspace-badge\s*\{([\s\S]*?)\}/,
+    )?.[1];
+    const taskKey = source.match(/\.ws-agent-task b\s*\{([\s\S]*?)\}/)?.[1];
+
+    expect(facts).toContain("min-width: 0");
+    expect(model).toContain("grid-template-columns: 0.7rem minmax(0, 1fr)");
+    expect(workspace).toContain("min-width: 0");
+    expect(workspace).toContain(
+      "grid-template-columns: 0.64rem minmax(0, 1fr) minmax(0, 1fr)",
+    );
+    expect(taskKey).toContain("max-width: 14ch");
+    expect(taskKey).toContain("text-overflow: ellipsis");
+  });
+
   test("keeps the right-pane refresh action as a borderless tabbar icon", () => {
     const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
     const tooltip = source.match(

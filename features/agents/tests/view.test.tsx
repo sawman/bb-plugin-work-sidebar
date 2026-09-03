@@ -275,6 +275,71 @@ describe("R15 registered Agents Work slot", () => {
     slot.lifecycle.unmount();
   });
 
+  it("keeps every long agent metadata value inside the row's shrinkable center rail", async () => {
+    const longModel = "claude-opus-5[1m]-with-an-intentionally-long-model-suffix";
+    const longWorktree = "managed-worktree-with-an-intentionally-long-descriptive-name";
+    const longTaskTitle = "An intentionally long task title that must never expand the agent action rail";
+    const slot = await agentsSlot(
+      {
+        status: "ready",
+        threads: [
+          thread("thr_root", null),
+          thread("thr_child", "thr_root", {
+            environment: {
+              id: "env_long",
+              name: longWorktree,
+              branchName: "bb/very-long-agent-branch-name",
+              workspaceDisplayKind: "managed-worktree",
+            },
+          }),
+        ],
+      },
+      rpcFixture({
+        getAgentDetails: () => ({
+          agents: [{ threadId: "thr_child", model: longModel }],
+        }),
+        sidebarTaskLinks: () => ({
+          available: true,
+          links: {
+            thr_child: [{
+              task: {
+                id: "task_long",
+                projectId: "project",
+                projectName: "Work",
+                key: "VERY-LONG-PROJECT-123456",
+                title: longTaskTitle,
+                status: "in_progress",
+                priority: "medium",
+                dueDate: null,
+                parentTaskId: null,
+              },
+              threadId: "thr_child",
+              liveStatus: "working",
+              role: "execution",
+              mode: "delegated",
+              idempotencyKey: "long-agent-details",
+              dispatchState: "ready",
+            }],
+          },
+          error: null,
+        }),
+      }),
+    );
+
+    await waitFor(() => expect(slot.getByText(longModel)).toBeTruthy());
+    expect(slot.getByText(longModel).closest(".ws-agent-model-fact")).toBeTruthy();
+    expect(slot.getByText(longWorktree).classList).toContain(
+      "ws-agent-workspace-detail",
+    );
+    expect(
+      slot.getByText("bb/very-long-agent-branch-name").classList,
+    ).toContain("ws-agent-workspace-label");
+    expect(slot.getByText(longTaskTitle).classList).toContain(
+      "ws-agent-task-title",
+    );
+    slot.lifecycle.unmount();
+  });
+
   it("uses one shared duration clock for every visible agent and clears it when Agents closes", async () => {
     const setInterval = vi.spyOn(window, "setInterval");
     const clearInterval = vi.spyOn(window, "clearInterval");

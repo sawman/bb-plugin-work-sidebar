@@ -30,6 +30,21 @@ import type { LegacyWorkContext, ServerLifecycle } from "../../server-lifecycle.
 export const WORK_BINDINGS_KEY = "work-bindings:v2";
 export const LEGACY_DISCOVERY_TTL_MS = 5_000;
 export const LEGACY_DISCOVERY_CONCURRENCY = 8;
+const WORK_BINDINGS_MIGRATION_KEY = "legacy-kv-v2-imported";
+// Terminal executions belong to BB Tasks, not the small dispatch-recovery
+// sidecar. Compact an old import once it grows beyond a practical recovery set.
+const WORK_BINDINGS_COMPACTION_THRESHOLD = 64;
+const workBindingsMigrations = [
+  `CREATE TABLE IF NOT EXISTS work_binding_state (
+     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+     bindings_json TEXT NOT NULL,
+     updated_at TEXT NOT NULL
+   );
+   CREATE TABLE IF NOT EXISTS work_binding_metadata (
+     key TEXT PRIMARY KEY,
+     value TEXT NOT NULL
+   );`,
+];
 type TasksPluginAdapter = ReturnType<typeof createTasksPluginAdapter>;
 export type WorkBindingsState = Pick<WorkBindings, "outcomes" | "executions">;
 export type StableLegacyContext = {
@@ -139,10 +154,118 @@ export function createWorkBindingsService(
   tasks: TasksPluginAdapter,
   lifecycle: ServerLifecycle,
 ) {
-  const read = async (): Promise<WorkBindings> =>
-    normalizeBindings(await bb.storage.kv.get<unknown>(WORK_BINDINGS_KEY));
-  const write = (bindings: WorkBindings) =>
-    bb.storage.kv.set(WORK_BINDINGS_KEY, bindings);
+  const database = bb.storage.database();
+  bb.storage.migrate(database, workBindingsMigrations);
+  let compaction: Promise<WorkBindings> | null = null;
+  let migration: Promise<void> | null = null;
+  const readDatabase = (): WorkBindings => {
+    const row = database
+      .prepare<[], { bindings_json: string }>(
+        "SELECT bindings_json FROM work_binding_state WHERE singleton = 1",
+      )
+      .get();
+    if (!row) return normalizeBindings(undefined);
+    try {
+      return normalizeBindings(JSON.parse(row.bindings_json));
+    } catch {
+      return normalizeBindings(undefined);
+    }
+  };
+  const writeDatabase = (bindings: WorkBindings) => {
+    database
+      .prepare(
+        `INSERT INTO work_binding_state (singleton, bindings_json, updated_at)
+         VALUES (1, ?, ?)
+         ON CONFLICT(singleton) DO UPDATE SET
+           bindings_json = excluded.bindings_json,
+           updated_at = excluded.updated_at`,
+      )
+      .run(JSON.stringify(bindings), new Date().toISOString());
+  };
+  const legacyMigrationComplete = () =>
+    Boolean(
+      database
+        .prepare<[string], { value: string }>(
+          "SELECT value FROM work_binding_metadata WHERE key = ?",
+        )
+        .get(WORK_BINDINGS_MIGRATION_KEY),
+    );
+  const ensureMigrated = async () => {
+    if (!migration) {
+      migration = (async () => {
+        if (legacyMigrationComplete()) return;
+        const legacy = normalizeBindings(
+          await bb.storage.kv.get<unknown>(WORK_BINDINGS_KEY),
+        );
+        if (legacy.outcomes.length || legacy.executions.length)
+          writeDatabase(legacy);
+        database
+          .prepare(
+            `INSERT INTO work_binding_metadata (key, value)
+             VALUES (?, ?)
+             ON CONFLICT(key) DO NOTHING`,
+          )
+          .run(WORK_BINDINGS_MIGRATION_KEY, new Date().toISOString());
+        await bb.storage.kv.delete(WORK_BINDINGS_KEY);
+      })();
+    }
+    await migration;
+  };
+  const compactTerminalExecutions = async (saved: WorkBindings) => {
+    if (saved.executions.length < WORK_BINDINGS_COMPACTION_THRESHOLD) return saved;
+
+    const tasksById = await tasks.allTasksById();
+    const executions = saved.executions.filter((binding) => {
+      const task = tasksById.get(binding.executionTaskId);
+      // A missing task and every unresolved dispatch retain their durable
+      // recovery path. Only a completed/canceled, fully-ready task is history.
+      return (
+        binding.dispatchState !== "ready" ||
+        !task ||
+        (task.status !== "done" && task.status !== "canceled")
+      );
+    });
+    if (executions.length === saved.executions.length) return saved;
+    const compacted = {
+      outcomes: saved.outcomes,
+      executions,
+    };
+    writeDatabase(compacted);
+    return compacted;
+  };
+  const read = async (): Promise<WorkBindings> => {
+    await ensureMigrated();
+    const saved = readDatabase();
+    if (saved.executions.length < WORK_BINDINGS_COMPACTION_THRESHOLD)
+      return saved;
+
+    if (!compaction) {
+      compaction = compactTerminalExecutions(saved).finally(() => {
+        compaction = null;
+      });
+    }
+    try {
+      await compaction;
+      return readDatabase();
+    } catch {
+      // A Tasks outage must not turn an otherwise-readable Work panel into an
+      // error. A later successful read can compact the same snapshot.
+      return saved;
+    }
+  };
+  const write = async (bindings: WorkBindings) => {
+    await ensureMigrated();
+    writeDatabase(bindings);
+  };
+  const pruneTerminalExecution = async (taskId: string) => {
+    const saved = await read();
+    const executions = saved.executions.filter(
+      (binding) =>
+        binding.executionTaskId !== taskId || binding.dispatchState !== "ready",
+    );
+    if (executions.length !== saved.executions.length)
+      await write({ outcomes: saved.outcomes, executions });
+  };
   const persistAssignee = async (
     taskId: string,
     assignee: "agent" | "human" | undefined,
@@ -800,6 +923,7 @@ export function createWorkBindingsService(
   return {
     read,
     write,
+    pruneTerminalExecution,
     rootThread,
     descendants,
     summarize,

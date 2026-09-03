@@ -137,6 +137,13 @@ function createBindingsFixture(options: {
             }],
           };
           if (method === "listTasks") return { tasks: [...tasks.values()], nextCursor: null };
+          if (method === "updateTask") {
+            const taskId = taskInput?.taskId as string;
+            const updated = tasks.get(taskId);
+            if (!updated) return { ok: false, error: { message: "Task not found" } };
+            updated.status = taskInput?.status as FixtureTask["status"];
+            return { ok: true, task: updated };
+          }
           if (method === "createTask") {
             const taskId = createdTaskIds.shift();
             if (!taskId) throw new Error("No fixture task id remains");
@@ -215,6 +222,149 @@ async function createDelegatedExecution(
 }
 
 describe("durable Work/Tasks binding parity", () => {
+  it("migrates legacy bindings into SQLite and compacts terminal execution history there", async () => {
+    const { host, tasks } = createBindingsFixture();
+    const terminal = tasks.get(DELEGATED_TASK_ID)!;
+    terminal.status = "done";
+    const now = "2026-08-28T00:00:00.000Z";
+    const execution = (idempotencyKey: string, dispatchState: "ready" | "recovery_required" = "ready") => ({
+      kind: "execution" as const,
+      rootThreadId: ROOT_THREAD_ID,
+      outcomeTaskId: OUTCOME_TASK_ID,
+      taskProjectId: TASK_PROJECT_ID,
+      executionTaskId: DELEGATED_TASK_ID,
+      ownerThreadId: CHILD_THREAD_ID,
+      mode: "delegated" as const,
+      idempotencyKey,
+      dispatchState,
+      recoveryMessage: dispatchState === "recovery_required" ? "Attachment needs recovery." : null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    const outcome = {
+      outcomes: [{
+        kind: "outcome",
+        rootThreadId: ROOT_THREAD_ID,
+        outcomeTaskId: OUTCOME_TASK_ID,
+        taskProjectId: TASK_PROJECT_ID,
+        createdAt: now,
+        updatedAt: now,
+      }],
+      executions: [],
+    };
+    await host.bb.storage.kv.set(WORK_BINDINGS_KEY, outcome);
+    await plugin(host.bb);
+
+    await expect(
+      host.harness.behavior.callRpc("getWorkContext", {
+        threadId: ROOT_THREAD_ID,
+      }),
+    ).resolves.toMatchObject({
+      bindings: [{ outcomeTaskId: OUTCOME_TASK_ID }],
+    });
+
+    await expect(host.bb.storage.kv.get(WORK_BINDINGS_KEY)).resolves.toBeUndefined();
+    const database = host.bb.storage.database();
+    database
+      .prepare(
+        `INSERT INTO work_binding_state (singleton, bindings_json, updated_at)
+         VALUES (1, ?, ?)
+         ON CONFLICT(singleton) DO UPDATE SET
+           bindings_json = excluded.bindings_json,
+           updated_at = excluded.updated_at`,
+      )
+      .run(
+        JSON.stringify({
+          ...outcome,
+          executions: [
+            ...Array.from({ length: 700 }, (_, index) =>
+              execution(`terminal-${index}`),
+            ),
+            {
+              ...execution("active"),
+              executionTaskId: DIRECT_TASK_ID,
+              ownerThreadId: ROOT_THREAD_ID,
+              mode: "direct" as const,
+            },
+            execution("recover", "recovery_required"),
+          ],
+        }),
+        now,
+      );
+
+    await expect(
+      host.harness.behavior.callRpc("getWorkContext", { threadId: ROOT_THREAD_ID }),
+    ).resolves.toMatchObject({
+      bindings: [
+        { outcomeTaskId: OUTCOME_TASK_ID },
+        { idempotencyKey: "active", executionTaskId: DIRECT_TASK_ID },
+        { idempotencyKey: "recover", dispatchState: "recovery_required" },
+      ],
+    });
+    expect(
+      JSON.parse(
+        database
+          .prepare<[], { bindings_json: string }>(
+            "SELECT bindings_json FROM work_binding_state WHERE singleton = 1",
+          )
+          .get()!.bindings_json,
+      ),
+    ).toMatchObject({
+      executions: [
+        { idempotencyKey: "active" },
+        { idempotencyKey: "recover" },
+      ],
+    });
+  });
+
+  it("removes a completed ready execution from the sidecar while BB Tasks keeps the task", async () => {
+    const { host, tasks } = createBindingsFixture();
+    const now = "2026-08-28T00:00:00.000Z";
+    await host.bb.storage.kv.set(WORK_BINDINGS_KEY, {
+      outcomes: [{
+        kind: "outcome",
+        rootThreadId: ROOT_THREAD_ID,
+        outcomeTaskId: OUTCOME_TASK_ID,
+        taskProjectId: TASK_PROJECT_ID,
+        createdAt: now,
+        updatedAt: now,
+      }],
+      executions: [{
+        kind: "execution",
+        rootThreadId: ROOT_THREAD_ID,
+        outcomeTaskId: OUTCOME_TASK_ID,
+        taskProjectId: TASK_PROJECT_ID,
+        executionTaskId: DIRECT_TASK_ID,
+        ownerThreadId: ROOT_THREAD_ID,
+        mode: "direct",
+        idempotencyKey: "complete-and-prune",
+        dispatchState: "ready",
+        recoveryMessage: null,
+        createdAt: now,
+        updatedAt: now,
+      }],
+    });
+    await plugin(host.bb);
+
+    await expect(
+      host.harness.behavior.callRpc("updateTaskStatus", {
+        taskId: DIRECT_TASK_ID,
+        status: "done",
+      }),
+    ).resolves.toMatchObject({ task: { id: DIRECT_TASK_ID, status: "done" } });
+
+    expect(tasks.get(DIRECT_TASK_ID)?.status).toBe("done");
+    const row = host.bb.storage.database()
+      .prepare<[], { bindings_json: string }>(
+        "SELECT bindings_json FROM work_binding_state WHERE singleton = 1",
+      )
+      .get();
+    expect(JSON.parse(row!.bindings_json)).toMatchObject({
+      outcomes: [{ outcomeTaskId: OUTCOME_TASK_ID }],
+      executions: [],
+    });
+  });
+
   it("resolves an ordinary link root before mutation so a lookup failure changes neither links nor cache", async () => {
     const { host, taskThreads, tasks } = createBindingsFixture({
       failRootResolution: true,

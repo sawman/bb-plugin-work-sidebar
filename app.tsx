@@ -4,7 +4,6 @@ import {
   useComposer,
   useComposerView,
   useRpc,
-  useSettings,
 } from "@get-bb/plugin-sdk/app";
 import type { PluginThreadHeaderActionProps } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
@@ -36,28 +35,6 @@ function WorkContextHeaderAction({
       {isCompactViewport ? "▣" : "Work"}
       </button>}
     </ActionTooltip>
-  );
-}
-
-function GitHubPollingSettings() {
-  const { values, isLoading } = useSettings();
-  return (
-    <section className="ws-settings-card" data-layout="narrow">
-      <strong>GitHub polling</strong>
-      <p>
-        Right Work polling checks only the current PR through REST; the left PR
-        list refreshes independently. GraphQL remains reserved for batch
-        metadata.
-      </p>
-      {!isLoading && (
-        <small>
-          Current policy: right every {values?.githubActivePollSeconds ?? "60"}s
-          visible / {values?.githubBackgroundPollSeconds ?? "300"}s hidden; left
-          every {values?.githubLeftListRefreshSeconds ?? "300"}s; up to{" "}
-          {values?.githubMaxRestPollsPerMinute ?? "30"} REST polls/minute.
-        </small>
-      )}
-    </section>
   );
 }
 
@@ -123,12 +100,6 @@ export default definePluginApp((app) => {
     title: "Sidebar appearance",
     description: "Tune the shared Threads, Tasks, and PR row layout.",
     component: withPluginProviders(SidebarAppearanceSettings),
-  });
-  app.slots.settingsSection({
-    id: "github-polling",
-    title: "GitHub polling",
-    description: "Control Work Sidebar GitHub polling and shared REST budget.",
-    component: withPluginProviders(GitHubPollingSettings),
   });
   app.slots.settingsSection({
     id: "optional-integrations",

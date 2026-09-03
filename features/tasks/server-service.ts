@@ -72,7 +72,7 @@ export type TasksRegistration = TaskHandlers & Pick<
   "available" | "projects" | "allTasksById" | "readAssignees"
 > & Pick<
   ReturnType<typeof createWorkBindingsService>,
-  "rootThread" | "descendants" | "summarize" | "links" | "legacy" | "context" | "outcome" | "execution" | "owner"
+  "rootThread" | "descendants" | "summarize" | "links" | "legacy" | "context" | "outcome" | "execution" | "owner" | "pruneTerminalExecution"
 > & {
   projectTaskSummary(
     task: Parameters<typeof summarizeTask>[0],
@@ -145,7 +145,12 @@ export function createTasksService(
       publishWorkBindingReady(bb.realtime, root.id);
       return { task: await taskWithProject(task), binding: bindings.summarize(binding) };
     },
-    async updateTaskStatus({ taskId, status }) { return adapter.update(taskId, status); },
+    async updateTaskStatus({ taskId, status }) {
+      const result = await adapter.update(taskId, status);
+      if (status === "done" || status === "canceled")
+        await bindings.pruneTerminalExecution(taskId);
+      return result;
+    },
     async updateTaskAssignee({ taskId, assignee }) { return adapter.writeAssignee(taskId, assignee); },
     async createSidebarTask({ projectId, title, assignee }) { return adapter.createSidebar(projectId, title, assignee); },
     async deleteSidebarTask({ taskId }) {
@@ -198,6 +203,7 @@ export function createTasksService(
     outcome: bindings.outcome,
     execution: bindings.execution,
     owner: bindings.owner,
+    pruneTerminalExecution: bindings.pruneTerminalExecution,
     registerTools: () => registerTasksTools(bb, adapter, bindings),
   };
 }
