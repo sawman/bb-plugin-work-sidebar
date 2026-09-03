@@ -87,12 +87,12 @@ export function ProviderStatusSection({
       <summary>
         <span className="ws-provider-status-title">
           <Icon name="ChevronRight" aria-hidden />
-          Provider
+          <span>
+            {provider.providerName}
+            {provider.usage?.planLabel ? ` ${provider.usage.planLabel}` : ""}
+          </span>
         </span>
-        <span className="ws-provider-status-summary">
-          {provider.providerName}
-          {provider.usage?.planLabel ? ` ${provider.usage.planLabel}` : ""} · {status}
-        </span>
+        <span className="ws-provider-status-summary">{status}</span>
       </summary>
       <div className="ws-provider-status-content">
         {provider.message ? (

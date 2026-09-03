@@ -218,8 +218,11 @@ describe("registered Status activity lifecycle", () => {
       ".ws-provider-status-section",
     );
     expect(providerSection?.open).toBe(false);
-    expect(slot.getByText("Codex Pro · Ready")).toBeTruthy();
-    fireEvent.click(slot.getByText("Provider"));
+    const providerSummary = providerSection?.querySelector("summary");
+    expect(providerSummary?.querySelector(".ws-provider-status-title")?.textContent).toBe("Codex Pro");
+    expect(providerSummary?.querySelector(".ws-provider-status-summary")?.textContent).toBe("Ready");
+    expect(within(providerSummary!).queryByText("Provider")).toBeNull();
+    fireEvent.click(providerSummary!);
     expect(providerSection?.open).toBe(true);
     expect(slot.getByRole("progressbar", { name: "Five-hour usage" }).getAttribute("aria-valuenow")).toBe("84");
     expect(slot.getByText("Five-hour limit · resets in 2h")).toBeTruthy();

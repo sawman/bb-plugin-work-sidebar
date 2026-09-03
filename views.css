@@ -2332,6 +2332,12 @@ button.ws-change-file-row:hover {
 .ws-provider-status-title {
   gap: 0.18rem;
   color: var(--foreground);
+  overflow: hidden;
+}
+.ws-provider-status-title > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ws-provider-status-title svg {
   width: 0.66rem;
@@ -2342,8 +2348,7 @@ button.ws-change-file-row:hover {
   transform: rotate(90deg);
 }
 .ws-provider-status-summary {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: none;
   white-space: nowrap;
 }
 .ws-provider-status-content {
