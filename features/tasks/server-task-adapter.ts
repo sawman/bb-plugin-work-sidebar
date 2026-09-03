@@ -48,6 +48,8 @@ export const projectSchema = z.object({
   createdAt: z.string(),
 });
 const taskPageSchema = z.object({ tasks: z.array(taskSchema), nextCursor: z.string().nullable() });
+const STALE_TASK_LIST_CURSOR_MESSAGE =
+  "task-list data changed after this cursor was issued; restart pagination without --cursor";
 export const taskMutationSchema = z.union([
   z.object({ ok: z.literal(true), task: taskSchema }),
   z.object({ ok: z.literal(false), error: z.object({ code: z.string(), message: z.string() }) }),
@@ -64,6 +66,16 @@ export type TaskUpdate = Partial<
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function isStaleTaskListCursorError(error: unknown): boolean {
+  if (!isRecord(error)) return false;
+  if (error.code === "stale_cursor") return true;
+  if (error.code !== "handler_error" || !isRecord(error.body)) return false;
+  const boundaryError = error.body.error;
+  return isRecord(boundaryError) &&
+    boundaryError.code === "handler_error" &&
+    boundaryError.message === STALE_TASK_LIST_CURSOR_MESSAGE;
 }
 
 /** Validated bridge to the Tasks plugin; no durable work-binding policy lives here. */
@@ -117,20 +129,29 @@ export function createTasksPluginAdapter(bb: BbPluginApi) {
     }
   };
   const listAll = async (input: { activeOnly: boolean; sort: "manual" | "priority" | "due"; parentTaskId?: string }): Promise<Task[]> => {
-    const tasks: Task[] = [];
-    let cursor: string | undefined;
-    do {
-      const page = await call("listTasks", {
-        activeOnly: input.activeOnly,
-        sort: input.sort,
-        limit: 500,
-        ...(input.parentTaskId ? { parentTaskId: input.parentTaskId } : {}),
-        ...(cursor ? { cursor } : {}),
-      }, taskPageSchema);
-      tasks.push(...page.tasks);
-      cursor = page.nextCursor ?? undefined;
-    } while (cursor);
-    return tasks;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const tasks = new Map<string, Task>();
+      let cursor: string | undefined;
+      try {
+        do {
+          const page = await call("listTasks", {
+            activeOnly: input.activeOnly,
+            sort: input.sort,
+            limit: 500,
+            ...(input.parentTaskId ? { parentTaskId: input.parentTaskId } : {}),
+            ...(cursor ? { cursor } : {}),
+          }, taskPageSchema);
+          for (const task of page.tasks) tasks.set(task.id, task);
+          cursor = page.nextCursor ?? undefined;
+        } while (cursor);
+        return [...tasks.values()];
+      } catch (error) {
+        if (attempt === 0 && cursor !== undefined && isStaleTaskListCursorError(error))
+          continue;
+        throw error;
+      }
+    }
+    throw new Error("Task pagination retry limit exhausted");
   };
   const projects = async () =>
     (await call("listProjects", {}, z.object({ projects: z.array(projectSchema) }))).projects;
