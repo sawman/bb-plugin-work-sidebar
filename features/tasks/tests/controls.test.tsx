@@ -558,8 +558,15 @@ describe("Tasks registered controls", () => {
     expect(metadata.querySelector(".ws-task-key-inline")?.textContent).toBe(
       "WORK-1",
     );
-    expect(metadata.querySelector(".ws-task-priority-slot")).toBeTruthy();
+    const primaryInfo = metadata.querySelector(".ws-task-row-primary-info")!;
+    expect(primaryInfo.querySelector(".ws-task-key-inline")).toBeTruthy();
+    expect(primaryInfo.querySelector(".ws-task-priority-slot")).toBeTruthy();
     expect(metadata.querySelector(".ws-task-thread-picker")).toBeTruthy();
+    expect(
+      primaryInfo.nextElementSibling?.classList.contains(
+        "ws-task-thread-picker",
+      ),
+    ).toBe(true);
     fireEvent.click(rendered.getByRole("button", { name: "Copy task WORK-1" }));
     await waitFor(() =>
       expect(clipboardWrite).toHaveBeenCalledWith("Task WORK-1"),

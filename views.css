@@ -753,6 +753,7 @@
 }
 .ws-task-row-primary-info {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 0.14rem;
 }
@@ -3459,7 +3460,8 @@ button.ws-provider-health:focus-visible {
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  align-items: stretch;
+  min-height: 1rem;
+  align-items: center;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -3474,8 +3476,9 @@ button.ws-provider-health:focus-visible {
   padding-inline: 0.22rem;
 }
 .ws-task-thread-chip > .ws-action-tooltip:has(.ws-task-owner-badge) {
-  display: block;
+  display: flex;
   min-width: 0;
+  align-items: center;
   overflow: hidden;
   flex: 1 1 auto;
 }
@@ -3483,6 +3486,8 @@ button.ws-provider-health:focus-visible {
   display: inline-flex;
   box-sizing: border-box;
   width: 100%;
+  min-height: 1rem;
+  align-items: center;
 }
 .ws-task-thread-chip > .ws-action-tooltip:has(.ws-task-thread-trigger) {
   flex: 0 0 1rem;

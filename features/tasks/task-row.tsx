@@ -221,17 +221,19 @@ export function TaskRow(props: TaskRowProps) {
               </ActionTooltip>
             </div>
             <div className="ws-task-meta ws-sidebar-row-meta">
-              <CopyBadge
-                className="ws-task-key-inline"
-                value={task.key}
-                copyValue={`Task ${task.key}`}
-                label="task"
-                variant="text"
-              >
-                {task.key}
-              </CopyBadge>
-              <span className="ws-task-priority-slot">
-                <TaskPriorityIcon priority={task.priority} />
+              <span className="ws-task-row-primary-info">
+                <CopyBadge
+                  className="ws-task-key-inline"
+                  value={task.key}
+                  copyValue={`Task ${task.key}`}
+                  label="task"
+                  variant="text"
+                >
+                  {task.key}
+                </CopyBadge>
+                <span className="ws-task-priority-slot">
+                  <TaskPriorityIcon priority={task.priority} />
+                </span>
               </span>
               <ThreadAssignmentPicker
                 taskKey={task.key}
