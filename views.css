@@ -1971,7 +1971,7 @@ button.ws-change-file-row:hover {
   color: var(--foreground);
 }
 .ws-repository-changes-toggle b {
-  font: var(--ws-text-label);
+  font: inherit;
   line-height: inherit;
 }
 .ws-repository-changes-toggle i {
