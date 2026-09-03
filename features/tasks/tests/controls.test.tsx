@@ -577,6 +577,10 @@ describe("Tasks registered controls", () => {
     const threadPicker = rendered.getByRole("button", {
       name: "Edit threads for WORK-1",
     });
+    expect(threadPicker.parentElement?.classList).toContain("ws-action-tooltip");
+    expect(threadPicker.parentElement?.parentElement?.classList).toContain(
+      "ws-task-thread-chip",
+    );
     fireEvent.click(threadPicker);
     const search = rendered.getByRole("combobox", {
       name: "Search threads for WORK-1",

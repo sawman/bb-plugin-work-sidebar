@@ -730,7 +730,8 @@
   overflow: hidden;
 }
 .ws-task-key-inline {
-  flex: none;
+  flex: 0 0 var(--ws-task-key-width, auto);
+  min-width: var(--ws-task-key-width, auto);
   font: var(--ws-text-code);
   line-height: inherit;
 }
@@ -3472,6 +3473,20 @@ button.ws-provider-health:focus-visible {
   border-radius: 0;
   padding-inline: 0.22rem;
 }
+.ws-task-thread-chip > .ws-action-tooltip:has(.ws-task-owner-badge) {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  flex: 1 1 auto;
+}
+.ws-task-thread-chip > .ws-action-tooltip .ws-task-owner-badge {
+  display: inline-flex;
+  box-sizing: border-box;
+  width: 100%;
+}
+.ws-task-thread-chip > .ws-action-tooltip:has(.ws-task-thread-trigger) {
+  flex: 0 0 1rem;
+}
 .ws-task-thread-chip .ws-task-owner-badge:hover,
 .ws-task-thread-empty:hover {
   background: var(--accent);
@@ -3843,6 +3858,9 @@ button.ws-provider-health:focus-visible {
 .ws-work-item-task-lanes .ws-task-workflow-title-line {
   display: grid;
   grid-template-columns: 0.7rem var(--ws-work-item-key-width) minmax(0, 1fr);
+  /* Resolve the shared `ch` track in the same font used by every task key. */
+  font: var(--ws-text-metadata);
+  line-height: inherit;
 }
 .ws-work-item-task-lanes .ws-task-workflow-key {
   min-width: 0;

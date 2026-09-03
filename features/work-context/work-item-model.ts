@@ -1,5 +1,6 @@
 import type { TaskSummary } from "../../work-model";
 import type { TrackerContext } from "../tracker/schemas";
+import { identifierColumnWidth } from "../../shared/identifier-width";
 
 export type WorkItemTrackerRecord = Readonly<
   TrackerContext["items"][number]["item"] & {
@@ -152,12 +153,7 @@ export function projectWorkItem({
     queue: workQueue,
   };
 }
-/** One measured key track keeps every visible Work-items title columnar. */
-export function workItemTaskKeyColumnWidth(keys: Iterable<string>) {
-  let widest = 1;
-  for (const key of keys) widest = Math.max(widest, key.trim().length);
-  return `${widest}ch`;
-}
+export { identifierColumnWidth as workItemTaskKeyColumnWidth } from "../../shared/identifier-width";
 
 type WorkItemTaskKeyCandidate = Readonly<{
   id: string;
@@ -193,7 +189,7 @@ export function workItemTaskKeyColumnWidthForVisibleRows({
   const workflowKeys = tasks
     .filter((task) => task.linkedThreadIds.includes(threadId) && !goalTaskIds.has(task.id))
     .map((task) => task.key);
-  return workItemTaskKeyColumnWidth([
+  return identifierColumnWidth([
     ...goalKeys,
     ...workflowKeys,
     ...executionTasks.map((task) => task.key),

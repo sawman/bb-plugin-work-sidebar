@@ -4,6 +4,7 @@ import {
   useMemo,
   useState,
   type MouseEvent as ReactMouseEvent,
+  type CSSProperties,
   type ReactNode,
 } from "react";
 import { useStore } from "zustand";
@@ -19,6 +20,7 @@ import {
 } from "@/components/ui/sidebar-list-actions";
 import { SidebarTable } from "@/components/ui/sidebar-table";
 import { SidebarSearch } from "@/components/ui/sidebar-search";
+import { identifierColumnWidth } from "../../shared/identifier-width";
 import type { ThreadProvider } from "../../components/threads/thread-provider-logo";
 import { TaskRow } from "./task-row";
 import type { rpcContract } from "../../contracts";
@@ -114,6 +116,13 @@ export function TasksLeftSidebar({
   const queue = useMemo(
     () => (active ? projectTaskQueue(filtered) : EMPTY_QUEUE),
     [active, filtered],
+  );
+  const taskKeyColumnWidth = useMemo(
+    () =>
+      identifierColumnWidth(
+        queue.flatMap((node) => [node.task.key, ...node.children.map((child) => child.key)]),
+      ),
+    [queue],
   );
   const keys = useMemo(() => {
     if (!active) return EMPTY_COUNTS;
@@ -404,6 +413,12 @@ export function TasksLeftSidebar({
           </div>
         )}
         {!isPending && !isError && queue.length > 0 ? (
+          <div
+            className="ws-task-key-lanes"
+            style={{
+              "--ws-task-key-width": taskKeyColumnWidth,
+            } as CSSProperties}
+          >
           <SidebarTable>
             {queue.map((node) => (
               <TaskRow
@@ -465,6 +480,7 @@ export function TasksLeftSidebar({
               />
             ))}
           </SidebarTable>
+          </div>
         ) : null}
         {!isPending && !isError && !filtered.length && (
           <div className="ws-empty">
