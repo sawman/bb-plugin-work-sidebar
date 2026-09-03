@@ -206,7 +206,10 @@ describe("pull-request presentation semantics", () => {
       { icon: "X", label: "Changes requested", tone: "destructive" },
     ],
     ["blocked", { icon: "Eye", label: "Review pending", tone: "open" }],
-    ["checks_pending", { icon: "Eye", label: "Review pending", tone: "open" }],
+    [
+      "checks_pending",
+      { icon: "LoaderCircle", label: "Checks pending", tone: "muted" },
+    ],
     [
       "review_requested",
       { icon: "Eye", label: "Review pending", tone: "open" },

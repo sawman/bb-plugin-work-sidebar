@@ -100,6 +100,17 @@ describe("stylesheet policy", () => {
     );
   });
 
+  test("keeps the repository status secondary and uses the muted diff-red tone", () => {
+    const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    const changed = source.match(/\.ws-pr-changes_requested\s*\{([\s\S]*?)\}/)?.[1];
+    const repositoryPill = source.match(
+      /\.ws-repository-heading-meta \.ws-pill\s*\{([\s\S]*?)\}/,
+    )?.[1];
+
+    expect(changed).toContain("color: var(--diff-removed)");
+    expect(repositoryPill).toContain("font: var(--ws-text-subtext)");
+  });
+
   test("uses equal metadata columns for every shared change delta pair", () => {
     const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
     const pair = source.match(/\.ws-line-deltas\s*\{([\s\S]*?)\}/)?.[1];
@@ -129,7 +140,7 @@ describe("stylesheet policy", () => {
     expect(stackDelta).toContain("text-align: left");
     expect(additions).toContain("color: var(--diff-added)");
     expect(deletions).toContain("color: var(--diff-removed)");
-    expect(changed).toContain("color: var(--warning-text)");
+    expect(changed).toContain("color: var(--diff-removed)");
     expect(source).toContain('"title title"\n    "subtitle deltas"');
   });
 

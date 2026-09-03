@@ -1598,7 +1598,7 @@
   white-space: nowrap;
 }
 .ws-pr-changes_requested {
-  color: var(--warning-text);
+  color: var(--diff-removed);
 }
 .ws-repository-card {
   gap: 0.32rem;
@@ -3048,6 +3048,10 @@ button.ws-provider-health:focus-visible {
   align-items: center;
   justify-content: flex-end;
   gap: 0.3rem;
+}
+.ws-repository-heading-meta .ws-pill {
+  font: var(--ws-text-subtext);
+  line-height: inherit;
 }
 .ws-task-meta {
   align-items: center;

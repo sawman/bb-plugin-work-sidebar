@@ -184,6 +184,26 @@ describe("R13 Changes error presentation", () => {
     );
 
     expect(screen.getByRole("img", { name: "Ready to merge" })).toBeTruthy();
+
+    rerender(
+      <ChangesStackBranchRow
+        branch={stackBranch()}
+        signals={{
+          state: "open",
+          draft: false,
+          attention: "review_requested",
+          checks: "passing",
+          review: "approved",
+          reviewCommentCount: 0,
+        }}
+        expanded={false}
+        checkingOut={false}
+        onToggle={() => undefined}
+        onCheckout={() => undefined}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "Ready to merge" })).toBeTruthy();
   });
 
   it.each([

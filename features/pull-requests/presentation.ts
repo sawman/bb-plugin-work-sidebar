@@ -62,6 +62,8 @@ export function pullRequestPresentation(input: {
     return { icon: "X", label: "Conflicts", tone: "destructive" };
   if (input.attention === "checks_failed")
     return { icon: "X", label: "CI failure", tone: "destructive" };
+  if (input.attention === "checks_pending")
+    return { icon: "LoaderCircle", label: "Checks pending", tone: "muted" };
   if (input.attention === "changes_requested")
     return { icon: "X", label: "Changes requested", tone: "destructive" };
   return { icon: "Eye", label: "Review pending", tone: "open" };

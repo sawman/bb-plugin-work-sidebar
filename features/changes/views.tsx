@@ -409,10 +409,13 @@ export function ChangesStackBranchRow({
   const presented = signal ? pullRequestSignalPresentation(signal) : null;
   const attention = branch.needsRebase
     ? "blocked"
-    : signals?.attention && signals.attention !== "none"
-      ? signals.attention
-      : signal
-        ? pullRequestAttentionFromSignal(signal)
+    // The signal is the current per-PR GitHub fact. Its aggregate attention
+    // counterpart can arrive from an older stack projection, so it must not
+    // turn an already-approved PR back into "Review pending".
+    : signal
+      ? pullRequestAttentionFromSignal(signal)
+      : signals?.attention && signals.attention !== "none"
+        ? signals.attention
         : undefined;
   const statePresentation = pullRequestPresentation({
     state: status === "blocked" ? "open" : status,
