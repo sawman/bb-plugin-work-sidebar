@@ -3402,31 +3402,58 @@ button.ws-provider-health:focus-visible {
 }
 .ws-settings-card {
   display: grid;
-  gap: 0.28rem;
+  gap: 0;
   max-width: 38rem;
   padding: 0.65rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--card);
-  font: var(--ws-text-title);
+  font: var(--ws-text-primary);
   line-height: inherit;
 }
 .ws-settings-card[data-layout="narrow"] {
   max-width: 28rem;
 }
-.ws-settings-card strong {
+.ws-settings-card-title {
+  margin: 0;
   font: var(--ws-text-title);
   line-height: inherit;
 }
-.ws-settings-card p,
-.ws-settings-card small {
+.ws-settings-group {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.55rem 0;
+}
+.ws-settings-group + .ws-settings-group {
+  border-top: 1px solid var(--border);
+}
+.ws-settings-group-header {
+  display: grid;
+  gap: 0.1rem;
+}
+.ws-settings-group-header :is(h3, p) {
   margin: 0;
+}
+.ws-settings-group-header h3 {
+  color: var(--foreground);
+  font: var(--ws-text-primary);
+  line-height: inherit;
+}
+.ws-settings-group-header p {
   color: var(--muted-foreground);
+  font: var(--ws-text-subtext);
   line-height: 1.4;
 }
-.ws-settings-card small {
-  font: var(--ws-text-subtext);
-  line-height: inherit;
+.ws-settings-group-body {
+  display: grid;
+}
+.ws-settings-group-body > * {
+  min-inline-size: 0;
+}
+.ws-settings-group-body > * + * {
+  margin-top: 0.35rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.35rem;
 }
 .ws-settings-row {
   display: grid;
@@ -3460,7 +3487,6 @@ button.ws-provider-health:focus-visible {
 .ws-sidebar-row-height-editor {
   display: grid;
   gap: 0.24rem;
-  padding: 0.35rem 0.45rem 0.45rem;
   font: var(--ws-text-subtext);
   line-height: inherit;
 }
@@ -3471,8 +3497,16 @@ button.ws-provider-health:focus-visible {
 }
 .ws-sidebar-appearance-field {
   min-inline-size: 0;
-  padding: 0.4rem;
-  border: 1px solid var(--border);
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+.ws-sidebar-appearance-field > legend {
+  margin-bottom: 0.3rem;
+  padding: 0;
+  color: var(--foreground);
+  font: var(--ws-text-label);
+  line-height: inherit;
 }
 .ws-working-animation-controls {
   display: grid;
@@ -3598,6 +3632,25 @@ button.ws-provider-health:focus-visible {
 }
 .ws-settings-card .ws-settings-error {
   color: var(--destructive);
+}
+.ws-settings-reset-button {
+  justify-self: start;
+  min-height: 1.7rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  padding: 0 0.5rem;
+  background: transparent;
+  color: var(--foreground);
+  font: var(--ws-text-subtext);
+  line-height: inherit;
+  cursor: pointer;
+}
+.ws-settings-reset-button:hover:not(:disabled) {
+  background: var(--accent);
+}
+.ws-settings-reset-button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
 }
 .ws-task-assign {
   display: block;

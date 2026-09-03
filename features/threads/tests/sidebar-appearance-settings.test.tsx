@@ -243,6 +243,39 @@ describe("sidebar appearance settings", () => {
     expect(results.incomplete).toEqual([]);
   });
 
+  it("groups related settings and safely rebuilds only cached plugin reads", async () => {
+    const appearance = vi.fn(() => ({ rowHeight: 40, textScale: 1 }));
+    const app = await loadPluginApp(() => import("../../../app"));
+    const section = app.settingsSections.find(
+      ({ id }) => id === "sidebar-appearance",
+    )!;
+    const slot = renderSlot(
+      section,
+      {},
+      {
+        rpc: { getSidebarAppearance: appearance } as never,
+      },
+    );
+    await slot.findByRole("spinbutton", { name: "Row height" });
+    expect(
+      [...slot.container.querySelectorAll(".ws-settings-group h3")].map(
+        (heading) => heading.textContent,
+      ),
+    ).toEqual(["Layout", "Activity", "Links", "Local data"]);
+    getPluginQueryClient().setQueryData(
+      ["work-sidebar", "inactive-test"],
+      { stale: true },
+    );
+
+    fireEvent.click(slot.getByRole("button", { name: "Clear cached data" }));
+
+    await waitFor(() => expect(appearance).toHaveBeenCalledTimes(2));
+    expect(
+      getPluginQueryClient().getQueryData(["work-sidebar", "inactive-test"]),
+    ).toBeUndefined();
+    expect(toast.success).toHaveBeenCalledWith("Cached plugin data cleared");
+  });
+
   it("offers and persists every working-provider animation", async () => {
     const save = vi.fn(async () => ({
       rowHeight: 40,

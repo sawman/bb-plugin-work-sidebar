@@ -1,5 +1,18 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { toast } from "sonner";
+import {
+  SettingsLabel,
+  SettingsRow,
+  type SettingsRowLayout,
+} from "../../components/ui/settings";
+
+export {
+  SettingsCard,
+  SettingsGroup,
+  SettingsLabel,
+  SettingsRow,
+  type SettingsRowLayout,
+} from "../../components/ui/settings";
 
 export type NumericSettingDescriptor = Readonly<{
   label: string;
@@ -11,61 +24,6 @@ export type NumericSettingDescriptor = Readonly<{
   successMessage(value: number): string;
   initialValue: number;
 }>;
-
-export type SettingsRowLayout = "inline-toggle" | "thread-popup";
-
-export function SettingsCard({
-  title,
-  className,
-  children,
-}: {
-  title?: string;
-  className: string;
-  children: ReactNode;
-}) {
-  return (
-    <div
-      data-layout="narrow"
-      className={`ws-settings-card ${className}`.trim()}
-    >
-      {title ? <strong>{title}</strong> : null}
-      {children}
-    </div>
-  );
-}
-
-export function SettingsRow({
-  layout,
-  className,
-  children,
-}: {
-  layout?: SettingsRowLayout;
-  className: string;
-  children: ReactNode;
-}) {
-  return (
-    <div
-      className={`ws-settings-row ${className}`.trim()}
-      data-layout={layout}
-    >
-      {children}
-    </div>
-  );
-}
-
-export function SettingsLabel({
-  htmlFor,
-  children,
-}: {
-  htmlFor: string;
-  children: ReactNode;
-}) {
-  return (
-    <label className="ws-settings-label" htmlFor={htmlFor}>
-      {children}
-    </label>
-  );
-}
 
 export function useFieldSavedVersion<T>(saved: T) {
   const field = useRef({ saved, version: 0 });

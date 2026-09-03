@@ -1,6 +1,6 @@
 import { useId } from "react";
 import { toast } from "sonner";
-import { SettingsLabel } from "./settings-editor";
+import { SettingsLabel } from "../../components/ui/settings";
 import {
   DEFAULT_WORKING_PROVIDER_ANIMATION,
   WORKING_PROVIDER_ANIMATION_SPEEDS,

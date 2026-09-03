@@ -1,10 +1,16 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { resetPluginQueryCache } from "../../query-runtime";
+import {
+  SettingsCard,
+  SettingsGroup,
+  type SettingsRowLayout,
+} from "../../components/ui/settings";
 import { useSidebarAppearancePreferences } from "./queries";
 import {
   NumericAutosaveEditor,
-  SettingsCard,
   useFieldSavedVersion,
   type NumericSettingDescriptor,
-  type SettingsRowLayout,
 } from "./settings-editor";
 import {
   DEFAULT_SIDEBAR_ROW_HEIGHT,
@@ -19,6 +25,29 @@ import {
 import { GroupActivityPriorityEditor } from "./group-activity-priority-editor";
 import { ExternalPrModifierEditor } from "./external-pr-modifier-editor";
 import { WorkingProviderAnimationEditor } from "./working-provider-animation-editor";
+
+function ResetPluginCacheControl() {
+  const queryClient = useQueryClient();
+  const clear = async () => {
+    try {
+      await resetPluginQueryCache(queryClient);
+      toast.success("Cached plugin data cleared");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not clear cached data",
+      );
+    }
+  };
+  return (
+    <button
+      className="ws-settings-reset-button"
+      type="button"
+      onClick={() => void clear()}
+    >
+      Clear cached data
+    </button>
+  );
+}
 const ROW_HEIGHT_SETTING: NumericSettingDescriptor = {
   label: "Row height",
   min: MIN_SIDEBAR_ROW_HEIGHT,
@@ -158,47 +187,58 @@ export function SidebarAppearanceSettings() {
   return (
     <SettingsCard
       className="ws-sidebar-appearance-settings"
-      title="Sidebar appearance"
     >
-      <SidebarRowHeightEditor
-        saved={preferences.appearance.data?.rowHeight}
-        savedVersion={rowHeightVersion}
-        pending={preferences.saveRowHeight.isPending}
-        onSave={(rowHeight) => preferences.saveRowHeight.mutateAsync(rowHeight)}
-        compact
-      />
-      <SidebarTextScaleEditor
-        saved={preferences.appearance.data?.textScale}
-        savedVersion={textScaleVersion}
-        pending={preferences.saveTextScale.isPending}
-        onSave={(textScale) => preferences.saveTextScale.mutateAsync(textScale)}
-        compact
-      />
-      <WorkingProviderAnimationEditor
-        saved={preferences.appearance.data?.workingProviderAnimation}
-        pending={preferences.saveWorkingProviderAnimation.isPending}
-        onSave={(workingProviderAnimation) =>
-          preferences.saveWorkingProviderAnimation.mutateAsync(
-            workingProviderAnimation,
-          )
-        }
-      />
-      <GroupActivityPriorityEditor
-        saved={preferences.appearance.data?.groupActivityPriority}
-        pending={preferences.saveGroupActivityPriority.isPending}
-        onSave={(groupActivityPriority) =>
-          preferences.saveGroupActivityPriority.mutateAsync(
-            groupActivityPriority,
-          )
-        }
-      />
-      <ExternalPrModifierEditor
-        saved={preferences.appearance.data?.openPrLinksExternallyWithModifier}
-        pending={preferences.saveOpenPrLinksExternallyWithModifier.isPending}
-        onSave={(value) =>
-          preferences.saveOpenPrLinksExternallyWithModifier.mutateAsync(value)
-        }
-      />
+      <SettingsGroup title="Layout">
+        <SidebarRowHeightEditor
+          saved={preferences.appearance.data?.rowHeight}
+          savedVersion={rowHeightVersion}
+          pending={preferences.saveRowHeight.isPending}
+          onSave={(rowHeight) => preferences.saveRowHeight.mutateAsync(rowHeight)}
+          compact
+        />
+        <SidebarTextScaleEditor
+          saved={preferences.appearance.data?.textScale}
+          savedVersion={textScaleVersion}
+          pending={preferences.saveTextScale.isPending}
+          onSave={(textScale) => preferences.saveTextScale.mutateAsync(textScale)}
+          compact
+        />
+      </SettingsGroup>
+      <SettingsGroup title="Activity">
+        <WorkingProviderAnimationEditor
+          saved={preferences.appearance.data?.workingProviderAnimation}
+          pending={preferences.saveWorkingProviderAnimation.isPending}
+          onSave={(workingProviderAnimation) =>
+            preferences.saveWorkingProviderAnimation.mutateAsync(
+              workingProviderAnimation,
+            )
+          }
+        />
+        <GroupActivityPriorityEditor
+          saved={preferences.appearance.data?.groupActivityPriority}
+          pending={preferences.saveGroupActivityPriority.isPending}
+          onSave={(groupActivityPriority) =>
+            preferences.saveGroupActivityPriority.mutateAsync(
+              groupActivityPriority,
+            )
+          }
+        />
+      </SettingsGroup>
+      <SettingsGroup title="Links">
+        <ExternalPrModifierEditor
+          saved={preferences.appearance.data?.openPrLinksExternallyWithModifier}
+          pending={preferences.saveOpenPrLinksExternallyWithModifier.isPending}
+          onSave={(value) =>
+            preferences.saveOpenPrLinksExternallyWithModifier.mutateAsync(value)
+          }
+        />
+      </SettingsGroup>
+      <SettingsGroup
+        title="Local data"
+        description="Rebuild this window from the plugin’s server data. Saved preferences and BB data stay unchanged."
+      >
+        <ResetPluginCacheControl />
+      </SettingsGroup>
     </SettingsCard>
   );
 }

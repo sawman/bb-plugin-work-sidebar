@@ -13,9 +13,9 @@ export type QueryPolicy = Readonly<{
   refetchOnReconnect?: boolean;
 }>;
 
-const queryRoot = ["work-sidebar"] as const;
+export const pluginQueryRoot = ["work-sidebar"] as const;
 export const workOutcomeQueryRoot = (): QueryKey => [
-  ...queryRoot,
+  ...pluginQueryRoot,
   "work",
   "outcome",
 ];
@@ -23,7 +23,7 @@ export const workOutcomeQueryRoot = (): QueryKey => [
 export const queryKeys = {
   assets: {
     providerLogo: (logoUrl: string): QueryKey => [
-      ...queryRoot,
+      ...pluginQueryRoot,
       "assets",
       "provider-logo",
       logoUrl,
@@ -31,40 +31,40 @@ export const queryKeys = {
   },
   agents: {
     details: (threadIds: readonly string[]): QueryKey => [
-      ...queryRoot,
+      ...pluginQueryRoot,
       "agents",
       "details",
       ...threadIds,
     ],
   },
   sidebar: {
-    order: (): QueryKey => [...queryRoot, "sidebar", "order"],
+    order: (): QueryKey => [...pluginQueryRoot, "sidebar", "order"],
     tasks: {
-      list: (): QueryKey => [...queryRoot, "sidebar", "tasks", "list"],
-      links: (): QueryKey => [...queryRoot, "sidebar", "tasks", "links"],
+      list: (): QueryKey => [...pluginQueryRoot, "sidebar", "tasks", "list"],
+      links: (): QueryKey => [...pluginQueryRoot, "sidebar", "tasks", "links"],
     },
   },
   work: {
     itemQueue: (threadId: string): QueryKey => [
-      ...queryRoot,
+      ...pluginQueryRoot,
       "work",
       "item-queue",
       threadId,
     ],
     status: (threadId: string): QueryKey => [
-      ...queryRoot,
+      ...pluginQueryRoot,
       "work",
       "status",
       threadId,
     ],
     activity: (threadId: string): QueryKey => [
-      ...queryRoot,
+      ...pluginQueryRoot,
       "work",
       "activity",
       threadId,
     ],
     backgroundJobs: (threadId: string): QueryKey => [
-      ...queryRoot,
+      ...pluginQueryRoot,
       "work",
       "background-jobs",
       threadId,
@@ -74,19 +74,19 @@ export const queryKeys = {
       threadId,
     ],
     goal: (threadId: string): QueryKey => [
-      ...queryRoot,
+      ...pluginQueryRoot,
       "work",
       "goal",
       threadId,
     ],
     plan: (threadId: string): QueryKey => [
-      ...queryRoot,
+      ...pluginQueryRoot,
       "work",
       "plan",
       threadId,
     ],
     providerHealth: (providerId: string): QueryKey => [
-      ...queryRoot,
+      ...pluginQueryRoot,
       "work",
       "provider-health",
       providerId,
@@ -196,6 +196,17 @@ const pluginQueryClient = new QueryClient({
 
 export function getPluginQueryClient(): QueryClient {
   return pluginQueryClient;
+}
+
+/**
+ * Clear only transient plugin-owned Query state. Persisted sidebar settings,
+ * groups, BB threads, Tasks, and tracker links stay intact; active views are
+ * reset and immediately rebuilt from their typed RPC sources.
+ */
+export async function resetPluginQueryCache(client = pluginQueryClient) {
+  await client.cancelQueries({ queryKey: pluginQueryRoot });
+  client.removeQueries({ queryKey: pluginQueryRoot, type: "inactive" });
+  await client.resetQueries({ queryKey: pluginQueryRoot });
 }
 
 export function PluginProviders({ children }: PropsWithChildren): ReactElement {

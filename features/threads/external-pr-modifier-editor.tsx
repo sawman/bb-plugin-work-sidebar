@@ -1,6 +1,6 @@
 import { useId } from "react";
 import { toast } from "sonner";
-import { SettingsLabel, SettingsRow } from "./settings-editor";
+import { SettingsLabel, SettingsRow } from "../../components/ui/settings";
 import { DEFAULT_OPEN_PR_LINKS_EXTERNALLY_WITH_MODIFIER } from "./sidebar-appearance";
 
 export function ExternalPrModifierEditor({

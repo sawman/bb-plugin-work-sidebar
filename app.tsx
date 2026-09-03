@@ -16,6 +16,7 @@ import { SidebarAppearanceSettings } from "./features/threads/sidebar-appearance
 import { WorkPanel } from "./features/work-context/panel";
 import { withPluginProviders } from "./query-runtime";
 import { ActionTooltip } from "./components/ui/action-tooltip";
+import { SettingsCard, SettingsGroup } from "./components/ui/settings";
 
 function WorkContextHeaderAction({
   isCompactViewport,
@@ -40,16 +41,12 @@ function WorkContextHeaderAction({
 
 function OptionalIntegrationsSettings() {
   return (
-    <section className="ws-settings-card" data-layout="narrow">
-      <strong>Optional integrations</strong>
-      <p>
-        Install and configure Taskboard to link Linear issues to Work items.
-      </p>
-      <small>
-        Without Taskboard, Linear controls stay hidden while BB Tasks and the
-        rest of Work Sidebar continue to work normally.
-      </small>
-    </section>
+    <SettingsCard>
+      <SettingsGroup
+        title="Taskboard"
+        description="Install and configure Taskboard to link Linear issues to Work items. Without it, Linear controls stay hidden while BB Tasks and the rest of Work Sidebar continue to work normally."
+      />
+    </SettingsCard>
   );
 }
 
