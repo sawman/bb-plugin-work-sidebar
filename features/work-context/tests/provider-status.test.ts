@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { projectProviderStatus } from "../provider-status";
+import {
+  projectProviderStatus,
+  providerHealthTooltip,
+} from "../provider-status";
 
 const provider = {
   providerId: "codex",
@@ -33,5 +36,19 @@ describe("Work provider status projection", () => {
       status: "unavailable",
       providerName: "new-provider",
     });
+  });
+
+  it("summarizes only the colour reason in the icon tooltip", () => {
+    expect(providerHealthTooltip(
+      projectProviderStatus({ providerId: "codex", provider, usage: usage(79) }),
+    )).toBe("Ready");
+    expect(providerHealthTooltip(
+      projectProviderStatus({ providerId: "codex", provider, usage: usage(84) }),
+    )).toBe("84% used");
+    expect(providerHealthTooltip(projectProviderStatus({
+      providerId: "codex",
+      provider: { ...provider, status: "expired" },
+      usage: usage(84),
+    }))).toBe("Down");
   });
 });

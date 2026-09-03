@@ -4,6 +4,7 @@ import { ThreadProviderLogo } from "../../components/threads/thread-provider-log
 import { ActionTooltip } from "../../components/ui/action-tooltip";
 import { Icon } from "../../components/ui/icon";
 import { readableStatus } from "../../work-model";
+import { providerHealthTooltip } from "./provider-status";
 import type { WorkProviderStatus } from "./schemas";
 
 type ProviderLogo = Parameters<typeof ThreadProviderLogo>[0]["provider"];
@@ -28,9 +29,10 @@ export function ProviderHealth({
 }) {
   const navigate = useBbNavigate();
   const maximum = maximumUsage(provider);
-  const label = `${provider.providerName} provider status: ${readableStatus(provider.status)}${
+  const accessibleLabel = `${provider.providerName} provider status: ${readableStatus(provider.status)}${
     maximum === null ? "" : ` · ${Math.round(maximum)}% used`
   }`;
+  const tooltipLabel = providerHealthTooltip(provider);
   const icon = (
     <span aria-hidden className="ws-provider-health-icon">
       <ThreadProviderLogo
@@ -42,12 +44,12 @@ export function ProviderHealth({
   );
   const className = `ws-provider-health ws-provider-health-${provider.tone}`;
   return provider.statusUrl ? (
-    <ActionTooltip label={label}>
+    <ActionTooltip label={tooltipLabel}>
       {(tooltipId) => (
         <button
           type="button"
           className={className}
-          aria-label={label}
+          aria-label={accessibleLabel}
           aria-describedby={tooltipId}
           onClick={() => navigate.openUrl(provider.statusUrl!)}
         >
@@ -56,12 +58,12 @@ export function ProviderHealth({
       )}
     </ActionTooltip>
   ) : (
-    <ActionTooltip label={label}>
+    <ActionTooltip label={tooltipLabel}>
       {(tooltipId) => (
         <span
           className={className}
           role="img"
-          aria-label={label}
+          aria-label={accessibleLabel}
           aria-describedby={tooltipId}
         >
           {icon}

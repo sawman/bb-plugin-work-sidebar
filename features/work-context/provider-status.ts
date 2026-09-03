@@ -31,6 +31,20 @@ type ProviderUsage =
       message: string;
     };
 
+export function providerHealthTooltip(provider: WorkProviderStatus) {
+  if (provider.status !== "ready") {
+    return provider.tone === "red" ? "Down" : "Unavailable";
+  }
+  if (provider.usage?.status === "ok") {
+    const maximum = Math.max(
+      0,
+      ...provider.usage.windows.map((window) => window.usedPercent),
+    );
+    if (maximum >= 80) return `${Math.round(maximum)}% used`;
+  }
+  return "Ready";
+}
+
 function unavailableUsageMessage(status: ProviderUsage["status"]) {
   if (status === "not_installed") return "Usage unavailable: provider not installed.";
   if (status === "unauthenticated") return "Usage unavailable: provider not signed in.";

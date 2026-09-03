@@ -218,7 +218,14 @@ describe("registered Status activity lifecycle", () => {
     const agentCopy = slot.getByText("Agent reply");
     expect(userCopy.nextElementSibling?.textContent).toBe("5m ago");
     expect(agentCopy.nextElementSibling?.textContent).toBe("1h ago");
-    expect(slot.getByRole("img", { name: "Codex provider status: Ready · 100% used" })).toBeTruthy();
+    const providerIcon = slot.getByRole("img", {
+      name: "Codex provider status: Ready · 100% used",
+    });
+    expect(providerIcon).toBeTruthy();
+    expect(
+      document.getElementById(providerIcon.getAttribute("aria-describedby")!)
+        ?.getAttribute("data-tooltip-label"),
+    ).toBe("100% used");
     slot.lifecycle.unmount();
   });
 
