@@ -47,6 +47,25 @@ export function providerHealthTooltip(provider: WorkProviderStatus) {
   return "Ready";
 }
 
+export function providerLimitHeading(
+  label: string,
+  resetsAt: string | null,
+  now = Date.now(),
+) {
+  const limitLabel = /\blimit$/i.test(label) ? label : `${label} limit`;
+  if (!resetsAt) return limitLabel;
+  const resetTime = Date.parse(resetsAt);
+  if (!Number.isFinite(resetTime)) return limitLabel;
+  const remainingMinutes = Math.ceil((resetTime - now) / 60_000);
+  if (remainingMinutes <= 0) return `${limitLabel} · resets now`;
+  if (remainingMinutes < 60) {
+    return `${limitLabel} · resets in ${remainingMinutes}m`;
+  }
+  const remainingHours = Math.ceil(remainingMinutes / 60);
+  if (remainingHours < 24) return `${limitLabel} · resets in ${remainingHours}h`;
+  return `${limitLabel} · resets in ${Math.ceil(remainingHours / 24)}d`;
+}
+
 function unavailableUsageMessage(status: ProviderUsage["status"]) {
   if (status === "not_installed") return "Usage unavailable: provider not installed.";
   if (status === "unauthenticated") return "Usage unavailable: provider not signed in.";

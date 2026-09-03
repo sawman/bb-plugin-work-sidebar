@@ -194,7 +194,11 @@ describe("registered Status activity lifecycle", () => {
               planLabel: "Pro",
               message: null,
               windows: [
-                { label: "Five-hour", usedPercent: 84, resetsAt: null },
+                {
+                  label: "Five-hour",
+                  usedPercent: 84,
+                  resetsAt: new Date(now + 2 * 60 * 60_000).toISOString(),
+                },
                 { label: "Weekly", usedPercent: 100, resetsAt: null },
               ],
             },
@@ -213,6 +217,7 @@ describe("registered Status activity lifecycle", () => {
     fireEvent.click(slot.getByText("Provider"));
     expect(providerSection?.open).toBe(true);
     expect(slot.getByRole("progressbar", { name: "Five-hour usage" }).getAttribute("aria-valuenow")).toBe("84");
+    expect(slot.getByText("Five-hour limit · resets in 2h")).toBeTruthy();
     expect(slot.getByRole("progressbar", { name: "Weekly usage" }).getAttribute("data-tone")).toBe("critical");
     const userCopy = slot.getByText("User request");
     const agentCopy = slot.getByText("Agent reply");

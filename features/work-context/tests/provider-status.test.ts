@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   projectProviderStatus,
   providerHealthTooltip,
+  providerLimitHeading,
 } from "../provider-status";
 
 const provider = {
@@ -63,5 +64,25 @@ describe("Work provider status projection", () => {
       provider: { ...provider, status },
       usage: usage(84),
     }))).toBe(label);
+  });
+
+  it("formats compact provider reset headings", () => {
+    const now = Date.UTC(2026, 8, 3, 12);
+    expect(providerLimitHeading("Weekly", null, now)).toBe("Weekly limit");
+    expect(providerLimitHeading(
+      "Five-hour",
+      new Date(now + 42 * 60_000).toISOString(),
+      now,
+    )).toBe("Five-hour limit · resets in 42m");
+    expect(providerLimitHeading(
+      "Weekly limit",
+      new Date(now + 3 * 60 * 60_000).toISOString(),
+      now,
+    )).toBe("Weekly limit · resets in 3h");
+    expect(providerLimitHeading(
+      "Monthly",
+      new Date(now + 2 * 24 * 60 * 60_000).toISOString(),
+      now,
+    )).toBe("Monthly limit · resets in 2d");
   });
 });

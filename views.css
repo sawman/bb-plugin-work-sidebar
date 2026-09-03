@@ -2349,7 +2349,7 @@ button.ws-change-file-row:hover {
 .ws-provider-status-content {
   display: grid;
   gap: 0.34rem;
-  padding: 0.2rem 0 0.4rem;
+  padding: 0.2rem 0 0.55rem;
 }
 .ws-provider-status-message {
   margin: 0;

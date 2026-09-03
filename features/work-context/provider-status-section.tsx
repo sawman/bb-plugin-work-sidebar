@@ -4,7 +4,10 @@ import { ThreadProviderLogo } from "../../components/threads/thread-provider-log
 import { ActionTooltip } from "../../components/ui/action-tooltip";
 import { Icon } from "../../components/ui/icon";
 import { readableStatus } from "../../work-model";
-import { providerHealthTooltip } from "./provider-status";
+import {
+  providerHealthTooltip,
+  providerLimitHeading,
+} from "./provider-status";
 import type { WorkProviderStatus } from "./schemas";
 
 type ProviderLogo = Parameters<typeof ThreadProviderLogo>[0]["provider"];
@@ -102,7 +105,7 @@ export function ProviderStatusSection({
                 const percentage = Math.max(0, Math.min(100, window.usedPercent));
                 return (
                   <div className="ws-provider-usage" key={window.label}>
-                    <span>{window.label}</span>
+                    <span>{providerLimitHeading(window.label, window.resetsAt)}</span>
                     <span>{Math.round(window.usedPercent)}%</span>
                     <span
                       className="ws-provider-usage-track"
