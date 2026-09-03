@@ -2535,6 +2535,7 @@ button.ws-provider-health:focus-visible {
   -webkit-line-clamp: 2;
 }
 .ws-status-card .ws-activity-item > time {
+  align-self: center;
   color: var(--muted-foreground);
   font: var(--ws-text-metadata);
   line-height: 1.25;
