@@ -7,7 +7,11 @@ export function queuedMessageCountdown(
   now: number,
 ): string | null {
   if (message.nextSendAt === null || message.nextSendAt <= now) return null;
-  return `${Math.max(1, Math.ceil((message.nextSendAt - now) / 60_000))}m`;
+  const minutes = Math.max(1, Math.ceil((message.nextSendAt - now) / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return remainingMinutes === 0 ? `${hours}h` : `${hours}h${remainingMinutes}m`;
 }
 
 export function queuedMessageDisplay(

@@ -51,12 +51,12 @@ const thread = {
 } as const;
 
 describe("queued message presentation and read contract", () => {
-  it("shows count and a minutes-only countdown while keeping the reason in its tooltip", () => {
-    expect(queuedMessageCountdown(queuedMessage, NOW)).toBe("65m");
-    expect(queuedMessageDisplay(queuedMessage, NOW)).toBe("2 · 65m");
+  it("shows count and a compact hour/minute countdown while keeping the reason in its tooltip", () => {
+    expect(queuedMessageCountdown(queuedMessage, NOW)).toBe("1h5m");
+    expect(queuedMessageDisplay(queuedMessage, NOW)).toBe("2 · 1h5m");
     expect(queuedMessageReason(queuedMessage)).toBe("Rate limited");
     expect(queuedMessageLabel(queuedMessage, NOW)).toBe(
-      "2 queued messages · next sends in 65m · Rate limited",
+      "2 queued messages · next sends in 1h5m · Rate limited",
     );
     const view = render(
       <ThreadStatus
@@ -67,9 +67,9 @@ describe("queued message presentation and read contract", () => {
       />,
     );
     const status = view.getByRole("status", {
-      name: "2 queued messages · next sends in 65m · Rate limited",
+      name: "2 queued messages · next sends in 1h5m · Rate limited",
     });
-    expect(status.textContent).toBe("2 · 65m");
+    expect(status.textContent).toBe("2 · 1h5m");
     expect(status.querySelector('[data-icon="MessageSquare"]')).toBeTruthy();
     expect(status.querySelector("[data-message-bubble]")).toBeTruthy();
     expect(status.getAttribute("aria-describedby")).toBeTruthy();
