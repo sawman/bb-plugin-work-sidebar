@@ -230,6 +230,8 @@ describe("stylesheet policy", () => {
     const tooltip = source.match(
       /\.ws-task-title-line > \.ws-action-tooltip\s*\{([\s\S]*?)\}/,
     )?.[1];
+    const picker = source.match(/\.ws-task-thread-picker\s*\{([\s\S]*?)\}/)?.[1];
+    const chip = source.match(/\.ws-task-thread-chip\s*\{([\s\S]*?)\}/)?.[1];
 
     expect(title).toContain("overflow: hidden");
     expect(title).toContain("text-overflow: ellipsis");
@@ -244,6 +246,9 @@ describe("stylesheet policy", () => {
     expect(assign).toContain("display: block");
     expect(assign).toContain("width: 100%");
     expect(assign).toContain("overflow: hidden");
+    expect(picker).toContain("width: 0");
+    expect(picker).toContain("flex: 1 1 5rem");
+    expect(chip).toContain("width: 100%");
   });
 
   test("keeps plugin tooltips flat instead of adding a bright underglow", () => {

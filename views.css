@@ -713,8 +713,13 @@
   height: 0.68rem;
 }
 .ws-task-meta {
-  flex-wrap: wrap;
-  overflow: visible;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.ws-task-key-inline {
+  flex: none;
+  font: var(--ws-text-code);
+  line-height: inherit;
 }
 .ws-task-owner-badge {
   min-width: 0;
@@ -725,10 +730,10 @@
   text-overflow: ellipsis;
 }
 .ws-task-row-actions {
-  display: grid;
-  grid-template-rows: auto auto;
-  justify-items: end;
-  gap: 0.08rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.2rem;
 }
 .ws-task-row-primary-info {
   display: inline-flex;
@@ -787,9 +792,9 @@
 }
 .ws-task-children {
   grid-column: 1 / -1;
-  margin-left: 0.55rem;
-  padding-left: 0.4rem;
-  border-left: 1px solid var(--border);
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 .ws-callout button {
   font: var(--ws-text-subtext);
@@ -3465,10 +3470,13 @@ button.ws-provider-health:focus-visible {
   position: relative;
   display: inline-flex;
   min-width: 0;
+  width: 0;
+  flex: 1 1 5rem;
   max-width: 100%;
 }
 .ws-task-thread-chip {
   display: inline-flex;
+  width: 100%;
   min-width: 0;
   max-width: 100%;
   align-items: stretch;
@@ -3478,7 +3486,9 @@ button.ws-provider-health:focus-visible {
   background: transparent;
 }
 .ws-task-thread-chip .ws-task-owner-badge {
+  flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
   border: 0;
   border-radius: 0;
   padding-inline: 0.22rem;

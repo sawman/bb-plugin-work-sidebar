@@ -527,10 +527,11 @@ describe("Tasks registered controls", () => {
         method === "updateTaskStatus" ? pending.promise : Promise.resolve({}),
       ),
     );
-    const status = rendered.getByLabelText(
-      "Change status for WORK-1: To do",
-    ) as HTMLSelectElement;
-    fireEvent.change(status, { target: { value: "done" } });
+    const status = rendered.getByRole("button", {
+      name: "Change status for WORK-1: To do",
+    }) as HTMLButtonElement;
+    fireEvent.click(status);
+    fireEvent.click(rendered.getByRole("option", { name: "Done" }));
     await waitFor(() =>
       expect(call).toHaveBeenCalledWith("updateTaskStatus", {
         taskId: "task_1",
@@ -553,12 +554,12 @@ describe("Tasks registered controls", () => {
     );
     const row = rendered.getByText(task.title).closest(".ws-task-row")!;
     const trailing = row.querySelector(".ws-task-row-actions")!;
-    const primaryInfo = trailing.querySelector(".ws-task-row-primary-info")!;
-    expect(primaryInfo.querySelector(".ws-task-key-badge")?.textContent).toBe(
+    const metadata = row.querySelector(".ws-task-meta")!;
+    expect(metadata.querySelector(".ws-task-key-inline")?.textContent).toBe(
       "WORK-1",
     );
-    expect(primaryInfo.querySelector(".ws-task-priority-slot")).toBeTruthy();
-    expect(row.querySelector(".ws-task-meta .ws-task-key-badge")).toBeNull();
+    expect(metadata.querySelector(".ws-task-priority-slot")).toBeTruthy();
+    expect(metadata.querySelector(".ws-task-thread-picker")).toBeTruthy();
     fireEvent.click(rendered.getByRole("button", { name: "Copy task WORK-1" }));
     await waitFor(() =>
       expect(clipboardWrite).toHaveBeenCalledWith("Task WORK-1"),
@@ -567,18 +568,9 @@ describe("Tasks registered controls", () => {
       trailing.querySelector('[aria-label="Change status for WORK-1: To do"]'),
     ).toBeTruthy();
     expect(
-      primaryInfo
-        .querySelector(".ws-task-priority-slot")
-        ?.compareDocumentPosition(
-          trailing.querySelector(
-            '[aria-label="Change status for WORK-1: To do"]',
-          )!,
-        )! & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-
-    expect(
       rendered.getByRole("switch", { name: "Human assigned to WORK-1" }),
     ).toBeTruthy();
+    expect(trailing.querySelector('[role="switch"]')).toBeTruthy();
     expect(
       rendered.queryByRole("button", { name: "Manage threads for WORK-1" }),
     ).toBeNull();

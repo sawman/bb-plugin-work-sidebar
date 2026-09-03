@@ -22,21 +22,10 @@ import type {
   TaskQueueNode,
   ThreadTaskLink,
 } from "../../work-model";
-import { taskStatusPresentation } from "./model";
 import { TaskPriorityIcon } from "./priority";
 import { AssigneePicker } from "./assignee-picker";
 import { ThreadAssignmentPicker } from "./thread-assignment-picker";
-
-const TASK_STATUSES: readonly SidebarTask["status"][] = [
-  "backlog",
-  "todo",
-  "in_progress",
-  "in_review",
-  "done",
-  "canceled",
-];
-const taskStatus = (status: SidebarTask["status"]) =>
-  taskStatusPresentation(status);
+import { TaskStatusControl } from "./workflow-card";
 
 export type TaskRowProps = {
   node: TaskQueueNode;
@@ -132,7 +121,6 @@ export function TaskRow(props: TaskRowProps) {
   const assigned = Boolean(
     bindingLink || (activeThreadId && task.linkedThreadIds.includes(activeThreadId)),
   );
-  const status = taskStatus(task.status);
   const peers = siblings.filter(
     (candidate) =>
       candidate.task.projectId === task.projectId &&
@@ -210,14 +198,15 @@ export function TaskRow(props: TaskRowProps) {
                   {(tooltipId) => (
                     <button
                       type="button"
-                      className="ws-task-children-disclosure"
+                      className="ws-task-children-disclosure ws-pr-stack-disclosure"
+                      data-state={childrenOpen ? "open" : "closed"}
                       aria-describedby={tooltipId}
                       aria-controls={`ws-task-children-${task.id}`}
                       aria-expanded={childrenOpen}
                       aria-label={`${childrenOpen ? "Collapse" : "Expand"} subtasks for ${task.key}`}
                       onClick={() => setChildrenOpen((current) => !current)}
                     >
-                      <Icon name={childrenOpen ? "ChevronDown" : "ChevronRight"} aria-hidden />
+                      <Icon name="ChevronRight" aria-hidden />
                     </button>
                   )}
                 </ActionTooltip>
@@ -237,17 +226,18 @@ export function TaskRow(props: TaskRowProps) {
               </ActionTooltip>
             </div>
             <div className="ws-task-meta ws-sidebar-row-meta">
-              {task.dueDate && (
-                <span className="ws-task-badge">Due {task.dueDate}</span>
-              )}
-              {showProject && (
-                <span className="ws-task-badge">{task.projectName}</span>
-              )}
-              {ownerState ? (
-                <span id={bindingDescriptionId} className="ws-sr-only">
-                  {ownerState}
-                </span>
-              ) : null}
+              <CopyBadge
+                className="ws-task-key-inline"
+                value={task.key}
+                copyValue={`Task ${task.key}`}
+                label="task"
+                variant="text"
+              >
+                {task.key}
+              </CopyBadge>
+              <span className="ws-task-priority-slot">
+                <TaskPriorityIcon priority={task.priority} />
+              </span>
               <ThreadAssignmentPicker
                 taskKey={task.key}
                 ownerThreadId={ownerThreadId}
@@ -259,58 +249,36 @@ export function TaskRow(props: TaskRowProps) {
                   ? onAttachToThread(task.id, threadId)
                   : onDetachFromThread(task.id, threadId)}
               />
+              {task.dueDate && (
+                <span className="ws-task-badge">Due {task.dueDate}</span>
+              )}
+              {showProject && (
+                <span className="ws-task-badge">{task.projectName}</span>
+              )}
+              {ownerState ? (
+                <span id={bindingDescriptionId} className="ws-sr-only">
+                  {ownerState}
+                </span>
+              ) : null}
             </div>
           </div>
           <div className="ws-task-row-actions ws-sidebar-row-trailing">
-            <span className="ws-task-row-primary-info">
-              <CopyBadge
-                className="ws-task-key-badge"
-                value={task.key}
-                copyValue={`Task ${task.key}`}
-                label="task"
-              >
-                {task.key}
-              </CopyBadge>
-              <span className="ws-task-priority-slot">
-                <TaskPriorityIcon priority={task.priority} />
-              </span>
-              <AssigneePicker
-                value={task.assignee}
-                taskKey={task.key}
-                disabled={updatingAssigneeTaskId === task.id}
-                onChange={(assignee) => {
-                  void onUpdateAssignee(task.id, assignee).catch(() => undefined);
-                }}
-              />
-            </span>
-            <span className="ws-task-row-controls">
-              <ActionTooltip label={status.label}>
-                {(tooltipId) => <label
-                className={`ws-task-status-picker ws-task-status-${task.status}`}
-                aria-describedby={tooltipId}
-              >
-                <Icon name={status.icon} aria-hidden />
-                <span className="ws-sr-only">Change status for {task.key}</span>
-                <select
-                  value={task.status}
-                  disabled={updatingTaskId === task.id}
-                  aria-label={`Change status for ${task.key}: ${status.label}`}
-                  onChange={(event) =>
-                    void onUpdateStatus(
-                      task.id,
-                      event.target.value as SidebarTask["status"],
-                    )
-                  }
-                >
-                  {TASK_STATUSES.map((next) => (
-                    <option key={next} value={next}>
-                      {taskStatus(next).label}
-                    </option>
-                  ))}
-                </select>
-                </label>}
-              </ActionTooltip>
-            </span>
+            <AssigneePicker
+              value={task.assignee}
+              taskKey={task.key}
+              disabled={updatingAssigneeTaskId === task.id}
+              onChange={(assignee) => {
+                void onUpdateAssignee(task.id, assignee).catch(() => undefined);
+              }}
+            />
+            <TaskStatusControl
+              taskKey={task.key}
+              status={task.status}
+              busy={updatingTaskId === task.id}
+              onChange={(next) => {
+                void onUpdateStatus(task.id, next).catch(() => undefined);
+              }}
+            />
           </div>
           {node.children.length > 0 && (
             <div

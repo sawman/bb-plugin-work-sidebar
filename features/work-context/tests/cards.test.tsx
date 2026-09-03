@@ -669,15 +669,10 @@ describe("registered Work context cards", () => {
       );
       expect(workItemsCard).toBeTruthy();
       expect(
-        within(workItemsCard!).queryByRole("switch", {
-          name: "Human assigned to WORK-1",
-        }),
-      ).toBeNull();
-      expect(
-        within(workItemsCard!).queryByRole("switch", {
+        within(workItemsCard!).getByRole("switch", {
           name: "Agent assigned to WORK-2",
         }),
-      ).toBeNull();
+      ).toBeTruthy();
     } finally {
       slot.lifecycle.unmount();
       getPluginQueryClient().clear();
@@ -1376,7 +1371,7 @@ describe("registered Work context cards", () => {
     getPluginQueryClient().clear();
   });
 
-  it("keeps task status actionable without assignee controls in Work items", async () => {
+  it("keeps the shared assignment and status controls actionable in Work items", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));
     let statusValue: import("../../../work-model").SidebarTask["status"] =
@@ -1399,6 +1394,10 @@ describe("registered Work context cards", () => {
         };
       },
     );
+    const updateTaskAssignee = vi.fn(async (input: {
+      taskId: string;
+      assignee: "agent" | "human";
+    }) => input);
     const taskRecord = () => ({
       id: "task_execution",
       projectId: "project_1",
@@ -1438,6 +1437,7 @@ describe("registered Work context cards", () => {
             executionTasks: [taskRecord()],
           }),
           updateTaskStatus,
+          updateTaskAssignee,
         }),
       },
     );
@@ -1448,7 +1448,16 @@ describe("registered Work context cards", () => {
     const taskRow = statusControl.closest(".ws-task-workflow-row")!;
     const actions = taskRow.querySelector(".ws-task-workflow-actions")!;
     expect(actions.contains(statusControl)).toBe(true);
-    expect(actions.querySelector('[role="switch"]')).toBeNull();
+    const assignment = actions.querySelector('[role="switch"]')!;
+    expect(assignment).toBeTruthy();
+    fireEvent.keyDown(assignment, { key: "ArrowRight" });
+    await waitFor(
+      () => expect(updateTaskAssignee).toHaveBeenCalledWith({
+        taskId: "task_human",
+        assignee: "agent",
+      }),
+      { timeout: 2_500 },
+    );
     fireEvent.click(statusControl);
     fireEvent.click(slot.getByRole("option", { name: "In Review" }));
     await waitFor(() =>
@@ -1820,6 +1829,7 @@ describe("registered Work context cards", () => {
     expect(Array.from(queueActions.children).map(
       (child) => child.querySelector("[aria-label]")?.getAttribute("aria-label"),
     )).toEqual([
+      "Agent assigned to WORK-2",
       "Make WORK-2 a goal",
       "Detach WORK-2 from this thread",
       "Change status for WORK-2: To do",

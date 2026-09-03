@@ -9,6 +9,7 @@ import { ActionTooltip } from "../../components/ui/action-tooltip";
 import { Icon } from "../../components/ui/icon";
 import { taskStatusPresentation } from "./model";
 import { TaskPriorityIcon } from "./priority";
+import { AssigneePicker } from "./assignee-picker";
 import type { SidebarTask } from "../../work-model";
 import {
   MAX_COMPLETED_TASK_PREVIEW,
@@ -22,6 +23,7 @@ export function TaskWorkflowCard({
   sections,
   busy,
   onStatusChange,
+  onAssigneeChange,
   detachableTaskIds,
   onDetach,
   onMakeGoal,
@@ -29,6 +31,7 @@ export function TaskWorkflowCard({
   sections: WorkflowSections;
   busy: boolean;
   onStatusChange(taskId: string, status: SidebarTask["status"]): void;
+  onAssigneeChange(taskId: string, assignee: SidebarTask["assignee"]): void;
   detachableTaskIds: ReadonlySet<string>;
   onDetach(taskId: string): void;
   onMakeGoal?(taskId: string): void;
@@ -44,6 +47,7 @@ export function TaskWorkflowCard({
         defaultOpen
         busy={busy}
         onStatusChange={onStatusChange}
+        onAssigneeChange={onAssigneeChange}
         detachableTaskIds={detachableTaskIds}
         onDetach={onDetach}
         onMakeGoal={onMakeGoal}
@@ -55,6 +59,7 @@ export function TaskWorkflowCard({
         defaultOpen
         busy={busy}
         onStatusChange={onStatusChange}
+        onAssigneeChange={onAssigneeChange}
         detachableTaskIds={detachableTaskIds}
         onDetach={onDetach}
         onMakeGoal={onMakeGoal}
@@ -67,6 +72,7 @@ export function TaskWorkflowCard({
         itemLimit={MAX_COMPLETED_TASK_PREVIEW}
         busy={busy}
         onStatusChange={onStatusChange}
+        onAssigneeChange={onAssigneeChange}
         detachableTaskIds={detachableTaskIds}
         onDetach={onDetach}
         onMakeGoal={onMakeGoal}
@@ -90,6 +96,7 @@ function WorkflowSection({
   defaultOpen = false,
   busy,
   onStatusChange,
+  onAssigneeChange,
   detachableTaskIds,
   onDetach,
   onMakeGoal,
@@ -103,6 +110,7 @@ function WorkflowSection({
   defaultOpen?: boolean;
   busy: boolean;
   onStatusChange(taskId: string, status: SidebarTask["status"]): void;
+  onAssigneeChange(taskId: string, assignee: SidebarTask["assignee"]): void;
   detachableTaskIds: ReadonlySet<string>;
   onDetach(taskId: string): void;
   onMakeGoal?(taskId: string): void;
@@ -125,6 +133,7 @@ function WorkflowSection({
               item={item}
               busy={busy}
               onStatusChange={onStatusChange}
+              onAssigneeChange={onAssigneeChange}
               detachable={detachableTaskIds.has(item.task.id)}
               onDetach={onDetach}
               onMakeGoal={onMakeGoal}
@@ -188,6 +197,7 @@ function WorkflowRow({
   item,
   busy,
   onStatusChange,
+  onAssigneeChange,
   detachable,
   onDetach,
   onMakeGoal,
@@ -195,6 +205,7 @@ function WorkflowRow({
   item: TaskWorkflowItem;
   busy: boolean;
   onStatusChange(taskId: string, status: SidebarTask["status"]): void;
+  onAssigneeChange(taskId: string, assignee: SidebarTask["assignee"]): void;
   detachable: boolean;
   onDetach(taskId: string): void;
   onMakeGoal?(taskId: string): void;
@@ -221,6 +232,12 @@ function WorkflowRow({
         role="group"
         aria-label={`Actions for ${task.key}`}
       >
+        <AssigneePicker
+          value={task.assignee}
+          taskKey={task.key}
+          disabled={busy}
+          onChange={(assignee) => onAssigneeChange(task.id, assignee)}
+        />
         {detachable && onMakeGoal ? (
           <ActionTooltip label="Move to Goals">
             {(tooltipId) => (
