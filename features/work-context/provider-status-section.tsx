@@ -85,15 +85,13 @@ export function ProviderStatusSection({
           Provider
         </span>
         <span className="ws-provider-status-summary">
-          {provider.providerName} · {status}
+          {provider.providerName}
+          {provider.usage?.planLabel ? ` ${provider.usage.planLabel}` : ""} · {status}
         </span>
       </summary>
       <div className="ws-provider-status-content">
         {provider.message ? (
           <p className="ws-provider-status-message">{provider.message}</p>
-        ) : null}
-        {provider.usage?.planLabel ? (
-          <span className="ws-provider-plan">{provider.usage.planLabel}</span>
         ) : null}
         {provider.usage?.status === "ok" ? (
           provider.usage.windows.length ? (

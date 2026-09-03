@@ -2351,8 +2351,7 @@ button.ws-change-file-row:hover {
   gap: 0.34rem;
   padding: 0.2rem 0 0.08rem 0.84rem;
 }
-.ws-provider-status-message,
-.ws-provider-plan {
+.ws-provider-status-message {
   margin: 0;
   color: var(--muted-foreground);
   font: var(--ws-text-metadata);
