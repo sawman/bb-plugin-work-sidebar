@@ -321,6 +321,14 @@ describe("R21D ThreadRow characterization", () => {
     expect(host.actions.open).not.toHaveBeenCalled();
   });
 
+  it("keeps the compact counter stable while preserving an exact large count", () => {
+    const view = renderRow({ children: 120 });
+    const control = view.getByRole("button", {
+      name: "120 child agents, collapsed",
+    });
+    expect(control.querySelector("small")?.textContent).toBe("∞");
+  });
+
   it("shows a durable host draft without selecting or visiting the thread", () => {
     const view = renderRow({ threadOverrides: { hasComposerDraft: true } });
 

@@ -1504,11 +1504,11 @@
   align-self: center;
   display: grid;
   grid-template-rows: 0.82rem 0.56rem;
-  row-gap: 0.1rem;
+  row-gap: 0.16rem;
   align-items: center;
   justify-items: center;
   min-width: 1.1rem;
-  min-height: 1.5rem;
+  min-height: 1.56rem;
   margin: 0;
   padding: 0.04rem 0 0.02rem 0.12rem;
   border: 0;
@@ -1520,6 +1520,8 @@
   cursor: pointer;
 }
 .ws-thread-agent-control small {
+  min-width: 2ch;
+  text-align: center;
   font: var(--ws-text-metadata);
   line-height: 1;
 }

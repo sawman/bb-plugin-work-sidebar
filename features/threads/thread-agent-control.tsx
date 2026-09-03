@@ -2,6 +2,11 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import type { ThreadProvider } from "@/components/threads/thread-provider-logo";
 import { ThreadRuntimeProvider } from "./thread-row-presentation";
 
+/** The compact row reserves two characters; the accessible label keeps the exact count. */
+export function childAgentCountDisplay(childCount: number) {
+  return childCount > 99 ? "∞" : String(childCount);
+}
+
 export function ThreadAgentControl({
   thread,
   provider,
@@ -46,7 +51,7 @@ export function ThreadAgentControl({
         staleWorking={staleWorking}
         staleWorkingMinutes={staleWorkingMinutes}
       />
-      <small aria-hidden>{childCount > 0 ? childCount : null}</small>
+      <small aria-hidden>{childCount > 0 ? childAgentCountDisplay(childCount) : null}</small>
     </button>
   );
 }
