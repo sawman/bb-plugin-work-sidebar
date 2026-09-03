@@ -2359,7 +2359,7 @@ button.ws-change-file-row:hover {
 }
 .ws-provider-usage-list {
   display: grid;
-  gap: 0.28rem;
+  gap: 0.4rem;
 }
 .ws-provider-usage {
   display: grid;
