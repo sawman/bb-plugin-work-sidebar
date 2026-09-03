@@ -3987,9 +3987,9 @@ button.ws-provider-health:focus-visible {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.38rem;
-  margin-top: 0.18rem;
+  margin-top: 0;
   border-top: 0;
-  padding-top: 0.42rem;
+  padding-top: 0.3rem;
 }
 .ws-work-item-destination {
   display: inline-flex;
