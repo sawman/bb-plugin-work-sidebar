@@ -487,8 +487,25 @@ describe("pull-request stack number presentation", () => {
 
     const badge = screen.getByRole("button", { name: "Copy PR number #97" });
     expect(badge.getAttribute("data-tone")).toBe("warning");
-    expect(tooltipLabel(badge)).toBe("Review: octocat");
+    expect(tooltipLabel(badge)).toBe("Review requested · Review: octocat");
     expect(badge.querySelector("svg")?.getAttribute("data-icon")).toBe("Eye");
+  });
+
+  it("keeps a CI-failure tooltip aligned with its red status badge", () => {
+    render(
+      <PullRequestIdentifierBadge
+        kind="pull-request"
+        number={99}
+        url="https://github.com/acme/repo/pull/99"
+        presentation={{ icon: "X", label: "CI failure", tone: "destructive" }}
+        reviewDetail="Approved: octocat"
+      />,
+    );
+
+    const badge = screen.getByRole("button", { name: "Copy PR number #99" });
+    expect(badge.getAttribute("data-tone")).toBe("destructive");
+    expect(badge.querySelector("svg")?.getAttribute("data-icon")).toBe("X");
+    expect(tooltipLabel(badge)).toBe("CI failure · Approved: octocat");
   });
 
   it.each([

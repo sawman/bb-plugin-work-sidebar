@@ -19,6 +19,15 @@ type PullRequestIdentifierProps = PullRequestIdentifier & {
   onKeyDown?: HTMLAttributes<HTMLSpanElement>["onKeyDown"];
 };
 
+/** The tooltip must describe the visual badge state before any review detail. */
+export function pullRequestBadgeTooltip(
+  presentation?: StatusPresentation,
+  reviewDetail?: string,
+) {
+  if (!presentation) return reviewDetail ?? "Pull request";
+  return reviewDetail ? `${presentation.label} · ${reviewDetail}` : presentation.label;
+}
+
 export function PullRequestIdentifierBadge(
   identifier: PullRequestIdentifierProps,
 ) {
@@ -28,7 +37,10 @@ export function PullRequestIdentifierBadge(
     );
   }
   const value = `#${identifier.number}`;
-  const stateLabel = identifier.reviewDetail ?? identifier.presentation?.label;
+  const stateLabel = pullRequestBadgeTooltip(
+    identifier.presentation,
+    identifier.reviewDetail,
+  );
 
   return (
     <CopyBadge
@@ -36,7 +48,7 @@ export function PullRequestIdentifierBadge(
       copyValue={identifier.url}
       label="PR number"
       className="ws-pr-identifier-badge ws-pr-number-badge"
-      title={stateLabel ?? "Pull request"}
+      title={stateLabel}
       tone={identifier.presentation?.tone}
       aria-haspopup={identifier.onContextMenu ? "menu" : undefined}
       onContextMenu={identifier.onContextMenu}
