@@ -327,6 +327,7 @@ describe("R21D ThreadRow characterization", () => {
       name: "120 child agents, collapsed",
     });
     expect(control.querySelector("small")?.textContent).toBe("∞");
+    expect(control.querySelector("small")?.dataset.saturated).toBe("true");
   });
 
   it("shows a durable host draft without selecting or visiting the thread", () => {

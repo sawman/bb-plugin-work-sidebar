@@ -51,7 +51,12 @@ export function ThreadAgentControl({
         staleWorking={staleWorking}
         staleWorkingMinutes={staleWorkingMinutes}
       />
-      <small aria-hidden>{childCount > 0 ? childAgentCountDisplay(childCount) : null}</small>
+      <small
+        aria-hidden
+        data-saturated={childCount > 99 ? "true" : undefined}
+      >
+        {childCount > 0 ? childAgentCountDisplay(childCount) : null}
+      </small>
     </button>
   );
 }

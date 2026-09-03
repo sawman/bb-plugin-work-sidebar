@@ -1525,6 +1525,10 @@
   font: var(--ws-text-metadata);
   line-height: 1;
 }
+.ws-thread-agent-control small[data-saturated="true"] {
+  transform: scale(1.3);
+  transform-origin: center;
+}
 .ws-thread-agent-control:hover {
   background: var(--accent);
   color: var(--foreground);
