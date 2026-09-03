@@ -7,11 +7,7 @@ export function queuedMessageCountdown(
   now: number,
 ): string | null {
   if (message.nextSendAt === null || message.nextSendAt <= now) return null;
-  const seconds = Math.ceil((message.nextSendAt - now) / 1_000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  return `${Math.max(1, Math.ceil((message.nextSendAt - now) / 60_000))}m`;
 }
 
 export function queuedMessageDisplay(
@@ -25,13 +21,14 @@ export function queuedMessageDisplay(
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
+export function queuedMessageReason(message: QueuedMessage): string {
+  return message.retryReason ?? message.waitingLabel ?? "Queued message";
+}
+
 export function queuedMessageLabel(message: QueuedMessage, now: number): string {
   const count = `${message.count} queued message${message.count === 1 ? "" : "s"}`;
   const countdown = queuedMessageCountdown(message, now);
-  const detail = message.retryReason ?? message.waitingLabel;
-  return [count, countdown ? `next sends in ${countdown}` : null, detail]
-    .filter((part): part is string => part !== null)
-    .join(" · ");
+  return [count, countdown ? `next sends in ${countdown}` : null, queuedMessageReason(message)].join(" · ");
 }
 
 /** The left sidebar is the sole owner of queued-message realtime updates. */

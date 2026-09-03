@@ -6,6 +6,7 @@ import {
   queuedMessageCountdown,
   queuedMessageDisplay,
   queuedMessageLabel,
+  queuedMessageReason,
 } from "../queued-messages";
 import type { QueuedMessage } from "../schemas";
 
@@ -13,7 +14,7 @@ const NOW = 1_800_000_000_000;
 const queuedMessage: QueuedMessage = {
   threadId: "thr_retry",
   count: 2,
-  nextSendAt: NOW + 65_000,
+  nextSendAt: NOW + 65 * 60_000,
   waitingLabel: "Retry: Rate limited",
   retryReason: "Rate limited",
 };
@@ -50,11 +51,12 @@ const thread = {
 } as const;
 
 describe("queued message presentation and read contract", () => {
-  it("shows count and countdown while keeping the queued reason available", () => {
-    expect(queuedMessageCountdown(queuedMessage, NOW)).toBe("1m");
-    expect(queuedMessageDisplay(queuedMessage, NOW)).toBe("2 · 1m");
+  it("shows count and a minutes-only countdown while keeping the reason in its tooltip", () => {
+    expect(queuedMessageCountdown(queuedMessage, NOW)).toBe("65m");
+    expect(queuedMessageDisplay(queuedMessage, NOW)).toBe("2 · 65m");
+    expect(queuedMessageReason(queuedMessage)).toBe("Rate limited");
     expect(queuedMessageLabel(queuedMessage, NOW)).toBe(
-      "2 queued messages · next sends in 1m · Rate limited",
+      "2 queued messages · next sends in 65m · Rate limited",
     );
     const view = render(
       <ThreadStatus
@@ -65,16 +67,16 @@ describe("queued message presentation and read contract", () => {
       />,
     );
     const status = view.getByRole("status", {
-      name: "2 queued messages · next sends in 1m · Rate limited",
+      name: "2 queued messages · next sends in 65m · Rate limited",
     });
-    expect(status.textContent).toBe("2 · 1m");
+    expect(status.textContent).toBe("2 · 65m");
     expect(status.querySelector('[data-icon="MessageSquare"]')).toBeTruthy();
     expect(status.getAttribute("aria-describedby")).toBeTruthy();
     expect(
       document
         .getElementById(status.getAttribute("aria-describedby") ?? "")
         ?.getAttribute("aria-label"),
-    ).toBe("2 queued messages · next sends in 1m ·…");
+    ).toBe("Rate limited");
     view.unmount();
   });
 });

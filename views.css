@@ -78,7 +78,7 @@
   color: var(--foreground);
 }
 .ws-thread-provider[data-runtime-state="waiting"] {
-  color: var(--warning);
+  color: var(--muted-foreground);
 }
 .ws-thread-provider[data-runtime-state="error"] {
   color: var(--destructive);
@@ -1268,9 +1268,6 @@
   width: 0.68rem;
   height: 0.68rem;
   stroke-width: 2.2;
-}
-.ws-queued-message[data-retry] {
-  color: var(--destructive);
 }
 @keyframes ws-thread-pulse {
   0%,

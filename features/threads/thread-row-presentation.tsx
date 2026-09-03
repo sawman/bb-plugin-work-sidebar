@@ -15,6 +15,7 @@ import { PullRequestIdentifierBadge } from "@/features/pull-requests/identifier-
 import {
   queuedMessageDisplay,
   queuedMessageLabel,
+  queuedMessageReason,
 } from "./queued-messages";
 import type { QueuedMessage } from "./schemas";
 import type { ThreadProject } from "./thread-row-types";
@@ -145,14 +146,13 @@ export function ThreadStatus({
         />
       )}
       {queuedMessage && (
-        <ActionTooltip label={queuedMessageLabel(queuedMessage, queuedMessageNow)}>
+        <ActionTooltip label={queuedMessageReason(queuedMessage)}>
           {(tooltipId) => (
             <span
               className="ws-queued-message"
               role="status"
               aria-label={queuedMessageLabel(queuedMessage, queuedMessageNow)}
               aria-describedby={tooltipId}
-              data-retry={queuedMessage.retryReason !== null || undefined}
             >
               <Icon name="MessageSquare" aria-hidden />
               {queuedMessageDisplay(queuedMessage, queuedMessageNow) && (
