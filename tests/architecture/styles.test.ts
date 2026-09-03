@@ -219,6 +219,22 @@ describe("stylesheet policy", () => {
     expect(refresh).toContain("border-radius: 0");
   });
 
+  test("keeps left Task titles and child disclosures shrinkable and single-line", () => {
+    const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    const title = source.match(/\.ws-task-title\s*\{([\s\S]*?)\}/)?.[1];
+    const line = source.match(/\.ws-task-title-line\s*\{([\s\S]*?)\}/)?.[1];
+    const tooltip = source.match(
+      /\.ws-task-title-line > \.ws-action-tooltip\s*\{([\s\S]*?)\}/,
+    )?.[1];
+
+    expect(title).toContain("overflow: hidden");
+    expect(title).toContain("text-overflow: ellipsis");
+    expect(title).toContain("white-space: nowrap");
+    expect(line).toContain("min-width: 0");
+    expect(tooltip).toContain("min-width: 0");
+    expect(tooltip).toContain("flex: 1 1 auto");
+  });
+
   test("keeps plugin tooltips flat instead of adding a bright underglow", () => {
     const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
     for (const [selector, body] of [

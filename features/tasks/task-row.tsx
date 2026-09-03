@@ -1,4 +1,8 @@
-import type { DragEvent, MouseEvent as ReactMouseEvent } from "react";
+import {
+  useState,
+  type DragEvent,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -20,6 +24,7 @@ import type {
 } from "../../work-model";
 import { taskStatusPresentation } from "./model";
 import { TaskPriorityIcon } from "./priority";
+import { AssigneePicker } from "./assignee-picker";
 import { ThreadAssignmentPicker } from "./thread-assignment-picker";
 
 const TASK_STATUSES: readonly SidebarTask["status"][] = [
@@ -104,6 +109,7 @@ export function TaskRow(props: TaskRowProps) {
     onSelect,
   } = props;
   const { task } = node;
+  const [childrenOpen, setChildrenOpen] = useState(true);
   const bindingLink = bindingLinks.get(task.id) ?? null;
   const bindingOwnerLink = bindingOwnerLinks.get(task.id) ?? null;
   const bindingOwned = Boolean(bindingOwnerLink);
@@ -123,7 +129,6 @@ export function TaskRow(props: TaskRowProps) {
       ? `Owner thread ${ownerThread.title} via ${ownerThread.providerId}`
       : `Owner thread unavailable${ownerThreadTitle ? `: ${ownerThreadTitle}` : ""}`
     : null;
-  const isUnowned = !ownerThreadId;
   const assigned = Boolean(
     bindingLink || (activeThreadId && task.linkedThreadIds.includes(activeThreadId)),
   );
@@ -197,19 +202,40 @@ export function TaskRow(props: TaskRowProps) {
           }}
         >
           <div className="ws-sidebar-row-main">
-            <ActionTooltip label={task.title}>
-              {(tooltipId) => <button
-              className={`ws-task-assign ${assigned ? "ws-task-assigned" : ""}`}
-              type="button"
-              aria-pressed={selectedTaskIds.has(task.id)}
-              aria-describedby={[ownerState ? bindingDescriptionId : null, tooltipId].filter(Boolean).join(" ")}
-              onClick={(event) => onSelect(task.id, event)}
-            >
-              <span className="ws-task-title ws-sidebar-row-title">
-                {task.title}
-              </span>
-              </button>}
-            </ActionTooltip>
+            <div className="ws-task-title-line">
+              {node.children.length > 0 ? (
+                <ActionTooltip
+                  label={`${childrenOpen ? "Collapse" : "Expand"} ${node.children.length} subtask${node.children.length === 1 ? "" : "s"}`}
+                >
+                  {(tooltipId) => (
+                    <button
+                      type="button"
+                      className="ws-task-children-disclosure"
+                      aria-describedby={tooltipId}
+                      aria-controls={`ws-task-children-${task.id}`}
+                      aria-expanded={childrenOpen}
+                      aria-label={`${childrenOpen ? "Collapse" : "Expand"} subtasks for ${task.key}`}
+                      onClick={() => setChildrenOpen((current) => !current)}
+                    >
+                      <Icon name={childrenOpen ? "ChevronDown" : "ChevronRight"} aria-hidden />
+                    </button>
+                  )}
+                </ActionTooltip>
+              ) : null}
+              <ActionTooltip label={task.title}>
+                {(tooltipId) => <button
+                  className={`ws-task-assign ${assigned ? "ws-task-assigned" : ""}`}
+                  type="button"
+                  aria-pressed={selectedTaskIds.has(task.id)}
+                  aria-describedby={[ownerState ? bindingDescriptionId : null, tooltipId].filter(Boolean).join(" ")}
+                  onClick={(event) => onSelect(task.id, event)}
+                >
+                  <span className="ws-task-title ws-sidebar-row-title">
+                    {task.title}
+                  </span>
+                </button>}
+              </ActionTooltip>
+            </div>
             <div className="ws-task-meta ws-sidebar-row-meta">
               {task.dueDate && (
                 <span className="ws-task-badge">Due {task.dueDate}</span>
@@ -248,18 +274,14 @@ export function TaskRow(props: TaskRowProps) {
               <span className="ws-task-priority-slot">
                 <TaskPriorityIcon priority={task.priority} />
               </span>
-              <ActionTooltip label={isUnowned
-                ? "An unowned task can be reassigned from this row's context menu."
-                : "Assignment is changed from the Work card when this task has an owner thread."}>
-                {(tooltipId) => <span
-                className="ws-task-assignee-readonly"
-                role="img"
-                aria-label={`${task.assignee === "agent" ? "Agent" : "Human"} assigned (read-only)`}
-                aria-describedby={tooltipId}
-              >
-                <Icon name={task.assignee === "agent" ? "Bot" : "User"} aria-hidden />
-                </span>}
-              </ActionTooltip>
+              <AssigneePicker
+                value={task.assignee}
+                taskKey={task.key}
+                disabled={updatingAssigneeTaskId === task.id}
+                onChange={(assignee) => {
+                  void onUpdateAssignee(task.id, assignee).catch(() => undefined);
+                }}
+              />
             </span>
             <span className="ws-task-row-controls">
               <ActionTooltip label={status.label}>
@@ -292,9 +314,11 @@ export function TaskRow(props: TaskRowProps) {
           </div>
           {node.children.length > 0 && (
             <div
+              id={`ws-task-children-${task.id}`}
               className="ws-task-children"
               role="group"
               aria-label={`Execution tasks for ${task.title}`}
+              hidden={!childrenOpen}
             >
               {node.children.map((child) => (
                 <TaskRow
@@ -345,32 +369,6 @@ export function TaskRow(props: TaskRowProps) {
         >
           Delete task
         </ContextMenuItem>
-        {isUnowned ? (
-          <>
-            <ContextMenuSeparator />
-            <ContextMenuLabel>Unowned task responsibility</ContextMenuLabel>
-            <ContextMenuItem
-              disabled={
-                task.assignee === "human" || updatingAssigneeTaskId === task.id
-              }
-              onSelect={() => {
-                void onUpdateAssignee(task.id, "human").catch(() => undefined);
-              }}
-            >
-              Assign to Human
-            </ContextMenuItem>
-            <ContextMenuItem
-              disabled={
-                task.assignee === "agent" || updatingAssigneeTaskId === task.id
-              }
-              onSelect={() => {
-                void onUpdateAssignee(task.id, "agent").catch(() => undefined);
-              }}
-            >
-              Assign to Agent
-            </ContextMenuItem>
-          </>
-        ) : null}
       </ContextMenuContent>
     </ContextMenu>
   );

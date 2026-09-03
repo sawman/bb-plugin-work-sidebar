@@ -665,8 +665,47 @@
 }
 .ws-task-title {
   display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font: var(--ws-text-primary);
   line-height: inherit;
+}
+.ws-task-title-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.14rem;
+}
+.ws-task-title-line > .ws-action-tooltip {
+  display: block;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.ws-task-children-disclosure {
+  display: grid;
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.ws-task-children-disclosure:hover {
+  color: var(--foreground);
+}
+.ws-task-children-disclosure:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+.ws-task-children-disclosure svg {
+  width: 0.68rem;
+  height: 0.68rem;
 }
 .ws-task-meta {
   flex-wrap: wrap;
@@ -3467,18 +3506,13 @@ button.ws-provider-health:focus-visible {
   white-space: nowrap;
 }
 .ws-task-thread-unavailable svg,
-.ws-task-assignee-readonly svg {
+.ws-task-thread-unavailable svg {
   width: 0.65rem;
   height: 0.65rem;
 }
 .ws-task-thread-unavailable > span:nth-child(2) {
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.ws-task-assignee-readonly {
-  display: inline-flex;
-  align-items: center;
-  color: var(--muted-foreground);
 }
 .ws-task-thread-trigger {
   display: inline-flex;

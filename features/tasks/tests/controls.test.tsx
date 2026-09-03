@@ -543,7 +543,7 @@ describe("Tasks registered controls", () => {
     rendered.lifecycle.unmount();
   });
 
-  it("edits one searchable left-row owner thread without exposing assignment controls", async () => {
+  it("edits one searchable left-row owner thread alongside the shared assignment switch", async () => {
     const pending = deferred<unknown>();
     const { rendered, call } = await leftSlot(
       [{ ...task, priority: "high" }],
@@ -576,9 +576,9 @@ describe("Tasks registered controls", () => {
         )! & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
-    expect(rendered.getByLabelText("Human assigned (read-only)")).toBeTruthy();
-    expect(rendered.queryByLabelText("Human assigned")).toBeNull();
-    expect(rendered.queryByLabelText("Agent assigned")).toBeNull();
+    expect(
+      rendered.getByRole("switch", { name: "Human assigned to WORK-1" }),
+    ).toBeTruthy();
     expect(
       rendered.queryByRole("button", { name: "Manage threads for WORK-1" }),
     ).toBeNull();
@@ -763,36 +763,60 @@ describe("Tasks registered controls", () => {
     rendered.lifecycle.unmount();
   });
 
-  it("keeps assignee read-only except for the unowned left-row escape hatch", async () => {
-    const pending = deferred<unknown>();
+  it("uses the shared delayed assignment switch for every left Task row", async () => {
     const { rendered, call } = await leftSlot(
       [task],
-      vi.fn((method) =>
-        method === "updateTaskAssignee" ? pending.promise : Promise.resolve({}),
-      ),
+      vi.fn(() => Promise.resolve({})),
     );
-    expect(rendered.getByLabelText("Human assigned (read-only)")).toBeTruthy();
-    fireEvent.contextMenu(rendered.getByText(task.title));
-    fireEvent.click(
-      rendered.getByRole("menuitem", { name: "Assign to Agent" }),
-    );
-    await waitFor(() =>
-      expect(call).toHaveBeenCalledWith("updateTaskAssignee", {
+    const control = rendered.getByRole("switch", {
+      name: "Human assigned to WORK-1",
+    });
+    fireEvent.keyDown(control, { key: "ArrowRight" });
+    await waitFor(
+      () => expect(call).toHaveBeenCalledWith("updateTaskAssignee", {
         taskId: "task_1",
         assignee: "agent",
       }),
+      { timeout: 2_500 },
     );
-    pending.reject(new Error("assignment failed"));
-    await waitFor(() => expect(rendered.getByText(task.title)).toBeTruthy());
     rendered.lifecycle.unmount();
     getPluginQueryClient().clear();
 
     const owned = await leftSlot([{ ...task, linkedThreadIds: ["thr_test"] }]);
-    fireEvent.contextMenu(owned.rendered.getByText(task.title));
     expect(
-      owned.rendered.queryByRole("menuitem", { name: "Assign to Agent" }),
-    ).toBeNull();
+      owned.rendered.getByRole("switch", { name: "Human assigned to WORK-1" }),
+    ).toBeTruthy();
     owned.rendered.lifecycle.unmount();
+  });
+
+  it("collapses and expands left-row subtasks without hiding their parent", async () => {
+    const child = {
+      ...task,
+      id: "task_child",
+      key: "WORK-2",
+      title: "Nested execution task",
+      parentTaskId: task.id,
+      position: 2048,
+    };
+    const { rendered } = await leftSlot([task, child]);
+    const disclosure = rendered.getByRole("button", {
+      name: "Collapse subtasks for WORK-1",
+    });
+    const children = rendered.getByRole("group", {
+      name: `Execution tasks for ${task.title}`,
+    });
+    expect(children.hidden).toBe(false);
+    fireEvent.click(disclosure);
+    expect(disclosure.getAttribute("aria-expanded")).toBe("false");
+    expect(children.hidden).toBe(true);
+    expect(rendered.getByText(task.title)).toBeTruthy();
+    expect(
+      rendered.getByRole("button", { name: "Expand subtasks for WORK-1" }),
+    ).toBe(disclosure);
+    fireEvent.click(disclosure);
+    expect(children.hidden).toBe(false);
+    await expectNoAriaViolations(rendered.container);
+    rendered.lifecycle.unmount();
   });
 
   it("presents unavailable owners without binding jargon", async () => {
