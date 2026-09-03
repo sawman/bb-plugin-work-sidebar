@@ -894,10 +894,14 @@ describe("R18 registered left sidebar parity", () => {
     await waitFor(() => expect(slot.getByText("Later")).toBeTruthy());
 
     const group = slot.getByText("Later").closest("summary")!;
-    expect(within(group).getByLabelText("Attention needed")).toBeTruthy();
+    expect(
+      within(group)
+        .getByRole("img", { name: "Group needs attention" })
+        .getAttribute("data-tone"),
+    ).toBe("attention");
     expect(
       within(slot.container.querySelector(".ws-active-threads summary")!).queryByLabelText(
-        "Attention needed",
+        "Group needs attention",
       ),
     ).toBeNull();
     slot.lifecycle.unmount();

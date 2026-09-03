@@ -1145,10 +1145,25 @@
   gap: 0.24rem;
   margin-left: auto;
 }
-.ws-thread-group-attention {
-  width: 0.68rem;
-  height: 0.68rem;
+.ws-thread-group-activity {
+  display: block;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: currentColor;
+}
+.ws-thread-group-activity[data-tone="error"] {
+  color: var(--destructive);
+}
+.ws-thread-group-activity[data-tone="attention"] {
   color: var(--warning);
+}
+.ws-thread-group-activity[data-tone="completed"] {
+  color: var(--success);
+}
+.ws-thread-group-activity[data-tone="working"] {
+  color: var(--foreground);
+  opacity: 0.72;
 }
 .ws-thread-group-empty {
   padding: 0.15rem 0.35rem 0.35rem;

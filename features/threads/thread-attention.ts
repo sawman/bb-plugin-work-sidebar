@@ -5,6 +5,30 @@ import { normalizeIndicator } from "@/work-model";
 
 export const DEFAULT_STALE_WORKING_MINUTES = 30;
 export const STALE_WORKING_MS = DEFAULT_STALE_WORKING_MINUTES * 60 * 1_000;
+export type ThreadGroupActivity =
+  | "error"
+  | "attention"
+  | "completed"
+  | "working";
+
+const GROUP_ACTIVITY_PRIORITY: Record<ThreadGroupActivity, number> = {
+  error: 4,
+  attention: 3,
+  completed: 2,
+  working: 1,
+};
+
+export function threadGroupActivity(
+  thread: PluginSidebarThread,
+): ThreadGroupActivity | null {
+  const indicator = normalizeIndicator(String(thread.indicator));
+  if (indicator === "unread-error") return "error";
+  if (thread.hasPendingInteraction || indicator === "waiting-for-input") {
+    return "attention";
+  }
+  if (indicator === "unread-success") return "completed";
+  return threadIsWorking(thread) ? "working" : null;
+}
 
 export function threadNeedsAttention(thread: PluginSidebarThread): boolean {
   const indicator = normalizeIndicator(String(thread.indicator));
@@ -21,16 +45,37 @@ export function threadTreeNeedsAttention(
   roots: readonly PluginSidebarThread[],
   childrenByThread: ReadonlyMap<string, readonly PluginSidebarThread[]>,
 ): boolean {
+  const activity = threadTreeGroupActivity(roots, childrenByThread);
+  return activity === "error" || activity === "attention" || activity === "completed";
+}
+
+/**
+ * Collapses visible thread activity to one header marker. The most urgent
+ * state wins: error, user attention, completion, then routine work.
+ */
+export function threadTreeGroupActivity(
+  roots: readonly PluginSidebarThread[],
+  childrenByThread: ReadonlyMap<string, readonly PluginSidebarThread[]>,
+): ThreadGroupActivity | null {
   const pending = [...roots];
   const visited = new Set<string>();
+  let activity: ThreadGroupActivity | null = null;
   while (pending.length > 0) {
     const thread = pending.pop();
     if (!thread || visited.has(thread.id)) continue;
     visited.add(thread.id);
-    if (threadNeedsAttention(thread)) return true;
+    const candidate = threadGroupActivity(thread);
+    if (
+      candidate &&
+      (!activity ||
+        GROUP_ACTIVITY_PRIORITY[candidate] > GROUP_ACTIVITY_PRIORITY[activity])
+    ) {
+      activity = candidate;
+      if (activity === "error") return activity;
+    }
     pending.push(...(childrenByThread.get(thread.id) ?? []));
   }
-  return false;
+  return activity;
 }
 
 export function threadIsWorking(thread: PluginSidebarThread): boolean {

@@ -20,7 +20,7 @@ import { threadTitle } from "@/work-model";
 import { archiveDurationLabel } from "./model";
 import type { RecycleBinEntry } from "./recycle-bin";
 import { ThreadGroupSummary } from "./thread-group-summary";
-import { threadNeedsAttention } from "./thread-attention";
+import { threadTreeGroupActivity } from "./thread-attention";
 
 type Project = { id: string; name: string; isPersonal: boolean };
 
@@ -73,10 +73,13 @@ export function RecycleBinView({
   );
   const searching = needle.length > 0;
   const effectivelyOpen = searching || open;
-  const needsAttention = entries.some((entry) => {
-    const thread = byId.get(entry.threadId);
-    return thread ? threadNeedsAttention(thread) : false;
-  });
+  const activity = threadTreeGroupActivity(
+    entries.flatMap((entry) => {
+      const thread = byId.get(entry.threadId);
+      return thread ? [thread] : [];
+    }),
+    new Map(),
+  );
   return (
     <details
       className="ws-thread-group ws-recycle-bin"
@@ -89,7 +92,7 @@ export function RecycleBinView({
       <ThreadGroupSummary
         label="Recycle Bin"
         count={entries.length}
-        needsAttention={needsAttention}
+        activity={activity}
       />
       {rows.length ? (
         <section className="ws-hierarchy" aria-label="Recycle Bin threads">

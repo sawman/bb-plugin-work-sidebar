@@ -6,7 +6,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_STALE_WORKING_MINUTES,
   STALE_WORKING_MS,
+  threadGroupActivity,
   threadNeedsAttention,
+  threadTreeGroupActivity,
   threadTreeNeedsAttention,
   threadReportsComposerDraft,
   useStaleWorking,
@@ -108,6 +110,39 @@ describe("thread attention presentation", () => {
       threadTreeNeedsAttention([root], new Map([[root.id, [child]]])),
     ).toBe(true);
     expect(threadTreeNeedsAttention([root], new Map())).toBe(false);
+  });
+
+  it("uses one group marker with error, attention, completion, and work priority", () => {
+    const root = thread({ id: "root", indicator: "runtime" });
+    const completed = thread({
+      id: "completed",
+      parentThreadId: root.id,
+      indicator: "unread-success",
+    });
+    const waiting = thread({
+      id: "waiting",
+      parentThreadId: root.id,
+      indicator: "waiting-for-input",
+    });
+    const errored = thread({
+      id: "errored",
+      parentThreadId: root.id,
+      indicator: "unread-error",
+    });
+
+    expect(threadGroupActivity(root)).toBe("working");
+    expect(threadTreeGroupActivity([root], new Map([[root.id, [completed]]]))).toBe(
+      "completed",
+    );
+    expect(threadTreeGroupActivity([root], new Map([[root.id, [completed, waiting]]]))).toBe(
+      "attention",
+    );
+    expect(
+      threadTreeGroupActivity(
+        [root],
+        new Map([[root.id, [completed, waiting, errored]]]),
+      ),
+    ).toBe("error");
   });
 
   it("does not paint an unread or completion dot", () => {

@@ -7,7 +7,7 @@ import { ThreadToTopDropZone } from "./thread-to-top-drop-zone";
 import { RecycleBinView } from "./recycle-bin-view";
 import type { RecycleBinEntry } from "./recycle-bin";
 import type { QueuedMessage } from "./schemas";
-import { threadTreeNeedsAttention } from "./thread-attention";
+import { threadTreeGroupActivity } from "./thread-attention";
 import { SidebarThreadTree } from "./sidebar-thread-tree";
 import { ThreadGroupSummary } from "./thread-group-summary";
 type SidebarGroupTreeProps = {
@@ -107,7 +107,7 @@ export function SidebarThreadGroups({
                 <ThreadGroupSummary
                   label="Active"
                   count={organization.activeRoots.length}
-                  needsAttention={threadTreeNeedsAttention(
+                  activity={threadTreeGroupActivity(
                     organization.activeRoots,
                     organization.activeChildren,
                   )}
@@ -143,7 +143,7 @@ export function SidebarThreadGroups({
               <ThreadGroupSummary
                 label={group.name}
                 count={roots.length}
-                needsAttention={threadTreeNeedsAttention(
+                activity={threadTreeGroupActivity(
                   roots,
                   tree?.children ?? new Map(),
                 )}
