@@ -2306,7 +2306,7 @@ button.ws-change-file-row:hover {
 }
 .ws-provider-status-section {
   border-bottom: 1px solid var(--border);
-  padding-bottom: 0.3rem;
+  padding-bottom: 0.4rem;
 }
 .ws-provider-status-section > summary {
   display: flex;
@@ -2489,7 +2489,7 @@ button.ws-provider-health:focus-visible {
 }
 .ws-status-card .ws-activity-list {
   gap: 0.34rem;
-  margin-top: 0.12rem;
+  margin-top: 0.22rem;
 }
 .ws-status-card .ws-activity-item {
   display: grid;
