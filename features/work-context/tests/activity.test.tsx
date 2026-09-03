@@ -155,6 +155,11 @@ describe("registered Status activity lifecycle", () => {
         (label) => label.textContent,
       ),
     ).toEqual(["User", "Agent"]);
+    expect(
+      [...slot.container.querySelectorAll(".ws-activity-label > svg")].map(
+        (icon) => icon.getAttribute("data-icon"),
+      ),
+    ).toEqual(["User", "Bot"]);
 
     slot.lifecycle.unmount();
   });

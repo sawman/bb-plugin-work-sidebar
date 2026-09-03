@@ -131,7 +131,7 @@ function ActivityRow({
   expanded,
   onToggle,
 }: {
-  label: string;
+  label: "User" | "Agent";
   entry: { text: string; kind: string; createdAt?: number | null };
   expanded: boolean;
   onToggle(): void;
@@ -145,7 +145,10 @@ function ActivityRow({
       aria-expanded={expanded}
       onClick={onToggle}
     >
-      <span className="ws-activity-label">{label}</span>
+      <span className="ws-activity-label">
+        <Icon name={label === "User" ? "User" : "Bot"} aria-hidden />
+        <span className="ws-sr-only">{label}</span>
+      </span>
       {entry.kind === "command" ? (
         <code className="ws-activity-command">{entry.text}</code>
       ) : (

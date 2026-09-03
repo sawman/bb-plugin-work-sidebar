@@ -2493,7 +2493,7 @@ button.ws-provider-health:focus-visible {
 }
 .ws-status-card .ws-activity-item {
   display: grid;
-  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  grid-template-columns: 0.9rem minmax(0, 1fr) auto;
   width: 100%;
   align-items: start;
   gap: 0.2rem;
@@ -2507,10 +2507,16 @@ button.ws-provider-health:focus-visible {
   column-gap: 0.08rem;
 }
 .ws-status-card .ws-activity-label {
+  display: grid;
   align-self: center;
+  place-items: center;
   color: var(--muted-foreground);
   font: var(--ws-text-metadata);
   line-height: 1.25;
+}
+.ws-status-card .ws-activity-label > svg {
+  width: 0.72rem;
+  height: 0.72rem;
 }
 .ws-status-card .ws-activity-item:hover {
   color: var(--foreground);
