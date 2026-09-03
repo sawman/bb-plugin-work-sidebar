@@ -3,24 +3,37 @@ import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
 import { reorderTaskSiblings, type SidebarTask } from "../../work-model";
 import { queryKeys, workOutcomeQueryRoot } from "../../query-runtime";
+import type { TaskFactDirectory } from "./facts";
 
-type TaskList = { tasks: SidebarTask[] };
-type WorkOutcomeCache = {
-  executionTasks?: Array<{ id: string; assignee?: SidebarTask["assignee"] }>;
-};
+type TaskListReferences = { taskIds: string[] };
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 type TaskScope = "list" | "links" | "outcome";
+type TaskInvalidation = {
+  scope: TaskScope;
+  projectId?: string | null;
+};
 
 export const taskOptimisticMutationKey = ["tasks", "optimistic"] as const;
 const taskAssignmentMutationScope = { id: "tasks-assignment" };
 const taskReorderMutationScope = { id: "tasks-reorder" };
 
-const invalidationState = new WeakMap<QueryClient, { deferred: Set<TaskScope> }>();
+const invalidationState = new WeakMap<
+  QueryClient,
+  { deferred: Map<string, TaskInvalidation> }
+>();
+
+function invalidationId({ scope, projectId }: TaskInvalidation) {
+  const projectScope =
+    scope === "outcome" || projectId === undefined
+      ? "*"
+      : (projectId ?? "all");
+  return `${scope}:${projectScope}`;
+}
 
 function stateFor(queryClient: QueryClient) {
   let state = invalidationState.get(queryClient);
   if (!state) {
-    state = { deferred: new Set() };
+    state = { deferred: new Map() };
     invalidationState.set(queryClient, state);
   }
   return state;
@@ -30,22 +43,52 @@ function hasOtherOptimisticMutation(queryClient: QueryClient, settlingOptimistic
   return queryClient.isMutating({ mutationKey: taskOptimisticMutationKey }) > (settlingOptimistic ? 1 : 0);
 }
 
-export function invalidateTaskQueries(queryClient: QueryClient, scopes: readonly TaskScope[], settlingOptimistic = false) {
+export function invalidateTaskQueries(
+  queryClient: QueryClient,
+  scopes: readonly TaskScope[],
+  settlingOptimistic = false,
+  projectId?: string | null,
+) {
   const state = stateFor(queryClient);
+  const requested = scopes.map((scope): TaskInvalidation => ({
+    scope,
+    ...(scope === "outcome" || projectId === undefined ? {} : { projectId }),
+  }));
   if (hasOtherOptimisticMutation(queryClient, settlingOptimistic)) {
-    scopes.forEach((scope) => state.deferred.add(scope));
+    requested.forEach((invalidation) =>
+      state.deferred.set(invalidationId(invalidation), invalidation),
+    );
     return Promise.resolve();
   }
-  const finalScopes = [...new Set([...state.deferred, ...scopes])];
+  const finalInvalidations = new Map(state.deferred);
+  requested.forEach((invalidation) =>
+    finalInvalidations.set(invalidationId(invalidation), invalidation),
+  );
   state.deferred.clear();
-  return Promise.all(finalScopes.map((scope) => queryClient.invalidateQueries({
-    queryKey:
-      scope === "list"
-        ? queryKeys.sidebar.tasks.list()
-        : scope === "links"
-          ? queryKeys.sidebar.tasks.links()
-          : workOutcomeQueryRoot(),
-  })));
+  for (const scope of ["list", "links"] as const) {
+    const rootId = invalidationId({ scope });
+    if (!finalInvalidations.has(rootId)) continue;
+    for (const [id, invalidation] of finalInvalidations)
+      if (invalidation.scope === scope && id !== rootId)
+        finalInvalidations.delete(id);
+  }
+  return Promise.all(
+    [...finalInvalidations.values()].map(
+      ({ scope, projectId: scopeProjectId }) =>
+        queryClient.invalidateQueries({
+          queryKey:
+            scope === "list"
+              ? scopeProjectId === undefined
+                ? queryKeys.sidebar.tasks.list()
+                : queryKeys.sidebar.tasks.list(scopeProjectId)
+              : scope === "links"
+                ? scopeProjectId === undefined
+                  ? queryKeys.sidebar.tasks.links()
+                  : queryKeys.sidebar.tasks.links(scopeProjectId)
+                : workOutcomeQueryRoot(),
+        }),
+    ),
+  );
 }
 
 export const taskMutationPlan = {
@@ -58,46 +101,45 @@ export const taskMutationPlan = {
   reorder: { optimistic: true, rollback: true, cancel: ["list"], invalidate: ["list"] },
 } as const satisfies Record<string, { optimistic: boolean; rollback: boolean; cancel: readonly TaskScope[]; invalidate: readonly TaskScope[] }>;
 
-export function useTasksMutations(rpc: Rpc) {
+export function useTasksMutations(rpc: Rpc, projectId: string | null = null) {
   const queryClient = useQueryClient();
   const key = (scope: TaskScope) =>
     scope === "list"
-      ? queryKeys.sidebar.tasks.list()
+      ? queryKeys.sidebar.tasks.list(projectId)
       : scope === "links"
-        ? queryKeys.sidebar.tasks.links()
+        ? queryKeys.sidebar.tasks.links(projectId)
         : workOutcomeQueryRoot();
   const cancel = async (scopes: readonly TaskScope[]) => Promise.all(scopes.map((scope) => queryClient.cancelQueries({ queryKey: key(scope) })));
-  const settle = (scopes: readonly TaskScope[], settlingOptimistic = false) => invalidateTaskQueries(queryClient, scopes, settlingOptimistic);
-  const snapshot = () => queryClient.getQueryData<TaskList>(key("list"));
-  const rollbackAssignment = (taskId: string, assignee: SidebarTask["assignee"] | undefined) => {
-    if (!assignee) return;
-    queryClient.setQueryData<TaskList>(key("list"), (current) => current && {
-      ...current,
-      tasks: current.tasks.map((task) => task.id === taskId ? { ...task, assignee } : task),
+  const settle = (scopes: readonly TaskScope[], settlingOptimistic = false) => invalidateTaskQueries(queryClient, scopes, settlingOptimistic, projectId);
+  const factKey = queryKeys.sidebar.tasks.facts(projectId);
+  const snapshot = () => queryClient.getQueryData<TaskFactDirectory>(factKey);
+  const listedTaskIds = () =>
+    queryClient.getQueryData<TaskListReferences>(key("list"))?.taskIds ?? [];
+  const patchFact = (
+    taskId: string,
+    update: (
+      task: TaskFactDirectory["facts"][string],
+    ) => TaskFactDirectory["facts"][string],
+  ) => {
+    queryClient.setQueryData<TaskFactDirectory>(factKey, (current) => {
+      const task = current?.facts[taskId];
+      if (!current || !task) return current;
+      return {
+        ...current,
+        facts: { ...current.facts, [taskId]: update(task) },
+      };
     });
   };
-  const patchOutcomeAssignment = (
+  const rollbackAssignment = (
     taskId: string,
-    assignee: SidebarTask["assignee"],
+    assignee: SidebarTask["assignee"] | undefined,
   ) => {
-    queryClient.setQueriesData<WorkOutcomeCache>(
-      { queryKey: workOutcomeQueryRoot() },
-      (current) =>
-        current?.executionTasks
-          ? {
-              ...current,
-              executionTasks: current.executionTasks.map((task) =>
-                task.id === taskId ? { ...task, assignee } : task,
-              ),
-            }
-          : current,
-    );
+    if (!assignee) return;
+    patchFact(taskId, (task) => ({ ...task, assignee }));
   };
   const rollbackReorder = (positions: ReadonlyMap<string, number | undefined>) => {
-    queryClient.setQueryData<TaskList>(key("list"), (current) => current && {
-      ...current,
-      tasks: current.tasks.map((task) => positions.has(task.id) ? { ...task, position: positions.get(task.id) } : task),
-    });
+    for (const [taskId, position] of positions)
+      patchFact(taskId, (task) => ({ ...task, position }));
   };
 
   const create = useMutation({
@@ -131,21 +173,12 @@ export function useTasksMutations(rpc: Rpc) {
     onMutate: async ({ taskId, assignee }) => {
       await cancel(taskMutationPlan.assignment.cancel);
       const previous = snapshot();
-      const previousOutcomes = queryClient.getQueriesData<WorkOutcomeCache>({
-        queryKey: workOutcomeQueryRoot(),
-      });
-      const previousAssignee = previous?.tasks.find((task) => task.id === taskId)?.assignee;
-      queryClient.setQueryData<TaskList>(key("list"), (current) => current && {
-        ...current,
-        tasks: current.tasks.map((task) => task.id === taskId ? { ...task, assignee } : task),
-      });
-      patchOutcomeAssignment(taskId, assignee);
-      return { previousAssignee, previousOutcomes };
+      const previousAssignee = previous?.facts[taskId]?.assignee;
+      patchFact(taskId, (task) => ({ ...task, assignee }));
+      return { previousAssignee };
     },
     onError: (_error, { taskId }, context) => {
       rollbackAssignment(taskId, context?.previousAssignee);
-      for (const [queryKey, value] of context?.previousOutcomes ?? [])
-        queryClient.setQueryData(queryKey, value);
     },
     onSettled: () => settle(taskMutationPlan.assignment.invalidate, true),
   });
@@ -156,16 +189,24 @@ export function useTasksMutations(rpc: Rpc) {
     onMutate: async ({ taskId, beforeTaskId, afterTaskId }) => {
       await cancel(taskMutationPlan.reorder.cancel);
       const previous = snapshot();
-      const source = previous?.tasks.find((task) => task.id === taskId);
-      const previousPositions = new Map((previous?.tasks ?? [])
+      const listedTasks = listedTaskIds().flatMap((id): SidebarTask[] => {
+        const fact = previous?.facts[id];
+        return fact ? [{ ...fact, linkedThreadIds: [] }] : [];
+      });
+      const source = listedTasks.find((task) => task.id === taskId);
+      const previousPositions = new Map(listedTasks
         .filter((task) => source && task.projectId === source.projectId && task.status === source.status && task.parentTaskId === source.parentTaskId)
         .map((task) => [task.id, task.position]));
-      if (previous) {
+      if (source) {
         const targetId = beforeTaskId ?? afterTaskId;
-        if (targetId) queryClient.setQueryData<TaskList>(key("list"), {
-          ...previous,
-          tasks: reorderTaskSiblings(previous.tasks, taskId, targetId, beforeTaskId ? "before" : "after"),
-        });
+        if (targetId)
+          for (const task of reorderTaskSiblings(
+            listedTasks,
+            taskId,
+            targetId,
+            beforeTaskId ? "before" : "after",
+          ))
+            patchFact(task.id, (fact) => ({ ...fact, position: task.position }));
       }
       return { previousPositions };
     },

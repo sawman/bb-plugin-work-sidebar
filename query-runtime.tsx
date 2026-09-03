@@ -20,6 +20,8 @@ export const workOutcomeQueryRoot = (): QueryKey => [
   "outcome",
 ];
 
+const taskProjectScope = (projectId: string | null) => projectId ?? "all";
+
 export const queryKeys = {
   assets: {
     providerLogo: (logoUrl: string): QueryKey => [
@@ -40,8 +42,27 @@ export const queryKeys = {
   sidebar: {
     order: (): QueryKey => [...pluginQueryRoot, "sidebar", "order"],
     tasks: {
-      list: (): QueryKey => [...pluginQueryRoot, "sidebar", "tasks", "list"],
-      links: (): QueryKey => [...pluginQueryRoot, "sidebar", "tasks", "links"],
+      list: (projectId?: string | null): QueryKey => [
+        ...pluginQueryRoot,
+        "sidebar",
+        "tasks",
+        "list",
+        ...(projectId === undefined ? [] : [taskProjectScope(projectId)]),
+      ],
+      links: (projectId?: string | null): QueryKey => [
+        ...pluginQueryRoot,
+        "sidebar",
+        "tasks",
+        "links",
+        ...(projectId === undefined ? [] : [taskProjectScope(projectId)]),
+      ],
+      facts: (projectId: string | null): QueryKey => [
+        ...pluginQueryRoot,
+        "sidebar",
+        "tasks",
+        "facts",
+        taskProjectScope(projectId),
+      ],
     },
   },
   work: {
@@ -132,6 +153,18 @@ export const queryPolicies = {
     gcTime: 10 * 60_000,
     retry: 1,
     refetchOnWindowFocus: false,
+  },
+  taskFactDirectory: {
+    // The directory is hydrated by task-bearing RPC queries. It never fetches
+    // independently and is retained only long enough to bridge mounted BB
+    // surfaces and short tab transitions.
+    staleTime: Infinity,
+    // Outlive the 10-minute source-reference caches so a remount cannot
+    // briefly resolve live task IDs against an already-collected directory.
+    gcTime: 30 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   },
   queuedMessages: {
     // Queue changes publish exact realtime signals. The active sidebar adds a

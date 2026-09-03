@@ -45,6 +45,7 @@ const EMPTY_SELECTED_IDS = new Set<string>();
 
 export interface TasksLeftSidebarProps {
   active: boolean;
+  projectId: string | null;
   activeThreadId: string | null;
   taskLinks: Readonly<Record<string, readonly ThreadTaskLink[]>>;
   ownerThreads: ReadonlyMap<
@@ -59,6 +60,7 @@ export interface TasksLeftSidebarProps {
 /** The Tasks slice owns task queries, mutations, selection, drag state, and composer UI. */
 export function TasksLeftSidebar({
   active,
+  projectId: factProjectId,
   activeThreadId,
   taskLinks,
   ownerThreads,
@@ -67,9 +69,11 @@ export function TasksLeftSidebar({
   settingsControl,
 }: TasksLeftSidebarProps) {
   const rpc = useRpc<typeof rpcContract>();
-  const { data, isPending, isError, error, refetch } = useTasksRead();
+  const { data, isPending, isError, error, refetch } = useTasksRead({
+    projectId: factProjectId,
+  });
   useTasksRealtimeInvalidation();
-  const mutations = useTasksMutations(rpc);
+  const mutations = useTasksMutations(rpc, factProjectId);
   const tasks = data?.tasks ?? EMPTY_TASKS;
   const projects = data?.projects ?? [];
   const [composerOpen, setComposerOpen] = useState(false);

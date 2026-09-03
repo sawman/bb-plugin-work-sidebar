@@ -6,13 +6,19 @@ import { AgentDurationClock, AgentRow } from "./agent-row";
 import { projectAgentChildren } from "./model";
 import { useAgentDetails } from "./queries";
 
-export function AgentsView({ threadId }: { threadId: string }) {
+export function AgentsView({
+  threadId,
+  projectId,
+}: {
+  threadId: string;
+  projectId: string | null;
+}) {
   const hostThreads = experimental_useSidebarThreads();
   // The Threads controller owns the single visible polling observer. Agents
   // still observe the shared cache for annotations but never add another
   // 30-second poller.
-  const taskLinks = useTaskLinksRead({ poll: false });
-  const outcome = useWorkOutcome(threadId);
+  const taskLinks = useTaskLinksRead({ projectId, poll: false });
+  const outcome = useWorkOutcome(threadId, projectId);
   const children = useMemo(
     () => projectAgentChildren(hostThreads.threads, threadId),
     [hostThreads.threads, threadId],

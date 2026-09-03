@@ -5,11 +5,20 @@ import {
   type QueryClient,
 } from "@tanstack/react-query";
 import { useRpc } from "@get-bb/plugin-sdk/app";
+import { useMemo } from "react";
 import type { rpcContract } from "../../contracts";
 import type { rpcSchemas } from "../../contracts.schemas";
 import type { z } from "zod";
 import { queryKeys, queryPolicies } from "../../query-runtime";
 import { shouldPollWorkActivity } from "./model";
+import {
+  adaptWorkOutcomeResponse,
+  resolveWorkOutcome,
+} from "../tasks/facts";
+import {
+  hydrateTaskFacts,
+  useSharedTaskFactDirectory,
+} from "../tasks/queries";
 
 type WorkStatus = z.infer<typeof rpcSchemas.getWorkStatus.output>;
 type WorkOutcome = z.infer<typeof rpcSchemas.getWorkOutcome.output>;
@@ -20,7 +29,7 @@ type WorkBackgroundJobs = z.infer<
   typeof rpcSchemas.getWorkBackgroundJobs.output
 >;
 
-type WorkQueryKey = "status" | "outcome" | "goal" | "plan";
+type WorkQueryKey = "goal" | "plan";
 
 /** Shared cadence for durable Work-card data while the Work tab is visible. */
 export const WORK_CARD_REFRESH_MS = 30_000;
@@ -28,7 +37,7 @@ export const WORK_CARD_REFRESH_MS = 30_000;
 function useWorkContextCard<T>(
   threadId: string,
   key: WorkQueryKey,
-  method: "getWorkStatus" | "getWorkOutcome" | "getWorkGoal" | "getWorkPlan",
+  method: "getWorkGoal" | "getWorkPlan",
 ) {
   const rpc = useRpc<typeof rpcContract>();
   return useQuery({
@@ -76,8 +85,38 @@ export function useLatestActivity(
         : false,
   });
 }
-export const useWorkOutcome = (threadId: string) =>
-  useWorkContextCard<WorkOutcome>(threadId, "outcome", "getWorkOutcome");
+export function useWorkOutcome(
+  threadId: string,
+  projectId: string | null = null,
+) {
+  const rpc = useRpc<typeof rpcContract>();
+  const queryClient = useQueryClient();
+  const directory = useSharedTaskFactDirectory(projectId);
+  const query = useQuery({
+    queryKey: queryKeys.work.outcome(threadId),
+    queryFn: async () => {
+      const result = await rpc.call("getWorkOutcome", { threadId });
+      const adapted = adaptWorkOutcomeResponse(result);
+      hydrateTaskFacts(queryClient, projectId, adapted.facts);
+      return adapted.references;
+    },
+    ...queryPolicies.workContext,
+    refetchOnMount: "always",
+    refetchInterval: WORK_CARD_REFRESH_MS,
+    refetchIntervalInBackground: false,
+  });
+  const data = useMemo(
+    () =>
+      query.data
+        ? (resolveWorkOutcome(query.data, directory.data) as WorkOutcome)
+        : undefined,
+    [directory.data, query.data],
+  );
+  return {
+    ...query,
+    data,
+  };
+}
 export function useWorkItemQueue(threadId: string) {
   const rpc = useRpc<typeof rpcContract>();
   return useQuery({

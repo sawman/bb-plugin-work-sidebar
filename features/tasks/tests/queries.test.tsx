@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { rpcContract } from "../../../contracts";
-import { getPluginQueryClient, queryKeys } from "../../../query-runtime";
+import { getPluginQueryClient, queryKeys, queryPolicies } from "../../../query-runtime";
+import type { TaskFactDirectory } from "../facts";
 
 type RpcHandlers = NonNullable<RenderSlotOptions<typeof rpcContract>["rpc"]>;
 type TasksResult = Awaited<ReturnType<RpcHandlers["sidebarTasks"]>>;
@@ -19,10 +20,17 @@ const task = {
   priority: "none" as const,
   dueDate: null,
   parentTaskId: null,
+  updatedAt: "2026-09-04T01:00:00.000Z",
   position: 1024,
   linkedThreadIds: ["thr_test"],
   assignee: "human" as const,
 };
+const {
+  linkedThreadIds: _linkedThreadIds,
+  assignee: _assignee,
+  position: _position,
+  ...taskSummary
+} = task;
 const emptyTasks: TasksResult = {
   available: true,
   tasks: [],
@@ -354,14 +362,127 @@ describe("Tasks read slots", () => {
     expect(
       getPluginQueryClient()
         .getQueryCache()
-        .find({ queryKey: queryKeys.sidebar.tasks.list() })
+        .find({ queryKey: queryKeys.sidebar.tasks.list(null) })
         ?.getObserversCount(),
     ).toBe(0);
     expect(
       getPluginQueryClient()
         .getQueryCache()
-        .find({ queryKey: queryKeys.sidebar.tasks.links() })
+        .find({ queryKey: queryKeys.sidebar.tasks.links(null) })
         ?.getObserversCount(),
     ).toBe(0);
+  });
+
+  it("shares one project TaskFact directory across Tasks, Work, bindings, and Agents with bounded cleanup", async () => {
+    const projectId = "project_scope";
+    const tasks = vi.fn<RpcHandlers["sidebarTasks"]>(() => populatedTasks);
+    const links = vi.fn<RpcHandlers["sidebarTaskLinks"]>(() => ({
+      available: true,
+      links: {
+        thr_child: [{
+          task: taskSummary,
+          threadId: "thr_child",
+          threadTitle: "Child worker",
+          liveStatus: "working",
+          role: "execution",
+          mode: "delegated",
+          idempotencyKey: "child-1",
+          dispatchState: "ready",
+        }],
+      },
+      error: null,
+    }));
+    const captured = await app();
+    const rpc = {
+      ...rpcFixtures(tasks, links),
+      getWorkOutcome: () => ({
+        rootThreadId: "thr_test",
+        tasksAvailable: true,
+        outcome: null,
+        executionTasks: [{ ...taskSummary, assignee: "human" as const }],
+        bindings: [{
+          rootThreadId: "thr_test",
+          outcomeTaskId: "outcome_1",
+          taskProjectId: "project_1",
+          executionTaskId: "task_1",
+          ownerThreadId: "thr_child",
+          mode: "delegated" as const,
+          idempotencyKey: "child-1",
+          dispatchState: "ready" as const,
+          recoveryMessage: null,
+        }],
+        legacy: { state: "none" as const, taskIds: [], message: null },
+      }),
+    } as RpcHandlers;
+    const left = renderSlot(captured.threadLists[0]!, {
+      ...leftProps(),
+      activeProjectId: projectId,
+    }, {
+      rpc,
+      context: { projectId, threadId: "thr_test" },
+    });
+    fireEvent.click(left.getByRole("button", { name: "Tasks" }));
+    await waitFor(() => expect(left.getByText("Ship mounted fixtures")).toBeTruthy());
+
+    const right = renderSlot(captured.threadPanelActions[0]!, {
+      threadId: "thr_test",
+      params: null,
+    }, {
+      rpc,
+      context: { projectId, threadId: "thr_test" },
+      sidebarThreads: {
+        status: "ready",
+        threads: [],
+      },
+    });
+    await waitFor(() => expect(right.getByText("Ship mounted fixtures")).toBeTruthy());
+    expect(tasks).toHaveBeenCalledTimes(1);
+
+    const directory = getPluginQueryClient().getQueryData<TaskFactDirectory>(
+      queryKeys.sidebar.tasks.facts(projectId),
+    );
+    expect(directory?.facts.task_1).toMatchObject({
+      key: "WORK-1",
+      title: "Ship mounted fixtures",
+    });
+    expect(getPluginQueryClient().getQueryData(
+      queryKeys.sidebar.tasks.list(projectId),
+    )).toMatchObject({
+      taskIds: ["task_1"],
+      relationships: [{ taskId: "task_1", linkedThreadIds: ["thr_test"] }],
+    });
+    const cachedOutcome = getPluginQueryClient().getQueryData<Record<string, unknown>>(
+      queryKeys.work.outcome("thr_test"),
+    );
+    expect(cachedOutcome).toMatchObject({
+      outcomeTaskId: null,
+      executionTaskIds: ["task_1"],
+      bindings: [{ executionTaskId: "task_1", ownerThreadId: "thr_child" }],
+    });
+    expect(cachedOutcome).not.toHaveProperty("outcome");
+    expect(cachedOutcome).not.toHaveProperty("executionTasks");
+
+    fireEvent.click(right.getByRole("tab", { name: "Agents" }));
+    await waitFor(() => expect(links).toHaveBeenCalled());
+    let cachedLinks: {
+      links: Record<string, Array<Record<string, unknown>>>;
+    } | undefined;
+    await waitFor(() => {
+      cachedLinks = getPluginQueryClient().getQueryData(
+        queryKeys.sidebar.tasks.links(projectId),
+      );
+      expect(cachedLinks?.links.thr_child?.[0]).toMatchObject({
+        taskId: "task_1",
+      });
+    });
+    expect(cachedLinks?.links.thr_child?.[0]).toMatchObject({ taskId: "task_1" });
+    expect(cachedLinks?.links.thr_child?.[0]).not.toHaveProperty("task");
+
+    right.lifecycle.unmount();
+    left.lifecycle.unmount();
+    expect(queryPolicies.taskFactDirectory.gcTime).toBeGreaterThan(0);
+    expect(getPluginQueryClient().getQueryCache().find({
+      queryKey: queryKeys.sidebar.tasks.facts(projectId),
+    })?.getObserversCount()).toBe(0);
   });
 });

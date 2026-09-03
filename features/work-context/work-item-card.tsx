@@ -60,16 +60,18 @@ type WorkQueueValue = {
 
 export function WorkItemCard({
   threadId,
+  projectId,
   tasks,
   taskMutations,
   tracker,
 }: {
   threadId: string;
+  projectId: string | null;
   tasks: TasksRead;
   taskMutations: TasksMutations;
   tracker: TrackerRead;
 }) {
-  const query = useWorkOutcome(threadId);
+  const query = useWorkOutcome(threadId, projectId);
   const workStatus = useWorkStatus(threadId);
   const mutation = useWorkOutcomeMutation(threadId);
   const queueQuery = useWorkItemQueue(threadId);

@@ -77,7 +77,9 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   );
   // Sole task-links observer, including native mode: Agents and WorkThreadTree share one
   // cache and polling owner rather than creating per-consumer intervals.
-  const { data: taskLinksData, refetch: refetchTaskLinks } = useTaskLinksRead();
+  const { data: taskLinksData, refetch: refetchTaskLinks } = useTaskLinksRead({
+    projectId: props.activeProjectId,
+  });
   const [threadSearchQuery, setThreadSearchQuery] = useState("");
   const [subtextRefreshKey, setSubtextRefreshKey] = useState(0);
   const providersById = useMemo(
@@ -285,6 +287,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
         />
         <TasksLeftSidebar
           active={view === "queue"}
+          projectId={props.activeProjectId}
           activeThreadId={props.activeThreadId}
           taskLinks={taskLinks}
           ownerThreads={taskOwnerThreads}

@@ -47,6 +47,13 @@ describe("R2 app registration and Query lifecycle", () => {
       "tasks",
       "links",
     ]);
+    expect(queryKeys.sidebar.tasks.facts("project_1")).toEqual([
+      "work-sidebar",
+      "sidebar",
+      "tasks",
+      "facts",
+      "project_1",
+    ]);
     expect(queryKeys.work.status("thr_test")).toEqual([
       "work-sidebar",
       "work",
@@ -154,12 +161,13 @@ describe("R2 app registration and Query lifecycle", () => {
     // Changes owns no cache entries until its tab mounts the panel; once
     // selected, the file query remains hook-stable and disabled until opened.
     // Work-item queue is independently cacheable from the outcome and task
-    // projections, so mounted Work now owns one additional query entry.
+    // projections. The mounted surfaces also share one project TaskFact
+    // directory rather than caching task fields in every relationship query.
     // The plugin-managed Recycle Bin, queued-message state, and the single
     // roster-wide PR directory and normalized fact directory are durable
     // sidebar reads. Queue changes arrive through realtime; PR consumers
     // observe these one-way Query entries.
-    expect(client.getQueryCache().getAll()).toHaveLength(23);
+    expect(client.getQueryCache().getAll()).toHaveLength(24);
     expect(
       client
         .getQueryCache()
@@ -237,15 +245,21 @@ describe("R2 app registration and Query lifecycle", () => {
     expect(
       client
         .getQueryCache()
-        .find({ queryKey: queryKeys.sidebar.tasks.list() })
+        .find({ queryKey: queryKeys.sidebar.tasks.list(null) })
         ?.getObserversCount(),
     ).toBe(2);
     expect(
       client
         .getQueryCache()
-        .find({ queryKey: queryKeys.sidebar.tasks.links() })
+        .find({ queryKey: queryKeys.sidebar.tasks.links(null) })
         ?.getObserversCount(),
     ).toBe(1);
+    expect(
+      client
+        .getQueryCache()
+        .find({ queryKey: queryKeys.sidebar.tasks.facts(null) })
+        ?.getObserversCount(),
+    ).toBe(4);
     expect(
       client
         .getQueryCache()

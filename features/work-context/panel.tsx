@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useStore } from "zustand";
 import {
   useRealtime,
+  useBbContext,
   type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
 import { RefreshButton } from "../../components/ui/refresh-button";
@@ -65,6 +66,7 @@ function queueRootEvent(scope: WorkPanelScope, rootThreadId: string) {
 
 export function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const queryClient = useQueryClient();
+  const { projectId } = useBbContext();
   const appearance = useSidebarAppearancePreferences();
   const tab = useStore(
     threadInteractionStore,
@@ -171,7 +173,9 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
           hidden={tab !== "work"}
           tabIndex={0}
         >
-          {tab === "work" && <WorkTabContent threadId={threadId} />}
+          {tab === "work" && (
+            <WorkTabContent threadId={threadId} projectId={projectId} />
+          )}
         </div>
         <div
           className="ws-panel-body"
@@ -191,17 +195,31 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
           hidden={tab !== "agents"}
           tabIndex={0}
         >
-          {tab === "agents" && <AgentsView threadId={threadId} />}
+          {tab === "agents" && (
+            <AgentsView threadId={threadId} projectId={projectId} />
+          )}
         </div>
       </div>
     </TextScaleProvider>
   );
 }
 
-function WorkTabContent({ threadId }: { threadId: string }) {
+function WorkTabContent({
+  threadId,
+  projectId,
+}: {
+  threadId: string;
+  projectId: string | null;
+}) {
   // Tracker data is displayed only by the Work tab. Mounting its observer here
   // lets inactive Changes and Agents tabs retain the warm cache without a live
   // query subscription.
   const tracker = useTracker(threadId);
-  return <WorkContextCards threadId={threadId} tracker={tracker} />;
+  return (
+    <WorkContextCards
+      threadId={threadId}
+      projectId={projectId}
+      tracker={tracker}
+    />
+  );
 }
