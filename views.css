@@ -19,8 +19,9 @@
   white-space: nowrap;
 }
 .ws-sidebar-row-title.ws-thread-attention {
-  font: var(--ws-text-title);
-  line-height: inherit;
+  /* Attention changes weight only: title metrics must not move the row. */
+  font: var(--ws-text-primary-attention);
+  line-height: 1.2;
 }
 .ws-sidebar-row-meta {
   display: flex;
@@ -3899,6 +3900,8 @@ button.ws-provider-health:focus-visible {
   --ws-text-code-weight: var(--font-weight-normal, 400);
   --ws-text-primary: var(--ws-text-primary-weight) var(--ws-text-primary-size) /
     normal var(--ws-text-font-family);
+  --ws-text-primary-attention: var(--ws-text-title-weight)
+    var(--ws-text-primary-size) / normal var(--ws-text-font-family);
   --ws-text-title: var(--ws-text-title-weight) var(--ws-text-title-size) /
     normal var(--ws-text-font-family);
   --ws-text-subtext: var(--ws-text-subtext-weight) var(--ws-text-subtext-size) /

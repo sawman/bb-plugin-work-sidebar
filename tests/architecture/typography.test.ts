@@ -175,6 +175,19 @@ describe("semantic typography architecture", () => {
       expect(scope?.[2]).toContain(`--ws-text-${role}-size:`);
       expect(scope?.[2]).toContain(`--ws-text-${role}:`);
     }
+    expect(scope?.[2]).toContain("--ws-text-primary-attention:");
+  });
+
+  test("keeps an attention title in the primary row geometry", () => {
+    const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    const tokenBlock = typographyTokenBlock(source);
+
+    expect(tokenBlock).toContain(
+      "--ws-text-primary-attention: var(--ws-text-title-weight)\n    var(--ws-text-primary-size)",
+    );
+    expect(source).toMatch(
+      /\.ws-sidebar-row-title\.ws-thread-attention\s*\{[\s\S]*?font:\s*var\(--ws-text-primary-attention\);[\s\S]*?line-height:\s*1\.2;/,
+    );
   });
 
   test("keeps the smallest scaled role above the accessibility floor", () => {
