@@ -78,6 +78,28 @@ function undocumentedImportantDeclarations(path: string, source: string) {
 }
 
 describe("stylesheet policy", () => {
+  test("uses BB diff hues for non-error positive and negative states", () => {
+    const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    const rule = (selector: string) =>
+      source.match(new RegExp(`${selector}\\s*\\{([\\s\\S]*?)\\}`))?.[1];
+
+    expect(rule("\\.ws-file-added")).toContain("color: var(--diff-added)");
+    expect(rule("\\.ws-file-deleted")).toContain("color: var(--diff-removed)");
+    expect(rule("\\.ws-outcome-status-done")).toContain("color: var(--diff-added)");
+    expect(rule("\\.ws-outcome-status-canceled")).toContain("color: var(--diff-removed)");
+    expect(rule("\\.ws-agent-state-complete")).toContain("color: var(--diff-added)");
+    expect(rule("\\.ws-runtime-state-complete")).toContain("color: var(--diff-added)");
+    expect(rule('\\.ws-status\\[data-tone="closed"\\]')).toContain(
+      "color: var(--diff-removed)",
+    );
+    expect(rule('\\.ws-status\\[data-tone="destructive"\\]')).toContain(
+      "color: var(--destructive)",
+    );
+    expect(rule("\\.ws-task-priority-urgent,\\n\\.ws-task-priority-high")).toContain(
+      "color: var(--warning-text)",
+    );
+  });
+
   test("uses equal metadata columns for every shared change delta pair", () => {
     const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
     const pair = source.match(/\.ws-line-deltas\s*\{([\s\S]*?)\}/)?.[1];

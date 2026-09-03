@@ -84,7 +84,7 @@
   color: var(--destructive);
 }
 .ws-thread-provider[data-runtime-state="complete"] {
-  color: var(--success);
+  color: var(--diff-added);
 }
 .ws-thread-provider-glyph {
   position: relative;
@@ -805,7 +805,7 @@
   color: var(--ring);
 }
 .ws-task-status-canceled {
-  color: var(--destructive);
+  color: var(--diff-removed);
 }
 .ws-task-children {
   grid-column: 1 / -1;
@@ -1159,7 +1159,7 @@
   color: var(--warning);
 }
 .ws-thread-group-activity[data-tone="completed"] {
-  color: var(--success);
+  color: var(--diff-added);
 }
 .ws-thread-group-activity[data-tone="working"] {
   color: var(--foreground);
@@ -1394,17 +1394,19 @@
 .ws-thread-pr-token[data-tone="success"],
 .ws-pr-number-badge[data-tone="open"],
 .ws-pr-number-badge[data-tone="success"] {
-  color: var(--success);
+  color: var(--diff-added);
 }
 .ws-thread-pr-token[data-tone="draft"],
 .ws-pr-number-badge[data-tone="draft"] {
   color: var(--muted-foreground);
 }
 .ws-thread-pr-token[data-tone="destructive"],
-.ws-thread-pr-token[data-tone="closed"],
-.ws-pr-number-badge[data-tone="destructive"],
-.ws-pr-number-badge[data-tone="closed"] {
+.ws-pr-number-badge[data-tone="destructive"] {
   color: var(--destructive);
+}
+.ws-thread-pr-token[data-tone="closed"],
+.ws-pr-number-badge[data-tone="closed"] {
+  color: var(--diff-removed);
 }
 .ws-thread-pr-token[data-tone="merged"],
 .ws-pr-number-badge[data-tone="merged"] {
@@ -1765,10 +1767,10 @@ button.ws-change-file-row:hover {
   line-height: inherit;
 }
 .ws-file-added {
-  color: var(--success);
+  color: var(--diff-added);
 }
 .ws-file-deleted {
-  color: var(--destructive);
+  color: var(--diff-removed);
 }
 .ws-file-modified,
 .ws-file-renamed {
@@ -2137,10 +2139,10 @@ button.ws-change-file-row:hover {
   color: var(--primary);
 }
 .ws-outcome-status-done {
-  color: var(--success);
+  color: var(--diff-added);
 }
 .ws-outcome-status-canceled {
-  color: var(--destructive);
+  color: var(--diff-removed);
 }
 .ws-outcome-status-updating svg {
   animation: ws-status-runtime-spin 1.2s linear infinite;
@@ -2210,7 +2212,7 @@ button.ws-change-file-row:hover {
   animation: ws-agent-blocked-nudge 1.8s ease-in-out infinite;
 }
 .ws-agent-state-complete {
-  color: var(--success);
+  color: var(--diff-added);
 }
 @keyframes ws-agent-working-bounce {
   0%,
@@ -2441,7 +2443,7 @@ button.ws-change-file-row:hover {
   display: block;
   width: var(--ws-provider-usage);
   height: 100%;
-  background: var(--success);
+  background: var(--diff-added);
 }
 .ws-provider-usage-track[data-tone="warning"] .ws-provider-usage-fill {
   background: var(--warning);
@@ -2470,7 +2472,7 @@ button.ws-provider-health:focus-visible {
   outline-offset: 2px;
 }
 .ws-provider-health-green {
-  color: var(--success);
+  color: var(--diff-added);
 }
 .ws-provider-health-amber {
   color: var(--warning);
@@ -2535,7 +2537,7 @@ button.ws-provider-health:focus-visible {
   color: var(--destructive);
 }
 .ws-runtime-state-complete {
-  color: var(--success);
+  color: var(--diff-added);
 }
 @keyframes ws-status-runtime-spin {
   to {
@@ -2869,11 +2871,13 @@ button.ws-provider-health:focus-visible {
 }
 .ws-status[data-tone="open"],
 .ws-status[data-tone="success"] {
-  color: var(--success);
+  color: var(--diff-added);
 }
-.ws-status[data-tone="destructive"],
-.ws-status[data-tone="closed"] {
+.ws-status[data-tone="destructive"] {
   color: var(--destructive);
+}
+.ws-status[data-tone="closed"] {
+  color: var(--diff-removed);
 }
 .ws-status[data-tone="warning"] {
   color: var(--warning);
@@ -3600,7 +3604,7 @@ button.ws-provider-health:focus-visible {
 }
 .ws-task-priority-urgent,
 .ws-task-priority-high {
-  color: var(--destructive);
+  color: var(--warning-text);
 }
 .ws-task-priority-medium {
   color: var(--warning);

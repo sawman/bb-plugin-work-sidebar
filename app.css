@@ -84,7 +84,7 @@
   white-space: nowrap;
 }
 .ws-pr-changes_requested {
-  color: var(--destructive);
+  color: var(--warning-text);
 }
 .ws-rename {
   padding: 0.35rem;
