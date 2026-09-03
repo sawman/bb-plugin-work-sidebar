@@ -10,6 +10,7 @@ export type PullRequestReviewState =
   | "none";
 export type PullRequestState = "closed" | "draft" | "merged" | "open";
 export type PullRequestAttention =
+  | "approved"
   | "blocked"
   | "changes_requested"
   | "checks_failed"
@@ -68,10 +69,15 @@ export function pullRequestPresentation(input: {
     return { icon: "Wrench", label: "Changes requested", tone: "closed" };
   if (input.attention === "review_requested")
     return { icon: "Eye", label: "Review requested", tone: "warning" };
+  if (input.attention === "approved")
+    return { icon: "Check", label: "Approved", tone: "success" };
   return { icon: "Eye", label: "Review pending", tone: "open" };
 }
 
-/** Resolve a complete PR fact consistently, keeping non-signal blockers intact. */
+/**
+ * The one status matrix shared by PR, Thread, and Changes views. Signals own
+ * review/check state; the aggregate preserves only branch-only conflicts.
+ */
 export function pullRequestSummaryPresentation(input: {
   state: PullRequestState;
   draft: boolean;
@@ -82,15 +88,14 @@ export function pullRequestSummaryPresentation(input: {
   const signalAttention = input.signal
     ? pullRequestAttentionFromSignal(input.signal)
     : null;
+  const aggregateAttention =
+    input.attention && input.attention !== "none" ? input.attention : null;
+  // A current signal supersedes an aggregate review/check summary. This also
+  // prevents an older "none" aggregate from hiding an Approved review.
   const attention =
-    // The authored aggregate can briefly retain changes_requested after a
-    // reviewer has been requested again. The review signal is the newer fact
-    // in that case; other explicit attention states still take precedence.
-    input.attention === "changes_requested" &&
-    (input.signal?.review === "review_requested" ||
-      input.signal?.review === "review_required")
-      ? (signalAttention ?? input.attention)
-      : (input.attention ?? signalAttention);
+    aggregateAttention === "conflicts"
+      ? aggregateAttention
+      : (signalAttention ?? aggregateAttention);
   return pullRequestPresentation({
     state: input.state,
     draft: input.draft,
@@ -102,15 +107,16 @@ export function pullRequestSummaryPresentation(input: {
 export function pullRequestAttentionFromSignal(
   signal: Pick<PullRequestSignal, "checks" | "review">,
 ): PullRequestAttention {
-  if (signal.review === "changes_requested") return "changes_requested";
   if (signal.checks === "failed") return "checks_failed";
-  if (
-    (signal.checks === "passing" || signal.checks === "none") &&
-    signal.review === "approved"
-  )
-    return "ready_to_merge";
   if (signal.checks === "pending") return "checks_pending";
-  return "review_requested";
+  if (signal.review === "review_requested" || signal.review === "review_required")
+    return "review_requested";
+  if (signal.review === "changes_requested") return "changes_requested";
+  if (signal.review === "approved")
+    return signal.checks === "passing" || signal.checks === "none"
+      ? "ready_to_merge"
+      : "approved";
+  return "none";
 }
 
 export function isVisibleAuthoredPullRequest(input: {

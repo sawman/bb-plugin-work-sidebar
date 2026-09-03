@@ -473,13 +473,13 @@ describe("pull-request stack number presentation", () => {
   });
 
   it.each([
-    ["Draft", "draft", "GitPullRequest", { draft: true, attention: "draft" }],
-    ["Review requested", "warning", "Eye", { draft: false, attention: "review_requested" }],
-    ["CI failure", "destructive", "X", { draft: false, attention: "checks_failed" }],
-    ["Changes requested", "closed", "Wrench", { draft: false, attention: "changes_requested" }],
-    ["Conflicts", "destructive", "X", { draft: false, attention: "conflicts" }],
-    ["Ready to merge", "success", "Check", { draft: false, attention: "ready_to_merge" }],
-  ])(
+    ["Draft", "draft", "GitPullRequest", { draft: true, attention: "draft", checks: "passing", review: "approved" }],
+    ["Review requested", "warning", "Eye", { draft: false, attention: "review_requested", checks: "none", review: "review_requested" }],
+    ["CI failure", "destructive", "X", { draft: false, attention: "checks_failed", checks: "failed", review: "none" }],
+    ["Changes requested", "closed", "Wrench", { draft: false, attention: "changes_requested", checks: "passing", review: "changes_requested" }],
+    ["Conflicts", "destructive", "X", { draft: false, attention: "conflicts", checks: "passing", review: "approved" }],
+    ["Ready to merge", "success", "Check", { draft: false, attention: "ready_to_merge", checks: "passing", review: "approved" }],
+  ] as const)(
     "exposes the %s status label, tone, and icon from the PR badge",
     (label, tone, icon, state) => {
       const { unmount } = render(
@@ -494,8 +494,8 @@ describe("pull-request stack number presentation", () => {
             attention: state.attention,
             head: "feature/status-badge",
             base: "main",
-            checks: "passing",
-            review: "approved",
+            checks: state.checks,
+            review: state.review,
             reviewCommentCount: 0,
           }}
           changingDraft={false}

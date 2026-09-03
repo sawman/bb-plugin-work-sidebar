@@ -9,6 +9,7 @@ import {
   pullRequestAttentionFromSignal,
   pullRequestPresentation,
   pullRequestSignalPresentation,
+  pullRequestSummaryPresentation,
 } from "../presentation";
 
 describe("pull-request presentation semantics", () => {
@@ -225,6 +226,7 @@ describe("pull-request presentation semantics", () => {
       { icon: "Eye", label: "Review requested", tone: "warning" },
     ],
     ["none", { icon: "Eye", label: "Review pending", tone: "open" }],
+    ["approved", { icon: "Check", label: "Approved", tone: "success" }],
   ] as const)(
     "preserves open attention %s after state precedence",
     (attention, expected) => {
@@ -259,8 +261,12 @@ describe("pull-request presentation semantics", () => {
       "checks_pending",
     ],
     [
+      { checks: "unknown", review: "approved", reviewCommentCount: 0 },
+      "approved",
+    ],
+    [
       { checks: "none", review: "none", reviewCommentCount: 0 },
-      "review_requested",
+      "none",
     ],
   ] as const)(
     "derives the summary badge state from CI and review signals",
@@ -268,6 +274,25 @@ describe("pull-request presentation semantics", () => {
       expect(pullRequestAttentionFromSignal(signal)).toBe(expected);
     },
   );
+
+  it("lets a current approved signal supersede stale aggregate attention", () => {
+    expect(
+      pullRequestSummaryPresentation({
+        state: "open",
+        draft: false,
+        attention: "none",
+        signal: { checks: "unknown", review: "approved" },
+      }),
+    ).toEqual({ icon: "Check", label: "Approved", tone: "success" });
+    expect(
+      pullRequestSummaryPresentation({
+        state: "open",
+        draft: false,
+        attention: "changes_requested",
+        signal: { checks: "passing", review: "review_required" },
+      }),
+    ).toEqual({ icon: "Eye", label: "Review requested", tone: "warning" });
+  });
 
   it("excludes archived repositories and exposes review counts to assistive technology", () => {
     expect(

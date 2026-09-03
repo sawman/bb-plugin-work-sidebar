@@ -41,6 +41,7 @@ export const pullRequest = z.object({
     ]),
   }),
   attention: z.enum([
+    "approved",
     "blocked",
     "changes_requested",
     "checks_failed",

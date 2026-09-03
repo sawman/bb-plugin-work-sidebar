@@ -1,8 +1,5 @@
 import type { ReactNode } from "react";
-import type {
-  PluginSidebarPullRequest,
-  PluginSidebarThread,
-} from "@get-bb/plugin-sdk/app";
+import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
 import { ActionTooltip } from "@/components/ui/action-tooltip";
 import { ThreadWorkspaceBadge } from "@/components/threads/thread-workspace-badge";
@@ -10,7 +7,7 @@ import {
   ThreadProviderLogo,
   type ThreadProvider,
 } from "@/components/threads/thread-provider-logo";
-import { pullRequestPresentation } from "@/features/pull-requests/presentation";
+import { pullRequestSummaryPresentation } from "@/features/pull-requests/presentation";
 import type { ThreadPullRequest } from "@/features/pull-requests/queries";
 import { PullRequestIdentifierBadge } from "@/features/pull-requests/identifier-badge";
 import {
@@ -72,14 +69,15 @@ export function ThreadMetadata({
   project?: ThreadProject;
   projectLabel: string;
   stackNumber?: ReactNode;
-  pullRequest: PluginSidebarPullRequest | ThreadPullRequest | null;
+  pullRequest: ThreadPullRequest | null;
   pullRequestLoading: boolean;
 }) {
   const pullRequestStatus = pullRequest
-    ? pullRequestPresentation({
+    ? pullRequestSummaryPresentation({
         state: pullRequest.state,
         draft: pullRequest.state === "draft",
         attention: pullRequest.attention,
+        signal: pullRequest.signal,
       })
     : null;
   return (

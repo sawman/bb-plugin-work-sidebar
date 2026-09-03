@@ -432,7 +432,7 @@ export interface CurrentPullRequestView {
     reviewRequestCount: number;
     state: "approved" | "changes_requested" | "none" | "review_requested" | "review_required";
   };
-  attention: "blocked" | "changes_requested" | "checks_failed" | "checks_pending" | "closed" | "conflicts" | "draft" | "merged" | "none" | "ready_to_merge" | "review_requested";
+  attention: "approved" | "blocked" | "changes_requested" | "checks_failed" | "checks_pending" | "closed" | "conflicts" | "draft" | "merged" | "none" | "ready_to_merge" | "review_requested";
   mergeability: {
     mergeStateStatus: "BEHIND" | "BLOCKED" | "CLEAN" | "DRAFT" | "HAS_HOOKS" | "DIRTY" | "UNKNOWN" | "UNSTABLE" | null;
     mergeable: "CONFLICTING" | "MERGEABLE" | "UNKNOWN" | null;
