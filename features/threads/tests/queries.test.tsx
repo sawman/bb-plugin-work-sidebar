@@ -297,7 +297,6 @@ describe("R9 Threads query ownership", () => {
       queryKeys.work.goal(threadId),
       queryKeys.work.plan(threadId),
       queryKeys.work.itemQueue(threadId),
-      queryKeys.work.providerHealth(threadId),
       trackerKeys.context(threadId),
     ];
     expect(invalidate.mock.calls).toEqual([
@@ -346,12 +345,12 @@ describe("R9 Threads query ownership", () => {
       await Promise.resolve();
     });
 
-    expect(invalidate).toHaveBeenCalledTimes(1 + 2 * (8 + 1));
+    expect(invalidate).toHaveBeenCalledTimes(1 + 2 * (7 + 1));
     cardInvalidation.resolve();
     await act(async () => {
       await mutation;
     });
-    expect(invalidate).toHaveBeenCalledTimes(1 + 2 * (8 + 1) + 2);
+    expect(invalidate).toHaveBeenCalledTimes(1 + 2 * (7 + 1) + 2);
     view.unmount();
     client.clear();
   });

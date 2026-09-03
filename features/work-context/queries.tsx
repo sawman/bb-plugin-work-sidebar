@@ -97,13 +97,40 @@ export const useWorkGoal = (threadId: string) =>
 export const useWorkPlan = (threadId: string) =>
   useWorkContextCard<WorkPlan>(threadId, "plan", "getWorkPlan");
 
-export function useWorkProviderHealth(threadId: string) {
+type ProviderHealthIdentity = {
+  providerId: string;
+  environmentId?: string | null;
+};
+
+export function invalidateWorkProviderHealth(
+  queryClient: QueryClient,
+  identity: ProviderHealthIdentity | undefined,
+) {
+  if (!identity) return Promise.resolve();
+  return queryClient.invalidateQueries({
+    queryKey: queryKeys.work.providerHealth(
+      identity.providerId,
+      identity.environmentId ?? null,
+    ),
+  });
+}
+
+export function useWorkProviderHealth(
+  threadId: string,
+  identity?: ProviderHealthIdentity,
+) {
   const rpc = useRpc<typeof rpcContract>();
+  const providerId = identity?.providerId ?? threadId;
+  const environmentId = identity?.environmentId ?? null;
   return useQuery({
-    queryKey: queryKeys.work.providerHealth(threadId),
+    queryKey: queryKeys.work.providerHealth(providerId, environmentId),
     queryFn: () => rpc.call("getWorkProviderStatus", { threadId }),
-    ...queryPolicies.health,
-    refetchInterval: 30_000,
+    // Wait for the status read to identify the provider/environment. Starting
+    // with a thread-keyed fallback would create a cold duplicate on every
+    // thread switch before the shared key becomes available.
+    enabled: Boolean(threadId && identity),
+    ...queryPolicies.providerHealth,
+    refetchInterval: 60_000,
     refetchIntervalInBackground: false,
   });
 }
@@ -134,7 +161,6 @@ export function invalidateWorkContextCards(
     queryKeys.work.goal,
     queryKeys.work.plan,
     queryKeys.work.itemQueue,
-    queryKeys.work.providerHealth,
   ];
   return Promise.all(
     keys.map((key) =>

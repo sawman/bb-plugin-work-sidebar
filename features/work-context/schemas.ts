@@ -78,6 +78,7 @@ export const workStatusSchema = z.object({
     status: z.enum(["active", "error", "idle", "pending", "starting", "stopping"]),
     runtimeStatus: z.string(),
     providerId: z.string(),
+    environmentId: z.string().nullable().optional(),
   }),
   children: z.array(z.object({
     id: z.string(),

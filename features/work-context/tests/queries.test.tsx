@@ -5,6 +5,7 @@ import { createElement, type PropsWithChildren } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   WORK_CARD_REFRESH_MS,
+  invalidateWorkProviderHealth,
   useWorkItemQueue,
   useWorkOutcomeMutation,
   useWorkPlan,
@@ -30,7 +31,19 @@ function wrapper(client: QueryClient) {
 describe("work-context provider health query", () => {
   afterEach(() => vi.useRealTimers());
 
-  it("polls once per visible 30-second interval and stops while the document is hidden", async () => {
+  it("waits for the provider/environment identity instead of fetching per thread", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderHook(() => useWorkProviderHealth("thr_health"), {
+      wrapper: wrapper(client),
+    });
+
+    await act(async () => { await Promise.resolve(); });
+    expect(rpcClient.call).not.toHaveBeenCalled();
+    view.unmount();
+    client.clear();
+  });
+
+  it("shares one provider/environment read and refreshes it every visible minute", async () => {
     vi.useFakeTimers();
     const previousVisibility = Object.getOwnPropertyDescriptor(document, "visibilityState");
     Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
@@ -43,7 +56,16 @@ describe("work-context provider health query", () => {
         message: null,
       }));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const view = renderHook(() => useWorkProviderHealth("thr_health"), {
+    const view = renderHook(() => ({
+      first: useWorkProviderHealth("thr_health", {
+        providerId: "codex",
+        environmentId: "env_health",
+      }),
+      second: useWorkProviderHealth("thr_other", {
+        providerId: "codex",
+        environmentId: "env_health",
+      }),
+    }), {
       wrapper: wrapper(client),
     });
 
@@ -52,18 +74,30 @@ describe("work-context provider health query", () => {
       await Promise.resolve();
     });
     expect(rpcClient.call).toHaveBeenCalledTimes(1);
+    expect(rpcClient.call).toHaveBeenCalledWith("getWorkProviderStatus", {
+      threadId: "thr_health",
+    });
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(30_000);
+      await invalidateWorkProviderHealth(client, {
+        providerId: "codex",
+        environmentId: "env_health",
+      });
+      await vi.advanceTimersByTimeAsync(0);
     });
     expect(rpcClient.call).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(rpcClient.call).toHaveBeenCalledTimes(3);
 
     Object.defineProperty(document, "visibilityState", { configurable: true, value: "hidden" });
     act(() => document.dispatchEvent(new Event("visibilitychange")));
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(60_000);
     });
-    expect(rpcClient.call).toHaveBeenCalledTimes(2);
+    expect(rpcClient.call).toHaveBeenCalledTimes(3);
 
     view.unmount();
     client.clear();

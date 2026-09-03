@@ -6,7 +6,7 @@ import { createBackgroundJobsReadService } from "./background-jobs-server.js";
 import { projectWorkBindingOwner } from "./server-owner-projection.js";
 import { createWorkItemQueueService, normalizeWorkItemQueue, WORK_ITEM_QUEUE_KEY } from "./work-item-queue-server.js";
 import { projectLatestActivity } from "./latest-activity.js";
-import { projectProviderStatus } from "./provider-status.js";
+import { createProviderStatusReadService } from "./provider-status-server.js";
 
 type WorkContextHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
@@ -48,6 +48,12 @@ export function createWorkContextRegistration(
   const backgroundJobs = createBackgroundJobsReadService({
     timeline: (input) => bb.sdk.threads.timeline(input),
   });
+  const providerStatus = createProviderStatusReadService({
+    getThread: (threadId) => bb.sdk.threads.get({ threadId }),
+    providerStates: (environmentId) =>
+      bb.sdk.system.providerStates(environmentId ? { environmentId } : {}),
+    usageLimits: (providerId) => bb.sdk.system.usageLimits({ providerId }),
+  });
   const readStatus = async (threadId: string) => {
     const [thread, children, root] = await Promise.all([
       bb.sdk.threads.get({ threadId }),
@@ -61,6 +67,7 @@ export function createWorkContextRegistration(
         status: thread.status,
         runtimeStatus: thread.runtime.displayStatus,
         providerId: thread.providerId,
+        environmentId: thread.environmentId ?? null,
       },
       children: children.map(({ thread: child, depth }) => ({
         id: child.id,
@@ -224,34 +231,7 @@ export function createWorkContextRegistration(
     async getWorkGoal({ threadId }) { return cards.goal(threadId); },
     async getWorkPlan({ threadId }) { return cards.plan(threadId); },
     async getWorkBackgroundJobs({ threadId }) { return backgroundJobs.read(threadId); },
-    async getWorkProviderStatus({ threadId }) {
-      const thread = await bb.sdk.threads.get({ threadId });
-      const [statesResult, usageResult] = await Promise.allSettled([
-        bb.sdk.system.providerStates(
-          thread.environmentId ? { environmentId: thread.environmentId } : {},
-        ),
-        bb.sdk.system.usageLimits({ providerId: thread.providerId }),
-      ]);
-      const provider = statesResult.status === "fulfilled"
-        ? statesResult.value.providers.find(
-            (candidate) => candidate.providerId === thread.providerId,
-          ) ?? null
-        : {
-          providerId: thread.providerId,
-          displayName: thread.providerId,
-          status: "unknown" as const,
-          statusMessage: statesResult.reason instanceof Error
-            ? statesResult.reason.message
-            : "Provider health could not be checked.",
-        };
-      return projectProviderStatus({
-        providerId: thread.providerId,
-        provider,
-        usage: usageResult.status === "fulfilled"
-          ? (usageResult.value[thread.providerId] ?? null)
-          : null,
-      });
-    },
+    async getWorkProviderStatus({ threadId }) { return providerStatus.read(threadId); },
     async getLatestActivity({ threadId }) {
       const [thread, timeline, output] = await Promise.all([
         bb.sdk.threads.get({ threadId }),

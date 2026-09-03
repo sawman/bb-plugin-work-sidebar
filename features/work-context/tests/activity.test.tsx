@@ -214,16 +214,20 @@ describe("registered Status activity lifecycle", () => {
 
     const idle = await slot.findByRole("img", { name: "Idle" });
     expect(idle.getAttribute("data-icon")).toBe("Zzz");
-    const providerSection = slot.container.querySelector<HTMLDetailsElement>(
-      ".ws-provider-status-section",
-    );
-    expect(providerSection?.open).toBe(false);
+    const providerSection = await waitFor(() => {
+      const section = slot.container.querySelector<HTMLDetailsElement>(
+        ".ws-provider-status-section",
+      );
+      expect(section).not.toBeNull();
+      return section!;
+    });
+    expect(providerSection.open).toBe(false);
     const providerSummary = providerSection?.querySelector("summary");
     expect(providerSummary?.querySelector(".ws-provider-status-title")?.textContent).toBe("Codex Pro");
     expect(providerSummary?.querySelector(".ws-provider-status-summary")?.textContent).toBe("Ready");
     expect(within(providerSummary!).queryByText("Provider")).toBeNull();
     fireEvent.click(providerSummary!);
-    expect(providerSection?.open).toBe(true);
+    expect(providerSection.open).toBe(true);
     expect(slot.getByRole("progressbar", { name: "Five-hour usage" }).getAttribute("aria-valuenow")).toBe("84");
     expect(slot.getByText("Five-hour limit · resets in 2h")).toBeTruthy();
     expect(slot.getByRole("progressbar", { name: "Weekly usage" }).getAttribute("data-tone")).toBe("critical");

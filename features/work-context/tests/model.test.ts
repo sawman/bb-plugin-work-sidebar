@@ -59,6 +59,19 @@ describe("work-context card model", () => {
       retry: false,
       refetchOnWindowFocus: false,
     });
+    expect(queryPolicies.providerHealth).toEqual({
+      staleTime: 60_000,
+      gcTime: 10 * 60_000,
+      retry: false,
+      refetchOnWindowFocus: false,
+    });
+    expect(queryKeys.work.providerHealth("codex", "env_one")).toEqual([
+      "work-sidebar",
+      "work",
+      "provider-health",
+      "codex",
+      "env_one",
+    ]);
   });
 
   it("moves outcome statuses backward and forward through the workflow", () => {

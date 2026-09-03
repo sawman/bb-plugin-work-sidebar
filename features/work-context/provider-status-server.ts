@@ -1,0 +1,106 @@
+import { projectProviderStatus } from "./provider-status.js";
+import type { WorkProviderStatus } from "./schemas.js";
+
+const PROVIDER_HEALTH_REFRESH_MS = 60_000;
+
+type ProviderState = {
+  providerId: string;
+  displayName: string;
+  status: WorkProviderStatus["status"];
+  statusMessage: string | null;
+};
+
+type ProviderUsage =
+  | {
+      status: "ok";
+      accountEmail?: string | null;
+      planLabel: string | null;
+      windows: readonly { label: string; resetsAt: string | null; usedPercent: number }[];
+    }
+  | {
+      status: "not_installed" | "unauthenticated" | "expired";
+    }
+  | {
+      status: "error";
+      accountEmail?: string | null;
+      planLabel?: string | null;
+      message: string;
+    };
+
+type ProviderStatusDependencies = {
+  getThread(threadId: string): Promise<{
+    environmentId?: string | null;
+    providerId: string;
+  }>;
+  providerStates(environmentId: string | null): Promise<{
+    providers: readonly ProviderState[];
+  }>;
+  usageLimits(providerId: string): Promise<Record<string, ProviderUsage | null | undefined>>;
+  now?(): number;
+};
+
+type CacheEntry = {
+  expiresAt: number;
+  value: WorkProviderStatus;
+};
+
+/**
+ * Provider state is environment-scoped and usage is provider-scoped. Cache
+ * their combined projection once per provider/environment so switching among
+ * matching threads does not repeat host health reads.
+ */
+export function createProviderStatusReadService({
+  getThread,
+  providerStates,
+  usageLimits,
+  now = Date.now,
+}: ProviderStatusDependencies) {
+  const cache = new Map<string, CacheEntry>();
+  const pending = new Map<string, Promise<WorkProviderStatus>>();
+  const keyFor = (providerId: string, environmentId: string | null) =>
+    JSON.stringify([providerId, environmentId]);
+
+  const readScope = async (providerId: string, environmentId: string | null) => {
+    const key = keyFor(providerId, environmentId);
+    const cached = cache.get(key);
+    if (cached && cached.expiresAt > now()) return cached.value;
+    const inFlight = pending.get(key);
+    if (inFlight) return inFlight;
+
+    const request = Promise.allSettled([
+      providerStates(environmentId),
+      usageLimits(providerId),
+    ])
+      .then(([statesResult, usageResult]) => {
+        const provider = statesResult.status === "fulfilled"
+          ? statesResult.value.providers.find((candidate) => candidate.providerId === providerId) ?? null
+          : {
+              providerId,
+              displayName: providerId,
+              status: "unknown" as const,
+              statusMessage: statesResult.reason instanceof Error
+                ? statesResult.reason.message
+                : "Provider health could not be checked.",
+            };
+        const value = projectProviderStatus({
+          providerId,
+          provider,
+          usage: usageResult.status === "fulfilled"
+            ? (usageResult.value[providerId] ?? null)
+            : null,
+        });
+        cache.set(key, { value, expiresAt: now() + PROVIDER_HEALTH_REFRESH_MS });
+        return value;
+      })
+      .finally(() => pending.delete(key));
+    pending.set(key, request);
+    return request;
+  };
+
+  return {
+    async read(threadId: string) {
+      const thread = await getThread(threadId);
+      return readScope(thread.providerId, thread.environmentId ?? null);
+    },
+  };
+}

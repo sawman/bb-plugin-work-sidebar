@@ -24,7 +24,7 @@ function countLabel(count: number, description: string) {
 export function StatusCard({ threadId }: { threadId: string }) {
   const query = useWorkStatus(threadId);
   const latestActivity = useLatestActivity(threadId, query.data?.currentThread.status);
-  const provider = useWorkProviderHealth(threadId);
+  const provider = useWorkProviderHealth(threadId, query.data?.currentThread);
   const providerDirectory = experimental_useProviders();
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const data = query.data;

@@ -85,11 +85,12 @@ export const queryKeys = {
       "plan",
       threadId,
     ],
-    providerHealth: (threadId: string): QueryKey => [
+    providerHealth: (providerId: string, environmentId: string | null = null): QueryKey => [
       ...queryRoot,
       "work",
       "provider-health",
-      threadId,
+      providerId,
+      environmentId ?? "global",
     ],
   },
 } as const;
@@ -150,6 +151,15 @@ export const queryPolicies = {
   health: {
     staleTime: 15_000,
     gcTime: 2 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  },
+  providerHealth: {
+    // Provider health/usage is shared by provider and environment, not by
+    // thread. Keep it warm through short thread switches; the active card
+    // refreshes it once per minute.
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
   },

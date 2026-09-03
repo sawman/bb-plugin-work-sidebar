@@ -14,7 +14,11 @@ import { AgentsView } from "../agents/views";
 import { invalidateGitHubApiHealth } from "../pull-requests/queries";
 import { threadInteractionStore, type WorkTab } from "../threads/store";
 import { invalidateTracker, useTracker } from "../tracker/queries";
-import { invalidateWorkContextCards, useWorkStatus } from "./queries";
+import {
+  invalidateWorkContextCards,
+  invalidateWorkProviderHealth,
+  useWorkStatus,
+} from "./queries";
 import { parseWorkSidebarRealtimeEvent } from "../../shared/work-realtime";
 import { WorkContextCards } from "./views";
 import {
@@ -140,6 +144,10 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
             onRefresh={() =>
               Promise.all([
                 invalidateWorkContextCards(queryClient, threadId),
+                invalidateWorkProviderHealth(
+                  queryClient,
+                  status.data?.currentThread,
+                ),
                 invalidateTracker(queryClient, threadId),
                 invalidateChanges(queryClient, threadId),
                 invalidateGitHubApiHealth(queryClient),
