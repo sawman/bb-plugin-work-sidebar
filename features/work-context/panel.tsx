@@ -12,6 +12,7 @@ import { ChangesPanel } from "../changes/panel";
 import { invalidateChanges } from "../changes/queries";
 import { changesInteractionStore } from "../changes/store";
 import { AgentsView } from "../agents/views";
+import { invalidateAgentDetails } from "../agents/queries";
 import {
   invalidateGitHubApiHealth,
   invalidateThreadPullRequestDirectory,
@@ -158,6 +159,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
                 ),
                 invalidateTracker(queryClient, threadId),
                 invalidateChanges(queryClient, threadId),
+                invalidateAgentDetails(queryClient),
                 invalidateGitHubApiHealth(queryClient),
                 invalidateThreadPullRequestDirectory(queryClient),
               ])

@@ -31,12 +31,12 @@ export function AgentsView({
   const modelsByThread = useMemo(
     () =>
       new Map(
-        (agentDetails.data?.agents ?? []).map(({ threadId: id, model }) => [
+        Object.entries(agentDetails.data?.facts ?? {}).map(([id, { model }]) => [
           id,
           model,
         ]),
       ),
-    [agentDetails.data?.agents],
+    [agentDetails.data?.facts],
   );
   const bindingsByOwner = useMemo(
     () =>

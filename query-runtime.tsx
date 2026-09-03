@@ -32,11 +32,10 @@ export const queryKeys = {
     ],
   },
   agents: {
-    details: (threadIds: readonly string[]): QueryKey => [
+    directory: (): QueryKey => [
       ...pluginQueryRoot,
       "agents",
-      "details",
-      ...threadIds,
+      "directory",
     ],
   },
   sidebar: {
@@ -127,11 +126,11 @@ export const queryPolicies = {
     refetchOnReconnect: false,
   },
   agentDetails: {
-    // A thread's execution model is fixed when the thread is created. Keep
-    // the directory for this frontend generation instead of refetching it on
-    // every host activity update or Agents-tab remount.
+    // Execution-model facts are immutable, but the host roster is not. The
+    // Agents slice reconciles its bounded directory with active rosters; this
+    // finite lifetime is a final safety net after every observer is gone.
     staleTime: Infinity,
-    gcTime: Infinity,
+    gcTime: 15 * 60_000,
     retry: 1,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,

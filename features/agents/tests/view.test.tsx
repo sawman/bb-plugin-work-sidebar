@@ -147,6 +147,26 @@ describe("R15 registered Agents Work slot", () => {
     slot.lifecycle.unmount();
   });
 
+  it("refreshes the active Agents roster through the shared directory", async () => {
+    const getAgentDetails = vi.fn(() => ({
+      agents: [{ threadId: "thr_child", model: "gpt-5.6-terra" }],
+    }));
+    const slot = await agentsSlot(
+      {
+        status: "ready",
+        threads: [thread("thr_root", null), thread("thr_child", "thr_root")],
+      },
+      rpcFixture({ getAgentDetails }),
+    );
+    await waitFor(() => expect(getAgentDetails).toHaveBeenCalledOnce());
+    fireEvent.click(slot.getByRole("button", { name: "Refresh work context" }));
+    await waitFor(() => expect(getAgentDetails).toHaveBeenCalledTimes(2));
+    expect(getAgentDetails).toHaveBeenLastCalledWith({
+      threadIds: ["thr_child"],
+    });
+    slot.lifecycle.unmount();
+  });
+
   it.each([
     ["loading", { status: "loading" as const }],
     ["error", { status: "error" as const }],
