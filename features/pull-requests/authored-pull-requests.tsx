@@ -102,20 +102,6 @@ export function AuthoredPullRequestRow({
               className="ws-pr-target-title ws-sidebar-row-title"
               href={pullRequest.url}
               aria-label={`Open pull request #${pullRequest.number}: ${pullRequest.title}`}
-              onClick={(event) => {
-                if (
-                  !onOpenPullRequest ||
-                  event.defaultPrevented ||
-                  event.button !== 0 ||
-                  event.metaKey ||
-                  event.ctrlKey ||
-                  event.shiftKey ||
-                  event.altKey
-                )
-                  return;
-                event.preventDefault();
-                onOpenPullRequest(pullRequest.url);
-              }}
             >
               {pullRequest.title}
             </BbUrlLink>

@@ -553,17 +553,8 @@ describe("pull-request stack number presentation", () => {
       "https://github.com/acme/repo/pull/95",
     );
 
-    const ordinaryClick = new MouseEvent("click", {
-      bubbles: true,
-      cancelable: true,
-      button: 0,
-    });
-    expect(title.dispatchEvent(ordinaryClick)).toBe(false);
-    expect(ordinaryClick.defaultPrevented).toBe(true);
-    expect(openPullRequest).toHaveBeenCalledWith(
-      "https://github.com/acme/repo/pull/95",
-    );
-    openPullRequest.mockClear();
+    expect(dispatchHrefClickWithoutJsdomNavigation(title)).toBe(false);
+    expect(openPullRequest).not.toHaveBeenCalled();
 
     for (const modifier of [
       { metaKey: true },
