@@ -1757,18 +1757,20 @@ button.ws-change-file-row:hover {
   line-height: inherit;
 }
 .ws-line-deltas {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: repeat(2, 5ch);
+  column-gap: 0.18rem;
   align-items: baseline;
-  gap: 0.18rem;
-  font: inherit;
+  font: var(--ws-text-metadata);
   font-variant-numeric: tabular-nums;
   line-height: inherit;
   white-space: nowrap;
 }
 .ws-line-delta {
   display: inline-block;
+  min-width: 5ch;
   color: var(--muted-foreground);
-  font: inherit;
+  font: var(--ws-text-metadata);
   line-height: inherit;
   text-align: right;
   white-space: nowrap;
@@ -1778,9 +1780,6 @@ button.ws-change-file-row:hover {
 }
 .ws-line-delta-deletions {
   color: var(--destructive);
-}
-.ws-change-file-row .ws-line-delta {
-  min-width: 5ch;
 }
 .ws-stack-line-deltas {
   margin-left: 0.1rem;

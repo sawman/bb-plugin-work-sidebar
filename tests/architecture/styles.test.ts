@@ -78,6 +78,18 @@ function undocumentedImportantDeclarations(path: string, source: string) {
 }
 
 describe("stylesheet policy", () => {
+  test("uses equal metadata columns for every shared change delta pair", () => {
+    const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    const pair = source.match(/\.ws-line-deltas\s*\{([\s\S]*?)\}/)?.[1];
+    const delta = source.match(/\.ws-line-delta\s*\{([\s\S]*?)\}/)?.[1];
+
+    expect(pair).toContain("display: inline-grid");
+    expect(pair).toContain("grid-template-columns: repeat(2, 5ch)");
+    expect(pair).toContain("font: var(--ws-text-metadata)");
+    expect(delta).toContain("min-width: 5ch");
+    expect(delta).toContain("font: var(--ws-text-metadata)");
+  });
+
   test("keeps every plugin stylesheet structurally valid and diffable", () => {
     const errors = stylesheetPaths().flatMap((path) =>
       stylesheetStructureErrors(path, readFileSync(path, "utf8")),
