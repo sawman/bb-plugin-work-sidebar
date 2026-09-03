@@ -321,11 +321,12 @@
 }
 .ws-panel-tabbar > .ws-action-tooltip {
   display: grid;
-  border-left: 1px solid var(--border);
 }
 .ws-panel-tabbar .ws-refresh-button {
   width: 2rem;
   height: 100%;
+  border: 0;
+  border-radius: 0;
 }
 .ws-icon-button {
   /* R17 important: host icon controls must use the fixed hit-target display. */

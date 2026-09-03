@@ -204,6 +204,21 @@ describe("stylesheet policy", () => {
     expect(content).toContain("overflow: hidden");
   });
 
+  test("keeps the right-pane refresh action as a borderless tabbar icon", () => {
+    const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
+    const tooltip = source.match(
+      /\.ws-panel-tabbar > \.ws-action-tooltip\s*\{([\s\S]*?)\}/,
+    )?.[1];
+    const refresh = source.match(
+      /\.ws-panel-tabbar \.ws-refresh-button\s*\{([\s\S]*?)\}/,
+    )?.[1];
+
+    expect(tooltip).toContain("display: grid");
+    expect(tooltip).not.toContain("border");
+    expect(refresh).toContain("border: 0");
+    expect(refresh).toContain("border-radius: 0");
+  });
+
   test("keeps plugin tooltips flat instead of adding a bright underglow", () => {
     const source = readFileSync(join(repositoryRoot, "views.css"), "utf8");
     for (const [selector, body] of [
