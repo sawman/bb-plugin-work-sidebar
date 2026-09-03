@@ -45,21 +45,21 @@ const recycleBinEntry = z
   })
   .strict();
 
-export const providerRetrySchema = z
+export const queuedMessageSchema = z
   .object({
-    id: z.string().min(1),
     threadId: z.string().startsWith("thr_"),
-    reason: z.string().trim().min(1).max(240),
-    attempt: z.number().int().positive(),
-    sendAt: z.number().int().nonnegative().nullable(),
+    count: z.number().int().positive(),
+    nextSendAt: z.number().int().nonnegative().nullable(),
+    waitingLabel: z.string().trim().min(1).max(240).nullable(),
+    retryReason: z.string().trim().min(1).max(240).nullable(),
   })
   .strict();
-export type ProviderRetry = z.infer<typeof providerRetrySchema>;
+export type QueuedMessage = z.infer<typeof queuedMessageSchema>;
 
 export const threadPreferenceSchemas = {
-  sidebarProviderRetries: {
+  sidebarQueuedMessages: {
     input: z.null(),
-    output: z.object({ retries: z.array(providerRetrySchema) }).strict(),
+    output: z.object({ messages: z.array(queuedMessageSchema) }).strict(),
   },
   getSidebarOrder: {
     input: z.null(),

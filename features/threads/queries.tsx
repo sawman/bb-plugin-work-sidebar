@@ -30,7 +30,7 @@ export const threadQueryKeys = {
   order: () => [...root, "order"] as const,
   groups: () => [...root, "groups"] as const,
   appearance: () => [...root, "appearance"] as const,
-  providerRetries: () => [...root, "provider-retries"] as const,
+  queuedMessages: () => [...root, "queued-messages"] as const,
   archived: () => [...root, "archived"] as const,
   recycleBin: () => [...root, "recycle-bin"] as const,
 } as const;
@@ -38,7 +38,7 @@ export const threadQueryPolicies = {
   order: queryPolicies.sidebarOrderPreferences,
   groups: queryPolicies.sidebarOrderPreferences,
   appearance: queryPolicies.sidebarOrderPreferences,
-  providerRetries: queryPolicies.providerRetries,
+  queuedMessages: queryPolicies.queuedMessages,
 } as const;
 export type ThreadsRpc = PluginRpcClient<typeof rpcContract>;
 export type SidebarAppearance = {
@@ -224,30 +224,30 @@ export function useThreadPreferences() {
 
 /** A single Work-tab observer reads durable queue rows; event ownership stays
  * in the sidebar controller so remounting a row can never add listeners. */
-export function useProviderRetriesQuery(rpc: ThreadsRpc, active: boolean) {
+export function useQueuedMessagesQuery(rpc: ThreadsRpc, active: boolean) {
   return useQuery({
-    queryKey: threadQueryKeys.providerRetries(),
-    queryFn: async () => (await rpc.call("sidebarProviderRetries", null)).retries,
-    ...threadQueryPolicies.providerRetries,
+    queryKey: threadQueryKeys.queuedMessages(),
+    queryFn: async () => (await rpc.call("sidebarQueuedMessages", null)).messages,
+    ...threadQueryPolicies.queuedMessages,
     enabled: active,
   });
 }
 
-export function useProviderRetries(active: boolean) {
-  return useProviderRetriesQuery(useRpc<typeof rpcContract>(), active);
+export function useQueuedMessages(active: boolean) {
+  return useQueuedMessagesQuery(useRpc<typeof rpcContract>(), active);
 }
 
-export function useProviderRetryInvalidation() {
+export function useQueuedMessageInvalidation() {
   const client = useQueryClient();
   useRealtime("work-sidebar:changed", (payload) => {
     if (
       typeof payload === "object" &&
       payload !== null &&
       "family" in payload &&
-      payload.family === "provider-retry"
+      payload.family === "queued-message"
     )
       void client.invalidateQueries({
-        queryKey: threadQueryKeys.providerRetries(),
+        queryKey: threadQueryKeys.queuedMessages(),
       });
   });
 }

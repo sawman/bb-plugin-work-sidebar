@@ -4,10 +4,10 @@ import { createArchivedThreadService, createThreadPreferencesService } from "./s
 import { createRecycleBinExpiryHandler } from "./recycle-bin-expiry.js";
 import { createSdkThreadHierarchyService, type WorkBindingReader } from "./hierarchy-server.js";
 import { registerThreadSettings } from "./settings-registration.js";
-import { createProviderRetryRegistration } from "./provider-retry-server.js";
+import { createQueuedMessageRegistration } from "./queued-messages-server.js";
 type ThreadHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
-  "sidebarProviderRetries" | "getSidebarOrder" | "saveSiblingOrder" | "getLaterThreads" | "saveLaterThreads" | "getThreadGroups" | "saveThreadGroups" | "getSidebarAppearance" | "saveSidebarAppearance" | "moveSidebarThread"
+  "sidebarQueuedMessages" | "getSidebarOrder" | "saveSiblingOrder" | "getLaterThreads" | "saveLaterThreads" | "getThreadGroups" | "saveThreadGroups" | "getSidebarAppearance" | "saveSidebarAppearance" | "moveSidebarThread"
     | "getRecycleBin" | "binSidebarThread" | "restoreBinnedSidebarThread" | "expireRecycleBinThreads" | "sidebarArchivedThreads" | "unarchiveSidebarThread"
 >;
 
@@ -24,9 +24,9 @@ export function createThreadRegistration(
     publish: (channel, payload) => bb.realtime.publish(channel, payload),
   });
   const hierarchy = createSdkThreadHierarchyService(bb, work, preferences);
-  const providerRetries = createProviderRetryRegistration(bb);
+  const queuedMessages = createQueuedMessageRegistration(bb);
   return {
-    sidebarProviderRetries: providerRetries.sidebarProviderRetries,
+    sidebarQueuedMessages: queuedMessages.sidebarQueuedMessages,
     async getSidebarOrder() {
       return { threadIds: await preferences.order() };
     },

@@ -155,8 +155,8 @@ describe("R2 app registration and Query lifecycle", () => {
     // selected, the file query remains hook-stable and disabled until opened.
     // Work-item queue is independently cacheable from the outcome and task
     // projections, so mounted Work now owns one additional query entry.
-    // The plugin-managed Recycle Bin and queued-provider-retry state are
-    // durable sidebar reads; retry changes arrive through realtime, not polling.
+    // The plugin-managed Recycle Bin and queued-message state are durable
+    // sidebar reads; queue changes arrive through realtime, not polling.
     expect(client.getQueryCache().getAll()).toHaveLength(21);
     expect(
       client
@@ -168,7 +168,7 @@ describe("R2 app registration and Query lifecycle", () => {
       client
         .getQueryCache()
         .find({
-          queryKey: ["work-sidebar", "sidebar", "threads", "provider-retries"],
+          queryKey: ["work-sidebar", "sidebar", "threads", "queued-messages"],
         })
         ?.getObserversCount(),
     ).toBe(1);

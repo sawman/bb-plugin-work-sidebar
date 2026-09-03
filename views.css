@@ -1254,7 +1254,7 @@
   color: var(--foreground);
   stroke-width: 2.2;
 }
-.ws-provider-retry {
+.ws-queued-message {
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -1264,10 +1264,13 @@
   line-height: 1;
   white-space: nowrap;
 }
-.ws-provider-retry svg {
+.ws-queued-message svg {
   width: 0.68rem;
   height: 0.68rem;
   stroke-width: 2.2;
+}
+.ws-queued-message[data-retry] {
+  color: var(--destructive);
 }
 @keyframes ws-thread-pulse {
   0%,

@@ -39,7 +39,7 @@ import {
   useThreadPreferences,
   useRecycleBin,
 } from "./queries";
-import { useSidebarProviderRetries } from "./provider-retry";
+import { useSidebarQueuedMessages } from "./queued-messages";
 import { useSidebarThreadOrganization } from "./sidebar-organization";
 import { threadInteractionStore } from "./store";
 import { SidebarThreadToolbar } from "./sidebar-toolbar";
@@ -73,7 +73,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   const queryClient = useQueryClient();
   const threadPreferences = useThreadPreferences();
   const [view, setView] = useState<SidebarView>("work");
-  const providerRetriesByThread = useSidebarProviderRetries(view === "work");
+  const queuedMessagesByThread = useSidebarQueuedMessages(view === "work");
   const recycleBin = useRecycleBin();
   const binnedIds = useMemo(
     () => new Set((recycleBin.bin.data ?? []).map((entry) => entry.threadId)),
@@ -328,7 +328,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
               staleWorkingMinutes={Number(
                 pluginSettings.values?.stuckThreadMinutes ?? "30",
               )}
-              providerRetriesByThread={providerRetriesByThread}
+              queuedMessagesByThread={queuedMessagesByThread}
               searchQuery={effectiveThreadSearchQuery}
               emptyMessage={
                 effectiveThreadSearchQuery

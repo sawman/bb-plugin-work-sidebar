@@ -202,7 +202,7 @@ describe("R2 server registration and disposal", () => {
       "checkoutStackBranch",
       "getWorkingTreeFileDiff",
       "getPullRequestFileDiff",
-      "sidebarProviderRetries",
+      "sidebarQueuedMessages",
       "getSidebarOrder",
       "saveSiblingOrder",
       "getLaterThreads",

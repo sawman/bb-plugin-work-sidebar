@@ -4,16 +4,16 @@ import { waitFor } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { getPluginQueryClient } from "../../../query-runtime";
 
-const retry = {
-  id: "queued_retry",
+const queuedMessage = {
   threadId: "thr_retry",
-  reason: "Rate limited",
-  attempt: 2,
-  sendAt: 1_800_000_065_000,
+  count: 2,
+  nextSendAt: 1_800_000_065_000,
+  waitingLabel: "Retry: Rate limited",
+  retryReason: "Rate limited",
 };
 
 const thread = {
-  id: retry.threadId,
+  id: queuedMessage.threadId,
   projectId: "project",
   title: "Retry me",
   titleFallback: null,
@@ -37,13 +37,13 @@ const thread = {
   latestAttentionAt: 0,
 } as const;
 
-describe("provider retry sidebar lifecycle", () => {
-  it("renders queued retries and refreshes only for its realtime signal", async () => {
+describe("queued message sidebar lifecycle", () => {
+  it("renders queued messages and refreshes only for its realtime signal", async () => {
     const app = await loadPluginApp(() => import("../../../app"));
-    const listRetries = vi
+    const listQueuedMessages = vi
       .fn()
-      .mockResolvedValueOnce({ retries: [retry] })
-      .mockResolvedValueOnce({ retries: [] });
+      .mockResolvedValueOnce({ messages: [queuedMessage] })
+      .mockResolvedValueOnce({ messages: [] });
     const slot = renderSlot(
       app.threadLists[0]!,
       { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: vi.fn(), searchQuery: "", Original: () => null },
@@ -56,16 +56,16 @@ describe("provider retry sidebar lifecycle", () => {
           getRecycleBin: () => ({ entries: [] }),
           sidebarTasks: () => ({ available: true, tasks: [], projects: [], error: null }),
           sidebarTaskLinks: () => ({ available: true, links: {}, error: null }),
-          sidebarProviderRetries: listRetries,
+          sidebarQueuedMessages: listQueuedMessages,
           sidebarArchivedThreads: () => ({ available: true, threads: [], error: null }),
         } as never,
       },
     );
-    await slot.findByRole("status", { name: /Rate limited; retry 2/i });
-    expect(listRetries).toHaveBeenCalledTimes(1);
-    await slot.behavior.emitRealtime("work-sidebar:changed", { family: "provider-retry", threadId: retry.threadId });
-    await waitFor(() => expect(listRetries).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(slot.queryByRole("status", { name: /Rate limited; retry 2/i })).toBeNull());
+    await slot.findByRole("status", { name: /2 queued messages.*Rate limited/i });
+    expect(listQueuedMessages).toHaveBeenCalledTimes(1);
+    await slot.behavior.emitRealtime("work-sidebar:changed", { family: "queued-message", threadId: queuedMessage.threadId });
+    await waitFor(() => expect(listQueuedMessages).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(slot.queryByRole("status", { name: /2 queued messages.*Rate limited/i })).toBeNull());
     slot.unmount();
     getPluginQueryClient().clear();
   });

@@ -26,8 +26,8 @@ export function ThreadRow({
   children,
   activeChildren,
   staleWorkingMinutes = 30,
-  providerRetry,
-  providerRetryNow = Date.now(),
+  queuedMessage,
+  queuedMessageNow = Date.now(),
   childrenExpanded,
   selected,
   groupId,
@@ -222,7 +222,7 @@ export function ThreadRow({
               trailing={
                 <ThreadStatus
                   thread={thread} hasComposerDraft={hasComposerDraft} staleWorking={staleWorking}
-                  staleWorkingMinutes={staleWorkingMinutes} providerRetry={providerRetry} providerRetryNow={providerRetryNow}
+                  staleWorkingMinutes={staleWorkingMinutes} queuedMessage={queuedMessage} queuedMessageNow={queuedMessageNow}
                 />
               }
             />

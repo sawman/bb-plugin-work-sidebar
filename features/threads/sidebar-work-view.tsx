@@ -4,7 +4,7 @@ import { SidebarThreadGroups } from "./sidebar-group-tree";
 import type { ThreadProviderDirectory } from "@/components/threads/thread-provider-logo";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import type { RecycleBinEntry } from "./recycle-bin";
-import type { ProviderRetry } from "./schemas";
+import type { QueuedMessage } from "./schemas";
 
 type SidebarWorkViewProps = {
   toolbar: ReactNode;
@@ -14,7 +14,7 @@ type SidebarWorkViewProps = {
   onNavigate(): void;
   subtextRefreshKey: number;
   staleWorkingMinutes: number;
-  providerRetriesByThread: ReadonlyMap<string, ProviderRetry>;
+  queuedMessagesByThread: ReadonlyMap<string, QueuedMessage>;
   searchQuery: string;
   emptyMessage: string;
   recycleBinEntries: readonly RecycleBinEntry[];
@@ -24,17 +24,17 @@ type SidebarWorkViewProps = {
   disclosuresReady: boolean;
 };
 
-function useProviderRetryClock(retries: ReadonlyMap<string, ProviderRetry>) {
+function useQueuedMessageClock(messages: ReadonlyMap<string, QueuedMessage>) {
   const [, refresh] = useReducer((revision: number) => revision + 1, 0);
   const now = Date.now();
-  const hasScheduledRetry = [...retries.values()].some(
-    (retry) => retry.sendAt !== null && retry.sendAt > now,
+  const hasScheduledMessage = [...messages.values()].some(
+    (message) => message.nextSendAt !== null && message.nextSendAt > now,
   );
   useEffect(() => {
-    if (!hasScheduledRetry) return;
+    if (!hasScheduledMessage) return;
     const timer = window.setInterval(refresh, 1_000);
     return () => window.clearInterval(timer);
-  }, [hasScheduledRetry]);
+  }, [hasScheduledMessage]);
   return now;
 }
 
@@ -46,7 +46,7 @@ export function SidebarWorkView({
   onNavigate,
   subtextRefreshKey,
   staleWorkingMinutes,
-  providerRetriesByThread,
+  queuedMessagesByThread,
   searchQuery,
   emptyMessage,
   recycleBinEntries,
@@ -55,7 +55,7 @@ export function SidebarWorkView({
   onDisclosureChange,
   disclosuresReady,
 }: SidebarWorkViewProps) {
-  const providerRetryNow = useProviderRetryClock(providerRetriesByThread);
+  const queuedMessageNow = useQueuedMessageClock(queuedMessagesByThread);
   return (
     <>
       <div className="ws-list-toolbar">{toolbar}</div>
@@ -67,8 +67,8 @@ export function SidebarWorkView({
           onNavigate={onNavigate}
           subtextRefreshKey={subtextRefreshKey}
           staleWorkingMinutes={staleWorkingMinutes}
-          providerRetriesByThread={providerRetriesByThread}
-          providerRetryNow={providerRetryNow}
+          queuedMessagesByThread={queuedMessagesByThread}
+          queuedMessageNow={queuedMessageNow}
           searchQuery={searchQuery}
           emptyMessage={emptyMessage}
           recycleBinEntries={recycleBinEntries}

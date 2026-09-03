@@ -2,16 +2,20 @@
 import { describe, expect, it } from "vitest";
 import { render } from "@testing-library/react";
 import { ThreadStatus } from "../thread-row-presentation";
-import { providerRetryCountdown, providerRetryLabel } from "../provider-retry";
-import type { ProviderRetry } from "../schemas";
+import {
+  queuedMessageCountdown,
+  queuedMessageDisplay,
+  queuedMessageLabel,
+} from "../queued-messages";
+import type { QueuedMessage } from "../schemas";
 
 const NOW = 1_800_000_000_000;
-const retry: ProviderRetry = {
-  id: "queued_retry",
+const queuedMessage: QueuedMessage = {
   threadId: "thr_retry",
-  reason: "Rate limited",
-  attempt: 2,
-  sendAt: NOW + 65_000,
+  count: 2,
+  nextSendAt: NOW + 65_000,
+  waitingLabel: "Retry: Rate limited",
+  retryReason: "Rate limited",
 };
 
 const thread = {
@@ -45,33 +49,32 @@ const thread = {
   latestAttentionAt: 0,
 } as const;
 
-describe("provider retry presentation and read contract", () => {
-  it("shows a compact countdown while keeping the full retry reason available", () => {
-    expect(providerRetryCountdown(retry, NOW)).toBe("1m");
-    expect(providerRetryLabel(retry, NOW)).toBe(
-      "Rate limited; retry 2 in 1m.",
+describe("queued message presentation and read contract", () => {
+  it("shows count and countdown while keeping the queued reason available", () => {
+    expect(queuedMessageCountdown(queuedMessage, NOW)).toBe("1m");
+    expect(queuedMessageDisplay(queuedMessage, NOW)).toBe("2 · 1m");
+    expect(queuedMessageLabel(queuedMessage, NOW)).toBe(
+      "2 queued messages · next sends in 1m · Rate limited",
     );
     const view = render(
       <ThreadStatus
         thread={thread}
         hasComposerDraft={false}
-        providerRetry={retry}
-        providerRetryNow={NOW}
+        queuedMessage={queuedMessage}
+        queuedMessageNow={NOW}
       />,
     );
     const status = view.getByRole("status", {
-      name: "Rate limited; retry 2 in 1m.",
+      name: "2 queued messages · next sends in 1m · Rate limited",
     });
-    expect(status.textContent).toBe("1m");
-    expect(status.querySelector('[data-icon="Clock"]')).toBeTruthy();
+    expect(status.textContent).toBe("2 · 1m");
+    expect(status.querySelector('[data-icon="MessageSquare"]')).toBeTruthy();
     expect(status.getAttribute("aria-describedby")).toBeTruthy();
     expect(
       document
         .getElementById(status.getAttribute("aria-describedby") ?? "")
         ?.getAttribute("aria-label"),
-    ).toBe(
-      "Rate limited; retry 2 in 1m.",
-    );
+    ).toBe("2 queued messages · next sends in 1m ·…");
     view.unmount();
   });
 });

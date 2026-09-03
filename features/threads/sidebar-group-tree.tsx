@@ -8,7 +8,7 @@ import { WorkThreadTree } from "./thread-tree";
 import { ThreadToTopDropZone } from "./thread-to-top-drop-zone";
 import { RecycleBinView } from "./recycle-bin-view";
 import type { RecycleBinEntry } from "./recycle-bin";
-import type { ProviderRetry } from "./schemas";
+import type { QueuedMessage } from "./schemas";
 type SidebarGroupTreeProps = {
   organization: SidebarThreadOrganization;
   activeThreadId: string | null;
@@ -16,8 +16,8 @@ type SidebarGroupTreeProps = {
   onNavigate(): void;
   subtextRefreshKey: number;
   staleWorkingMinutes: number;
-  providerRetriesByThread: ReadonlyMap<string, ProviderRetry>;
-  providerRetryNow: number;
+  queuedMessagesByThread: ReadonlyMap<string, QueuedMessage>;
+  queuedMessageNow: number;
   searchQuery: string;
   emptyMessage: string;
   recycleBinEntries: readonly RecycleBinEntry[];
@@ -25,7 +25,7 @@ type SidebarGroupTreeProps = {
   disclosures: Readonly<Record<string, boolean>>; onDisclosureChange(id: string, open: boolean): void; disclosuresReady: boolean;
 };
 
-type ThreadTreeProps = Pick<SidebarGroupTreeProps, "activeThreadId" | "providersById" | "onNavigate" | "subtextRefreshKey" | "staleWorkingMinutes" | "providerRetriesByThread" | "providerRetryNow"> & {
+type ThreadTreeProps = Pick<SidebarGroupTreeProps, "activeThreadId" | "providersById" | "onNavigate" | "subtextRefreshKey" | "staleWorkingMinutes" | "queuedMessagesByThread" | "queuedMessageNow"> & {
   organization: SidebarThreadOrganization;
   roots: readonly PluginSidebarThread[];
   childrenByThread: ReadonlyMap<string, PluginSidebarThread[]>;
@@ -41,8 +41,8 @@ function ThreadTree({
   onNavigate,
   subtextRefreshKey,
   staleWorkingMinutes,
-  providerRetriesByThread,
-  providerRetryNow,
+  queuedMessagesByThread,
+  queuedMessageNow,
   label,
 }: ThreadTreeProps) {
   return (
@@ -72,8 +72,8 @@ function ThreadTree({
             onDropThread={organization.reorder}
             subtextRefreshKey={subtextRefreshKey}
             staleWorkingMinutes={staleWorkingMinutes}
-            providerRetriesByThread={providerRetriesByThread}
-            providerRetryNow={providerRetryNow}
+            queuedMessagesByThread={queuedMessagesByThread}
+            queuedMessageNow={queuedMessageNow}
           />
         ))}
       </SidebarTable>
@@ -90,8 +90,8 @@ export function SidebarThreadGroups({
   onNavigate,
   subtextRefreshKey,
   staleWorkingMinutes,
-  providerRetriesByThread,
-  providerRetryNow,
+  queuedMessagesByThread,
+  queuedMessageNow,
   searchQuery,
   emptyMessage,
   recycleBinEntries,
@@ -100,7 +100,7 @@ export function SidebarThreadGroups({
 }: SidebarGroupTreeProps) {
   const sharedTreeProps = {
     organization, activeThreadId, providersById, onNavigate, subtextRefreshKey,
-    staleWorkingMinutes, providerRetriesByThread, providerRetryNow,
+    staleWorkingMinutes, queuedMessagesByThread, queuedMessageNow,
   };
   const dropTargetId =
     organization.dropTarget?.kind === "group"

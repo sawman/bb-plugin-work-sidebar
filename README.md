@@ -30,7 +30,7 @@ fall into three categories:
 | --- | --- | --- |
 | **BB Tasks** (built in) | BB task queue, Work-item goals, task ownership, durable execution bindings, and agent task tools | The plugin still loads, but its task and work-item workflows are unavailable. Treat Tasks as required for the full experience. |
 | **Taskboard** (`taskboard`, optional) | Linear issue search, linking, primary Linear goals, and Linear status updates | Everything else keeps working. The Work card stays BB-Tasks-only, without an install prompt or Linear controls. Existing Linear links are retained for when Taskboard returns. |
-| **Provider retry** (built in, optional) | The retry clock/reason shown on a thread after a transient provider failure | No retry indicator appears. Work Sidebar reads BB's standard queued-retry data and does not require provider-retry to be enabled. |
+| **Provider retry** (built in, optional) | Enqueues provider retries alongside ordinary queued messages | The queue indicator still represents messages BB has queued; no provider-retry-specific reason appears. |
 | Provider plugins (Codex, Claude, etc.) | Starting and running threads | No static dependency: Work Sidebar discovers host providers and renders whatever is available. |
 | GitHub CLI authentication | Pull-request, Stack, review, and GitHub-health enrichment | Thread, Tasks, Work, and Agents surfaces continue to work; PR data reports its own unavailable/limited state. |
 

@@ -12,8 +12,11 @@ import {
 } from "@/components/threads/thread-provider-logo";
 import { pullRequestPresentation } from "@/features/pull-requests/presentation";
 import { PullRequestIdentifierBadge } from "@/features/pull-requests/identifier-badge";
-import { providerRetryCountdown, providerRetryLabel } from "./provider-retry";
-import type { ProviderRetry } from "./schemas";
+import {
+  queuedMessageDisplay,
+  queuedMessageLabel,
+} from "./queued-messages";
+import type { QueuedMessage } from "./schemas";
 import type { ThreadProject } from "./thread-row-types";
 import {
   threadProviderRuntimeState,
@@ -26,16 +29,12 @@ export function ThreadRuntimeProvider({
   activeChildren = 0,
   staleWorking,
   staleWorkingMinutes = 30,
-  providerRetry,
-  providerRetryNow = Date.now(),
 }: {
   thread: PluginSidebarThread;
   provider?: ThreadProvider;
   activeChildren?: number;
   staleWorking: boolean;
   staleWorkingMinutes?: number;
-  providerRetry?: ProviderRetry;
-  providerRetryNow?: number;
 }) {
   const runtimeState = threadProviderRuntimeState(
     thread,
@@ -116,15 +115,15 @@ export function ThreadStatus({
   hasComposerDraft,
   staleWorking = false,
   staleWorkingMinutes = 30,
-  providerRetry,
-  providerRetryNow = Date.now(),
+  queuedMessage,
+  queuedMessageNow = Date.now(),
 }: {
   thread: PluginSidebarThread;
   hasComposerDraft: boolean;
   staleWorking?: boolean;
   staleWorkingMinutes?: number;
-  providerRetry?: ProviderRetry;
-  providerRetryNow?: number;
+  queuedMessage?: QueuedMessage;
+  queuedMessageNow?: number;
 }) {
   return (
     <span className="ws-thread-trailing ws-sidebar-row-trailing">
@@ -145,20 +144,22 @@ export function ThreadStatus({
           aria-label={`${thread.indicatorLabel ?? "Thread activity"}; no agent update for ${staleWorkingMinutes} minutes`}
         />
       )}
-      {providerRetry && (
-        <ActionTooltip label={providerRetryLabel(providerRetry, providerRetryNow)}>
+      {queuedMessage && (
+        <ActionTooltip label={queuedMessageLabel(queuedMessage, queuedMessageNow)}>
           {(tooltipId) => (
             <span
-              className="ws-provider-retry"
+              className="ws-queued-message"
               role="status"
-              aria-label={providerRetryLabel(providerRetry, providerRetryNow)}
+              aria-label={queuedMessageLabel(queuedMessage, queuedMessageNow)}
               aria-describedby={tooltipId}
-              data-retry-reason={providerRetry.reason}
+              data-retry={queuedMessage.retryReason !== null || undefined}
             >
-              <Icon name="Clock" aria-hidden />
-              <span aria-hidden>
-                {providerRetryCountdown(providerRetry, providerRetryNow)}
-              </span>
+              <Icon name="MessageSquare" aria-hidden />
+              {queuedMessageDisplay(queuedMessage, queuedMessageNow) && (
+                <span aria-hidden>
+                  {queuedMessageDisplay(queuedMessage, queuedMessageNow)}
+                </span>
+              )}
             </span>
           )}
         </ActionTooltip>
