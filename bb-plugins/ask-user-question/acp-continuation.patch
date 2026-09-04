@@ -132,7 +132,7 @@ index bf0dc30..3350d78 100644
        expect(tool?.inputSchema).toEqual(TOOL_INPUT_JSON_SCHEMA);
 +      expect(resolved.instructions).toBe(
 +        providerId.startsWith("acp-")
-+          ? "On ACP, AskUserQuestion returns after showing the question. Stop after calling it: the selected answer arrives as a follow-up message."
++          ? "On ACP, AskUserQuestion returns after showing the question. Continue only work independent of the answer; the selected answer arrives as a follow-up message."
 +          : null,
 +      );
      },
@@ -155,7 +155,7 @@ index bf0dc30..3350d78 100644
 +      );
 +
 +      expect(await resultText(result)).toBe(
-+        "Question shown. Wait for the user's follow-up answer before continuing.",
++        "Question shown. Continue only work independent of the answer; the selected answer arrives as a follow-up message.",
 +      );
 +      expect(host.harness.pendingInteractions).toHaveLength(1);
 +      controller.abort();
@@ -170,7 +170,7 @@ index bf0dc30..3350d78 100644
 +          [
 +            {
 +              threadId: "thread-test",
-+              mode: "steer-if-active",
++              mode: "auto",
 +              input: [
 +                {
 +                  type: "text",
@@ -215,7 +215,7 @@ index 892065a..38ee851 100644
  
 +const ACP_PROVIDER_ID_PREFIX = "acp-";
 +const ACP_PENDING_RESULT =
-+  "Question shown. Wait for the user's follow-up answer before continuing.";
++  "Question shown. Continue only work independent of the answer; the selected answer arrives as a follow-up message.";
 +
  function errorResult(message: string): PluginAgentToolResult {
    return { content: [{ type: "text", text: message }], isError: true };
@@ -248,7 +248,7 @@ index 892065a..38ee851 100644
 +  try {
 +    await bb.sdk.threads.send({
 +      threadId,
-+      mode: "steer-if-active",
++      mode: "auto",
 +      input: [
 +        {
 +          type: "text",
@@ -315,7 +315,7 @@ index 892065a..38ee851 100644
        return { tools: [], skills: [] };
      }
 +    const instructions = isAcpProviderId(context.provider.id)
-+      ? "On ACP, AskUserQuestion returns after showing the question. Stop after calling it: the selected answer arrives as a follow-up message."
++      ? "On ACP, AskUserQuestion returns after showing the question. Continue only work independent of the answer; the selected answer arrives as a follow-up message."
 +      : undefined;
      return {
        tools: [{ name: TOOL_NAME, parameters: TOOL_INPUT_JSON_SCHEMA }],

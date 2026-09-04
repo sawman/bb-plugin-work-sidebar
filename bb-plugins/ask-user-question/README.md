@@ -10,9 +10,10 @@ no longer return it to the waiting agent, requiring a manual Resume.
 
 For every provider with an ID beginning `acp-`, return after the question has
 been rendered and retain `requestInput` without the original tool-call abort
-signal. On submission, send the normalized answer to the same thread with
-`threads.send({ mode: "steer-if-active" })`. Native-user-question providers
-remain excluded by their declared capability.
+signal. The agent may continue work that does not depend on the answer. On
+submission, send the normalized answer to the same thread with
+`threads.send({ mode: "auto" })`: it steers a live turn or starts an idle one.
+Native-user-question providers remain excluded by their declared capability.
 
 The source patch is [acp-continuation.patch](acp-continuation.patch). It adds
 coverage for Cursor, OpenCode, and a custom ACP provider, plus dismissal.
