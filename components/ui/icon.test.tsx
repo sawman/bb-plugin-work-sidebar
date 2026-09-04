@@ -17,3 +17,11 @@ describe("Git icon geometry", () => {
     expect(pullRequest).toContain('d="M6 6v12m6-14v12a4 4 0 0 0 4 4h2"');
   });
 });
+
+describe("status icon geometry", () => {
+  it("optically centers the bottom-heavy wrench glyph", () => {
+    const wrench = renderToStaticMarkup(<Icon name="Wrench" />);
+
+    expect(wrench).toContain('transform="translate(0 -1)"');
+  });
+});
