@@ -13,6 +13,18 @@ Last checked: 2026-09-04 against BB Tasks 0.1.2 / SDK 0.4.34.
 
 ## Check later
 
+- [ ] **ACP AskUserQuestion continuation (BBPLUG-334).** BB's local
+  `ask-user-question` plugin now avoids holding an interactive MCP tool call
+  open for every ACP provider (`providerId.startsWith("acp-")`). It returns
+  immediately after showing the question, then delivers the submitted answer
+  through `threads.send({ mode: "steer-if-active" })`; this prevents ACP
+  clients from timing out and leaves no manual Resume step. The first local
+  patch was commit `9f0b0a7a4` in the sibling BB checkout, generalized to all
+  ACPs by `cc1a52e66`. On every BB release, inspect
+  `plugins/ask-user-question/src/server.ts` and ACP interactive-call support:
+  remove this patch only when ACP guarantees a durable answer continuation,
+  otherwise reapply it and retain its cross-provider test matrix.
+
 - [ ] **Thread-filtered Tasks read (BBPLUG-252).** The sidebar currently has
   to read every active project task and call `listTaskThreads(taskId)` for each
   one. BB Tasks has an indexed `task_threads.thread_id` table, but its public
