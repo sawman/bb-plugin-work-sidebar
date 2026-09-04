@@ -20,6 +20,11 @@
               "targetPath": "server/dist/start-server.js.map"
             }
           ],
+          "coreTests": [
+            "test/internal/internal-events-tool-calls.test.ts",
+            "test/services/pending-interactions.test.ts",
+            "test/threads/thread-send-dispatch.test.ts"
+          ],
           "turboFilter": "bb-plugin-ask-user-question"
         },
         {

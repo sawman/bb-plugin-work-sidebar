@@ -208,6 +208,177 @@ index 7e972ae..807eb47 100644
        signal: new AbortController().signal,
      };
      const found = service.findAgentTool("search_issues")!;
+diff --git a/apps/server/test/threads/thread-send-dispatch.test.ts b/apps/server/test/threads/thread-send-dispatch.test.ts
+index ad620a8..88c8016 100644
+--- a/apps/server/test/threads/thread-send-dispatch.test.ts
++++ b/apps/server/test/threads/thread-send-dispatch.test.ts
+@@ -14,7 +14,12 @@ import {
+   type ThreadChangedMessage,
+ } from "@bb/domain";
+ import { groupHostDaemonEvents } from "@bb/host-daemon-contract";
++import type { PluginHookName } from "@get-bb/plugin-sdk";
+ import { describe, expect, it, vi } from "vitest";
++import {
++  setPluginHookProvider,
++  type PluginHookRegistration,
++} from "../../src/services/plugins/plugin-hook-registry.js";
+ import type { TelemetryService } from "../../src/services/system/telemetry.js";
+ import { sendQueuedMessage } from "../../src/services/threads/queued-messages.js";
+ import { queueParentSystemMessage } from "../../src/services/threads/parent-system-messages.js";
+@@ -126,6 +131,153 @@ function parseThreadMessages(
+   });
+ }
+ 
++function autoSendPayload(text: string) {
++  return {
++    input: textInput(text),
++    mode: "auto" as const,
++    model: "gpt-5",
++    permissionMode: "full" as const,
++    reasoningLevel: "medium" as const,
++    serviceTier: "default" as const,
++  };
++}
++
++function requestPluginForm(
++  harness: TestAppHarness,
++  args: { threadId: string; nonBlocking: boolean },
++) {
++  return harness.deps.pendingInteractions.requestPluginInteraction({
++    pluginId: "ask-user-question",
++    threadId: args.threadId,
++    rendererId: "ask-user-question",
++    title: "Question",
++    payload: { questions: [] },
++    timeoutMs: 10_000,
++    ...(args.nonBlocking ? { nonBlocking: true } : {}),
++  });
++}
++
++function cancelPluginForm(harness: TestAppHarness, threadId: string): void {
++  const [interaction] =
++    harness.deps.pendingInteractions.listPendingThreadInteractions(threadId);
++  harness.deps.pendingInteractions.cancelPluginInteraction({
++    threadId,
++    interactionId: interaction!.id,
++    reason: "user",
++  });
++}
++
++type HookRegistry = {
++  [K in PluginHookName]: PluginHookRegistration<K>[];
++};
++
++describe("plugin interaction dispatch gates", () => {
++  it.each(["idle", "active"] as const)(
++    "does not queue an auto-send behind a non-blocking form on an %s thread",
++    async (status) => {
++      await withTestHarness(async (harness) => {
++        const value = status === "idle" ? 601 : 602;
++        const { environment, thread } = seedProviderThreadFixture({
++          harness,
++          status,
++          value,
++        });
++        if (status === "active") {
++          seedTurnStarted(harness.deps, {
++            environmentId: environment.id,
++            threadId: thread.id,
++            turnId: `turn-non-blocking-${status}`,
++            providerThreadId: `provider-send-dispatch-${value}`,
++          });
++        }
++        const pending = requestPluginForm(harness, {
++          threadId: thread.id,
++          nonBlocking: true,
++        });
++
++        await expect(
++          acceptThreadSendRequest(harness.deps, {
++            payload: autoSendPayload(`answer while ${status}`),
++            thread,
++          }),
++        ).resolves.toMatchObject({ ok: true, delivery: "sent" });
++        expect(listQueuedThreadMessages(harness.db, thread.id)).toEqual([]);
++
++        cancelPluginForm(harness, thread.id);
++        await expect(pending).resolves.toMatchObject({ outcome: "cancelled" });
++      });
++    },
++  );
++
++  it("continues to queue an auto-send behind an ordinary blocking form", async () => {
++    await withTestHarness(async (harness) => {
++      const { thread } = seedProviderThreadFixture({ harness, value: 603 });
++      const pending = requestPluginForm(harness, {
++        threadId: thread.id,
++        nonBlocking: false,
++      });
++
++      await expect(
++        acceptThreadSendRequest(harness.deps, {
++          payload: autoSendPayload("must wait for a normal form"),
++          thread,
++        }),
++      ).resolves.toMatchObject({
++        ok: true,
++        delivery: "queued",
++        waitingOn: { kind: "interaction" },
++      });
++
++      cancelPluginForm(harness, thread.id);
++      await expect(pending).resolves.toMatchObject({ outcome: "cancelled" });
++    });
++  });
++
++  it("preserves a real provider-capacity wait without mislabelling it as an interaction", async () => {
++    await withTestHarness(async (harness) => {
++      const hooks: HookRegistry = { "message.dispatch": [] };
++      hooks["message.dispatch"].push({
++        pluginId: "provider-retry",
++        handler: () => ({ action: "wait", reason: "Provider is cooling down" }),
++      });
++      setPluginHookProvider({
++        listHooks: (hook) => hooks[hook],
++        invokeHook: async (_pluginId, _label, run) => ({
++          ok: true,
++          value: await run(),
++        }),
++        decisionTimeoutMs: 10_000,
++      });
++      try {
++        const { thread } = seedProviderThreadFixture({ harness, value: 604 });
++        const pending = requestPluginForm(harness, {
++          threadId: thread.id,
++          nonBlocking: true,
++        });
++
++        await expect(
++          acceptThreadSendRequest(harness.deps, {
++            payload: autoSendPayload("answer while provider is unavailable"),
++            thread,
++          }),
++        ).resolves.toMatchObject({
++          ok: true,
++          delivery: "queued",
++          waitingOn: {
++            kind: "plugin",
++            pluginId: "provider-retry",
++          },
++        });
++
++        cancelPluginForm(harness, thread.id);
++        await expect(pending).resolves.toMatchObject({ outcome: "cancelled" });
++      } finally {
++        setPluginHookProvider(undefined);
++      }
++    });
++  });
++});
++
+ describe("queued message dispatch hook", () => {
+   it("rolls back and sends no host command when the idle thread was archived between claim and dispatch", async () => {
+     await withTestHarness(async (harness) => {
 diff --git a/packages/domain/src/pending-interactions.ts b/packages/domain/src/pending-interactions.ts
 index 06e87b8..d4378f4 100644
 --- a/packages/domain/src/pending-interactions.ts
@@ -518,7 +689,7 @@ index 4e03f6a..c06b4ed 100644
    );
  }
 diff --git a/plugins/ask-user-question/src/server-harness.test.ts b/plugins/ask-user-question/src/server-harness.test.ts
-index bf0dc30..b1eba03 100644
+index bf0dc30..3f5a7de 100644
 --- a/plugins/ask-user-question/src/server-harness.test.ts
 +++ b/plugins/ask-user-question/src/server-harness.test.ts
 @@ -3,17 +3,48 @@ import {
@@ -573,7 +744,32 @@ index bf0dc30..b1eba03 100644
  function configurationContext(
    providerId: string,
    supportsNativeUserQuestion = false,
-@@ -85,7 +116,7 @@ describe("provider gating", () => {
+@@ -64,6 +95,24 @@ const questions = [
+   },
+ ];
+ 
++function queuedQuestion(index: number) {
++  return {
++    ...questions[0],
++    question: `Which database should we use for queued case ${index}?`,
++    header: `Queue ${index}`,
++  };
++}
++
++function queuedBatch(start: number, count: number) {
++  return Array.from({ length: count }, (_unused, index) =>
++    queuedQuestion(start + index),
++  );
++}
++
++const queueBoundaryCases = [0, 1, 28, 29, 30, 31, 32].flatMap((depth) =>
++  [1, 2, 3, 4].map((incoming) => ({ depth, incoming })),
++);
++
+ async function resultText(
+   result: Awaited<ReturnType<FakePluginHost["harness"]["callAgentTool"]>>,
+ ): Promise<string> {
+@@ -85,7 +134,7 @@ describe("provider gating", () => {
      },
    );
  
@@ -582,7 +778,7 @@ index bf0dc30..b1eba03 100644
      "registers the tool for %s with Claude's exact advertised schema",
      async (providerId) => {
        const host = createHost();
-@@ -96,6 +127,14 @@ describe("provider gating", () => {
+@@ -96,6 +145,14 @@ describe("provider gating", () => {
        const [tool] = resolved.tools;
        expect(tool?.name).toBe(TOOL_NAME);
        expect(tool?.inputSchema).toEqual(TOOL_INPUT_JSON_SCHEMA);
@@ -597,10 +793,33 @@ index bf0dc30..b1eba03 100644
      },
    );
  
-@@ -126,6 +165,139 @@ describe("provider gating", () => {
+@@ -126,6 +183,366 @@ describe("provider gating", () => {
  });
  
  describe("asking a question", () => {
++  it.each([1, 2, 3, 4])(
++    "queues every question from a %s-question ACP batch in order",
++    async (count) => {
++      const host = createHost({
++        providerId: "acp-cursor",
++        send: async () => ({}),
++      });
++
++      await expect(
++        callWithoutProviderId(host, { questions: queuedBatch(0, count) }),
++      ).resolves.toBe(
++        "Question added. You may continue independent work; each user answer arrives as a follow-up message.",
++      );
++
++      const queued = (await host.harness.callRpc("getQuestionQueue", {
++        threadId: "thread-test",
++      })) as { payload: { questions: Array<{ id: string }> } | null };
++      expect(queued.payload?.questions.map((question) => question.id)).toEqual(
++        Array.from({ length: count }, (_unused, index) => `q${index}`),
++      );
++    },
++  );
++
 +  it("returns more than one interaction's queued questions through the RPC", async () => {
 +    const host = createHost({
 +      providerId: "acp-cursor",
@@ -631,6 +850,210 @@ index bf0dc30..b1eba03 100644
 +      "q4",
 +    ]);
 +  });
++
++  it("rejects a batch that would overflow the 32-question inbox without dropping existing questions", async () => {
++    const host = createHost({
++      providerId: "acp-cursor",
++      send: async () => ({}),
++    });
++    for (let batch = 0; batch < 8; batch += 1) {
++      await callWithoutProviderId(host, {
++        questions: queuedBatch(batch * 4, 4),
++      });
++    }
++
++    const overflow = await callWithoutProviderId(host, {
++      questions: [queuedQuestion(99)],
++    });
++    expect(await resultText(overflow as never)).toContain(
++      "inbox is full (32)",
++    );
++    const queue = (await host.harness.callRpc("getQuestionQueue", {
++      threadId: "thread-test",
++    })) as { payload: { questions: Array<{ id: string }> } | null };
++    expect(queue.payload?.questions).toHaveLength(32);
++    expect(queue.payload?.questions.at(-1)?.id).toBe("q31");
++  });
++
++  it("deduplicates a repeated question without consuming inbox capacity", async () => {
++    const host = createHost({
++      providerId: "acp-cursor",
++      send: async () => ({}),
++    });
++    await callWithoutProviderId(host, { questions: [queuedQuestion(1)] });
++    await callWithoutProviderId(host, { questions: [queuedQuestion(1)] });
++
++    const queue = (await host.harness.callRpc("getQuestionQueue", {
++      threadId: "thread-test",
++    })) as { payload: { questions: Array<{ id: string }> } | null };
++    expect(queue.payload?.questions.map((question) => question.id)).toEqual([
++      "q0",
++    ]);
++  });
++
++  it.each(queueBoundaryCases)(
++    "handles a $incoming-question batch at queue depth $depth atomically",
++    async ({ depth, incoming }) => {
++      const host = createHost({
++        providerId: "acp-cursor",
++        send: async () => ({}),
++      });
++      for (let index = 0; index < depth; index += 1) {
++        await callWithoutProviderId(host, {
++          questions: [queuedQuestion(index)],
++        });
++      }
++      const before = (await host.harness.callRpc("getQuestionQueue", {
++        threadId: "thread-test",
++      })) as {
++        payload: { questions: Array<{ id: string }> } | null;
++        version: number;
++      };
++
++      const result = await callWithoutProviderId(host, {
++        questions: queuedBatch(depth, incoming),
++      });
++      const after = (await host.harness.callRpc("getQuestionQueue", {
++        threadId: "thread-test",
++      })) as {
++        payload: { questions: Array<{ id: string }> } | null;
++        version: number;
++      };
++      if (depth + incoming <= 32) {
++        expect(await resultText(result as never)).toBe(
++          "Question added. You may continue independent work; each user answer arrives as a follow-up message.",
++        );
++        expect(after.payload?.questions).toHaveLength(depth + incoming);
++        expect(after.payload?.questions.map((question) => question.id)).toEqual(
++          Array.from(
++            { length: depth + incoming },
++            (_unused, index) => `q${index}`,
++          ),
++        );
++        expect(after.version).toBeGreaterThan(before.version);
++      } else {
++        expect(await resultText(result as never)).toContain("inbox is full (32)");
++        expect(after).toEqual(before);
++      }
++    },
++  );
++
++  it("keeps a queued question after delivery fails and delivers it once on retry", async () => {
++    let available = false;
++    const send = vi.fn(async () => {
++      if (!available) throw new Error("provider unavailable");
++    });
++    const host = createHost({ providerId: "acp-cursor", send });
++    await callWithoutProviderId(host, { questions });
++
++    await expect(
++      host.harness.callRpc("answerQueuedQuestion", {
++        threadId: "thread-test",
++        questionId: "q0",
++        answer: { selected: ["q0o1"] },
++      }),
++    ).rejects.toThrow("provider unavailable");
++    await expect(
++      host.harness.callRpc("getQuestionQueue", { threadId: "thread-test" }),
++    ).resolves.toMatchObject({ payload: { questions: [{ id: "q0" }] } });
++
++    available = true;
++    await expect(
++      host.harness.callRpc("answerQueuedQuestion", {
++        threadId: "thread-test",
++        questionId: "q0",
++        answer: { selected: ["q0o1"] },
++      }),
++    ).resolves.toMatchObject({ remaining: 0 });
++    expect(send).toHaveBeenCalledTimes(2);
++    await expect(
++      host.harness.callRpc("getQuestionQueue", { threadId: "thread-test" }),
++    ).resolves.toMatchObject({ payload: null });
++  });
++
++  it("delivers a concurrent duplicate answer at most once", async () => {
++    let release: (() => void) | undefined;
++    const gate = new Promise<void>((resolve) => {
++      release = resolve;
++    });
++    const send = vi.fn(async () => gate);
++    const host = createHost({ providerId: "acp-cursor", send });
++    await callWithoutProviderId(host, { questions });
++    const first = host.harness.callRpc("answerQueuedQuestion", {
++      threadId: "thread-test",
++      questionId: "q0",
++      answer: { selected: ["q0o1"] },
++    });
++
++    await expect(
++      host.harness.callRpc("answerQueuedQuestion", {
++        threadId: "thread-test",
++        questionId: "q0",
++        answer: { selected: ["q0o1"] },
++      }),
++    ).rejects.toThrow("already being delivered");
++    release?.();
++    await expect(first).resolves.toMatchObject({ remaining: 0 });
++    expect(send).toHaveBeenCalledTimes(1);
++  });
++
++  it("rejects an answer when no ACP inbox exists", async () => {
++    const host = createHost({ providerId: "acp-cursor", send: async () => ({}) });
++    await expect(
++      host.harness.callRpc("answerQueuedQuestion", {
++        threadId: "thread-test",
++        questionId: "q0",
++        answer: { selected: ["q0o1"] },
++      }),
++    ).rejects.toThrow("no longer pending");
++  });
++
++  it("accepts an RPC answer after the original ACP tool call has aborted", async () => {
++    const send = vi.fn(async () => ({}));
++    const host = createHost({ providerId: "acp-cursor", send });
++    const controller = new AbortController();
++    await host.harness.callAgentTool(
++      TOOL_NAME,
++      { questions },
++      { providerId: "acp-cursor", signal: controller.signal } as never,
++    );
++    controller.abort();
++
++    await expect(
++      host.harness.callRpc("answerQueuedQuestion", {
++        threadId: "thread-test",
++        questionId: "q0",
++        answer: { selected: ["q0o1"] },
++      }),
++    ).resolves.toMatchObject({ remaining: 0 });
++    expect(send).toHaveBeenCalledTimes(1);
++  });
++
++  it.each([0, 2, 4])(
++    "removes only queue position %s and preserves survivor order",
++    async (index) => {
++      const send = vi.fn(async () => ({}));
++      const host = createHost({ providerId: "acp-cursor", send });
++      await callWithoutProviderId(host, { questions: queuedBatch(0, 5) });
++
++      await expect(
++        host.harness.callRpc("answerQueuedQuestion", {
++          threadId: "thread-test",
++          questionId: `q${index}`,
++          answer: { selected: [`q${index}o1`] },
++        }),
++      ).resolves.toMatchObject({ remaining: 4 });
++      const queue = (await host.harness.callRpc("getQuestionQueue", {
++        threadId: "thread-test",
++      })) as { payload: { questions: Array<{ id: string }> } | null };
++      expect(queue.payload?.questions.map((question) => question.id)).toEqual(
++        [0, 1, 2, 3, 4]
++          .filter((candidate) => candidate !== index)
++          .map((candidate) => `q${candidate}`),
++      );
++      expect(send).toHaveBeenCalledTimes(1);
++    },
++  );
 +
 +  it("uses the thread provider when the live tool context omits providerId", async () => {
 +    const host = createHost({
@@ -738,7 +1161,7 @@ index bf0dc30..b1eba03 100644
      const host = createHost();
      const call = host.harness.callAgentTool(TOOL_NAME, { questions });
 diff --git a/plugins/ask-user-question/src/server.ts b/plugins/ask-user-question/src/server.ts
-index 892065a..04afc41 100644
+index 892065a..3c1037e 100644
 --- a/plugins/ask-user-question/src/server.ts
 +++ b/plugins/ask-user-question/src/server.ts
 @@ -1,8 +1,16 @@
@@ -759,7 +1182,7 @@ index 892065a..04afc41 100644
  } from "./contracts.js";
  import {
    TOOL_DESCRIPTION,
-@@ -20,11 +28,223 @@ import {
+@@ -20,11 +28,238 @@ import {
  export const TOOL_NAME = "AskUserQuestion";
  export const RENDERER_ID = ASK_USER_QUESTION_RENDERER_ID;
  
@@ -839,6 +1262,22 @@ index 892065a..04afc41 100644
 +  }
 +}
 +
++function newQuestionCount(
++  queue: QuestionQueue,
++  payload: InteractionPayload,
++): number {
++  const seenPrompts = new Set(
++    queue.questions.map((question) => question.prompt),
++  );
++  let count = 0;
++  for (const source of payload.questions) {
++    if (seenPrompts.has(source.prompt)) continue;
++    seenPrompts.add(source.prompt);
++    count += 1;
++  }
++  return count;
++}
++
 +function appendQuestions(
 +  queue: QuestionQueue,
 +  payload: InteractionPayload,
@@ -848,7 +1287,6 @@ index 892065a..04afc41 100644
 +  );
 +  for (const source of payload.questions) {
 +    if (seenPrompts.has(source.prompt)) continue;
-+    if (queue.questions.length >= MAX_QUEUED_QUESTIONS) break;
 +    const id = `q${queue.nextQuestionId++}`;
 +    queue.questions.push({
 +      ...source,
@@ -983,7 +1421,7 @@ index 892065a..04afc41 100644
    bb.agents.registerTool({
      name: TOOL_NAME,
      description: TOOL_DESCRIPTION,
-@@ -48,17 +268,54 @@ export default function plugin(bb: BbPluginApi) {
+@@ -48,17 +283,67 @@ export default function plugin(bb: BbPluginApi) {
        }
  
        const askedAt = Date.now();
@@ -993,6 +1431,14 @@ index 892065a..04afc41 100644
 -        result = await bb.ui.requestInput(
 +        const existing = acp ? queues.get(ctx.threadId) : undefined;
 +        if (existing !== undefined) {
++          if (
++            newQuestionCount(existing, payload) >
++            MAX_QUEUED_QUESTIONS - existing.questions.length
++          ) {
++            return errorResult(
++              `The ACP question inbox is full (${MAX_QUEUED_QUESTIONS}). Answer or dismiss a question before adding more.`,
++            );
++          }
 +          appendQuestions(existing, payload);
 +          publishQueue(ctx.threadId, existing);
 +          return ACP_PENDING_RESULT;
@@ -1001,6 +1447,11 @@ index 892065a..04afc41 100644
 +          ? { questions: [], nextQuestionId: 0, version: 0 }
 +          : undefined;
 +        if (queue !== undefined) {
++          if (newQuestionCount(queue, payload) > MAX_QUEUED_QUESTIONS) {
++            return errorResult(
++              `The ACP question inbox is full (${MAX_QUEUED_QUESTIONS}). Answer or dismiss a question before adding more.`,
++            );
++          }
 +          appendQuestions(queue, payload);
 +          queues.set(ctx.threadId, queue);
 +        }
@@ -1040,7 +1491,7 @@ index 892065a..04afc41 100644
        } catch (error) {
          return errorResult(
            `The question could not be shown (${error instanceof Error ? error.message : String(error)}). Only one prompt can await the user at a time — put all of your questions in a single AskUserQuestion call, or continue with your best judgement.`,
-@@ -93,9 +350,13 @@ export default function plugin(bb: BbPluginApi) {
+@@ -93,9 +378,13 @@ export default function plugin(bb: BbPluginApi) {
      if (context.provider.capabilities.supportsNativeUserQuestion) {
        return { tools: [], skills: [] };
      }

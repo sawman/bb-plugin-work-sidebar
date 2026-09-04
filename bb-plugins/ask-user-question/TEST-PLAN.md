@@ -24,6 +24,7 @@ any gate fails.
 | Dependencies | `pnpm install --frozen-lockfile` completes before any patched-core build or test. |
 | Core types | `turbo run typecheck --filter=@bb/server --force` passes after patches apply. |
 | Core interaction behavior | Focused pending-interaction tests prove a blocking interaction gates messages and a non-blocking plugin form remains pending while messages dispatch. |
+| Core dispatch states | Focused thread-dispatch tests send an ACP answer to idle and active/running threads, prove ordinary forms still produce an `interaction` wait, and prove a real provider-capacity wait remains a provider/plugin wait rather than being masked by the question form. |
 | Core tool route | Focused internal tool-call test proves a provider ID reaches the plugin context on current BB; plugin fallback is separately tested with that field absent. |
 | Plugin types | `turbo run typecheck --filter=bb-plugin-ask-user-question --force` passes. |
 | Plugin behavior | Focused plugin tests cover native blocking calls and ACP non-blocking calls, provider lookup fallback, validation, queueing, answer delivery, dismissal, and final-form cleanup. |
@@ -63,6 +64,28 @@ These tests belong in the pinned BB source patch, not only in this repository.
 | Dismiss | No answer is sent and queued state is cleaned up as defined by the UX. |
 | Double click / concurrent answer | At most one message is sent for that question; the second response is a harmless stale/not-found result. |
 
+### Exhaustive bounded queue matrix
+
+The implementation accepts 1–4 questions per call and stores at most 32
+unanswered ACP questions per thread. The automated suite must exercise the
+entire boundary, not only a representative happy path:
+
+| Dimension | Required values |
+| --- | --- |
+| Questions in one tool call | 1, 2, 3, 4 |
+| Existing queue depth before a call | 0, 1, 28, 29, 30, 31, 32 |
+| Incoming unique count | 1, 2, 3, 4 |
+| Capacity result | Every sum `<= 32` is accepted in insertion order; every sum `> 32` is rejected atomically with the existing queue byte-for-byte unchanged. |
+| Duplicate prompt | Repeating a prompt neither consumes capacity nor changes ordering/version beyond the defined no-op semantics. |
+| Answer position | First, middle, and final queue entries; after each answer, only that entry is removed and all survivors retain order. |
+| Answer selection | One option, multiple options, free text, empty, unknown option, duplicate option, malformed result. |
+| Delivery outcome | Success, rejection, delayed resolution, two concurrent submits, and retry after rejection. |
+
+Use deterministic generated cases for the cartesian boundary table above
+(seeded/explicit loops, not time-dependent randomness). Every generated case
+must assert the queue IDs, version monotonicity, send count, and surviving
+contents. A failure must print the seed/case tuple for exact reproduction.
+
 ### Dispatch and lifecycle
 
 | Case | Expected result |
@@ -73,6 +96,10 @@ These tests belong in the pinned BB source patch, not only in this repository.
 | Answer arrives while a normal blocking interaction exists | The normal interaction retains its existing dispatch semantics; no bypass is introduced. |
 | Plugin reload / server restart with queued questions | Queue persistence and post-restart answer delivery behave according to the stored interaction state; no duplicate messages. |
 | Abort signal from original ACP tool call | The non-blocking request is retained and can still be answered after the tool call has returned. |
+| Original tool-call timeout | The same as abort: a later inbox answer is accepted and sent exactly once; the original timeout must never cancel the display-only form. |
+| Queue delivery while provider is unavailable | The question is retained after `threads.send` rejects; one explicit retry sends it once when delivery recovers. |
+| Queue delivery while a thread is running/thinking | `mode: "auto"` follows the existing join/steer path; the form adds no `interaction` wait. |
+| Queue delivery while core has a real blocker | The message keeps its real wait reason (provider capacity, provisioning, busy turn, or a normal user interaction) and is drained only by core's ordinary lifecycle. |
 
 ## Deployment and rollback smoke matrix
 

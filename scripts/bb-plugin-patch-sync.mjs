@@ -41,6 +41,7 @@ const coreArtifacts = [
     ),
   ).values(),
 ];
+const coreTests = plan.patches.flatMap((entry) => entry.coreTests ?? []);
 
 function run(command, commandArgs, options = {}) {
   console.log(`$ ${[command, ...commandArgs].join(" ")}`);
@@ -124,15 +125,22 @@ try {
     }
   }
 
-  for (const entry of plan.patches) {
-    if (entry.serverRouteTest === undefined) continue;
+  if (coreTests.length > 0) {
     run(join(sourceRoot, "node_modules/.bin/turbo"), [
       "run",
       "typecheck",
       "--filter=@bb/server",
       "--force",
     ], { cwd: sourceRoot });
-    run("pnpm", ["--filter", "@bb/server", "exec", "vitest", "run", entry.serverRouteTest], {
+    run("pnpm", [
+      "--filter",
+      "@bb/server",
+      "exec",
+      "vitest",
+      "run",
+      "--no-file-parallelism",
+      ...coreTests,
+    ], {
       cwd: sourceRoot,
     });
   }

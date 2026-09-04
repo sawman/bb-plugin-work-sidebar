@@ -18,9 +18,11 @@ by their declared capability.
 
 The normal host interaction is one form containing **one to four** independent
 questions and returns one combined answer object. ACP calls append independent
-questions to a per-thread inbox (bounded at 32); each selected answer is sent
-immediately, while unanswered questions remain visible. The final answer closes
-the display-only interaction without producing a duplicate follow-up.
+questions to a per-thread inbox (bounded at 32). An overflowing batch is
+rejected atomically rather than silently dropping questions. Each selected
+answer is sent immediately while unanswered questions remain visible. The final
+answer closes the display-only interaction without producing a duplicate
+follow-up.
 
 The source patch is [acp-continuation.patch](acp-continuation.patch). It adds
 coverage for Cursor, OpenCode, and a custom ACP provider, plus dismissal.
@@ -39,9 +41,9 @@ The versioned release criteria and live smoke matrix are in
   [`rollback/bb-0.41.0/`](rollback/bb-0.41.0/), verified by its
   [`manifest.json`](rollback/bb-0.41.0/manifest.json). The local pre-deploy
   copy under `~/.bb/patch-backups/` is only a convenience mirror.
-- Validation: 46 focused plugin tests, 31 focused pending-interaction/core
-  tests, plugin and core typechecks, builds, installed-artifact inspection,
-  and a live ACP Reply round-trip.
+- Validation: 87 focused plugin tests, 72 focused core tests, plugin and core
+  typechecks, builds, installed-artifact inspection, and a live ACP Reply
+  round-trip.
 
 ## Update procedure
 
