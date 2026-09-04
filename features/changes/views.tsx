@@ -318,7 +318,7 @@ function CurrentPullRequestDetails({
   const summary = [
     signal.review.label,
     checkSummary(pullRequest.checks),
-    `Merge ${readableStatus(pullRequest.mergeability.state)}`,
+    readableStatus(pullRequest.mergeability.state),
   ].join(" · ");
   return (
     <div className="ws-current-pr-details" aria-label={summary}>

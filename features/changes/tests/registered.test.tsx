@@ -358,7 +358,7 @@ describe("R13 registered Changes Work slot", () => {
     ).toBe(true);
     fireEvent.click(nonStackDisclosure);
     expect(
-      nonStack.getByText("Approved · 2 checks passed · Merge Mergeable"),
+      nonStack.getByText("Approved · 2 checks passed · Mergeable"),
     ).toBeTruthy();
     expect(nonStack.getByText("Changed files are unavailable.")).toBeTruthy();
     nonStack.lifecycle.unmount();
@@ -549,7 +549,7 @@ describe("R13 registered Changes Work slot", () => {
     });
     fireEvent.click(disclosure);
     expect(
-      slot.getByText("Review: octocat · 2 checks passed · Merge Mergeable"),
+      slot.getByText("Review: octocat · 2 checks passed · Mergeable"),
     ).toBeTruthy();
     slot.lifecycle.unmount();
   });
