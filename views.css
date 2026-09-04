@@ -1807,7 +1807,7 @@ button.ws-change-file-row:hover {
   display: inline-block;
   min-width: 5ch;
   color: var(--muted-foreground);
-  font: var(--ws-text-metadata);
+  font: inherit;
   line-height: inherit;
   text-align: right;
   white-space: nowrap;
@@ -4206,7 +4206,7 @@ button.ws-provider-health:focus-visible {
   gap: 0.38rem;
   margin-top: 0;
   border-top: 0;
-  padding-top: 0.16rem;
+  padding-top: 0;
 }
 .ws-work-item-destination {
   display: inline-flex;

@@ -152,7 +152,7 @@ describe("stylesheet policy", () => {
     expect(pair).toContain("grid-template-columns: repeat(2, 5ch)");
     expect(pair).toContain("font: var(--ws-text-metadata)");
     expect(delta).toContain("min-width: 5ch");
-    expect(delta).toContain("font: var(--ws-text-metadata)");
+    expect(delta).toContain("font: inherit");
     expect(stackPair).toContain("grid-template-columns: repeat(2, 6ch)");
     expect(stackPair).toContain("grid-area: deltas");
     expect(stackDelta).toContain("min-width: 6ch");

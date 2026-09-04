@@ -1,7 +1,7 @@
 :root {
   /* Shared overlays stay distinct without the bright halo of host popovers. */
-  --ws-overlay-shadow: 0 0.12rem 0.45rem
-    color-mix(in srgb, var(--foreground) 12%, transparent);
+  --ws-overlay-shadow: 0 0.08rem 0.28rem
+    color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 .ws-list,
 .ws-panel {
