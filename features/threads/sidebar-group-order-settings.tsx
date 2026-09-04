@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useRef,
   useState,
   type DragEvent as ReactDragEvent,
@@ -39,6 +40,7 @@ export function ThreadGroupOrderSettings({
     value: string;
   } | null>(null);
   const renameTriggerRefs = useRef(new Map<string, HTMLButtonElement>());
+  const renameFormRef = useRef<HTMLFormElement>(null);
   const finishDrag = () => {
     setDraggedGroupId(null);
     setDragTarget(null);
@@ -72,6 +74,16 @@ export function ThreadGroupOrderSettings({
     if (rename?.groupId !== group.id) return;
     if (settings.onRenameGroup(group, rename.value)) closeRename();
   };
+  useEffect(() => {
+    if (!rename) return;
+    const dismissOutsideRename = (event: PointerEvent) => {
+      if (renameFormRef.current?.contains(event.target as Node)) return;
+      closeRename(rename.groupId);
+    };
+    document.addEventListener("pointerdown", dismissOutsideRename, true);
+    return () =>
+      document.removeEventListener("pointerdown", dismissOutsideRename, true);
+  }, [rename]);
   return (
     <div
       className="ws-thread-group-settings"
@@ -129,6 +141,7 @@ export function ThreadGroupOrderSettings({
           >
             {group && rename?.groupId === group.id ? (
               <form
+                ref={renameFormRef}
                 className="ws-thread-group-rename-form"
                 onSubmit={(event) => {
                   event.preventDefault();
@@ -160,20 +173,17 @@ export function ThreadGroupOrderSettings({
                 />
               </form>
             ) : group ? (
-              <ActionTooltip label="Rename">
-                {(tooltipId) => <button
+              <button
                 ref={(node) => {
                   if (node) renameTriggerRefs.current.set(group.id, node);
                   else renameTriggerRefs.current.delete(group.id);
                 }}
                 type="button"
                 className="ws-thread-group-rename"
-                aria-describedby={tooltipId}
                 onClick={() => setRename({ groupId: group.id, value: group.name })}
-                >
+              >
                 {group.name}
-                </button>}
-              </ActionTooltip>
+              </button>
             ) : (
               <span className="ws-thread-group-system">Active</span>
             )}

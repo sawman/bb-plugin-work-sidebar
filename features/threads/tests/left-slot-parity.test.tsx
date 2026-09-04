@@ -1088,6 +1088,32 @@ describe("R18 registered left sidebar parity", () => {
     slot.lifecycle.unmount();
   });
 
+  it("dismisses group renaming on an outside press without a redundant tooltip", async () => {
+    const slot = await leftSlot({
+      threads: [thread("thr_alpha", "Alpha thread")],
+      groups: [
+        { id: "group_alpha", name: "Alpha", threadIds: ["thr_alpha"] },
+      ],
+    });
+
+    await waitFor(() => expect(slot.getByText("Alpha")).toBeTruthy());
+    fireEvent.click(slot.getByRole("button", { name: "Thread list settings" }));
+    const trigger = slot.getByRole("button", { name: "Alpha" });
+    expect(trigger.getAttribute("aria-describedby")).toBeNull();
+
+    fireEvent.click(trigger);
+    expect(slot.getByRole("textbox", { name: "Rename Alpha" })).toBeTruthy();
+    fireEvent.pointerDown(slot.getByText("Groups"));
+
+    expect(slot.queryByRole("textbox", { name: "Rename Alpha" })).toBeNull();
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        slot.getByRole("button", { name: "Alpha" }),
+      ),
+    );
+    slot.lifecycle.unmount();
+  });
+
   it("persists group disclosures without treating search expansion as a preference", async () => {
     let disclosures: Record<string, boolean> = {};
     const groups = [
