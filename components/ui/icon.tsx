@@ -54,7 +54,7 @@ const paths: Record<string, React.ReactNode> = {
     <>
       <circle cx="6" cy="6" r="2" />
       <circle cx="6" cy="18" r="2" />
-      <circle cx="18" cy="18" r="2" />
+      <circle cx="18" cy="6" r="2" />
       <path d="M6 8v8m2 2h6a4 4 0 0 0 4-4V8" />
     </>
   ),
@@ -63,7 +63,8 @@ const paths: Record<string, React.ReactNode> = {
       <circle cx="6" cy="6" r="2" />
       <circle cx="6" cy="18" r="2" />
       <circle cx="18" cy="12" r="2" />
-      <path d="M6 8v8m2-2h6a4 4 0 0 0 4-4V8" />
+      <path d="M8 6h2a8 8 0 0 1 8 8v-2" />
+      <path d="M8 18h2a8 8 0 0 0 8-8v2" />
     </>
   ),
   GitPullRequest: (

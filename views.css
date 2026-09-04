@@ -1415,7 +1415,7 @@
 }
 .ws-thread-pr-token[data-tone="merged"],
 .ws-pr-number-badge[data-tone="merged"] {
-  color: var(--primary);
+  color: var(--pr-merged);
 }
 .ws-linear-linked-list {
   display: grid;
@@ -2902,7 +2902,7 @@ button.ws-provider-health:focus-visible {
   color: var(--warning);
 }
 .ws-status[data-tone="merged"] {
-  color: var(--primary);
+  color: var(--pr-merged);
 }
 .ws-work-toolbar-actions {
   min-height: 1.6rem;

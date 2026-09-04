@@ -95,6 +95,9 @@ describe("stylesheet policy", () => {
     expect(rule('\\.ws-status\\[data-tone="destructive"\\]')).toContain(
       "color: var(--destructive)",
     );
+    expect(rule('\\.ws-status\\[data-tone="merged"\\]')).toContain(
+      "color: var(--pr-merged)",
+    );
     expect(
       rule('\\.ws-thread-pr-token\\[data-tone="warning"\\],\\n\\.ws-pr-number-badge\\[data-tone="warning"\\]'),
     ).toContain("color: var(--warning)");
