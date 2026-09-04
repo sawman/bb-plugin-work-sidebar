@@ -6,6 +6,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 
 /** Tooltip copy must remain a brief control hint, not secondary UI text. */
 export const MAX_TOOLTIP_LABEL_LENGTH = 40;
@@ -105,28 +106,36 @@ export function ActionTooltip({
     left: position?.left ?? 0,
     top: position?.top ?? 0,
   };
-  return (
+  const content = (
     <span
-      ref={anchorRef}
-      className="ws-action-tooltip"
-      onPointerEnter={() => setOpen(true)}
-      onPointerLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
-      }}
-    >
-      {children(tooltipId)}
+      ref={tooltipRef}
+      id={tooltipId}
+      aria-label={semantic ? tooltipLabel : undefined}
+      className="ws-action-tooltip-content"
+      data-tooltip-label={tooltipLabel}
+      data-open={open || undefined}
+      data-portalled="true"
+      role={semantic ? "tooltip" : undefined}
+      style={tooltipStyle}
+    />
+  );
+  return (
+    <>
       <span
-        ref={tooltipRef}
-        id={tooltipId}
-        aria-label={semantic ? tooltipLabel : undefined}
-        className="ws-action-tooltip-content"
-        data-tooltip-label={tooltipLabel}
-        data-open={open || undefined}
-        role={semantic ? "tooltip" : undefined}
-        style={tooltipStyle}
-      />
-    </span>
+        ref={anchorRef}
+        className="ws-action-tooltip"
+        onPointerEnter={() => setOpen(true)}
+        onPointerLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+        }}
+      >
+        {children(tooltipId)}
+      </span>
+      {typeof document === "undefined"
+        ? content
+        : createPortal(content, document.body)}
+    </>
   );
 }

@@ -4021,7 +4021,8 @@ button.ws-provider-health:focus-visible {
 }
 .ws-action-tooltip-content {
   position: fixed;
-  z-index: 1000;
+  /* Portalled to body so headers and panels cannot trap its stacking layer. */
+  z-index: 1200;
   width: max-content;
   max-width: 12rem;
   padding: 0.22rem 0.36rem;

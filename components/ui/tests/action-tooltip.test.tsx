@@ -43,6 +43,7 @@ describe("ActionTooltip", () => {
     );
     const anchor = view.container.querySelector<HTMLElement>(".ws-action-tooltip")!;
     const tooltip = screen.getByRole("tooltip");
+    expect(tooltip.closest("[data-portalled=true]")).toBe(tooltip);
     vi.spyOn(anchor, "getBoundingClientRect").mockReturnValue({
       left: 94, top: 2, width: 8, height: 12, bottom: 14,
     } as DOMRect);
@@ -56,6 +57,33 @@ describe("ActionTooltip", () => {
       expect((tooltip as HTMLElement).style.left).toBe("44px");
       expect((tooltip as HTMLElement).style.top).toBe("19px");
       expect(tooltip.getAttribute("data-open")).toBe("true");
+    });
+  });
+
+  it("renders above local stacking contexts without leaving the viewport", async () => {
+    const view = render(
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <ActionTooltip label="Settings">
+          {(tooltipId) => <button aria-describedby={tooltipId}>Control</button>}
+        </ActionTooltip>
+      </div>,
+    );
+    const anchor = view.container.querySelector<HTMLElement>(".ws-action-tooltip")!;
+    const tooltip = screen.getByRole("tooltip");
+    vi.spyOn(anchor, "getBoundingClientRect").mockReturnValue({
+      left: 2, top: 2, width: 8, height: 12, bottom: 14,
+    } as DOMRect);
+    vi.spyOn(tooltip, "getBoundingClientRect").mockReturnValue({
+      width: 48, height: 20,
+    } as DOMRect);
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 100 });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 100 });
+
+    fireEvent.pointerEnter(anchor);
+    await waitFor(() => {
+      expect(tooltip.parentElement).toBe(document.body);
+      expect((tooltip as HTMLElement).style.left).toBe("8px");
+      expect((tooltip as HTMLElement).style.top).toBe("19px");
     });
   });
 });

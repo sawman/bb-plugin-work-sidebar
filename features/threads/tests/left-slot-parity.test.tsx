@@ -1006,9 +1006,11 @@ describe("R18 registered left sidebar parity", () => {
     const activeHandle = slot.getByRole("button", {
       name: "Drag Active to reorder",
     });
-    expect(activeHandle.parentElement?.lastElementChild?.previousElementSibling).toBe(
-      activeHandle,
-    );
+    expect(
+      activeHandle.closest("[data-group-position]")?.querySelector(
+        ".ws-thread-group-drag",
+      ),
+    ).toBe(activeHandle);
     const betaRow = slot
       .getByRole("button", { name: "Drag Beta to reorder" })
       .closest("[data-group-position]")!;
@@ -1019,8 +1021,8 @@ describe("R18 registered left sidebar parity", () => {
     const betaHandle = slot.getByRole("button", {
       name: "Drag Beta to reorder",
     });
-    expect(betaRow.lastElementChild?.firstElementChild).toBe(betaHandle);
-    expect(betaHandle.parentElement?.previousElementSibling?.firstElementChild).toBe(
+    expect(betaRow.querySelector(".ws-thread-group-drag")).toBe(betaHandle);
+    expect(betaRow.querySelector(".ws-thread-group-remove")).toBe(
       slot.getByRole("button", { name: "Remove Beta" }),
     );
     fireEvent.dragStart(activeHandle, {

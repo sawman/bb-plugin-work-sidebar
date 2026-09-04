@@ -5,9 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TabSelector } from "./tab-selector";
 
 const items = [
-  { id: "work", label: "Work", description: "Work details" },
-  { id: "changes", label: "Changes", description: "Changed files" },
-  { id: "agents", label: "Agents", description: "Running agents" },
+  { id: "work", label: "Work" },
+  { id: "changes", label: "Changes" },
+  { id: "agents", label: "Agents" },
 ] as const;
 
 afterEach(cleanup);
@@ -48,8 +48,8 @@ describe("TabSelector", () => {
     const view = render(<ControlledSelector tabs />);
     const work = view.getByRole("tab", { name: "Work" });
     expect(work.getAttribute("title")).toBeNull();
-    expect(work.getAttribute("aria-describedby")).toBeTruthy();
-    expect(view.container.querySelector(".ws-action-tooltip-content")?.getAttribute("role")).toBeNull();
+    expect(work.getAttribute("aria-describedby")).toBeNull();
+    expect(document.querySelector(".ws-action-tooltip-content")).toBeNull();
     fireEvent.keyDown(work, { key: "ArrowRight" });
 
     const changes = view.getByRole("tab", { name: "Changes" });

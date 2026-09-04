@@ -36,19 +36,10 @@ import { TextScaleProvider, textScaleStyle } from "../../shared/text-scale";
 const WORK_TABS: readonly {
   id: WorkTab;
   label: string;
-  description: string;
 }[] = [
-  {
-    id: "work",
-    label: "Work",
-    description: "Outcome, execution tasks, goal, and plan",
-  },
-  {
-    id: "changes",
-    label: "Changes",
-    description: "Pull request, stack, branch, and working-tree state",
-  },
-  { id: "agents", label: "Agents", description: "Delegated child threads" },
+  { id: "work", label: "Work" },
+  { id: "changes", label: "Changes" },
+  { id: "agents", label: "Agents" },
 ];
 const MAX_QUEUED_ROOT_EVENTS = 8;
 
