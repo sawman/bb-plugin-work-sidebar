@@ -1955,6 +1955,11 @@ button.ws-change-file-row:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.ws-thread-group-settings-row > .ws-action-tooltip:has(.ws-thread-group-rename) {
+  min-width: 0;
+  max-width: 100%;
+  justify-self: start;
+}
 .ws-thread-group-rename-form {
   min-width: 0;
   padding: 0 0.25rem;

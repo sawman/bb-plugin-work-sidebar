@@ -173,17 +173,24 @@ export function ThreadGroupOrderSettings({
                 />
               </form>
             ) : group ? (
-              <button
-                ref={(node) => {
-                  if (node) renameTriggerRefs.current.set(group.id, node);
-                  else renameTriggerRefs.current.delete(group.id);
-                }}
-                type="button"
-                className="ws-thread-group-rename"
-                onClick={() => setRename({ groupId: group.id, value: group.name })}
-              >
-                {group.name}
-              </button>
+              <ActionTooltip label="Rename group">
+                {(tooltipId) => (
+                  <button
+                    ref={(node) => {
+                      if (node) renameTriggerRefs.current.set(group.id, node);
+                      else renameTriggerRefs.current.delete(group.id);
+                    }}
+                    type="button"
+                    className="ws-thread-group-rename"
+                    aria-describedby={tooltipId}
+                    onClick={() =>
+                      setRename({ groupId: group.id, value: group.name })
+                    }
+                  >
+                    {group.name}
+                  </button>
+                )}
+              </ActionTooltip>
             ) : (
               <span className="ws-thread-group-system">Active</span>
             )}

@@ -1088,7 +1088,7 @@ describe("R18 registered left sidebar parity", () => {
     slot.lifecycle.unmount();
   });
 
-  it("dismisses group renaming on an outside press without a redundant tooltip", async () => {
+  it("dismisses group renaming on an outside press and anchors its rename hint", async () => {
     const slot = await leftSlot({
       threads: [thread("thr_alpha", "Alpha thread")],
       groups: [
@@ -1099,7 +1099,12 @@ describe("R18 registered left sidebar parity", () => {
     await waitFor(() => expect(slot.getByText("Alpha")).toBeTruthy());
     fireEvent.click(slot.getByRole("button", { name: "Thread list settings" }));
     const trigger = slot.getByRole("button", { name: "Alpha" });
-    expect(trigger.getAttribute("aria-describedby")).toBeNull();
+    const tooltipId = trigger.getAttribute("aria-describedby");
+    expect(tooltipId).toBeTruthy();
+    expect(
+      document.getElementById(tooltipId!)?.getAttribute("data-tooltip-label"),
+    ).toBe("Rename group");
+    expect(trigger.parentElement?.classList).toContain("ws-action-tooltip");
 
     fireEvent.click(trigger);
     expect(slot.getByRole("textbox", { name: "Rename Alpha" })).toBeTruthy();
