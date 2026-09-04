@@ -22,7 +22,12 @@ function countLabel(count: number, description: string) {
 export function StatusCard({ threadId }: { threadId: string }) {
   const query = useWorkStatus(threadId);
   const latestActivity = useLatestActivity(threadId, query.data?.currentThread.status);
-  const provider = useWorkProviderHealth(threadId, query.data?.currentThread);
+  // The current server includes the provider snapshot in Work status. Retain
+  // a compatibility read for an older server response during a rolling reload.
+  const legacyProvider = useWorkProviderHealth(
+    threadId,
+    query.data?.provider ? undefined : query.data?.currentThread,
+  );
   const providerStatusExpanded = useStore(
     threadInteractionStore,
     (state) => state.providerStatusExpandedThreadIds.has(threadId),
@@ -30,6 +35,7 @@ export function StatusCard({ threadId }: { threadId: string }) {
   const providerDirectory = experimental_useProviders();
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const data = query.data;
+  const providerStatus = data?.provider ?? legacyProvider.data ?? null;
   const total = data?.children.filter((child) => !child.isArchived).length ?? 0;
   const active = data?.children.filter(
     (child) => !child.isArchived && ["active", "starting"].includes(child.status),
@@ -56,9 +62,9 @@ export function StatusCard({ threadId }: { threadId: string }) {
             activity={activity}
             total={total}
             active={active}
-            provider={provider.data ?? null}
-            providerLogo={provider.data
-              ? providerDirectory.providers.find((candidate) => candidate.id === provider.data!.providerId)
+            provider={providerStatus}
+            providerLogo={providerStatus
+              ? providerDirectory.providers.find((candidate) => candidate.id === providerStatus.providerId)
               : undefined}
           />
         ) : undefined
@@ -67,9 +73,9 @@ export function StatusCard({ threadId }: { threadId: string }) {
       error={query.error}
       onRetry={() => void query.refetch()}
     >
-      {provider.data ? (
+      {providerStatus ? (
         <ProviderStatusSection
-          provider={provider.data}
+          provider={providerStatus}
           expanded={providerStatusExpanded}
           onExpandedChange={(expanded) =>
             threadInteractionStore.getState().setProviderStatusExpanded(threadId, expanded)}

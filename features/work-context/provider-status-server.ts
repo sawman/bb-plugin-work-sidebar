@@ -96,6 +96,15 @@ export function createProviderStatusReadService({
   };
 
   return {
+    /**
+     * Exposes a fresh lifecycle-owned value without starting a read. Work
+     * status uses this to include a warm provider snapshot without making
+     * its own card response wait on provider usage I/O.
+     */
+    peekIdentity(providerId: string) {
+      const cached = cache.get(keyFor(providerId));
+      return cached && cached.expiresAt > now() ? cached.value : undefined;
+    },
     readIdentity(providerId: string) {
       return readScope(providerId);
     },

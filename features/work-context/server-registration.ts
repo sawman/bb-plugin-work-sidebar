@@ -90,6 +90,7 @@ export function createWorkContextRegistration(
       tasks.descendants(threadId),
       tasks.rootThread(threadId),
     ]);
+    const provider = providerStatus.peekIdentity(thread.providerId);
     return {
       rootThreadId: root.id,
       currentThread: {
@@ -99,6 +100,7 @@ export function createWorkContextRegistration(
         providerId: thread.providerId,
         environmentId: thread.environmentId ?? null,
       },
+      ...(provider ? { provider } : {}),
       children: children.map(({ thread: child, depth }) => ({
         id: child.id,
         title: child.title ?? child.titleFallback ?? "Untitled agent",

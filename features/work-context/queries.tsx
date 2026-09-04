@@ -58,10 +58,19 @@ export function useWorkStatus(
   { poll = false }: { poll?: boolean } = {},
 ) {
   const rpc = useRpc<typeof rpcContract>();
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: queryKeys.work.status(threadId),
-    queryFn: () =>
-      rpc.call("getWorkStatus", { threadId }) as Promise<WorkStatus>,
+    queryFn: async () => {
+      const result = await rpc.call("getWorkStatus", { threadId }) as WorkStatus;
+      if (result.provider) {
+        queryClient.setQueryData(
+          queryKeys.work.providerHealth(result.currentThread.providerId),
+          result.provider,
+        );
+      }
+      return result;
+    },
     ...queryPolicies.workContext,
     refetchOnMount: "always",
     refetchInterval: poll ? WORK_CARD_REFRESH_MS : false,

@@ -80,6 +80,10 @@ export const workStatusSchema = z.object({
     providerId: z.string(),
     environmentId: z.string().nullable().optional(),
   }),
+  // The Status card needs provider health alongside the thread identity. Keep
+  // it in this response so opening a thread does not require a second client
+  // round trip after this read discovers the provider id.
+  provider: z.lazy(() => workProviderStatusSchema).optional(),
   children: z.array(z.object({
     id: z.string(),
     title: z.string(),

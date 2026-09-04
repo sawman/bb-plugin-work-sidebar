@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type PropsWithChildren } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { queryKeys } from "../../../query-runtime";
 import {
   WORK_CARD_REFRESH_MS,
   invalidateWorkProviderHealth,
@@ -100,6 +101,51 @@ describe("work-context provider health query", () => {
     client.clear();
     if (previousVisibility) Object.defineProperty(document, "visibilityState", previousVisibility);
     else delete (document as { visibilityState?: string }).visibilityState;
+  });
+
+  it("hydrates the provider directory from the status response without a second RPC", async () => {
+    const provider = {
+      tone: "green" as const,
+      providerId: "codex",
+      providerName: "Codex",
+      statusUrl: null,
+      status: "ready" as const,
+      message: null,
+      usage: null,
+    };
+    rpcClient.call.mockReset();
+    rpcClient.call.mockImplementation((method) => {
+      if (method === "getWorkStatus") {
+        return Promise.resolve({
+          rootThreadId: "thr_health",
+          currentThread: {
+            title: "Health",
+            status: "idle",
+            runtimeStatus: "idle",
+            providerId: "codex",
+          },
+          provider,
+          children: [],
+        });
+      }
+      throw new Error(`Unexpected RPC ${method}`);
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderHook(() => useWorkStatus("thr_health"), {
+      wrapper: wrapper(client),
+    });
+
+    await waitFor(() => {
+      expect(view.result.current.data?.provider).toEqual(provider);
+    });
+    expect(client.getQueryData(queryKeys.work.providerHealth("codex"))).toEqual(provider);
+    expect(rpcClient.call).toHaveBeenCalledOnce();
+    expect(rpcClient.call).toHaveBeenCalledWith("getWorkStatus", {
+      threadId: "thr_health",
+    });
+
+    view.unmount();
+    client.clear();
   });
 });
 

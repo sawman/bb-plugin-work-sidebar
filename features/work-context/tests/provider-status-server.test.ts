@@ -65,6 +65,54 @@ describe("Work provider status server read", () => {
     expect(providerStates).toHaveBeenCalledTimes(1);
     expect(usageLimits).toHaveBeenCalledTimes(1);
   });
+
+  it("includes a warm shared provider snapshot in the Work status response", async () => {
+    const providerStates = vi.fn(async () => ({
+      providers: [{
+        providerId: "codex",
+        displayName: "Codex",
+        status: "ready" as const,
+        statusMessage: null,
+      }],
+    }));
+    const usageLimits = vi.fn(async () => ({
+      codex: { status: "ok" as const, planLabel: "Pro", windows: [] },
+    }));
+    const registration = createWorkContextRegistration({
+      bb: {
+        events: { on: vi.fn() },
+        storage: { kv: { get: vi.fn(), set: vi.fn() } },
+        realtime: { publish: vi.fn() },
+        sdk: {
+          threads: {
+            get: vi.fn(async ({ threadId }) => ({
+              id: threadId,
+              title: "Status thread",
+              status: "idle",
+              runtime: { displayStatus: "idle" },
+              environmentId: "env_status",
+              providerId: "codex",
+            })),
+            timeline: vi.fn(),
+          },
+          system: { providerStates, usageLimits },
+        },
+      } as never,
+      lifecycle: createServerLifecycle(),
+      tasks: {
+        descendants: vi.fn(async () => []),
+        rootThread: vi.fn(async (id) => ({ id })),
+      } as never,
+    });
+
+    await registration.getWorkProviderStatus({ providerId: "codex" });
+    await expect(registration.getWorkStatus({ threadId: "thr_status" })).resolves.toMatchObject({
+      currentThread: { providerId: "codex" },
+      provider: { providerId: "codex", providerName: "Codex", status: "ready" },
+    });
+    expect(providerStates).toHaveBeenCalledOnce();
+    expect(usageLimits).toHaveBeenCalledOnce();
+  });
 });
 
 describe("provider status read cache", () => {
