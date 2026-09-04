@@ -19,6 +19,7 @@
   },
   "scripts": {
     "build": "env -u BB_CLI bb plugin build .",
+    "bb-plugins:sync": "node scripts/bb-plugin-patch-sync.mjs",
     "dev": "bb plugin dev .",
     "theme-control": "node scripts/bb-theme-control.mjs",
     "typecheck": "tsc --noEmit",

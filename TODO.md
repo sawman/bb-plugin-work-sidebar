@@ -18,14 +18,12 @@ Last checked: 2026-09-04 against BB Tasks 0.1.2 / SDK 0.4.34.
   open for every ACP provider (`providerId.startsWith("acp-")`). It returns
   immediately after showing the question, then delivers the submitted answer
   through `threads.send({ mode: "steer-if-active" })`; this prevents ACP
-  clients from timing out and leaves no manual Resume step. The first local
-  patch was commit `9f0b0a7a4` in the sibling BB checkout, generalized to all
-  ACPs by `cc1a52e66`. It is deployed into BB 0.41.0's built-in plugin as of
-  2026-09-04; the pristine server artifacts are preserved in
-  `~/.bb/patch-backups/ask-user-question-acp-continuation-20260904/`.
-  On every BB release, inspect `plugins/ask-user-question/src/server.ts` and
-  ACP interactive-call support: remove this patch only when ACP guarantees a
-  durable answer continuation, otherwise reapply it and retain its
+  clients from timing out and leaves no manual Resume step. It is deployed into
+  BB 0.41.0 as of 2026-09-04 and cataloged with an exact source ref, patch,
+  regression suite, and rollback artifacts in
+  [`bb-plugins/ask-user-question/`](bb-plugins/ask-user-question/). On every
+  BB release, run `npm run bb-plugins:sync`: remove this patch only when ACP
+  guarantees a durable answer continuation, otherwise rebase it and retain its
   cross-provider test matrix.
 
 - [ ] **Thread-filtered Tasks read (BBPLUG-252).** The sidebar currently has

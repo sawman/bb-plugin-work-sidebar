@@ -1,0 +1,124 @@
+diff --git a/plugins/automations/src/automations.test.ts b/plugins/automations/src/automations.test.ts
+index ec34800..5103174 100644
+--- a/plugins/automations/src/automations.test.ts
++++ b/plugins/automations/src/automations.test.ts
+@@ -159,20 +159,39 @@ function legacyAutomationRow(
+   };
+ }
+ 
+-function createAutomationServiceBb() {
++function createAutomationServiceBb(options: { personalProjectId?: string } = {}) {
++  const { personalProjectId } = options;
+   return {
+     sdk: {
+       projects: {
+-        get: async ({ projectId }: { projectId: string }) => ({
+-          id: projectId,
+-          kind: "standard" as const,
+-          name: "Test Project",
+-          gitRemoteUrl: null,
+-          createdAt: 1,
+-          updatedAt: 1,
+-          sources: [],
+-        }),
+-        list: async () => [],
++        get: async ({ projectId }: { projectId: string }) => {
++          if (projectId === personalProjectId) {
++            throw new Error("Project not found");
++          }
++          return {
++            id: projectId,
++            kind: "standard" as const,
++            name: "Test Project",
++            gitRemoteUrl: null,
++            createdAt: 1,
++            updatedAt: 1,
++            sources: [],
++          };
++        },
++        list: async ({ includePersonal }: { includePersonal?: boolean } = {}) =>
++          includePersonal && personalProjectId !== undefined
++            ? [
++                {
++                  id: personalProjectId,
++                  kind: "personal" as const,
++                  name: "Personal",
++                  gitRemoteUrl: null,
++                  createdAt: 1,
++                  updatedAt: 1,
++                  sources: [],
++                },
++              ]
++            : [],
+       },
+       providers: {
+         list: async () =>
+@@ -980,6 +999,35 @@ describe("automation data access", () => {
+ });
+ 
+ describe("automation service", () => {
++  it("creates automations for the personal project listed by the SDK", async () => {
++    const db = createTestDb();
++    const service = createAutomationService({
++      bb: createAutomationServiceBb({ personalProjectId: "proj_personal" }),
++      db,
++      pluginDataDir: "/tmp",
++      serverUrl: "http://127.0.0.1:38886",
++    });
++
++    const automation = await service.create({
++      projectId: "proj_personal",
++      name: "Personal automation",
++      enabled: true,
++      trigger: oneShotTrigger(),
++      execution: {
++        mode: "agent",
++        prompt: "hello",
++        providerId: "codex",
++        model: "gpt-5",
++        reasoningLevel: "medium",
++        permissionMode: "accept-edits",
++        environment: { type: "project-default" },
++      },
++      origin: "human",
++    });
++
++    expect(automation.projectId).toBe("proj_personal");
++  });
++
+   it("validates project availability before creating an automation", async () => {
+     const db = createTestDb();
+     const bb = {
+diff --git a/plugins/automations/src/service.ts b/plugins/automations/src/service.ts
+index fa30f1c..b3df64d 100644
+--- a/plugins/automations/src/service.ts
++++ b/plugins/automations/src/service.ts
+@@ -452,10 +452,25 @@ async function requireProjectAvailable(
+ ): Promise<void> {
+   try {
+     projectAvailableSchema.parse(await bb.sdk.projects.get({ projectId }));
+-  } catch (error) {
++    return;
++  } catch (getError) {
++    try {
++      const projects = projectSummaryListSchema.parse(
++        await bb.sdk.projects.list({ includePersonal: true }),
++      );
++      const project = projects.find((candidate) => candidate.id === projectId);
++      if (
++        project !== undefined &&
++        (project.deletedAt === undefined || project.deletedAt === null)
++      ) {
++        return;
++      }
++    } catch {
++      // Preserve the more specific get() failure below.
++    }
+     throw new Error(
+       `Project ${projectId} is not available: ${
+-        error instanceof Error ? error.message : String(error)
++        getError instanceof Error ? getError.message : String(getError)
+       }`,
+     );
+   }
+ }

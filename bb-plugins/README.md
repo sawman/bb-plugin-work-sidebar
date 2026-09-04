@@ -17,3 +17,9 @@ matching BB version.
 | Built-in plugin | Patch | Status |
 | --- | --- | --- |
 | `ask-user-question` | [ACP answer continuation](ask-user-question/README.md) | deployed on BB 0.41.0 |
+| `automations` | [Personal-project availability](automations/README.md) | deployed on BB 0.41.0 |
+
+Run `npm run bb-plugins:sync` for the non-mutating local CI pass. It stages
+only verified artifacts. `npm run bb-plugins:sync -- --deploy` reruns that
+preflight, creates a fresh local backup, deploys, and reloads the cataloged
+built-ins.

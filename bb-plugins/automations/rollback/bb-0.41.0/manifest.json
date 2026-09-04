@@ -1,0 +1,27 @@
+{
+  "bbVersion": "0.41.0",
+  "pluginId": "automations",
+  "sdkVersion": "0.4.34",
+  "target": "server/dist/builtin-plugins/automations/dist",
+  "purpose": "Pre-patch rollback payload for the personal-project deployment on 2026-09-03.",
+  "files": {
+    "server.js": {
+      "sha256": "d89f4c7bf1b300882992db0abfd0dda0770a66871cfc1d210a14c233e199d7ef",
+      "bytes": 1003939
+    },
+    "server.js.map": {
+      "sha256": "60fd1b78f8a02a85d704216d1a51a65bdd4d486532c1c5c7dea24fac0a4dc66a",
+      "bytes": 1714729
+    },
+    "server.meta.json": {
+      "sha256": "6693bdafb6d5f80115abbff2b3401eea36b288d6c6d3e35373400e5eaaf29fe6",
+      "bytes": 215
+    }
+  },
+  "restore": [
+    "Verify this exact BB version is installed.",
+    "Verify every SHA-256 hash above.",
+    "Copy these three files to the target path, replacing the installed artifacts.",
+    "Run: bb plugin reload automations"
+  ]
+}

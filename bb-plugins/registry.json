@@ -1,0 +1,26 @@
+{
+  "coreRepository": "https://github.com/get-bb/bb.git",
+  "versions": {
+    "0.41.0": {
+      "sourceRef": "desktop-v0.41.0",
+      "sourceCommit": "ee4a5777bf1efb255a87cd9dc91fd3ae92830268",
+      "patches": [
+        {
+          "id": "ask-user-question-acp-continuation",
+          "pluginId": "ask-user-question",
+          "pluginPath": "plugins/ask-user-question",
+          "sourcePatch": "bb-plugins/ask-user-question/acp-continuation.patch",
+          "turboFilter": "bb-plugin-ask-user-question",
+          "serverRouteTest": "test/internal/internal-events-tool-calls.test.ts"
+        },
+        {
+          "id": "automations-personal-projects",
+          "pluginId": "automations",
+          "pluginPath": "plugins/automations",
+          "sourcePatch": "bb-plugins/automations/personal-projects.patch",
+          "turboFilter": "bb-plugin-automations"
+        }
+      ]
+    }
+  }
+}

@@ -1,17 +1,17 @@
 diff --git a/apps/server/src/internal/tool-calls.ts b/apps/server/src/internal/tool-calls.ts
-index 6160fa1b0..097bd83fa 100644
+index 64a9f5e..1e012e2 100644
 --- a/apps/server/src/internal/tool-calls.ts
 +++ b/apps/server/src/internal/tool-calls.ts
-@@ -95,6 +95,7 @@ export function registerInternalToolCallRoutes(app: Hono, deps: AppDeps): void {
+@@ -86,6 +86,7 @@ export function registerInternalToolCallRoutes(app: Hono, deps: AppDeps): void {
              ctx: {
                threadId: thread.id,
                projectId: thread.projectId,
 +              providerId: thread.providerId,
-               // The request's own abort signal: it fires if the daemon
-               // round-trip is torn down while the tool runs.
                signal: context.req.raw.signal,
+             },
+           }),
 diff --git a/apps/server/test/internal/internal-events-tool-calls.test.ts b/apps/server/test/internal/internal-events-tool-calls.test.ts
-index 8f007aeb5..82c991dfd 100644
+index 40146d7..6559cd9 100644
 --- a/apps/server/test/internal/internal-events-tool-calls.test.ts
 +++ b/apps/server/test/internal/internal-events-tool-calls.test.ts
 @@ -92,13 +92,17 @@ describe("internal event and tool-call routes", () => {
@@ -50,7 +50,7 @@ index 8f007aeb5..82c991dfd 100644
            await expect(readJson(response)).resolves.toEqual({
              success: true,
 diff --git a/apps/server/test/services/plugins/plugin-agent-tools.test.ts b/apps/server/test/services/plugins/plugin-agent-tools.test.ts
-index d37e3ec4b..d1e4390d7 100644
+index 7e972ae..807eb47 100644
 --- a/apps/server/test/services/plugins/plugin-agent-tools.test.ts
 +++ b/apps/server/test/services/plugins/plugin-agent-tools.test.ts
 @@ -176,6 +176,7 @@ describe("bb.agents.registerTool", () => {
@@ -70,10 +70,10 @@ index d37e3ec4b..d1e4390d7 100644
      };
      const found = service.findAgentTool("search_issues")!;
 diff --git a/packages/plugin-sdk/src/backend-contract.ts b/packages/plugin-sdk/src/backend-contract.ts
-index 2553ad214..c06823fd4 100644
+index ee8f3b2..c072fcd 100644
 --- a/packages/plugin-sdk/src/backend-contract.ts
 +++ b/packages/plugin-sdk/src/backend-contract.ts
-@@ -369,6 +369,8 @@ export type PluginAgentToolResult =
+@@ -696,6 +696,8 @@ export type PluginAgentToolResult =
  export interface PluginAgentToolContext {
    threadId: string;
    projectId: string;
@@ -83,10 +83,10 @@ index 2553ad214..c06823fd4 100644
     * is torn down mid-call). */
    signal: AbortSignal;
 diff --git a/packages/plugin-sdk/src/testing/fake-plugin-host.ts b/packages/plugin-sdk/src/testing/fake-plugin-host.ts
-index 486d26858..b2afa402e 100644
+index 117292b..11269fc 100644
 --- a/packages/plugin-sdk/src/testing/fake-plugin-host.ts
 +++ b/packages/plugin-sdk/src/testing/fake-plugin-host.ts
-@@ -2149,6 +2149,7 @@ function createFakePluginHostInternal(
+@@ -2247,6 +2247,7 @@ function createFakePluginHostInternal(
        return record.execute(parsed.value, {
          threadId: ctx?.threadId ?? "thread-test",
          projectId: ctx?.projectId ?? "project-test",
@@ -94,9 +94,8 @@ index 486d26858..b2afa402e 100644
          signal: ctx?.signal ?? new AbortController().signal,
        });
      },
-
 diff --git a/plugins/ask-user-question/src/server-harness.test.ts b/plugins/ask-user-question/src/server-harness.test.ts
-index 8d234d4f4..61e215dbd 100644
+index bf0dc30..3350d78 100644
 --- a/plugins/ask-user-question/src/server-harness.test.ts
 +++ b/plugins/ask-user-question/src/server-harness.test.ts
 @@ -8,8 +8,16 @@ import plugin, { RENDERER_ID, TOOL_NAME } from "./server.js";
@@ -118,7 +117,7 @@ index 8d234d4f4..61e215dbd 100644
    plugin(host.bb as unknown as Parameters<typeof plugin>[0]);
    return host;
  }
-@@ -87,7 +95,7 @@ describe("provider gating", () => {
+@@ -85,7 +93,7 @@ describe("provider gating", () => {
      },
    );
  
@@ -127,8 +126,9 @@ index 8d234d4f4..61e215dbd 100644
      "registers the tool for %s with Claude's exact advertised schema",
      async (providerId) => {
        const host = createHost();
-@@ -100,4 +108,9 @@ describe("provider gating", () => {
-       // zod-derived one — that is the whole point of the override.
+@@ -96,6 +104,11 @@ describe("provider gating", () => {
+       const [tool] = resolved.tools;
+       expect(tool?.name).toBe(TOOL_NAME);
        expect(tool?.inputSchema).toEqual(TOOL_INPUT_JSON_SCHEMA);
 +      expect(resolved.instructions).toBe(
 +        providerId.startsWith("acp-")
@@ -137,7 +137,8 @@ index 8d234d4f4..61e215dbd 100644
 +      );
      },
    );
-@@ -130,6 +143,66 @@ describe("provider gating", () => {
+ 
+@@ -126,6 +139,66 @@ describe("provider gating", () => {
  });
  
  describe("asking a question", () => {
@@ -205,19 +206,13 @@ index 8d234d4f4..61e215dbd 100644
      const host = createHost();
      const call = host.harness.callAgentTool(TOOL_NAME, { questions });
 diff --git a/plugins/ask-user-question/src/server.ts b/plugins/ask-user-question/src/server.ts
-index 0dd68bacd..692beebf5 100644
+index 892065a..38ee851 100644
 --- a/plugins/ask-user-question/src/server.ts
 +++ b/plugins/ask-user-question/src/server.ts
-@@ -20,10 +20,66 @@ import {
+@@ -20,10 +20,60 @@ import {
  export const TOOL_NAME = "AskUserQuestion";
  export const RENDERER_ID = ASK_USER_QUESTION_RENDERER_ID;
  
-+// ACP clients own the MCP request deadline and may terminate an interactive
-+// tools/call while the user is still reading the question. The server cannot
-+// extend that deadline reliably, so all ACP providers use a two-step flow:
-+// return as soon as the interaction is shown, then steer the answer back to
-+// the thread when it arrives. Native-question providers are withheld above.
-+// Revisit when ACP specifies a durable interactive tool-call continuation.
 +const ACP_PROVIDER_ID_PREFIX = "acp-";
 +const ACP_PENDING_RESULT =
 +  "Question shown. Wait for the user's follow-up answer before continuing.";
@@ -275,7 +270,7 @@ index 0dd68bacd..692beebf5 100644
  export default function plugin(bb: BbPluginApi) {
    bb.agents.registerTool({
      name: TOOL_NAME,
-@@ -50,17 +106,37 @@ export default function plugin(bb: BbPluginApi) {
+@@ -48,17 +98,37 @@ export default function plugin(bb: BbPluginApi) {
        }
  
        const askedAt = Date.now();
@@ -313,9 +308,9 @@ index 0dd68bacd..692beebf5 100644
 +        }
 +        result = await request;
        } catch (error) {
-         // A thread holds at most one interaction at a time, so two questions
-         // issued as parallel tool calls race and the loser lands here. Say so
-@@ -102,9 +178,13 @@ export default function plugin(bb: BbPluginApi) {
+         return errorResult(
+           `The question could not be shown (${error instanceof Error ? error.message : String(error)}). Only one prompt can await the user at a time — put all of your questions in a single AskUserQuestion call, or continue with your best judgement.`,
+@@ -93,9 +163,13 @@ export default function plugin(bb: BbPluginApi) {
      if (context.provider.capabilities.supportsNativeUserQuestion) {
        return { tools: [], skills: [] };
      }
