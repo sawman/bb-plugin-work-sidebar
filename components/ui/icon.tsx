@@ -72,7 +72,7 @@ const paths: Record<string, React.ReactNode> = {
       <circle cx="6" cy="4" r="2" />
       <circle cx="6" cy="20" r="2" />
       <circle cx="18" cy="20" r="2" />
-      <path d="M6 6v12m6-14v8a4 4 0 0 0 4 4h2" />
+      <path d="M6 6v12m6-14v12a4 4 0 0 0 4 4h2" />
     </>
   ),
   GripVertical: (
