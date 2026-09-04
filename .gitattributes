@@ -2,4 +2,4 @@
 bb-plugins/**/rollback/** -text whitespace=-trailing-space
 
 # Unified diffs preserve blank context lines as `+ `; do not misclassify them.
-bb-plugins/**/*.patch whitespace=-blank-at-eol
+bb-plugins/**/*.patch whitespace=-blank-at-eol,-blank-at-eof

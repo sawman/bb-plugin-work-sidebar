@@ -1,5 +1,265 @@
+diff --git a/apps/server/src/internal/tool-calls.ts b/apps/server/src/internal/tool-calls.ts
+index 64a9f5e..1e012e2 100644
+--- a/apps/server/src/internal/tool-calls.ts
++++ b/apps/server/src/internal/tool-calls.ts
+@@ -86,6 +86,7 @@ export function registerInternalToolCallRoutes(app: Hono, deps: AppDeps): void {
+             ctx: {
+               threadId: thread.id,
+               projectId: thread.projectId,
++              providerId: thread.providerId,
+               signal: context.req.raw.signal,
+             },
+           }),
+diff --git a/apps/server/src/services/interactions/pending-interactions.ts b/apps/server/src/services/interactions/pending-interactions.ts
+index 57bd573..ef064d7 100644
+--- a/apps/server/src/services/interactions/pending-interactions.ts
++++ b/apps/server/src/services/interactions/pending-interactions.ts
+@@ -111,6 +111,7 @@ interface RequestPluginInteractionArgs {
+   rendererId: string;
+   title: string;
+   payload: JsonValue;
++  nonBlocking?: boolean;
+   timeoutMs: number;
+   signal?: AbortSignal;
+ }
+@@ -269,6 +270,15 @@ function notifyInteractionChanged({
+   );
+ }
+ 
++function isNonBlockingPluginInteraction(
++  interaction: PendingInteraction,
++): boolean {
++  return (
++    isPluginPendingInteraction(interaction) &&
++    interaction.payload.nonBlocking === true
++  );
++}
++
+ export class PendingInteractionLifecycle {
+   private readonly deps: CreateLifecycleDeps;
+   private readonly pluginWaiters = new Map<string, PluginInteractionWaiter>();
+@@ -348,9 +358,14 @@ export class PendingInteractionLifecycle {
+   }
+ 
+   hasPendingThreadInteraction(threadId: string): boolean {
+-    return (
+-      getActivePendingInteractionForThread(this.deps.db, threadId) !== null
+-    );
++    const row = getActivePendingInteractionForThread(this.deps.db, threadId);
++    if (row === null) return false;
++    try {
++      return !isNonBlockingPluginInteraction(toPendingInteraction(row));
++    } catch {
++      // A malformed row must never allow a message to bypass an unknown gate.
++      return true;
++    }
+   }
+ 
+   registerPendingInteraction(
+@@ -488,6 +503,7 @@ export class PendingInteractionLifecycle {
+         payload: JSON.stringify({
+           kind: "plugin",
+           title: args.title,
++          ...(args.nonBlocking ? { nonBlocking: true } : {}),
+           data: args.payload,
+         }),
+       });
+@@ -527,7 +543,7 @@ export class PendingInteractionLifecycle {
+       appendPendingInteractionTimelineEvent(this.deps, interaction);
+       notifyInteractionChanged({
+         deps: this.deps,
+-        hasPendingInteraction: true,
++        hasPendingInteraction: !isNonBlockingPluginInteraction(interaction),
+         threadId: interaction.threadId,
+       });
+     } catch (error) {
+diff --git a/apps/server/src/services/plugins/plugin-api.ts b/apps/server/src/services/plugins/plugin-api.ts
+index a011d04..c046cdc 100644
+--- a/apps/server/src/services/plugins/plugin-api.ts
++++ b/apps/server/src/services/plugins/plugin-api.ts
+@@ -401,6 +401,7 @@ export function createPluginApi(options: {
+     rendererId: string;
+     title: string;
+     payload: JsonValue;
++    nonBlocking?: boolean;
+     timeoutMs: number;
+     signal?: AbortSignal;
+   }) => Promise<PluginInteractionResult>;
+@@ -575,6 +576,7 @@ export function createPluginApi(options: {
+       rendererId: request.rendererId,
+       title: request.title.trim(),
+       payload,
++      nonBlocking: request.nonBlocking === true,
+       timeoutMs,
+       signal: requestOptions?.signal,
+     });
+diff --git a/apps/server/test/internal/internal-events-tool-calls.test.ts b/apps/server/test/internal/internal-events-tool-calls.test.ts
+index 40146d7..0b38cdf 100644
+--- a/apps/server/test/internal/internal-events-tool-calls.test.ts
++++ b/apps/server/test/internal/internal-events-tool-calls.test.ts
+@@ -92,13 +92,17 @@ describe("internal event and tool-call routes", () => {
+       const toolResult = new Promise<ToolCallResponse>((resolve) => {
+         completeTool = resolve;
+       });
++      let invokedProviderId: string | null = null;
+       setPluginAgentContributions({
+         listSkillRootContributions: () => [],
+         listAgentTools: () => [],
+         listInstructionContributions: () => [],
+         findAgentTool: (name) =>
+           name === record.name ? { pluginId: "fixture", record } : undefined,
+-        invokeAgentTool: () => toolResult,
++        invokeAgentTool: ({ ctx }) => {
++          invokedProviderId = ctx.providerId ?? null;
++          return toolResult;
++        },
+         resolveMention: async () => ({ ok: false, error: "unused" }),
+       });
+ 
+@@ -116,6 +120,7 @@ describe("internal event and tool-call routes", () => {
+         const thread = seedThread(harness.deps, {
+           projectId: project.id,
+           environmentId: environment.id,
++          providerId: "acp-cursor",
+         });
+ 
+         const server = serve({
+@@ -156,6 +161,7 @@ describe("internal event and tool-call routes", () => {
+           const response = earlyResponse ?? (await responsePromise);
+ 
+           expect(earlyResponse).not.toBeNull();
++          expect(invokedProviderId).toBe("acp-cursor");
+           expect(response.status).toBe(200);
+           await expect(readJson(response)).resolves.toEqual({
+             success: true,
+diff --git a/apps/server/test/services/pending-interactions.test.ts b/apps/server/test/services/pending-interactions.test.ts
+index 9b0d67d..da17a1b 100644
+--- a/apps/server/test/services/pending-interactions.test.ts
++++ b/apps/server/test/services/pending-interactions.test.ts
+@@ -65,6 +65,7 @@ function requestPluginInteraction(
+   args: {
+     threadId: string;
+     name?: string;
++    nonBlocking?: boolean;
+     signal?: AbortSignal;
+   },
+ ) {
+@@ -75,11 +76,43 @@ function requestPluginInteraction(
+     title: "Add secrets",
+     payload: { fields: [{ name: args.name ?? "API_KEY" }] },
+     timeoutMs: 10_000,
++    ...(args.nonBlocking ? { nonBlocking: true } : {}),
+     ...(args.signal ? { signal: args.signal } : {}),
+   });
+ }
+ 
+ describe("pending interaction lifecycle", () => {
++  it("keeps a non-blocking plugin form visible without gating thread delivery", async () => {
++    await withTestHarness(async (harness) => {
++      const thread = seedPluginInteractionThread(harness.deps, "non-blocking");
++      const pending = requestPluginInteraction(harness.deps, {
++        threadId: thread.id,
++        nonBlocking: true,
++      });
++
++      expect(
++        harness.deps.pendingInteractions.listPendingThreadInteractions(thread.id),
++      ).toMatchObject([
++        {
++          status: "pending",
++          payload: { kind: "plugin", nonBlocking: true },
++        },
++      ]);
++      expect(
++        harness.deps.pendingInteractions.hasPendingThreadInteraction(thread.id),
++      ).toBe(false);
++
++      const [interaction] =
++        harness.deps.pendingInteractions.listPendingThreadInteractions(thread.id);
++      harness.deps.pendingInteractions.cancelPluginInteraction({
++        threadId: thread.id,
++        interactionId: interaction!.id,
++        reason: "user",
++      });
++      await expect(pending).resolves.toEqual({ outcome: "cancelled", reason: "user" });
++    });
++  });
++
+   it("returns a plugin response only through memory and persists metadata only", async () => {
+     await withTestHarness(async (harness) => {
+       const thread = seedPluginInteractionThread(harness.deps, "memory-only");
+diff --git a/apps/server/test/services/plugins/plugin-agent-tools.test.ts b/apps/server/test/services/plugins/plugin-agent-tools.test.ts
+index 7e972ae..807eb47 100644
+--- a/apps/server/test/services/plugins/plugin-agent-tools.test.ts
++++ b/apps/server/test/services/plugins/plugin-agent-tools.test.ts
+@@ -176,6 +176,7 @@ describe("bb.agents.registerTool", () => {
+     const ctx = {
+       threadId: "thr_1",
+       projectId: "proj_1",
++      providerId: "codex",
+       signal: new AbortController().signal,
+     };
+     const alpha = service.findAgentTool("alpha_tool")!;
+@@ -221,6 +222,7 @@ describe("bb.agents.registerTool", () => {
+     const ctx = {
+       threadId: "thr_1",
+       projectId: "proj_1",
++      providerId: "codex",
+       signal: new AbortController().signal,
+     };
+     const found = service.findAgentTool("search_issues")!;
+diff --git a/packages/domain/src/pending-interactions.ts b/packages/domain/src/pending-interactions.ts
+index 06e87b8..d4378f4 100644
+--- a/packages/domain/src/pending-interactions.ts
++++ b/packages/domain/src/pending-interactions.ts
+@@ -339,6 +339,7 @@ export type UserQuestionPendingInteractionPayload = z.infer<
+ const pluginPendingInteractionPayloadSchema = z.object({
+   kind: z.literal("plugin"),
+   title: z.string().trim().min(1).max(PLUGIN_INTERACTION_MAX_TITLE_LENGTH),
++  nonBlocking: z.boolean().optional(),
+   data: jsonValueSchema,
+ });
+ type PluginPendingInteractionPayload = z.infer<
+diff --git a/packages/plugin-sdk/src/backend-contract.ts b/packages/plugin-sdk/src/backend-contract.ts
+index ee8f3b2..2a3888a 100644
+--- a/packages/plugin-sdk/src/backend-contract.ts
++++ b/packages/plugin-sdk/src/backend-contract.ts
+@@ -621,6 +621,12 @@ export interface PluginInteractionRequest {
+   rendererId: string;
+   title: string;
+   payload: JsonValue;
++  /**
++   * Keep this form visible without treating it as a thread-level dispatch
++   * barrier. The plugin remains responsible for delivering submitted values.
++   * This is intended for asynchronous inbox-style prompts, not approvals.
++   */
++  nonBlocking?: boolean;
+   /** Defaults to ten minutes; capped at one hour. */
+   timeoutMs?: number;
+ }
+@@ -696,6 +702,8 @@ export type PluginAgentToolResult =
+ export interface PluginAgentToolContext {
+   threadId: string;
+   projectId: string;
++  /** Available on hosts that expose provider identity to tool calls. */
++  providerId?: string;
+   /** The tool-call request's abort signal (aborts if the daemon round-trip
+    * is torn down mid-call). */
+   signal: AbortSignal;
+diff --git a/packages/plugin-sdk/src/testing/fake-plugin-host.ts b/packages/plugin-sdk/src/testing/fake-plugin-host.ts
+index 117292b..11269fc 100644
+--- a/packages/plugin-sdk/src/testing/fake-plugin-host.ts
++++ b/packages/plugin-sdk/src/testing/fake-plugin-host.ts
+@@ -2247,6 +2247,7 @@ function createFakePluginHostInternal(
+       return record.execute(parsed.value, {
+         threadId: ctx?.threadId ?? "thread-test",
+         projectId: ctx?.projectId ?? "project-test",
++        providerId: ctx?.providerId ?? "codex",
+         signal: ctx?.signal ?? new AbortController().signal,
+       });
+     },
 diff --git a/plugins/ask-user-question/app.test.tsx b/plugins/ask-user-question/app.test.tsx
-index ad02532..95dd0f3 100644
+index ad02532..62f8195 100644
 --- a/plugins/ask-user-question/app.test.tsx
 +++ b/plugins/ask-user-question/app.test.tsx
 @@ -54,20 +54,25 @@ function render(
@@ -39,7 +299,7 @@ index ad02532..95dd0f3 100644
  }
  
  function getButtonByText(
-@@ -216,6 +221,29 @@ describe("multi-select and multi-question flows", () => {
+@@ -216,6 +221,47 @@ describe("multi-select and multi-question flows", () => {
      fireEvent.click(getButtonByText(slot, "Cancel"));
      expect(cancel).toHaveBeenCalledTimes(1);
    });
@@ -66,11 +326,29 @@ index ad02532..95dd0f3 100644
 +      }),
 +    );
 +  });
++
++  it("closes the display-only interaction after the final queued answer", async () => {
++    const cancel = vi.fn(async () => undefined);
++    const send = vi.fn(async () => ({ remaining: 0, version: 2 }));
++    const slot = render(singleSelect, {
++      cancel,
++      rpc: {
++        getQuestionQueue: () => ({ payload: multi, version: 1 }),
++        answerQueuedQuestion: send,
++      },
++    });
++
++    await slot.findByText("1 of 2");
++    fireEvent.click(getButtonByText(slot, "Metrics"));
++    fireEvent.click(getButtonByText(slot, "Send answer"));
++
++    await vi.waitFor(() => expect(cancel).toHaveBeenCalledTimes(1));
++  });
  });
  
  describe("a payload the form cannot read", () => {
 diff --git a/plugins/ask-user-question/app.tsx b/plugins/ask-user-question/app.tsx
-index 4e03f6a..9fb4890 100644
+index 4e03f6a..c06b4ed 100644
 --- a/plugins/ask-user-question/app.tsx
 +++ b/plugins/ask-user-question/app.tsx
 @@ -10,8 +10,11 @@ import {
@@ -144,7 +422,7 @@ index 4e03f6a..9fb4890 100644
      void (async () => {
        try {
          await submit(buildInteractionResponse(questions, formState));
-@@ -393,7 +428,42 @@ function AskUserQuestionInteraction({
+@@ -393,7 +428,50 @@ function AskUserQuestionInteraction({
      })();
    };
  
@@ -168,7 +446,15 @@ index 4e03f6a..9fb4890 100644
 +        questionId: currentQuestion.id,
 +        answer,
 +      })
-+      .then(refreshQueue)
++      .then((result) => {
++        if (result.remaining === 0) {
++          // The answer is already on its way to the agent. Settle the
++          // display-only interaction so its card and server row do not linger.
++          void cancel();
++          return;
++        }
++        refreshQueue();
++      })
 +      .catch((error: unknown) =>
 +        setSendError(
 +          `Could not send answer: ${
@@ -187,7 +473,7 @@ index 4e03f6a..9fb4890 100644
      if (isLast) {
        submitAnswer();
        return;
-@@ -455,7 +525,16 @@ function AskUserQuestionInteraction({
+@@ -455,7 +533,16 @@ function AskUserQuestionInteraction({
      );
    }
  
@@ -205,7 +491,7 @@ index 4e03f6a..9fb4890 100644
  
    const currentState = answerStateFor(formState, currentQuestion);
  
-@@ -509,16 +588,23 @@ function AskUserQuestionInteraction({
+@@ -509,16 +596,23 @@ function AskUserQuestionInteraction({
            <Button
              type="button"
              size="sm"
@@ -232,7 +518,7 @@ index 4e03f6a..9fb4890 100644
    );
  }
 diff --git a/plugins/ask-user-question/src/server-harness.test.ts b/plugins/ask-user-question/src/server-harness.test.ts
-index bf0dc30..09af157 100644
+index bf0dc30..b1eba03 100644
 --- a/plugins/ask-user-question/src/server-harness.test.ts
 +++ b/plugins/ask-user-question/src/server-harness.test.ts
 @@ -3,17 +3,48 @@ import {
@@ -311,7 +597,7 @@ index bf0dc30..09af157 100644
      },
    );
  
-@@ -126,6 +165,138 @@ describe("provider gating", () => {
+@@ -126,6 +165,139 @@ describe("provider gating", () => {
  });
  
  describe("asking a question", () => {
@@ -399,11 +685,12 @@ index bf0dc30..09af157 100644
 +        { providerId, signal: controller.signal } as never,
 +      );
 +
-+      expect(await resultText(result)).toBe(
-+        "Question added. You may continue independent work; each user answer arrives as a follow-up message.",
-+      );
-+      expect(host.harness.pendingInteractions).toHaveLength(1);
-+      controller.abort();
++    expect(await resultText(result)).toBe(
++      "Question added. You may continue independent work; each user answer arrives as a follow-up message.",
++    );
++    expect(host.harness.pendingInteractions).toHaveLength(1);
++    expect(host.harness.pendingInteractions[0]?.nonBlocking).toBe(true);
++    controller.abort();
 +      expect(host.harness.pendingInteractions).toHaveLength(1);
 +      const pending = host.harness.pendingInteractions[0]!;
 +      host.harness.submitInteraction(pending.id, {
@@ -451,7 +738,7 @@ index bf0dc30..09af157 100644
      const host = createHost();
      const call = host.harness.callAgentTool(TOOL_NAME, { questions });
 diff --git a/plugins/ask-user-question/src/server.ts b/plugins/ask-user-question/src/server.ts
-index 892065a..d748acd 100644
+index 892065a..04afc41 100644
 --- a/plugins/ask-user-question/src/server.ts
 +++ b/plugins/ask-user-question/src/server.ts
 @@ -1,8 +1,16 @@
@@ -696,7 +983,7 @@ index 892065a..d748acd 100644
    bb.agents.registerTool({
      name: TOOL_NAME,
      description: TOOL_DESCRIPTION,
-@@ -48,17 +268,53 @@ export default function plugin(bb: BbPluginApi) {
+@@ -48,17 +268,54 @@ export default function plugin(bb: BbPluginApi) {
        }
  
        const askedAt = Date.now();
@@ -723,6 +1010,7 @@ index 892065a..d748acd 100644
              rendererId: RENDERER_ID,
              title: buildInteractionTitle(payload),
              payload,
++            nonBlocking: acp,
            },
 -          { signal: ctx.signal },
 +          acp ? undefined : { signal: ctx.signal },
@@ -752,7 +1040,7 @@ index 892065a..d748acd 100644
        } catch (error) {
          return errorResult(
            `The question could not be shown (${error instanceof Error ? error.message : String(error)}). Only one prompt can await the user at a time — put all of your questions in a single AskUserQuestion call, or continue with your best judgement.`,
-@@ -93,9 +349,13 @@ export default function plugin(bb: BbPluginApi) {
+@@ -93,9 +350,13 @@ export default function plugin(bb: BbPluginApi) {
      if (context.provider.capabilities.supportsNativeUserQuestion) {
        return { tools: [], skills: [] };
      }
@@ -778,3 +1066,4 @@ index 828fdeb..02eeaff 100644
 +- On ACP, later AskUserQuestion calls join the open question inbox; each answer is delivered separately while unanswered questions remain visible
  - Use multiSelect: true to allow multiple answers to be selected for a question
  - If you recommend a specific option, make that the first option in the list and add "(Recommended)" at the end of the label
+ 

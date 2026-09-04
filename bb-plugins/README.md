@@ -22,4 +22,5 @@ matching BB version.
 Run `npm run bb-plugins:sync` for the non-mutating local CI pass. It stages
 only verified artifacts. `npm run bb-plugins:sync -- --deploy` reruns that
 preflight, creates a fresh local backup, deploys, and reloads the cataloged
-built-ins.
+built-ins. A catalog entry with core artifacts also stages and deploys those
+files; restart BB before treating a core patch as active.

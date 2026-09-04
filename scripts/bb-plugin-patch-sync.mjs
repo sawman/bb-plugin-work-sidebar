@@ -31,6 +31,17 @@ if (plan === undefined) {
   );
 }
 
+const coreArtifacts = [
+  ...new Map(
+    plan.patches.flatMap((entry) =>
+      (entry.coreArtifacts ?? []).map((artifact) => [
+        artifact.targetPath,
+        artifact,
+      ]),
+    ),
+  ).values(),
+];
+
 function run(command, commandArgs, options = {}) {
   console.log(`$ ${[command, ...commandArgs].join(" ")}`);
   execFileSync(command, commandArgs, { stdio: "inherit", ...options });
@@ -67,6 +78,11 @@ async function copyPluginArtifacts(from, to) {
   }
 }
 
+async function copyCoreArtifact(from, to) {
+  await mkdir(dirname(to), { recursive: true });
+  await copyFile(from, to);
+}
+
 const workspace = await mkdtemp(join(tmpdir(), `bb-plugin-sync-${version}-`));
 const sourceRoot = join(workspace, "bb");
 const stagingRoot = join(
@@ -92,8 +108,22 @@ try {
   for (const entry of plan.patches) {
     run("git", ["apply", sourcePatch(entry)], { cwd: sourceRoot });
   }
-
   run("pnpm", ["install", "--frozen-lockfile"], { cwd: sourceRoot });
+  if (coreArtifacts.length > 0) {
+    run(join(sourceRoot, "node_modules/.bin/turbo"), [
+      "run",
+      "build",
+      "--filter=@bb/server",
+      "--force",
+    ], { cwd: sourceRoot });
+    for (const artifact of coreArtifacts) {
+      await copyCoreArtifact(
+        join(sourceRoot, artifact.sourcePath),
+        join(stagingRoot, "core", artifact.targetPath),
+      );
+    }
+  }
+
   for (const entry of plan.patches) {
     if (entry.serverRouteTest === undefined) continue;
     run(join(sourceRoot, "node_modules/.bin/turbo"), [
@@ -133,7 +163,7 @@ try {
 
   await writeFile(
     join(stagingRoot, "manifest.json"),
-    `${JSON.stringify({ version, sourceRef: plan.sourceRef, sourceCommit: plan.sourceCommit, patches: plan.patches }, null, 2)}\n`,
+    `${JSON.stringify({ version, sourceRef: plan.sourceRef, sourceCommit: plan.sourceCommit, patches: plan.patches, coreArtifacts }, null, 2)}\n`,
   );
   console.log(`Verified build staged at ${stagingRoot}`);
 
@@ -145,6 +175,14 @@ try {
       process.env.BB_PATCH_BACKUP_ROOT ?? join(process.env.HOME ?? "", ".bb/patch-backups"),
       `bb-${version}-${new Date().toISOString().replaceAll(/[:.]/g, "-")}`,
     );
+    for (const artifact of coreArtifacts) {
+      const target = join(appRoot, artifact.targetPath);
+      await copyCoreArtifact(target, join(backupRoot, "core", artifact.targetPath));
+      await copyCoreArtifact(
+        join(stagingRoot, "core", artifact.targetPath),
+        target,
+      );
+    }
     for (const entry of plan.patches) {
       const target = installedPluginDir(entry.pluginId);
       await copyPluginArtifacts(target, join(backupRoot, entry.pluginId));
@@ -152,6 +190,9 @@ try {
       run("bb", ["plugin", "reload", entry.pluginId]);
     }
     console.log(`Deployed. Previous artifacts backed up at ${backupRoot}`);
+    if (coreArtifacts.length > 0) {
+      console.log("Restart BB before relying on deployed core artifacts.");
+    }
   }
 } finally {
   if (!keepWorkspace) await rm(workspace, { recursive: true, force: true });

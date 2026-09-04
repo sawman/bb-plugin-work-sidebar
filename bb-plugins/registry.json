@@ -10,6 +10,16 @@
           "pluginId": "ask-user-question",
           "pluginPath": "plugins/ask-user-question",
           "sourcePatch": "bb-plugins/ask-user-question/acp-continuation.patch",
+          "coreArtifacts": [
+            {
+              "sourcePath": "apps/server/dist/start-server.js",
+              "targetPath": "server/dist/start-server.js"
+            },
+            {
+              "sourcePath": "apps/server/dist/start-server.js.map",
+              "targetPath": "server/dist/start-server.js.map"
+            }
+          ],
           "turboFilter": "bb-plugin-ask-user-question"
         },
         {
