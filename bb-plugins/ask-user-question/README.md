@@ -42,4 +42,5 @@ coverage for Cursor, OpenCode, and a custom ACP provider, plus dismissal.
    emergency rollback is needed, restore the version-matched payload in
    `rollback/bb-<version>/` after checking its manifest hashes.
 4. Confirm one live ACP question and Reply resumes its agent, then update this
-   document and the compatibility watchlist in [`TODO.md`](../../TODO.md).
+   document and the compatibility watchlist in
+   [`docs/bb-compatibility-watchlist.md`](../../docs/bb-compatibility-watchlist.md).

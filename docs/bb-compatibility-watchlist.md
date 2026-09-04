@@ -1,4 +1,4 @@
-# UPSTREAM BB COMPATIBILITY WATCHLIST
+# BB COMPATIBILITY WATCHLIST
 
 This is compatibility documentation only, not the repository work queue. BB Tasks remains the source of truth for repository work.
 

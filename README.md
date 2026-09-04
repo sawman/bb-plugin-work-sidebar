@@ -67,7 +67,7 @@ authoritative guidance for agents changing the plugin. The short version:
    do not carry replacement domain state.
 
 The compatibility items that depend on future BB SDK support are kept in
-[`TODO.md`](TODO.md).
+[`docs/bb-compatibility-watchlist.md`](docs/bb-compatibility-watchlist.md).
 
 ## Develop
 
