@@ -47,10 +47,23 @@ function installedPluginDir(pluginId) {
 const standaloneBbEnvironment = { ...process.env };
 delete standaloneBbEnvironment.BB_CLI;
 
-async function copyServerArtifacts(from, to) {
+const pluginArtifactNames = [
+  "server.js",
+  "server.js.map",
+  "server.meta.json",
+  "app.js",
+  "app.css",
+  "app.meta.json",
+];
+
+async function copyPluginArtifacts(from, to) {
   await mkdir(to, { recursive: true });
-  for (const file of ["server.js", "server.js.map", "server.meta.json"]) {
-    await copyFile(join(from, file), join(to, file));
+  for (const file of pluginArtifactNames) {
+    try {
+      await copyFile(join(from, file), join(to, file));
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
   }
 }
 
@@ -115,7 +128,7 @@ try {
     if (metadata.pluginId !== entry.pluginId || metadata.builtWith?.bbVersion !== version) {
       throw new Error(`Unexpected ${entry.pluginId} build metadata.`);
     }
-    await copyServerArtifacts(join(pluginRoot, "dist"), join(stagingRoot, entry.pluginId));
+    await copyPluginArtifacts(join(pluginRoot, "dist"), join(stagingRoot, entry.pluginId));
   }
 
   await writeFile(
@@ -134,8 +147,8 @@ try {
     );
     for (const entry of plan.patches) {
       const target = installedPluginDir(entry.pluginId);
-      await copyServerArtifacts(target, join(backupRoot, entry.pluginId));
-      await copyServerArtifacts(join(stagingRoot, entry.pluginId), target);
+      await copyPluginArtifacts(target, join(backupRoot, entry.pluginId));
+      await copyPluginArtifacts(join(stagingRoot, entry.pluginId), target);
       run("bb", ["plugin", "reload", entry.pluginId]);
     }
     console.log(`Deployed. Previous artifacts backed up at ${backupRoot}`);

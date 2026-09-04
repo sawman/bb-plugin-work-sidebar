@@ -1,104 +1,220 @@
-diff --git a/apps/server/src/internal/tool-calls.ts b/apps/server/src/internal/tool-calls.ts
-index 64a9f5e..1e012e2 100644
---- a/apps/server/src/internal/tool-calls.ts
-+++ b/apps/server/src/internal/tool-calls.ts
-@@ -86,6 +86,7 @@ export function registerInternalToolCallRoutes(app: Hono, deps: AppDeps): void {
-             ctx: {
-               threadId: thread.id,
-               projectId: thread.projectId,
-+              providerId: thread.providerId,
-               signal: context.req.raw.signal,
-             },
-           }),
-diff --git a/apps/server/test/internal/internal-events-tool-calls.test.ts b/apps/server/test/internal/internal-events-tool-calls.test.ts
-index 40146d7..6559cd9 100644
---- a/apps/server/test/internal/internal-events-tool-calls.test.ts
-+++ b/apps/server/test/internal/internal-events-tool-calls.test.ts
-@@ -92,13 +92,17 @@ describe("internal event and tool-call routes", () => {
-       const toolResult = new Promise<ToolCallResponse>((resolve) => {
-         completeTool = resolve;
-       });
-+      let invokedProviderId: string | null = null;
-       setPluginAgentContributions({
-         listSkillRootContributions: () => [],
-         listAgentTools: () => [],
-         listInstructionContributions: () => [],
-         findAgentTool: (name) =>
-           name === record.name ? { pluginId: "fixture", record } : undefined,
--        invokeAgentTool: () => toolResult,
-+        invokeAgentTool: ({ ctx }) => {
-+          invokedProviderId = ctx.providerId;
-+          return toolResult;
-+        },
-         resolveMention: async () => ({ ok: false, error: "unused" }),
-       });
- 
-@@ -116,6 +120,7 @@ describe("internal event and tool-call routes", () => {
-         const thread = seedThread(harness.deps, {
-           projectId: project.id,
-           environmentId: environment.id,
-+          providerId: "acp-cursor",
-         });
- 
-         const server = serve({
-@@ -156,6 +161,7 @@ describe("internal event and tool-call routes", () => {
-           const response = earlyResponse ?? (await responsePromise);
- 
-           expect(earlyResponse).not.toBeNull();
-+          expect(invokedProviderId).toBe("acp-cursor");
-           expect(response.status).toBe(200);
-           await expect(readJson(response)).resolves.toEqual({
-             success: true,
-diff --git a/apps/server/test/services/plugins/plugin-agent-tools.test.ts b/apps/server/test/services/plugins/plugin-agent-tools.test.ts
-index 7e972ae..807eb47 100644
---- a/apps/server/test/services/plugins/plugin-agent-tools.test.ts
-+++ b/apps/server/test/services/plugins/plugin-agent-tools.test.ts
-@@ -176,6 +176,7 @@ describe("bb.agents.registerTool", () => {
-     const ctx = {
-       threadId: "thr_1",
-       projectId: "proj_1",
-+      providerId: "codex",
-       signal: new AbortController().signal,
-     };
-     const alpha = service.findAgentTool("alpha_tool")!;
-@@ -221,6 +222,7 @@ describe("bb.agents.registerTool", () => {
-     const ctx = {
-       threadId: "thr_1",
-       projectId: "proj_1",
-+      providerId: "codex",
-       signal: new AbortController().signal,
-     };
-     const found = service.findAgentTool("search_issues")!;
-diff --git a/packages/plugin-sdk/src/backend-contract.ts b/packages/plugin-sdk/src/backend-contract.ts
-index ee8f3b2..c072fcd 100644
---- a/packages/plugin-sdk/src/backend-contract.ts
-+++ b/packages/plugin-sdk/src/backend-contract.ts
-@@ -696,6 +696,8 @@ export type PluginAgentToolResult =
- export interface PluginAgentToolContext {
-   threadId: string;
-   projectId: string;
-+  /** The provider running this thread, e.g. `codex` or `acp-cursor`. */
-+  providerId: string;
-   /** The tool-call request's abort signal (aborts if the daemon round-trip
-    * is torn down mid-call). */
-   signal: AbortSignal;
-diff --git a/packages/plugin-sdk/src/testing/fake-plugin-host.ts b/packages/plugin-sdk/src/testing/fake-plugin-host.ts
-index 117292b..11269fc 100644
---- a/packages/plugin-sdk/src/testing/fake-plugin-host.ts
-+++ b/packages/plugin-sdk/src/testing/fake-plugin-host.ts
-@@ -2247,6 +2247,7 @@ function createFakePluginHostInternal(
-       return record.execute(parsed.value, {
-         threadId: ctx?.threadId ?? "thread-test",
-         projectId: ctx?.projectId ?? "project-test",
-+        providerId: ctx?.providerId ?? "codex",
-         signal: ctx?.signal ?? new AbortController().signal,
-       });
+diff --git a/plugins/ask-user-question/app.test.tsx b/plugins/ask-user-question/app.test.tsx
+index ad02532..95dd0f3 100644
+--- a/plugins/ask-user-question/app.test.tsx
++++ b/plugins/ask-user-question/app.test.tsx
+@@ -54,20 +54,25 @@ function render(
+   handlers: {
+     submit?: (value: unknown) => Promise<void>;
+     cancel?: () => Promise<void>;
++    rpc?: Record<string, (input: unknown) => unknown>;
+   } = {},
+ ) {
+-  return renderSlot(app.pendingInteractions[0]!, {
+-    interaction: {
+-      id: "pint_test",
+-      threadId: "thr_test",
+-      title: "Database",
+-      payload: payload as never,
+-      createdAt: 0,
+-      expiresAt: null,
++  return renderSlot(
++    app.pendingInteractions[0]!,
++    {
++      interaction: {
++        id: "pint_test",
++        threadId: "thr_test",
++        title: "Database",
++        payload: payload as never,
++        createdAt: 0,
++        expiresAt: null,
++      },
++      submit: handlers.submit ?? (async () => undefined),
++      cancel: handlers.cancel ?? (async () => undefined),
      },
+-    submit: handlers.submit ?? (async () => undefined),
+-    cancel: handlers.cancel ?? (async () => undefined),
+-  });
++    { rpc: handlers.rpc },
++  );
+ }
+ 
+ function getButtonByText(
+@@ -216,6 +221,29 @@ describe("multi-select and multi-question flows", () => {
+     fireEvent.click(getButtonByText(slot, "Cancel"));
+     expect(cancel).toHaveBeenCalledTimes(1);
+   });
++
++  it("sends one queued ACP answer without closing the remaining inbox", async () => {
++    const send = vi.fn(async () => ({ remaining: 1, version: 2 }));
++    const slot = render(singleSelect, {
++      submit: vi.fn(async () => undefined),
++      rpc: {
++        getQuestionQueue: () => ({ payload: multi, version: 1 }),
++        answerQueuedQuestion: send,
++      },
++    });
++
++    await slot.findByText("1 of 2");
++    fireEvent.click(getButtonByText(slot, "Metrics"));
++    fireEvent.click(getButtonByText(slot, "Send answer"));
++
++    await vi.waitFor(() =>
++      expect(send).toHaveBeenCalledWith({
++        threadId: "thr_test",
++        questionId: "q0",
++        answer: { selected: ["q0o0"] },
++      }),
++    );
++  });
+ });
+ 
+ describe("a payload the form cannot read", () => {
+diff --git a/plugins/ask-user-question/app.tsx b/plugins/ask-user-question/app.tsx
+index 4e03f6a..f2ef0fa 100644
+--- a/plugins/ask-user-question/app.tsx
++++ b/plugins/ask-user-question/app.tsx
+@@ -10,8 +10,11 @@ import {
+ } from "react";
+ import {
+   definePluginApp,
++  useRealtime,
++  useRpc,
+   type PluginPendingInteractionProps,
+ } from "@get-bb/plugin-sdk/app";
++import type { questionQueueRpcContract } from "./src/server.js";
+ import { Button } from "@bb/shared-ui/button";
+ import { Icon } from "@bb/shared-ui/icon";
+ import { usePointerCoarse } from "@bb/shared-ui/hooks/use-pointer-coarse";
+@@ -307,11 +310,25 @@ function AskUserQuestionInteraction({
+   submit,
+   cancel,
+ }: PluginPendingInteractionProps) {
++  const rpc = useRpc<typeof questionQueueRpcContract>();
+   const parsed = useMemo(
+     () => interactionPayloadSchema.safeParse(interaction.payload),
+     [interaction.payload],
+   );
+-  const questions = parsed.success ? parsed.data.questions : [];
++  const initialQuestions = parsed.success ? parsed.data.questions : [];
++  const [queuedQuestions, setQueuedQuestions] = useState<
++    readonly InteractionQuestion[] | null
++  >(null);
++  const refreshQueue = useCallback(() => {
++    void rpc
++      .call("getQuestionQueue", { threadId: interaction.threadId })
++      .then((result) => setQueuedQuestions(result.payload?.questions ?? null))
++      .catch(() => undefined);
++  }, [interaction.threadId, rpc]);
++  useEffect(refreshQueue, [refreshQueue]);
++  useRealtime("question-queue-changed", refreshQueue);
++  const questions = queuedQuestions ?? initialQuestions;
++  const queued = queuedQuestions !== null;
+   const [formState, setFormState] = useState<QuestionFormState>(() =>
+     createInitialFormState(questions),
+   );
+@@ -340,6 +357,12 @@ function AskUserQuestionInteraction({
+     [formState, questions, totalQuestions],
+   );
+ 
++  useEffect(() => {
++    setCurrentIndex((index) =>
++      Math.min(index, Math.max(totalQuestions - 1, 0)),
++    );
++  }, [totalQuestions]);
++
+   const updateQuestionState = (
+     question: InteractionQuestion,
+     update: (state: QuestionAnswerState) => QuestionAnswerState,
+@@ -393,7 +416,36 @@ function AskUserQuestionInteraction({
+     })();
+   };
+ 
++  const sendCurrentAnswer = (): void => {
++    if (busy || currentQuestion === null) return;
++    if (
++      !isQuestionAnswered(
++        currentQuestion,
++        answerStateFor(formState, currentQuestion),
++      )
++    ) {
++      return;
++    }
++    const answer = buildInteractionResponse([currentQuestion], formState)
++      .answers[currentQuestion.id];
++    if (answer === undefined) return;
++    setBusy(true);
++    void rpc
++      .call("answerQueuedQuestion", {
++        threadId: interaction.threadId,
++        questionId: currentQuestion.id,
++        answer,
++      })
++      .then(refreshQueue)
++      .catch(() => undefined)
++      .finally(() => setBusy(false));
++  };
++
+   const handleAdvance = (): void => {
++    if (queued) {
++      sendCurrentAnswer();
++      return;
++    }
+     if (isLast) {
+       submitAnswer();
+       return;
+@@ -455,7 +507,16 @@ function AskUserQuestionInteraction({
+     );
+   }
+ 
+-  if (!currentQuestion) return null;
++  if (!currentQuestion) {
++    return queued ? (
++      <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
++        <span>No questions waiting.</span>
++        <Button type="button" size="sm" variant="ghost" onClick={handleCancel}>
++          Close
++        </Button>
++      </div>
++    ) : null;
++  }
+ 
+   const currentState = answerStateFor(formState, currentQuestion);
+ 
+@@ -509,13 +570,18 @@ function AskUserQuestionInteraction({
+           <Button
+             type="button"
+             size="sm"
+-            disabled={busy || (isLast && !allAnswered)}
++            disabled={
++              busy ||
++              (queued
++                ? !isQuestionAnswered(currentQuestion, currentState)
++                : isLast && !allAnswered)
++            }
+             onClick={handleAdvance}
+           >
+             {busy ? (
+               <Icon name="Spinner" className="size-3 animate-spin" />
+             ) : null}
+-            {isLast ? "Submit answer" : "Next"}
++            {queued ? "Send answer" : isLast ? "Submit answer" : "Next"}
+           </Button>
+         </div>
+       </div>
 diff --git a/plugins/ask-user-question/src/server-harness.test.ts b/plugins/ask-user-question/src/server-harness.test.ts
-index bf0dc30..3350d78 100644
+index bf0dc30..8b1e8c0 100644
 --- a/plugins/ask-user-question/src/server-harness.test.ts
 +++ b/plugins/ask-user-question/src/server-harness.test.ts
-@@ -8,8 +8,16 @@ import plugin, { RENDERER_ID, TOOL_NAME } from "./server.js";
+@@ -3,17 +3,48 @@ import {
+   createFakePluginHost,
+   type FakePluginHost,
+ } from "@get-bb/plugin-sdk/testing";
+-import type { PluginAgentConfigurationContext } from "@get-bb/plugin-sdk";
++import type {
++  PluginAgentConfigurationContext,
++  PluginAgentToolContext,
++} from "@get-bb/plugin-sdk";
+ import plugin, { RENDERER_ID, TOOL_NAME } from "./server.js";
  import { TOOL_INPUT_JSON_SCHEMA } from "./tool-definition.js";
  import type { InteractionPayload, ToolResult } from "./contracts.js";
  
@@ -106,18 +222,42 @@ index bf0dc30..3350d78 100644
 -  const host = createFakePluginHost({ pluginId: "ask-user-question" });
 +function createHost(options?: {
 +  send?: (args: unknown) => Promise<unknown>;
++  providerId?: string;
 +}): FakePluginHost {
 +  const host = createFakePluginHost({
 +    pluginId: "ask-user-question",
-+    sdk:
-+      options?.send === undefined
-+        ? undefined
-+        : { threads: { send: options.send } },
++    sdk: {
++      threads: {
++        ...(options?.send === undefined ? {} : { send: options.send }),
++        ...(options?.providerId === undefined
++          ? {}
++          : { get: async () => ({ providerId: options.providerId }) }),
++      },
++    },
 +  });
    plugin(host.bb as unknown as Parameters<typeof plugin>[0]);
    return host;
  }
-@@ -85,7 +93,7 @@ describe("provider gating", () => {
+ 
++async function callWithoutProviderId(
++  host: FakePluginHost,
++  input: unknown,
++): Promise<unknown> {
++  const tool = host.harness.registrations.agentTools.find(
++    (candidate) => candidate.name === TOOL_NAME,
++  );
++  if (tool === undefined) throw new Error("AskUserQuestion is not registered");
++  return tool.execute(input, {
++    threadId: "thread-test",
++    projectId: "project-test",
++    signal: new AbortController().signal,
++  } as unknown as PluginAgentToolContext);
++}
++
+ function configurationContext(
+   providerId: string,
+   supportsNativeUserQuestion = false,
+@@ -85,7 +116,7 @@ describe("provider gating", () => {
      },
    );
  
@@ -126,7 +266,7 @@ index bf0dc30..3350d78 100644
      "registers the tool for %s with Claude's exact advertised schema",
      async (providerId) => {
        const host = createHost();
-@@ -96,6 +104,14 @@ describe("provider gating", () => {
+@@ -96,6 +127,14 @@ describe("provider gating", () => {
        const [tool] = resolved.tools;
        expect(tool?.name).toBe(TOOL_NAME);
        expect(tool?.inputSchema).toEqual(TOOL_INPUT_JSON_SCHEMA);
@@ -135,16 +275,57 @@ index bf0dc30..3350d78 100644
 +      );
 +      expect(resolved.instructions).toBe(
 +        providerId.startsWith("acp-")
-+          ? "On ACP, AskUserQuestion returns after showing the form. Batch 1-4 independent questions in that call; separate calls are not queued. Continue only work independent of the answer; the combined answers arrive as a follow-up message."
++          ? "On ACP, AskUserQuestion adds each call to the visible question inbox and returns immediately. Continue independent work; each submitted answer arrives as a follow-up message."
 +          : null,
 +      );
      },
    );
  
-@@ -126,6 +142,66 @@ describe("provider gating", () => {
+@@ -126,6 +165,107 @@ describe("provider gating", () => {
  });
  
  describe("asking a question", () => {
++  it("uses the thread provider when the live tool context omits providerId", async () => {
++    const host = createHost({
++      providerId: "acp-cursor",
++      send: async () => ({}),
++    });
++    const followUp = {
++      ...questions[0],
++      question: "Which cache should we use?",
++      header: "Cache",
++    };
++
++    await expect(callWithoutProviderId(host, { questions })).resolves.toBe(
++      "Question added. You may continue independent work; each user answer arrives as a follow-up message.",
++    );
++    await expect(
++      callWithoutProviderId(host, { questions: [followUp] }),
++    ).resolves.toBe(
++      "Question added. You may continue independent work; each user answer arrives as a follow-up message.",
++    );
++    expect(host.harness.pendingInteractions).toHaveLength(1);
++
++    const before = await host.harness.callRpc("getQuestionQueue", {
++      threadId: "thread-test",
++    });
++    expect(before).toMatchObject({
++      payload: { questions: [{ id: "q0" }, { id: "q1" }] },
++    });
++
++    await host.harness.callRpc("answerQueuedQuestion", {
++      threadId: "thread-test",
++      questionId: "q0",
++      answer: { selected: ["q0o1"] },
++    });
++    expect(host.harness.sdk.callsTo("threads.send")).toHaveLength(1);
++    await expect(
++      host.harness.callRpc("getQuestionQueue", {
++        threadId: "thread-test",
++      }),
++    ).resolves.toMatchObject({ payload: { questions: [{ id: "q1" }] } });
++  });
++
 +  it.each(["acp-cursor", "acp-opencode", "acp-custom"])(
 +    "returns immediately for %s and sends its later answer to the thread",
 +    async (providerId) => {
@@ -154,11 +335,11 @@ index bf0dc30..3350d78 100644
 +      const result = await host.harness.callAgentTool(
 +        TOOL_NAME,
 +        { questions },
-+        { providerId, signal: controller.signal },
++        { providerId, signal: controller.signal } as never,
 +      );
 +
 +      expect(await resultText(result)).toBe(
-+        "Question form shown. Batch 1-4 independent questions in this call; separate calls are not queued. Continue only work independent of the answers; the combined answers arrive as a follow-up message.",
++        "Question added. You may continue independent work; each user answer arrives as a follow-up message.",
 +      );
 +      expect(host.harness.pendingInteractions).toHaveLength(1);
 +      controller.abort();
@@ -196,7 +377,7 @@ index bf0dc30..3350d78 100644
 +    await host.harness.callAgentTool(
 +      TOOL_NAME,
 +      { questions },
-+      { providerId: "acp-cursor" },
++      { providerId: "acp-cursor" } as never,
 +    );
 +
 +    host.harness.cancelInteraction(host.harness.pendingInteractions[0]!.id);
@@ -208,36 +389,121 @@ index bf0dc30..3350d78 100644
    it("opens an interaction and returns the answer in Claude's result shape", async () => {
      const host = createHost();
      const call = host.harness.callAgentTool(TOOL_NAME, { questions });
-diff --git a/plugins/ask-user-question/src/tool-definition.ts b/plugins/ask-user-question/src/tool-definition.ts
---- a/plugins/ask-user-question/src/tool-definition.ts
-+++ b/plugins/ask-user-question/src/tool-definition.ts
-@@ -2,6 +2,8 @@ export const TOOL_DESCRIPTION = `Use this tool only when you are blocked on a d
- 
- Usage notes:
- - Users will always be able to select "Other" to provide custom text input
-+- Batch 1-4 independent questions in a single call: the user sees one form and the response includes every answer
-+- Do not issue another AskUserQuestion while a form is awaiting reply; separate calls are not queued
- - Use multiSelect: true to allow multiple answers to be selected for a question
- - If you recommend a specific option, make that the first option in the list and add "(Recommended)" at the end of the label
- 
 diff --git a/plugins/ask-user-question/src/server.ts b/plugins/ask-user-question/src/server.ts
-index 892065a..38ee851 100644
+index 892065a..cfe583c 100644
 --- a/plugins/ask-user-question/src/server.ts
 +++ b/plugins/ask-user-question/src/server.ts
-@@ -20,10 +20,60 @@ import {
+@@ -1,8 +1,16 @@
+-import type { BbPluginApi, PluginAgentToolResult } from "@get-bb/plugin-sdk";
++import {
++  defineRpcContract,
++  type BbPluginApi,
++  type PluginAgentToolResult,
++} from "@get-bb/plugin-sdk";
++import { z } from "zod";
+ import {
+   ASK_USER_QUESTION_RENDERER_ID,
++  interactionPayloadSchema,
+   interactionResponseSchema,
+   toolInputSchema,
++  type InteractionPayload,
++  type InteractionQuestion,
+ } from "./contracts.js";
+ import {
+   TOOL_DESCRIPTION,
+@@ -20,11 +28,206 @@ import {
  export const TOOL_NAME = "AskUserQuestion";
  export const RENDERER_ID = ASK_USER_QUESTION_RENDERER_ID;
  
 +const ACP_PROVIDER_ID_PREFIX = "acp-";
++const QUESTION_QUEUE_CHANNEL = "question-queue-changed";
 +const ACP_PENDING_RESULT =
-+  "Question form shown. Batch 1-4 independent questions in this call; separate calls are not queued. Continue only work independent of the answers; the combined answers arrive as a follow-up message.";
++  "Question added. You may continue independent work; each user answer arrives as a follow-up message.";
++
++interface QuestionQueue {
++  questions: InteractionQuestion[];
++  nextQuestionId: number;
++  version: number;
++}
++
++export const questionQueueRpcContract = defineRpcContract({
++  getQuestionQueue: {
++    input: z.object({ threadId: z.string().min(1) }).strict(),
++    output: z
++      .object({
++        payload: interactionPayloadSchema.nullable(),
++        version: z.number().int().nonnegative(),
++      })
++      .strict(),
++  },
++  answerQueuedQuestion: {
++    input: z
++      .object({
++        threadId: z.string().min(1),
++        questionId: z.string().min(1),
++        answer: z.unknown(),
++      })
++      .strict(),
++    output: z
++      .object({
++        remaining: z.number().int().nonnegative(),
++        version: z.number().int().nonnegative(),
++      })
++      .strict(),
++  },
++});
 +
  function errorResult(message: string): PluginAgentToolResult {
    return { content: [{ type: "text", text: message }], isError: true };
  }
  
-+function isAcpProviderId(providerId: string): boolean {
-+  return providerId.startsWith(ACP_PROVIDER_ID_PREFIX);
++function isAcpProviderId(providerId: unknown): boolean {
++  return (
++    typeof providerId === "string" &&
++    providerId.startsWith(ACP_PROVIDER_ID_PREFIX)
++  );
++}
++
++async function resolveProviderId(
++  bb: BbPluginApi,
++  ctx: { threadId: string; providerId?: unknown },
++): Promise<string | null> {
++  if (typeof ctx.providerId === "string") return ctx.providerId;
++  try {
++    const thread = await bb.sdk.threads.get({ threadId: ctx.threadId });
++    const providerId = (thread as { providerId?: unknown }).providerId;
++    return typeof providerId === "string" ? providerId : null;
++  } catch (error) {
++    bb.log.warn(
++      `AskUserQuestion could not resolve the thread provider: ${
++        error instanceof Error ? error.message : String(error)
++      }`,
++    );
++    return null;
++  }
++}
++
++function appendQuestions(
++  queue: QuestionQueue,
++  payload: InteractionPayload,
++): void {
++  const seenPrompts = new Set(
++    queue.questions.map((question) => question.prompt),
++  );
++  for (const source of payload.questions) {
++    if (seenPrompts.has(source.prompt)) continue;
++    const id = `q${queue.nextQuestionId++}`;
++    queue.questions.push({
++      ...source,
++      id,
++      options: source.options.map((option, index) => ({
++        ...option,
++        value: `${id}o${index}`,
++      })),
++    });
++    seenPrompts.add(source.prompt);
++  }
++  queue.version += 1;
 +}
 +
 +async function deliverAcpAnswer(args: {
@@ -283,16 +549,96 @@ index 892065a..38ee851 100644
 +}
 +
  export default function plugin(bb: BbPluginApi) {
++  const queues = new Map<string, QuestionQueue>();
++  const sendingQuestionIds = new Set<string>();
++  const publishQueue = (
++    threadId: string,
++    queue: QuestionQueue | undefined,
++  ): void => {
++    bb.realtime.publish(QUESTION_QUEUE_CHANNEL, {
++      threadId,
++      version: queue?.version ?? 0,
++    });
++  };
++
++  bb.rpc.register(questionQueueRpcContract, {
++    getQuestionQueue({ threadId }) {
++      const queue = queues.get(threadId);
++      return {
++        payload: queue === undefined ? null : { questions: queue.questions },
++        version: queue?.version ?? 0,
++      };
++    },
++    async answerQueuedQuestion({ threadId, questionId, answer }) {
++      const queue = queues.get(threadId);
++      const question = queue?.questions.find(
++        (candidate) => candidate.id === questionId,
++      );
++      const parsed = interactionResponseSchema.safeParse({
++        answers: { [questionId]: answer },
++      });
++      if (queue === undefined || question === undefined || !parsed.success)
++        throw new Error("Question answer is no longer pending.");
++      const toolResult = buildToolResult(
++        { questions: [question] },
++        parsed.data,
++      );
++      if (Object.keys(toolResult.answers).length === 0)
++        throw new Error("Choose an answer before sending it.");
++      const sendingKey = `${threadId}:${questionId}`;
++      if (sendingQuestionIds.has(sendingKey)) {
++        throw new Error("That answer is already being delivered.");
++      }
++      sendingQuestionIds.add(sendingKey);
++      try {
++        await bb.sdk.threads.send({
++          threadId,
++          mode: "auto",
++          input: [
++            {
++              type: "text",
++              text: `AskUserQuestion answer:\n${JSON.stringify(toolResult)}`,
++              mentions: [],
++              visibility: "agent-only",
++            },
++          ],
++        });
++        queue.questions = queue.questions.filter(
++          (candidate) => candidate.id !== questionId,
++        );
++        queue.version += 1;
++        publishQueue(threadId, queue);
++      } finally {
++        sendingQuestionIds.delete(sendingKey);
++      }
++      return { remaining: queue.questions.length, version: queue.version };
++    },
++  });
++
    bb.agents.registerTool({
      name: TOOL_NAME,
-@@ -48,17 +98,37 @@ export default function plugin(bb: BbPluginApi) {
+     description: TOOL_DESCRIPTION,
+@@ -48,17 +251,53 @@ export default function plugin(bb: BbPluginApi) {
        }
  
        const askedAt = Date.now();
-+      const acp = isAcpProviderId(ctx.providerId);
++      const acp = isAcpProviderId(await resolveProviderId(bb, ctx));
        let result;
        try {
 -        result = await bb.ui.requestInput(
++        const existing = acp ? queues.get(ctx.threadId) : undefined;
++        if (existing !== undefined) {
++          appendQuestions(existing, payload);
++          publishQueue(ctx.threadId, existing);
++          return ACP_PENDING_RESULT;
++        }
++        const queue = acp
++          ? { questions: [], nextQuestionId: 0, version: 0 }
++          : undefined;
++        if (queue !== undefined) {
++          appendQuestions(queue, payload);
++          queues.set(ctx.threadId, queue);
++        }
 +        const request = bb.ui.requestInput(
            {
              threadId: ctx.threadId,
@@ -305,13 +651,16 @@ index 892065a..38ee851 100644
          );
 +        if (acp) {
 +          void request.then(
-+            (resolved) =>
++            (resolved) => (
++              queues.delete(ctx.threadId),
++              publishQueue(ctx.threadId, undefined),
 +              deliverAcpAnswer({
 +                bb,
 +                threadId: ctx.threadId,
 +                payload,
 +                result: resolved,
-+              }),
++              })
++            ),
 +            (error) =>
 +              bb.log.warn(
 +                `AskUserQuestion could not wait for an ACP answer: ${
@@ -325,12 +674,12 @@ index 892065a..38ee851 100644
        } catch (error) {
          return errorResult(
            `The question could not be shown (${error instanceof Error ? error.message : String(error)}). Only one prompt can await the user at a time — put all of your questions in a single AskUserQuestion call, or continue with your best judgement.`,
-@@ -93,9 +163,13 @@ export default function plugin(bb: BbPluginApi) {
+@@ -93,9 +332,13 @@ export default function plugin(bb: BbPluginApi) {
      if (context.provider.capabilities.supportsNativeUserQuestion) {
        return { tools: [], skills: [] };
      }
 +    const instructions = isAcpProviderId(context.provider.id)
-+      ? "On ACP, AskUserQuestion returns after showing the form. Batch 1-4 independent questions in that call; separate calls are not queued. Continue only work independent of the answer; the combined answers arrive as a follow-up message."
++      ? "On ACP, AskUserQuestion adds each call to the visible question inbox and returns immediately. Continue independent work; each submitted answer arrives as a follow-up message."
 +      : undefined;
      return {
        tools: [{ name: TOOL_NAME, parameters: TOOL_INPUT_JSON_SCHEMA }],
@@ -339,3 +688,15 @@ index 892065a..38ee851 100644
      };
    });
  }
+diff --git a/plugins/ask-user-question/src/tool-definition.ts b/plugins/ask-user-question/src/tool-definition.ts
+index 828fdeb..02eeaff 100644
+--- a/plugins/ask-user-question/src/tool-definition.ts
++++ b/plugins/ask-user-question/src/tool-definition.ts
+@@ -2,6 +2,8 @@ export const TOOL_DESCRIPTION = `Use this tool only when you are blocked on a de
+ 
+ Usage notes:
+ - Users will always be able to select "Other" to provide custom text input
++- Batch 1-4 independent questions in a single call: the user sees one form and the response includes every answer
++- On ACP, later AskUserQuestion calls join the open question inbox; each answer is delivered separately while unanswered questions remain visible
+ - Use multiSelect: true to allow multiple answers to be selected for a question
+ - If you recommend a specific option, make that the first option in the list and add "(Recommended)" at the end of the label

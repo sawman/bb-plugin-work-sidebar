@@ -10,8 +10,7 @@
           "pluginId": "ask-user-question",
           "pluginPath": "plugins/ask-user-question",
           "sourcePatch": "bb-plugins/ask-user-question/acp-continuation.patch",
-          "turboFilter": "bb-plugin-ask-user-question",
-          "serverRouteTest": "test/internal/internal-events-tool-calls.test.ts"
+          "turboFilter": "bb-plugin-ask-user-question"
         },
         {
           "id": "automations-personal-projects",
