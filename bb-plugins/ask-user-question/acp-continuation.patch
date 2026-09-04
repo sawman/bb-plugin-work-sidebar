@@ -70,7 +70,7 @@ index ad02532..95dd0f3 100644
  
  describe("a payload the form cannot read", () => {
 diff --git a/plugins/ask-user-question/app.tsx b/plugins/ask-user-question/app.tsx
-index 4e03f6a..f2ef0fa 100644
+index 4e03f6a..9fb4890 100644
 --- a/plugins/ask-user-question/app.tsx
 +++ b/plugins/ask-user-question/app.tsx
 @@ -10,8 +10,11 @@ import {
@@ -85,7 +85,7 @@ index 4e03f6a..f2ef0fa 100644
  import { Button } from "@bb/shared-ui/button";
  import { Icon } from "@bb/shared-ui/icon";
  import { usePointerCoarse } from "@bb/shared-ui/hooks/use-pointer-coarse";
-@@ -307,11 +310,25 @@ function AskUserQuestionInteraction({
+@@ -307,11 +310,36 @@ function AskUserQuestionInteraction({
    submit,
    cancel,
  }: PluginPendingInteractionProps) {
@@ -99,11 +99,22 @@ index 4e03f6a..f2ef0fa 100644
 +  const [queuedQuestions, setQueuedQuestions] = useState<
 +    readonly InteractionQuestion[] | null
 +  >(null);
++  const [queueError, setQueueError] = useState<string | null>(null);
++  const [sendError, setSendError] = useState<string | null>(null);
 +  const refreshQueue = useCallback(() => {
 +    void rpc
 +      .call("getQuestionQueue", { threadId: interaction.threadId })
-+      .then((result) => setQueuedQuestions(result.payload?.questions ?? null))
-+      .catch(() => undefined);
++      .then((result) => {
++        setQueuedQuestions(result.payload?.questions ?? null);
++        setQueueError(null);
++      })
++      .catch((error: unknown) => {
++        setQueueError(
++          `Could not load this question: ${
++            error instanceof Error ? error.message : String(error)
++          }`,
++        );
++      });
 +  }, [interaction.threadId, rpc]);
 +  useEffect(refreshQueue, [refreshQueue]);
 +  useRealtime("question-queue-changed", refreshQueue);
@@ -112,7 +123,7 @@ index 4e03f6a..f2ef0fa 100644
    const [formState, setFormState] = useState<QuestionFormState>(() =>
      createInitialFormState(questions),
    );
-@@ -340,6 +357,12 @@ function AskUserQuestionInteraction({
+@@ -340,6 +368,12 @@ function AskUserQuestionInteraction({
      [formState, questions, totalQuestions],
    );
  
@@ -125,7 +136,15 @@ index 4e03f6a..f2ef0fa 100644
    const updateQuestionState = (
      question: InteractionQuestion,
      update: (state: QuestionAnswerState) => QuestionAnswerState,
-@@ -393,7 +416,36 @@ function AskUserQuestionInteraction({
+@@ -383,6 +417,7 @@ function AskUserQuestionInteraction({
+   const submitAnswer = (): void => {
+     if (busy || !allAnswered) return;
+     setBusy(true);
++    setSendError(null);
+     void (async () => {
+       try {
+         await submit(buildInteractionResponse(questions, formState));
+@@ -393,7 +428,42 @@ function AskUserQuestionInteraction({
      })();
    };
  
@@ -150,7 +169,13 @@ index 4e03f6a..f2ef0fa 100644
 +        answer,
 +      })
 +      .then(refreshQueue)
-+      .catch(() => undefined)
++      .catch((error: unknown) =>
++        setSendError(
++          `Could not send answer: ${
++            error instanceof Error ? error.message : String(error)
++          }`,
++        ),
++      )
 +      .finally(() => setBusy(false));
 +  };
 +
@@ -162,7 +187,7 @@ index 4e03f6a..f2ef0fa 100644
      if (isLast) {
        submitAnswer();
        return;
-@@ -455,7 +507,16 @@ function AskUserQuestionInteraction({
+@@ -455,7 +525,16 @@ function AskUserQuestionInteraction({
      );
    }
  
@@ -180,7 +205,7 @@ index 4e03f6a..f2ef0fa 100644
  
    const currentState = answerStateFor(formState, currentQuestion);
  
-@@ -509,13 +570,18 @@ function AskUserQuestionInteraction({
+@@ -509,16 +588,23 @@ function AskUserQuestionInteraction({
            <Button
              type="button"
              size="sm"
@@ -201,8 +226,13 @@ index 4e03f6a..f2ef0fa 100644
            </Button>
          </div>
        </div>
++      {queueError !== null ? <p role="alert">{queueError}</p> : null}
++      {sendError !== null ? <p role="alert">{sendError}</p> : null}
+     </div>
+   );
+ }
 diff --git a/plugins/ask-user-question/src/server-harness.test.ts b/plugins/ask-user-question/src/server-harness.test.ts
-index bf0dc30..8b1e8c0 100644
+index bf0dc30..09af157 100644
 --- a/plugins/ask-user-question/src/server-harness.test.ts
 +++ b/plugins/ask-user-question/src/server-harness.test.ts
 @@ -3,17 +3,48 @@ import {
@@ -281,10 +311,41 @@ index bf0dc30..8b1e8c0 100644
      },
    );
  
-@@ -126,6 +165,107 @@ describe("provider gating", () => {
+@@ -126,6 +165,138 @@ describe("provider gating", () => {
  });
  
  describe("asking a question", () => {
++  it("returns more than one interaction's queued questions through the RPC", async () => {
++    const host = createHost({
++      providerId: "acp-cursor",
++      send: async () => ({}),
++    });
++
++    for (let index = 0; index < 5; index += 1) {
++      await callWithoutProviderId(host, {
++        questions: [
++          {
++            ...questions[0],
++            question: `Which database should we use for ${index}?`,
++            header: `Database ${index}`,
++          },
++        ],
++      });
++    }
++
++    const queued = (await host.harness.callRpc("getQuestionQueue", {
++      threadId: "thread-test",
++    })) as { payload: { questions: Array<{ id: string }> } | null };
++    expect(queued.payload?.questions).toHaveLength(5);
++    expect(queued.payload?.questions.map((question) => question.id)).toEqual([
++      "q0",
++      "q1",
++      "q2",
++      "q3",
++      "q4",
++    ]);
++  });
++
 +  it("uses the thread provider when the live tool context omits providerId", async () => {
 +    const host = createHost({
 +      providerId: "acp-cursor",
@@ -390,7 +451,7 @@ index bf0dc30..8b1e8c0 100644
      const host = createHost();
      const call = host.harness.callAgentTool(TOOL_NAME, { questions });
 diff --git a/plugins/ask-user-question/src/server.ts b/plugins/ask-user-question/src/server.ts
-index 892065a..cfe583c 100644
+index 892065a..d748acd 100644
 --- a/plugins/ask-user-question/src/server.ts
 +++ b/plugins/ask-user-question/src/server.ts
 @@ -1,8 +1,16 @@
@@ -411,12 +472,13 @@ index 892065a..cfe583c 100644
  } from "./contracts.js";
  import {
    TOOL_DESCRIPTION,
-@@ -20,11 +28,206 @@ import {
+@@ -20,11 +28,223 @@ import {
  export const TOOL_NAME = "AskUserQuestion";
  export const RENDERER_ID = ASK_USER_QUESTION_RENDERER_ID;
  
 +const ACP_PROVIDER_ID_PREFIX = "acp-";
 +const QUESTION_QUEUE_CHANNEL = "question-queue-changed";
++const MAX_QUEUED_QUESTIONS = 32;
 +const ACP_PENDING_RESULT =
 +  "Question added. You may continue independent work; each user answer arrives as a follow-up message.";
 +
@@ -426,12 +488,19 @@ index 892065a..cfe583c 100644
 +  version: number;
 +}
 +
++const queuedInteractionPayloadSchema = z.object({
++  questions: z
++    .array(interactionPayloadSchema.shape.questions.element)
++    .min(1)
++    .max(MAX_QUEUED_QUESTIONS),
++});
++
 +export const questionQueueRpcContract = defineRpcContract({
 +  getQuestionQueue: {
 +    input: z.object({ threadId: z.string().min(1) }).strict(),
 +    output: z
 +      .object({
-+        payload: interactionPayloadSchema.nullable(),
++        payload: queuedInteractionPayloadSchema.nullable(),
 +        version: z.number().int().nonnegative(),
 +      })
 +      .strict(),
@@ -492,6 +561,7 @@ index 892065a..cfe583c 100644
 +  );
 +  for (const source of payload.questions) {
 +    if (seenPrompts.has(source.prompt)) continue;
++    if (queue.questions.length >= MAX_QUEUED_QUESTIONS) break;
 +    const id = `q${queue.nextQuestionId++}`;
 +    queue.questions.push({
 +      ...source,
@@ -565,7 +635,10 @@ index 892065a..cfe583c 100644
 +    getQuestionQueue({ threadId }) {
 +      const queue = queues.get(threadId);
 +      return {
-+        payload: queue === undefined ? null : { questions: queue.questions },
++        payload:
++          queue === undefined || queue.questions.length === 0
++            ? null
++            : { questions: queue.questions },
 +        version: queue?.version ?? 0,
 +      };
 +    },
@@ -607,7 +680,12 @@ index 892065a..cfe583c 100644
 +          (candidate) => candidate.id !== questionId,
 +        );
 +        queue.version += 1;
-+        publishQueue(threadId, queue);
++        if (queue.questions.length === 0) {
++          queues.delete(threadId);
++          publishQueue(threadId, undefined);
++        } else {
++          publishQueue(threadId, queue);
++        }
 +      } finally {
 +        sendingQuestionIds.delete(sendingKey);
 +      }
@@ -618,7 +696,7 @@ index 892065a..cfe583c 100644
    bb.agents.registerTool({
      name: TOOL_NAME,
      description: TOOL_DESCRIPTION,
-@@ -48,17 +251,53 @@ export default function plugin(bb: BbPluginApi) {
+@@ -48,17 +268,53 @@ export default function plugin(bb: BbPluginApi) {
        }
  
        const askedAt = Date.now();
@@ -674,7 +752,7 @@ index 892065a..cfe583c 100644
        } catch (error) {
          return errorResult(
            `The question could not be shown (${error instanceof Error ? error.message : String(error)}). Only one prompt can await the user at a time — put all of your questions in a single AskUserQuestion call, or continue with your best judgement.`,
-@@ -93,9 +332,13 @@ export default function plugin(bb: BbPluginApi) {
+@@ -93,9 +349,13 @@ export default function plugin(bb: BbPluginApi) {
      if (context.provider.capabilities.supportsNativeUserQuestion) {
        return { tools: [], skills: [] };
      }
