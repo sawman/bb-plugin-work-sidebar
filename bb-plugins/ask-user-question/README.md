@@ -15,6 +15,13 @@ submission, send the normalized answer to the same thread with
 `threads.send({ mode: "auto" })`: it steers a live turn or starts an idle one.
 Native-user-question providers remain excluded by their declared capability.
 
+The host-supported interaction is one form containing **one to four**
+independent questions. It returns one combined answer object. Separate
+`AskUserQuestion` calls are not a FIFO queue: an agent must wait for the
+current form's answer before asking a dependent follow-up. The ACP guidance
+states this explicitly so non-blocking tool calls do not get mistaken for
+queued forms.
+
 The source patch is [acp-continuation.patch](acp-continuation.patch). It adds
 coverage for Cursor, OpenCode, and a custom ACP provider, plus dismissal.
 
