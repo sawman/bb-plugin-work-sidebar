@@ -22,6 +22,6 @@ describe("status icon geometry", () => {
   it("optically centers the bottom-heavy wrench glyph", () => {
     const wrench = renderToStaticMarkup(<Icon name="Wrench" />);
 
-    expect(wrench).toContain('transform="translate(0 -1)"');
+    expect(wrench).toContain('transform="translate(0 -2)"');
   });
 });

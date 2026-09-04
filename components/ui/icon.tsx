@@ -186,7 +186,7 @@ const paths: Record<string, React.ReactNode> = {
     <>
       <path
         d="M14.5 6.5a4 4 0 0 0-5.2 5.2L4 17a2 2 0 1 0 2.8 2.8l5.3-5.3a4 4 0 0 0 5.2-5.2l-2.7 2.1-2.2-2.2z"
-        transform="translate(0 -1)"
+        transform="translate(0 -2)"
       />
     </>
   ),
