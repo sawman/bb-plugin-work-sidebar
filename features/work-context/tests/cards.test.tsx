@@ -735,9 +735,18 @@ describe("registered Work context cards", () => {
       expect(
         slot.queryByRole("button", { name: "Detach WORK-2 from this thread" }),
       ).toBeNull();
+      // Needs you is a hand-off queue: every row exposes the same two controls
+      // (assignment and status), regardless of whether its linkage is generic
+      // or a durable execution binding. Association actions belong to Queue.
       expect(
-        slot.getByRole("button", { name: "Detach WORK-3 from this thread" }),
-      ).toBeTruthy();
+        slot.queryByRole("button", { name: "Detach WORK-3 from this thread" }),
+      ).toBeNull();
+      const needsYou = slot.getByRole("heading", { name: "Needs you" }).closest("section")!;
+      expect(
+        within(needsYou).getAllByRole("group", { name: /Actions for WORK-/ }).map(
+          (actions) => actions.children.length,
+        ),
+      ).toEqual([2]);
       const workItemsCard = slot.container.querySelector<HTMLElement>(
         '[data-card="work items"]',
       );

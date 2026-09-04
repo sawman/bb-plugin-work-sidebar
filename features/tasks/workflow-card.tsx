@@ -50,7 +50,6 @@ export function TaskWorkflowCard({
         onAssigneeChange={onAssigneeChange}
         detachableTaskIds={detachableTaskIds}
         onDetach={onDetach}
-        onMakeGoal={onMakeGoal}
       />
       <WorkflowSection
         id={`${idPrefix}-queue`}
@@ -63,6 +62,7 @@ export function TaskWorkflowCard({
         detachableTaskIds={detachableTaskIds}
         onDetach={onDetach}
         onMakeGoal={onMakeGoal}
+        showAssociationActions
       />
       <WorkflowSection
         id={`${idPrefix}-completed`}
@@ -75,7 +75,6 @@ export function TaskWorkflowCard({
         onAssigneeChange={onAssigneeChange}
         detachableTaskIds={detachableTaskIds}
         onDetach={onDetach}
-        onMakeGoal={onMakeGoal}
       />
       {!sections.needsYou.length &&
       !sections.queue.length &&
@@ -100,6 +99,7 @@ function WorkflowSection({
   detachableTaskIds,
   onDetach,
   onMakeGoal,
+  showAssociationActions = false,
 }: {
   id: string;
   title: "Needs you" | "Queue" | "Completed";
@@ -114,6 +114,7 @@ function WorkflowSection({
   detachableTaskIds: ReadonlySet<string>;
   onDetach(taskId: string): void;
   onMakeGoal?(taskId: string): void;
+  showAssociationActions?: boolean;
 }) {
   const visibleItems = items.slice(0, itemLimit);
   const count = total ?? items.length;
@@ -134,7 +135,7 @@ function WorkflowSection({
               busy={busy}
               onStatusChange={onStatusChange}
               onAssigneeChange={onAssigneeChange}
-              detachable={detachableTaskIds.has(item.task.id)}
+              detachable={showAssociationActions && detachableTaskIds.has(item.task.id)}
               onDetach={onDetach}
               onMakeGoal={onMakeGoal}
             />
