@@ -1,0 +1,5 @@
+# Version-pinned built-in rollback bundles are deployed artifacts, not source.
+bb-plugins/ask-user-question/rollback/** -text whitespace=-trailing-space
+
+# Unified diffs preserve blank context lines as `+ `; do not misclassify them.
+bb-plugins/**/*.patch whitespace=-blank-at-eol

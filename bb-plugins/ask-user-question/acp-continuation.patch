@@ -1,0 +1,331 @@
+diff --git a/apps/server/src/internal/tool-calls.ts b/apps/server/src/internal/tool-calls.ts
+index 6160fa1b0..097bd83fa 100644
+--- a/apps/server/src/internal/tool-calls.ts
++++ b/apps/server/src/internal/tool-calls.ts
+@@ -95,6 +95,7 @@ export function registerInternalToolCallRoutes(app: Hono, deps: AppDeps): void {
+             ctx: {
+               threadId: thread.id,
+               projectId: thread.projectId,
++              providerId: thread.providerId,
+               // The request's own abort signal: it fires if the daemon
+               // round-trip is torn down while the tool runs.
+               signal: context.req.raw.signal,
+diff --git a/apps/server/test/internal/internal-events-tool-calls.test.ts b/apps/server/test/internal/internal-events-tool-calls.test.ts
+index 8f007aeb5..82c991dfd 100644
+--- a/apps/server/test/internal/internal-events-tool-calls.test.ts
++++ b/apps/server/test/internal/internal-events-tool-calls.test.ts
+@@ -92,13 +92,17 @@ describe("internal event and tool-call routes", () => {
+       const toolResult = new Promise<ToolCallResponse>((resolve) => {
+         completeTool = resolve;
+       });
++      let invokedProviderId: string | null = null;
+       setPluginAgentContributions({
+         listSkillRootContributions: () => [],
+         listAgentTools: () => [],
+         listInstructionContributions: () => [],
+         findAgentTool: (name) =>
+           name === record.name ? { pluginId: "fixture", record } : undefined,
+-        invokeAgentTool: () => toolResult,
++        invokeAgentTool: ({ ctx }) => {
++          invokedProviderId = ctx.providerId;
++          return toolResult;
++        },
+         resolveMention: async () => ({ ok: false, error: "unused" }),
+       });
+ 
+@@ -116,6 +120,7 @@ describe("internal event and tool-call routes", () => {
+         const thread = seedThread(harness.deps, {
+           projectId: project.id,
+           environmentId: environment.id,
++          providerId: "acp-cursor",
+         });
+ 
+         const server = serve({
+@@ -156,6 +161,7 @@ describe("internal event and tool-call routes", () => {
+           const response = earlyResponse ?? (await responsePromise);
+ 
+           expect(earlyResponse).not.toBeNull();
++          expect(invokedProviderId).toBe("acp-cursor");
+           expect(response.status).toBe(200);
+           await expect(readJson(response)).resolves.toEqual({
+             success: true,
+diff --git a/apps/server/test/services/plugins/plugin-agent-tools.test.ts b/apps/server/test/services/plugins/plugin-agent-tools.test.ts
+index d37e3ec4b..d1e4390d7 100644
+--- a/apps/server/test/services/plugins/plugin-agent-tools.test.ts
++++ b/apps/server/test/services/plugins/plugin-agent-tools.test.ts
+@@ -176,6 +176,7 @@ describe("bb.agents.registerTool", () => {
+     const ctx = {
+       threadId: "thr_1",
+       projectId: "proj_1",
++      providerId: "codex",
+       signal: new AbortController().signal,
+     };
+     const alpha = service.findAgentTool("alpha_tool")!;
+@@ -221,6 +222,7 @@ describe("bb.agents.registerTool", () => {
+     const ctx = {
+       threadId: "thr_1",
+       projectId: "proj_1",
++      providerId: "codex",
+       signal: new AbortController().signal,
+     };
+     const found = service.findAgentTool("search_issues")!;
+diff --git a/packages/plugin-sdk/src/backend-contract.ts b/packages/plugin-sdk/src/backend-contract.ts
+index 2553ad214..c06823fd4 100644
+--- a/packages/plugin-sdk/src/backend-contract.ts
++++ b/packages/plugin-sdk/src/backend-contract.ts
+@@ -369,6 +369,8 @@ export type PluginAgentToolResult =
+ export interface PluginAgentToolContext {
+   threadId: string;
+   projectId: string;
++  /** The provider running this thread, e.g. `codex` or `acp-cursor`. */
++  providerId: string;
+   /** The tool-call request's abort signal (aborts if the daemon round-trip
+    * is torn down mid-call). */
+   signal: AbortSignal;
+diff --git a/packages/plugin-sdk/src/testing/fake-plugin-host.ts b/packages/plugin-sdk/src/testing/fake-plugin-host.ts
+index 486d26858..b2afa402e 100644
+--- a/packages/plugin-sdk/src/testing/fake-plugin-host.ts
++++ b/packages/plugin-sdk/src/testing/fake-plugin-host.ts
+@@ -2149,6 +2149,7 @@ function createFakePluginHostInternal(
+       return record.execute(parsed.value, {
+         threadId: ctx?.threadId ?? "thread-test",
+         projectId: ctx?.projectId ?? "project-test",
++        providerId: ctx?.providerId ?? "codex",
+         signal: ctx?.signal ?? new AbortController().signal,
+       });
+     },
+
+diff --git a/plugins/ask-user-question/src/server-harness.test.ts b/plugins/ask-user-question/src/server-harness.test.ts
+index 8d234d4f4..61e215dbd 100644
+--- a/plugins/ask-user-question/src/server-harness.test.ts
++++ b/plugins/ask-user-question/src/server-harness.test.ts
+@@ -8,8 +8,16 @@ import plugin, { RENDERER_ID, TOOL_NAME } from "./server.js";
+ import { TOOL_INPUT_JSON_SCHEMA } from "./tool-definition.js";
+ import type { InteractionPayload, ToolResult } from "./contracts.js";
+ 
+-function createHost(): FakePluginHost {
+-  const host = createFakePluginHost({ pluginId: "ask-user-question" });
++function createHost(options?: {
++  send?: (args: unknown) => Promise<unknown>;
++}): FakePluginHost {
++  const host = createFakePluginHost({
++    pluginId: "ask-user-question",
++    sdk:
++      options?.send === undefined
++        ? undefined
++        : { threads: { send: options.send } },
++  });
+   plugin(host.bb as unknown as Parameters<typeof plugin>[0]);
+   return host;
+ }
+@@ -87,7 +95,7 @@ describe("provider gating", () => {
+     },
+   );
+ 
+-  it.each(["codex", "pi", "acp-cursor"])(
++  it.each(["codex", "pi", "acp-cursor", "acp-opencode", "acp-custom"])(
+     "registers the tool for %s with Claude's exact advertised schema",
+     async (providerId) => {
+       const host = createHost();
+@@ -100,4 +108,9 @@ describe("provider gating", () => {
+       // zod-derived one — that is the whole point of the override.
+       expect(tool?.inputSchema).toEqual(TOOL_INPUT_JSON_SCHEMA);
++      expect(resolved.instructions).toBe(
++        providerId.startsWith("acp-")
++          ? "On ACP, AskUserQuestion returns after showing the question. Stop after calling it: the selected answer arrives as a follow-up message."
++          : null,
++      );
+     },
+   );
+@@ -130,6 +143,66 @@ describe("provider gating", () => {
+ });
+ 
+ describe("asking a question", () => {
++  it.each(["acp-cursor", "acp-opencode", "acp-custom"])(
++    "returns immediately for %s and sends its later answer to the thread",
++    async (providerId) => {
++      const host = createHost({ send: async () => ({}) });
++      const controller = new AbortController();
++
++      const result = await host.harness.callAgentTool(
++        TOOL_NAME,
++        { questions },
++        { providerId, signal: controller.signal },
++      );
++
++      expect(await resultText(result)).toBe(
++        "Question shown. Wait for the user's follow-up answer before continuing.",
++      );
++      expect(host.harness.pendingInteractions).toHaveLength(1);
++      controller.abort();
++      expect(host.harness.pendingInteractions).toHaveLength(1);
++      const pending = host.harness.pendingInteractions[0]!;
++      host.harness.submitInteraction(pending.id, {
++        answers: { q0: { selected: ["q0o1"] } },
++      });
++
++      await vi.waitFor(() =>
++        expect(host.harness.sdk.callsTo("threads.send")).toEqual([
++          [
++            {
++              threadId: "thread-test",
++              mode: "steer-if-active",
++              input: [
++                {
++                  type: "text",
++                  text: expect.stringContaining(
++                    '"Which database should we use?":"SQLite"',
++                  ),
++                  mentions: [],
++                  visibility: "agent-only",
++                },
++              ],
++            },
++          ],
++        ]),
++      );
++    },
++  );
++
++  it("does not send a follow-up when an ACP question is dismissed", async () => {
++    const host = createHost({ send: async () => ({}) });
++    await host.harness.callAgentTool(
++      TOOL_NAME,
++      { questions },
++      { providerId: "acp-cursor" },
++    );
++
++    host.harness.cancelInteraction(host.harness.pendingInteractions[0]!.id);
++    await Promise.resolve();
++
++    expect(host.harness.sdk.callsTo("threads.send")).toEqual([]);
++  });
++
+   it("opens an interaction and returns the answer in Claude's result shape", async () => {
+     const host = createHost();
+     const call = host.harness.callAgentTool(TOOL_NAME, { questions });
+diff --git a/plugins/ask-user-question/src/server.ts b/plugins/ask-user-question/src/server.ts
+index 0dd68bacd..692beebf5 100644
+--- a/plugins/ask-user-question/src/server.ts
++++ b/plugins/ask-user-question/src/server.ts
+@@ -20,10 +20,66 @@ import {
+ export const TOOL_NAME = "AskUserQuestion";
+ export const RENDERER_ID = ASK_USER_QUESTION_RENDERER_ID;
+ 
++// ACP clients own the MCP request deadline and may terminate an interactive
++// tools/call while the user is still reading the question. The server cannot
++// extend that deadline reliably, so all ACP providers use a two-step flow:
++// return as soon as the interaction is shown, then steer the answer back to
++// the thread when it arrives. Native-question providers are withheld above.
++// Revisit when ACP specifies a durable interactive tool-call continuation.
++const ACP_PROVIDER_ID_PREFIX = "acp-";
++const ACP_PENDING_RESULT =
++  "Question shown. Wait for the user's follow-up answer before continuing.";
++
+ function errorResult(message: string): PluginAgentToolResult {
+   return { content: [{ type: "text", text: message }], isError: true };
+ }
+ 
++function isAcpProviderId(providerId: string): boolean {
++  return providerId.startsWith(ACP_PROVIDER_ID_PREFIX);
++}
++
++async function deliverAcpAnswer(args: {
++  bb: BbPluginApi;
++  threadId: string;
++  payload: ReturnType<typeof buildInteractionPayload>;
++  result: Awaited<ReturnType<BbPluginApi["ui"]["requestInput"]>>;
++}): Promise<void> {
++  const { bb, threadId, payload, result } = args;
++  if (result.outcome !== "submitted") return;
++
++  const parsed = interactionResponseSchema.safeParse(result.value);
++  if (!parsed.success) {
++    bb.log.warn("AskUserQuestion could not read an ACP answer");
++    return;
++  }
++  const toolResult = buildToolResult(payload, parsed.data);
++  if (Object.keys(toolResult.answers).length === 0) {
++    bb.log.info("AskUserQuestion ACP answer was empty");
++    return;
++  }
++
++  try {
++    await bb.sdk.threads.send({
++      threadId,
++      mode: "steer-if-active",
++      input: [
++        {
++          type: "text",
++          text: `AskUserQuestion answer:\n${JSON.stringify(toolResult)}`,
++          mentions: [],
++          visibility: "agent-only",
++        },
++      ],
++    });
++  } catch (error) {
++    bb.log.warn(
++      `Could not deliver AskUserQuestion answer to ACP: ${
++        error instanceof Error ? error.message : String(error)
++      }`,
++    );
++  }
++}
++
+ export default function plugin(bb: BbPluginApi) {
+   bb.agents.registerTool({
+     name: TOOL_NAME,
+@@ -50,17 +106,37 @@ export default function plugin(bb: BbPluginApi) {
+       }
+ 
+       const askedAt = Date.now();
++      const acp = isAcpProviderId(ctx.providerId);
+       let result;
+       try {
+-        result = await bb.ui.requestInput(
++        const request = bb.ui.requestInput(
+           {
+             threadId: ctx.threadId,
+             rendererId: RENDERER_ID,
+             title: buildInteractionTitle(payload),
+             payload,
+           },
+-          { signal: ctx.signal },
++          acp ? undefined : { signal: ctx.signal },
+         );
++        if (acp) {
++          void request.then(
++            (resolved) =>
++              deliverAcpAnswer({
++                bb,
++                threadId: ctx.threadId,
++                payload,
++                result: resolved,
++              }),
++            (error) =>
++              bb.log.warn(
++                `AskUserQuestion could not wait for an ACP answer: ${
++                  error instanceof Error ? error.message : String(error)
++                }`,
++              ),
++          );
++          return ACP_PENDING_RESULT;
++        }
++        result = await request;
+       } catch (error) {
+         // A thread holds at most one interaction at a time, so two questions
+         // issued as parallel tool calls race and the loser lands here. Say so
+@@ -102,9 +178,13 @@ export default function plugin(bb: BbPluginApi) {
+     if (context.provider.capabilities.supportsNativeUserQuestion) {
+       return { tools: [], skills: [] };
+     }
++    const instructions = isAcpProviderId(context.provider.id)
++      ? "On ACP, AskUserQuestion returns after showing the question. Stop after calling it: the selected answer arrives as a follow-up message."
++      : undefined;
+     return {
+       tools: [{ name: TOOL_NAME, parameters: TOOL_INPUT_JSON_SCHEMA }],
+       skills: [],
++      ...(instructions === undefined ? {} : { instructions }),
+     };
+   });
+ }

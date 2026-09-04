@@ -1,0 +1,27 @@
+{
+  "bbVersion": "0.41.0",
+  "pluginId": "ask-user-question",
+  "sdkVersion": "0.4.34",
+  "target": "server/dist/builtin-plugins/ask-user-question/dist",
+  "purpose": "Pre-patch rollback payload for the ACP answer-continuation deployment on 2026-09-04.",
+  "files": {
+    "server.js": {
+      "sha256": "c318ca03a11f99d82c70638979888f9da043e3a3a5a44792e71a968e68af06fa",
+      "bytes": 535635
+    },
+    "server.js.map": {
+      "sha256": "3d51900c9482fbfa428378b6a8a98fbf7c52e834f092f2962b80d29f46950e16",
+      "bytes": 948115
+    },
+    "server.meta.json": {
+      "sha256": "684cbbc284b6012a668b7c46c0ee8e18e0f46e7fa4d921b276229839367d2cff",
+      "bytes": 221
+    }
+  },
+  "restore": [
+    "Verify this exact BB version is installed.",
+    "Verify every SHA-256 hash above.",
+    "Copy these three files to the target path, replacing the installed artifacts.",
+    "Run: bb plugin reload ask-user-question"
+  ]
+}
