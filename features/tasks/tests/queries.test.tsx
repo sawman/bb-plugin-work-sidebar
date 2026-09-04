@@ -261,10 +261,9 @@ describe("Tasks read slots", () => {
     expect(loading.getByText("Status")).toBeTruthy();
     resolve(emptyTasks);
     await waitFor(() =>
-      expect(
-        loading.getByText("No tasks are attached to this thread."),
-      ).toBeTruthy(),
+      expect(loading.getByText("Needs you")).toBeTruthy(),
     );
+    expect(loading.queryByText("No tasks are attached to this thread.")).toBeNull();
     loading.lifecycle.unmount();
     getPluginQueryClient().clear();
 
@@ -311,10 +310,9 @@ describe("Tasks read slots", () => {
     ).toBeNull();
     fireEvent.click(retry.getByRole("button", { name: "Try again" }));
     await waitFor(() =>
-      expect(
-        retry.getByText("No tasks are attached to this thread."),
-      ).toBeTruthy(),
+      expect(retry.getByText("Needs you")).toBeTruthy(),
     );
+    expect(retry.queryByText("No tasks are attached to this thread.")).toBeNull();
     expect(failing).toHaveBeenCalledTimes(3);
     retry.lifecycle.unmount();
   });

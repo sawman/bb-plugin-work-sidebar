@@ -76,11 +76,6 @@ export function TaskWorkflowCard({
         detachableTaskIds={detachableTaskIds}
         onDetach={onDetach}
       />
-      {!sections.needsYou.length &&
-      !sections.queue.length &&
-      !sections.completed.length ? (
-        <p className="ws-card-note">No tasks are attached to this thread.</p>
-      ) : null}
     </div>
   );
 }
