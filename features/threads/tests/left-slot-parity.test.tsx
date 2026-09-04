@@ -1103,7 +1103,7 @@ describe("R18 registered left sidebar parity", () => {
     expect(tooltipId).toBeTruthy();
     expect(
       document.getElementById(tooltipId!)?.getAttribute("data-tooltip-label"),
-    ).toBe("Rename group");
+    ).toBe("Rename");
     expect(trigger.parentElement?.classList).toContain("ws-action-tooltip");
 
     fireEvent.click(trigger);

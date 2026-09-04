@@ -173,7 +173,7 @@ export function ThreadGroupOrderSettings({
                 />
               </form>
             ) : group ? (
-              <ActionTooltip label="Rename group">
+              <ActionTooltip label="Rename">
                 {(tooltipId) => (
                   <button
                     ref={(node) => {
