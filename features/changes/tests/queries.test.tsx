@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { changesKeys, changesPolicies } from "../model";
+import type { Changes } from "../schemas";
 import {
   invalidateChanges,
   useChanges,
@@ -16,6 +17,59 @@ afterEach(() => {
 });
 
 describe("R13 Changes queries", () => {
+  it("renders a cached projection immediately while a stale refresh is in flight", async () => {
+    let resolve!: (value: Changes) => void;
+    const refreshed = new Promise<Changes>((next) => {
+      resolve = next;
+    });
+    const threadId = "thr_cached_projection";
+    const cached: Changes = {
+      currentPullRequest: null,
+      stack: null,
+      stackUnavailableReason: null,
+      githubStack: null,
+      repository: {
+        outcome: "available",
+        message: null,
+        branch: "cached-branch",
+        base: "main",
+        ahead: 0,
+        behind: 0,
+        worktreeState: "clean",
+        hasUncommittedChanges: false,
+        changedFileCount: 0,
+        changedInsertions: 0,
+        changedDeletions: 0,
+        changedFiles: [],
+      },
+    };
+    const rpc = { call: vi.fn(() => refreshed) };
+    const client = new QueryClient();
+    client.setQueryData<Changes>(changesKeys.projection(threadId), cached);
+    await client.invalidateQueries({
+      queryKey: changesKeys.projection(threadId),
+    });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const view = renderHook(
+      () =>
+        useChanges(rpc as never, threadId, {
+          visiblePollMs: 1_000,
+          backgroundPollMs: 9_000,
+        }),
+      { wrapper },
+    );
+
+    expect(view.result.current.data).toBe(cached);
+    expect(view.result.current.isPending).toBe(false);
+    await waitFor(() => expect(view.result.current.isFetching).toBe(true));
+
+    resolve(cached);
+    await waitFor(() => expect(view.result.current.isFetching).toBe(false));
+    view.unmount();
+  });
+
   it("invalidates only the Changes projection, leaving fingerprint and file diff caches fresh", async () => {
     const client = new QueryClient();
     const threadId = "thr_projection";

@@ -1608,6 +1608,17 @@
 .ws-repository-card {
   gap: 0.32rem;
 }
+.ws-repository-loading {
+  display: inline-grid;
+  width: 0.84rem;
+  height: 0.84rem;
+  place-items: center;
+  color: var(--muted-foreground);
+}
+.ws-repository-loading > svg {
+  width: 0.76rem;
+  height: 0.76rem;
+}
 .ws-stack-rail {
   display: grid;
   gap: 0.08rem;

@@ -175,6 +175,45 @@ describe("R14 Changes interactions", () => {
     expect(open).toHaveBeenCalledOnce();
   });
 
+  it("keeps cached repository details visible while its projection refreshes", () => {
+    const { container } = render(
+      <ChangesRepositoryCard
+        repository={{
+          outcome: "available",
+          message: null,
+          branch: "cached-branch",
+          base: "main",
+          ahead: 0,
+          behind: 0,
+          worktreeState: "clean",
+          hasUncommittedChanges: false,
+          changedFileCount: 0,
+          changedInsertions: 0,
+          changedDeletions: 0,
+          changedFiles: [],
+        }}
+        loading={false}
+        refreshing
+        expanded={false}
+        onToggle={() => undefined}
+        onOpenFile={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText("cached-branch")).toBeTruthy();
+    expect(
+      screen.getByRole("status", { name: "Refreshing repository" }),
+    ).toBeTruthy();
+    expect(
+      container.querySelector('[data-icon="RefreshCw"]')?.getAttribute(
+        "data-motion",
+      ),
+    ).toBe("spin");
+    expect(container.querySelector("article")?.getAttribute("aria-busy")).toBe(
+      "true",
+    );
+  });
+
   it("renders every received working-tree file without a local truncation notice", () => {
     const changedFiles = Array.from({ length: 8 }, (_, index) => ({
       path: `src/visible-${index + 1}.ts`,

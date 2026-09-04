@@ -194,6 +194,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
       <ChangesRepositoryCard
         repository={changesQuery.data?.repository}
         loading={changesQuery.isPending}
+        refreshing={changesQuery.isFetching && !changesQuery.isPending}
         expanded={presentation?.repositoryExpanded ?? false}
         contextMeta={contextMeta}
         onToggle={() =>

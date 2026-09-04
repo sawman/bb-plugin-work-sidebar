@@ -117,6 +117,7 @@ function RepositoryDetails({
 export function ChangesRepositoryCard({
   repository,
   loading,
+  refreshing = false,
   expanded,
   contextMeta,
   onToggle,
@@ -125,6 +126,7 @@ export function ChangesRepositoryCard({
 }: {
   repository: Repository | undefined;
   loading: boolean;
+  refreshing?: boolean;
   expanded: boolean;
   contextMeta?: ReactNode;
   onToggle(): void;
@@ -134,7 +136,10 @@ export function ChangesRepositoryCard({
   if (loading)
     return (
       <SurfaceCard className="ws-empty-state-card" aria-busy="true">
-        <SurfaceCardHeading title="Repository" />
+        <SurfaceCardHeading
+          title="Repository"
+          trailing={<RepositoryLoadingIndicator />}
+        />
         <p className="ws-card-note">
           Loading pull requests and working-tree changes…
         </p>
@@ -144,11 +149,15 @@ export function ChangesRepositoryCard({
     ? repositoryPresentation(repository)
     : { label: "Unavailable", tone: "unavailable" as const };
   return (
-    <SurfaceCard className="ws-repository-card">
+    <SurfaceCard
+      className="ws-repository-card"
+      aria-busy={refreshing || undefined}
+    >
       <SurfaceCardHeading
         title={repository?.branch ?? "Repository"}
         trailing={
           <span className="ws-repository-heading-meta">
+            {refreshing ? <RepositoryLoadingIndicator /> : null}
             {contextMeta}
             <span
               className={`ws-pill ${presentation.tone === "changed" ? "ws-pr-changes_requested" : ""}`}
@@ -172,6 +181,23 @@ export function ChangesRepositoryCard({
         </p>
       )}
     </SurfaceCard>
+  );
+}
+
+function RepositoryLoadingIndicator(): ReactElement {
+  return (
+    <span
+      className="ws-repository-loading"
+      role="status"
+      aria-label="Refreshing repository"
+    >
+      <Icon
+        name="RefreshCw"
+        className="ws-refresh-icon"
+        data-motion="spin"
+        aria-hidden
+      />
+    </span>
   );
 }
 
