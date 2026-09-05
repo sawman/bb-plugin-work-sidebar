@@ -142,8 +142,10 @@ The browser-safe contract exposes strict JSON methods:
 - `setHumanMessageBookmark({ threadId, messageId, bookmarked })`;
 
 List results include active/saved counts, a bounded result page, and an opaque
-cursor. Search and default projections share one query family keyed by thread,
-mode, normalized query, and cursor.
+cursor. Search and default projections each use one finite query scope keyed
+by thread and normalized query. Loaded cursor pages belong to that one
+sequential infinite-query chain, so a refetch starts at page one and derives
+every later cursor from its refreshed predecessor.
 
 Successful mutations publish one `work-sidebar:changed` signal with family
 `inbox` and `threadId`; clients invalidate only that thread's Inbox keys.

@@ -118,16 +118,11 @@ export const queryKeys = {
       "inbox",
       threadId,
     ],
-    page: (
-      threadId: string,
-      query: string,
-      cursor: string | null,
-    ): QueryKey => [
+    scope: (threadId: string, query: string): QueryKey => [
       ...pluginQueryRoot,
       "inbox",
       threadId,
       query.trim().replace(/\s+/g, " "),
-      cursor ?? "first",
     ],
   },
 } as const;
@@ -229,7 +224,7 @@ export const queryPolicies = {
   inbox: {
     staleTime: 0,
     // Inbox is durable and realtime-backed, but must not retain an unbounded
-    // per-thread/search/cursor cache after Work is no longer observed.
+    // per-thread/search cache after Work is no longer observed.
     gcTime: 10 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,

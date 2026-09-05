@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, type InfiniteData } from "@tanstack/react-query";
 import { createElement, type PropsWithChildren } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { queryKeys, queryPolicies } from "../../../query-runtime";
@@ -58,18 +58,17 @@ afterEach(() => {
 });
 
 describe("Inbox query lifecycle", () => {
-  it("uses finite thread/search/cursor keys and finite cache retention", () => {
+  it("uses finite thread/search scope keys and finite cache retention", () => {
     expect(queryPolicies.inbox.gcTime).toBeGreaterThan(0);
     expect(queryPolicies.inbox.gcTime).toBeLessThan(Infinity);
-    expect(queryKeys.inbox.page("thr_one", " history ", null)).toEqual([
+    expect(queryKeys.inbox.scope("thr_one", " history ")).toEqual([
       "work-sidebar",
       "inbox",
       "thr_one",
       "history",
-      "first",
     ]);
-    expect(queryKeys.inbox.page("thr_one", "history", "cursor-2")).not.toEqual(
-      queryKeys.inbox.page("thr_one", "history", null),
+    expect(queryKeys.inbox.scope("thr_one", "history")).toEqual(
+      queryKeys.inbox.scope("thr_one", " history "),
     );
   });
 
@@ -93,7 +92,7 @@ describe("Inbox query lifecycle", () => {
       queryKey: queryKeys.inbox.thread("thr_one"),
     });
 
-    const query = client.getQueryCache().find({ queryKey: queryKeys.inbox.page("thr_one", "", null) });
+    const query = client.getQueryCache().find({ queryKey: queryKeys.inbox.scope("thr_one", "") });
     expect(query?.getObserversCount()).toBeGreaterThan(0);
     view.unmount();
     expect(query?.getObserversCount()).toBe(0);
@@ -119,11 +118,11 @@ describe("Inbox query lifecycle", () => {
     await act(async () => {
       const mutation = view.result.current.mutations.acknowledge.mutateAsync({ messageId: message.id, revision: message.revision });
       const rejection = mutation.then(() => null, (error: unknown) => error);
-      await waitFor(() => expect(client.getQueryData<InboxPage>(queryKeys.inbox.page("thr_one", "", null))?.activeCount).toBe(0));
+      await waitFor(() => expect(cachedPages(client, "thr_one")[0]?.activeCount).toBe(0));
       rejectMutation(new Error("Message changed; refresh and retry."));
       await expect(rejection).resolves.toMatchObject({ message: "Message changed; refresh and retry." });
     });
-    expect(client.getQueryData(queryKeys.inbox.page("thr_one", "", null))).toEqual(page);
+    expect(cachedPages(client, "thr_one")).toEqual([page]);
     view.unmount();
     client.clear();
   });
@@ -200,7 +199,7 @@ describe("Inbox query lifecycle", () => {
     client.clear();
   });
 
-  it("projects optimistic counts consistently across every cached cursor page", async () => {
+  it("projects optimistic counts once across every page in one infinite scope", async () => {
     const secondPage = { ...page, cursor: null, messages: [{ ...message, id: "msg_two" }] };
     let resolveMutation!: (value: typeof message) => void;
     rpcClient.call
@@ -219,8 +218,7 @@ describe("Inbox query lifecycle", () => {
     await waitFor(() => expect(view.result.current.query.data?.messages).toHaveLength(2));
     const mutation = view.result.current.mutations.acknowledge.mutateAsync({ messageId: message.id, revision: message.revision });
     await waitFor(() => {
-      expect(client.getQueryData<InboxPage>(queryKeys.inbox.page("thr_one", "", null))?.activeCount).toBe(0);
-      expect(client.getQueryData<InboxPage>(queryKeys.inbox.page("thr_one", "", "next"))?.activeCount).toBe(0);
+      expect(cachedPages(client, "thr_one").map((cached) => cached.activeCount)).toEqual([0, 0]);
     });
     resolveMutation(message);
     await mutation;
@@ -247,4 +245,78 @@ describe("Inbox query lifecycle", () => {
     view.unmount();
     client.clear();
   });
+
+  it("refetches a 51-message insert chain from page one without a boundary drop or duplicate", async () => {
+    const before = messageRange(1, 51);
+    const after = [makeMessage(0), ...before];
+    let inserted = false;
+    rpcClient.call.mockImplementation((_method: string, input: { cursor?: string }) => {
+      const records = inserted ? after : before;
+      const boundary = inserted ? "insert-page-2" : "initial-page-2";
+      if (!input.cursor) return Promise.resolve(makePage(records.slice(0, 25), boundary));
+      if (input.cursor === boundary) return Promise.resolve(makePage(records.slice(25), null));
+      return Promise.reject(new Error(`stale cursor ${input.cursor}`));
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderHook(() => useInboxMessages("thr_one", ""), { wrapper: wrapper(client) });
+    await waitFor(() => expect(view.result.current.hasNextPage).toBe(true));
+    await act(async () => { view.result.current.fetchNextPage(); });
+    await waitFor(() => expect(view.result.current.data?.messages).toHaveLength(51));
+    inserted = true;
+    await act(async () => { await view.result.current.refetch(); });
+    await waitFor(() => expect(view.result.current.data?.messages).toHaveLength(52));
+    expect(uniqueIds(view.result.current.data?.messages ?? [])).toEqual(after.map((entry) => entry.id));
+    expect(rpcClient.call).toHaveBeenCalledWith("listHumanMessages", expect.objectContaining({ cursor: "insert-page-2" }));
+    view.unmount();
+    client.clear();
+  });
+
+  it("refetches a 51-message acknowledge chain from page one without a pulled-up duplicate", async () => {
+    const before = messageRange(1, 51);
+    const after = before.slice(1);
+    let acknowledged = false;
+    rpcClient.call.mockImplementation((_method: string, input: { cursor?: string }) => {
+      const records = acknowledged ? after : before;
+      const boundary = acknowledged ? "ack-page-2" : "initial-page-2";
+      if (!input.cursor) return Promise.resolve(makePage(records.slice(0, 25), boundary));
+      if (input.cursor === boundary) return Promise.resolve(makePage(records.slice(25), null));
+      return Promise.reject(new Error(`stale cursor ${input.cursor}`));
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderHook(() => useInboxMessages("thr_one", ""), { wrapper: wrapper(client) });
+    await waitFor(() => expect(view.result.current.hasNextPage).toBe(true));
+    await act(async () => { view.result.current.fetchNextPage(); });
+    await waitFor(() => expect(view.result.current.data?.messages).toHaveLength(51));
+    acknowledged = true;
+    await act(async () => { await view.result.current.refetch(); });
+    await waitFor(() => expect(view.result.current.data?.messages).toHaveLength(50));
+    expect(uniqueIds(view.result.current.data?.messages ?? [])).toEqual(after.map((entry) => entry.id));
+    expect(rpcClient.call).toHaveBeenCalledWith("listHumanMessages", expect.objectContaining({ cursor: "ack-page-2" }));
+    view.unmount();
+    client.clear();
+  });
 });
+
+function cachedPages(client: QueryClient, threadId: string) {
+  return client.getQueryData<InfiniteData<InboxPage, string | null>>(
+    queryKeys.inbox.scope(threadId, ""),
+  )?.pages ?? [];
+}
+
+function makeMessage(index: number): HumanMessage {
+  return { ...message, id: `msg_${String(index).padStart(3, "0")}` };
+}
+
+function messageRange(first: number, last: number) {
+  return Array.from({ length: last - first + 1 }, (_, offset) => makeMessage(first + offset));
+}
+
+function makePage(messages: readonly HumanMessage[], cursor: string | null): InboxPage {
+  return { messages, cursor, activeCount: messages.length, savedCount: 0 };
+}
+
+function uniqueIds(messages: readonly HumanMessage[]) {
+  const ids = messages.map((entry) => entry.id);
+  expect(new Set(ids)).toHaveLength(ids.length);
+  return ids;
+}

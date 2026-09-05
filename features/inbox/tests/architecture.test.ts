@@ -21,7 +21,9 @@ describe("Inbox architecture boundaries", () => {
 
   it("keeps scope-safe debouncing, exact invalidation, optimistic count updates, and safe Mermaid policy explicit", () => {
     expect(views).toContain("setTimeout");
-    expect(queries).toContain("pagination.scopeKey !== scopeKey");
+    expect(queries).toContain("useInfiniteQuery");
+    expect(queries).toContain("queryKeys.inbox.scope(threadId, normalized)");
+    expect(queries).toContain("getNextPageParam");
     expect(queries).toContain("queryKeys.inbox.thread(threadId)");
     expect(queries).toContain("activeCount");
     expect(queries).toContain("savedCount");

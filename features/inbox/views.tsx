@@ -9,6 +9,7 @@ import { SurfaceCard, SurfaceCardHeading } from "../../components/ui/surface-car
 import { messageIsInbox, messageIsSaved, messageLabel, splitInboxMarkdown } from "./model";
 import {
   useInboxMessages,
+  useInboxMessageMutationState,
   useInboxMutations,
 } from "./queries";
 import type { HumanMessage } from "./schemas";
@@ -67,7 +68,7 @@ export function InboxCard({ threadId }: { threadId: string }) {
             <InboxResults
               messages={messages}
               hasNextPage={query.hasNextPage}
-              fetching={query.isFetching}
+              fetching={query.isFetchingNextPage}
               onLoadMore={query.fetchNextPage}
               mutations={mutations}
             />
@@ -104,7 +105,7 @@ export function InboxCard({ threadId }: { threadId: string }) {
                 )}
               </CountedDisclosure>
               {query.hasNextPage ? (
-                <LoadMoreButton fetching={query.isFetching} onClick={query.fetchNextPage} />
+                <LoadMoreButton fetching={query.isFetchingNextPage} onClick={query.fetchNextPage} />
               ) : null}
             </>
           )
@@ -170,14 +171,7 @@ function InboxMessageRow({
   mutations: ReturnType<typeof useInboxMutations>;
 }) {
   const [expanded, setExpanded] = useState(true);
-  const acknowledgeBusy = mutations.acknowledge.isPending && mutations.acknowledge.variables?.messageId === message.id;
-  const bookmarkBusy = mutations.bookmark.isPending && mutations.bookmark.variables?.messageId === message.id;
-  const busy = acknowledgeBusy || bookmarkBusy;
-  const error = mutations.acknowledge.variables?.messageId === message.id
-    ? mutations.acknowledge.error
-    : mutations.bookmark.variables?.messageId === message.id
-      ? mutations.bookmark.error
-      : null;
+  const { busy, error } = useInboxMessageMutationState(message.threadId, message.id);
   const acknowledge = () => mutations.acknowledge.mutate({ messageId: message.id, revision: message.revision });
   const bookmark = () => mutations.bookmark.mutate({ messageId: message.id, bookmarked: !message.bookmarkedAt, revision: message.revision });
   return (

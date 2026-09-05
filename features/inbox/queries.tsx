@@ -1,12 +1,13 @@
 import {
+  type InfiniteData,
   useMutation,
-  useQueries,
+  useInfiniteQuery,
+  useMutationState,
   useQueryClient,
   type QueryClient,
   type QueryKey,
 } from "@tanstack/react-query";
 import { useRpc, useRealtime } from "@get-bb/plugin-sdk/app";
-import { useState } from "react";
 import type { rpcContract } from "../../contracts";
 import type { HumanMessage } from "./schemas";
 import { queryKeys, queryPolicies } from "../../query-runtime";
@@ -34,29 +35,6 @@ const deferredInvalidations = new WeakMap<QueryClient, DeferredClientState>();
 
 function normalizedQuery(query: string) {
   return query.trim().replace(/\s+/g, " ");
-}
-
-function pageQuery(
-  rpc: ReturnType<typeof useRpc<typeof rpcContract>>,
-  threadId: string,
-  query: string,
-  cursor: string | null,
-) {
-  return {
-    queryKey: queryKeys.inbox.page(threadId, query, cursor),
-    queryFn: () => rpc.call(
-      "listHumanMessages",
-      {
-        threadId,
-        ...(query ? { query } : {}),
-        limit: 50,
-        ...(cursor ? { cursor } : {}),
-      },
-    ) as Promise<InboxPage>,
-    ...queryPolicies.inbox,
-    refetchOnMount: "always" as const,
-    refetchInterval: false as const,
-  };
 }
 
 function hasInboxMutation(queryClient: QueryClient, threadId: string) {
@@ -134,21 +112,26 @@ export function useInboxMessages(threadId: string, query: string) {
   const rpc = useRpc<typeof rpcContract>();
   useInboxRealtime(threadId);
   const normalized = normalizedQuery(query);
-  const scopeKey = `${threadId}\u0000${normalized}`;
-  const [pagination, setPagination] = useState<{
-    scopeKey: string;
-    cursors: readonly (string | null)[];
-  }>({ scopeKey, cursors: [null] });
-  // Reset during render so a thread/search transition never mounts a query
-  // with the previous scope's cursor for one frame.
-  if (pagination.scopeKey !== scopeKey)
-    setPagination({ scopeKey, cursors: [null] });
-  const cursors = pagination.scopeKey === scopeKey ? pagination.cursors : [null];
-  const cursorKey = cursors.join("\u0000");
-  const queries = useQueries({
-    queries: cursors.map((cursor) => pageQuery(rpc, threadId, normalized, cursor)),
+  const queryResult = useInfiniteQuery({
+    queryKey: queryKeys.inbox.scope(threadId, normalized),
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => rpc.call(
+      "listHumanMessages",
+      {
+        threadId,
+        ...(normalized ? { query: normalized } : {}),
+        limit: 50,
+        ...(pageParam ? { cursor: pageParam } : {}),
+      },
+    ) as Promise<InboxPage>,
+    getNextPageParam: (lastPage) => lastPage?.cursor ?? undefined,
+    ...queryPolicies.inbox,
+    refetchOnMount: "always" as const,
+    refetchInterval: false as const,
   });
-  const pages = queries.map((queryResult) => queryResult.data).filter((page): page is InboxPage => Boolean(page));
+  // A refetch starts with page one, then derives subsequent cursors from the
+  // refreshed predecessor; stale cursor keys cannot survive this boundary.
+  const pages = (queryResult.data?.pages ?? []).filter((page): page is InboxPage => Boolean(page));
   const lastPage = pages.at(-1);
   const data = pages.length
     ? {
@@ -158,27 +141,22 @@ export function useInboxMessages(threadId: string, query: string) {
         savedCount: lastPage?.savedCount ?? 0,
       }
     : undefined;
-  const pending = queries.some((queryResult) => queryResult.isPending);
-  const error = queries.find((queryResult) => queryResult.error)?.error ?? null;
-  const fetching = queries.some((queryResult) => queryResult.isFetching);
   return {
     data,
-    error,
-    isPending: pending,
-    isInitialPending: !data && pending,
-    isFetching: fetching,
-    hasNextPage: Boolean(lastPage?.cursor),
-    fetchNextPage: () => {
-      if (lastPage?.cursor && !cursors.includes(lastPage.cursor))
-        setPagination((current) => ({ ...current, cursors: [...current.cursors, lastPage.cursor!] }));
-    },
-    refetch: () => Promise.all(queries.map((query) => query.refetch())),
-    retryFailedPage: () => queries.find((query) => query.error)?.refetch(),
-    cursorKey,
+    error: queryResult.error,
+    isPending: queryResult.isPending,
+    isInitialPending: !data && queryResult.isPending,
+    isFetching: queryResult.isFetching,
+    isFetchingNextPage: queryResult.isFetchingNextPage,
+    hasNextPage: queryResult.hasNextPage,
+    fetchNextPage: () => void queryResult.fetchNextPage(),
+    refetch: queryResult.refetch,
+    retryFailedPage: () => void queryResult.fetchNextPage(),
   };
 }
 
-type Snapshot = readonly [QueryKey, InboxPage | undefined][];
+type InboxData = InfiniteData<InboxPage, string | null>;
+type Snapshot = readonly [QueryKey, InboxData | undefined][];
 
 function updateCachedMessages(
   queryClient: QueryClient,
@@ -186,34 +164,51 @@ function updateCachedMessages(
   update: (message: HumanMessage) => HumanMessage,
 ) {
   const snapshots: Snapshot = queryClient
-    .getQueriesData<InboxPage>({ queryKey: queryKeys.inbox.thread(threadId) })
+    .getQueriesData<InboxData>({ queryKey: queryKeys.inbox.thread(threadId) })
     .map(([key, page]) => [key, page]);
-  const scopeDeltas = new Map<string, { active: number; saved: number }>();
-  const updatedPages = snapshots.map(([key, page]) => {
-    if (!page) return [key, page] as const;
-    const previousById = new Map(page.messages.map((message) => [message.id, message]));
-    const messages = page.messages.map(update);
-    const delta = scopeDeltas.get(key.slice(0, -1).join("\u0000")) ?? { active: 0, saved: 0 };
-    for (const message of messages) {
-      const previous = previousById.get(message.id);
-      delta.active += (previous?.acknowledgedAt === null ? -1 : 0) + (message.acknowledgedAt === null ? 1 : 0);
-      const before = previous?.acknowledgedAt !== null && previous?.bookmarkedAt !== null;
-      const after = message.acknowledgedAt !== null && message.bookmarkedAt !== null;
-      delta.saved += (after ? 1 : 0) - (before ? 1 : 0);
-    }
-    scopeDeltas.set(key.slice(0, -1).join("\u0000"), delta);
-    return [key, { ...page, messages }] as const;
-  });
-  for (const [key, page] of updatedPages) {
-    if (!page) continue;
-    const delta = scopeDeltas.get(key.slice(0, -1).join("\u0000")) ?? { active: 0, saved: 0 };
-    queryClient.setQueryData<InboxPage>(key, {
+  for (const [key, data] of snapshots) {
+    if (!data) continue;
+    let activeDelta = 0;
+    let savedDelta = 0;
+    const changedIds = new Set<string>();
+    const pages = data.pages.map((page) => ({
       ...page,
-      activeCount: Math.max(0, page.activeCount + delta.active),
-      savedCount: Math.max(0, page.savedCount + delta.saved),
+      messages: page.messages.map((message) => {
+        const next = update(message);
+        if (next === message || changedIds.has(message.id)) return next;
+        changedIds.add(message.id);
+        activeDelta += Number(next.acknowledgedAt === null) - Number(message.acknowledgedAt === null);
+        savedDelta += Number(next.acknowledgedAt !== null && next.bookmarkedAt !== null)
+          - Number(message.acknowledgedAt !== null && message.bookmarkedAt !== null);
+        return next;
+      }),
+    }));
+    queryClient.setQueryData<InboxData>(key, {
+      ...data,
+      pages: pages.map((page) => ({
+        ...page,
+        activeCount: Math.max(0, page.activeCount + activeDelta),
+        savedCount: Math.max(0, page.savedCount + savedDelta),
+      })),
     });
   }
   return snapshots;
+}
+
+type InboxMutationVariables = { messageId: string };
+
+/** Mutation-cache projection keeps busy/error state tied to a row, even when
+ * another row starts the same action before the first settles. */
+export function useInboxMessageMutationState(threadId: string, messageId: string) {
+  const states = useMutationState({
+    filters: { mutationKey: inboxOptimisticMutationKey(threadId) },
+    select: (mutation) => mutation.state,
+  });
+  const matching = states.filter((state) => (state.variables as InboxMutationVariables | undefined)?.messageId === messageId);
+  const latestError = matching
+    .filter((state) => state.status === "error" && state.error)
+    .sort((left, right) => right.submittedAt - left.submittedAt)[0]?.error ?? null;
+  return { busy: matching.some((state) => state.status === "pending"), error: latestError };
 }
 
 function rollback(queryClient: QueryClient, snapshots: Snapshot) {

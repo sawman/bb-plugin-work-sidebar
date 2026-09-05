@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { configureAxe } from "vitest-axe";
@@ -166,6 +166,29 @@ describe("Inbox Work card", () => {
     expect((within(savedRow).getByRole("button", { name: /Remove bookmark/ }) as HTMLButtonElement).disabled).toBe(false);
     rejectAcknowledgement(new Error("Message changed"));
     expect((await within(activeRow).findByRole("alert")).textContent).toContain("Message changed");
+    expect(within(savedRow).queryByRole("alert")).toBeNull();
+    view.unmount();
+    client.clear();
+  });
+
+  it("keeps rapid different-row actions and errors local to their originating rows", async () => {
+    const rejecters: ((error: Error) => void)[] = [];
+    rpcClient.call.mockImplementation((method: string) => method === "listHumanMessages"
+      ? Promise.resolve({ messages: [active, saved], cursor: null, activeCount: 1, savedCount: 1 })
+      : new Promise((_resolve, reject) => { rejecters.push(reject); }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
+    const activeRow = (await view.findByText("msg_active")).closest("li")!;
+    const savedRow = view.getByText("msg_saved").closest("li")!;
+    fireEvent.click(within(activeRow).getByRole("button", { name: /Bookmark message/ }));
+    fireEvent.click(within(savedRow).getByRole("button", { name: /Remove bookmark/ }));
+    await waitFor(() => {
+      expect(activeRow.getAttribute("data-busy")).toBe("true");
+      expect(savedRow.getAttribute("data-busy")).toBe("true");
+    });
+    await act(async () => { rejecters[0]?.(new Error("First row changed")); });
+    expect((await within(activeRow).findByRole("alert")).textContent).toContain("First row changed");
+    expect(savedRow.getAttribute("data-busy")).toBe("true");
     expect(within(savedRow).queryByRole("alert")).toBeNull();
     view.unmount();
     client.clear();
