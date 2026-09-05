@@ -75,8 +75,10 @@ function flushDeferredInvalidation(queryClient: QueryClient, threadId: string) {
     return;
   }
   // TanStack joins an uncached fetch even with cancelRefetch enabled. Keep the
-  // signal pending until that request settles, then start a fresh page chain.
-  if (queryClient.getQueryCache().findAll({ queryKey: queryKeys.inbox.thread(threadId) })
+  // signal pending until a visible initial request settles, then start a fresh
+  // page chain. Inactive searches must not block the currently observed scope;
+  // observer removal also reaches this check through the cache subscription.
+  if (queryClient.getQueryCache().findAll({ queryKey: queryKeys.inbox.thread(threadId), type: "active" })
     .some((query) => query.state.data === undefined && query.state.fetchStatus !== "idle")) return;
   thread.pending = false;
   thread.invalidating = true;

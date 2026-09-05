@@ -116,6 +116,8 @@ describe("Inbox query lifecycle", () => {
     try {
       expect(rpcClient.call).toHaveBeenCalledTimes(1);
       expect(view.result.current.data).toBeUndefined();
+      const queryCleanup = trackCacheSubscriptions(client.getQueryCache());
+      const mutationCleanup = trackCacheSubscriptions(client.getMutationCache());
       await act(async () => {
         for (let index = 0; index < signals; index += 1)
           realtime.handler?.({ family: "inbox", threadId: "thr_one" });
@@ -132,6 +134,94 @@ describe("Inbox query lifecycle", () => {
         expect(view.result.current.isFetching).toBe(false);
       });
       expect(rpcClient.call).toHaveBeenCalledTimes(2);
+      for (const cleanups of [queryCleanup, mutationCleanup]) {
+        expect(cleanups).toHaveLength(1);
+        expect(cleanups[0]).toHaveBeenCalledTimes(1);
+      }
+    } finally {
+      view.unmount();
+      client.clear();
+    }
+  });
+
+  it.each([
+    ["after", 1], ["before", 1], ["before", 3],
+  ] as const)("refreshes cached B once for %s abandoning uncached A (%s signals)", async (timing, signals) => {
+    let resolveA!: (value: InboxPage) => void;
+    let resolveB!: (value: InboxPage) => void;
+    const abandoned = new Promise<InboxPage>((resolve) => { resolveA = resolve; });
+    const fresh = new Promise<InboxPage>((resolve) => { resolveB = resolve; });
+    const updated = { ...page, messages: [{ ...message, body: "Fresh B", revision: 2 }] };
+    rpcClient.call.mockImplementation((_method: string, input: { query: string }) => {
+      if (input.query === "A") return abandoned;
+      return Promise.resolve(page);
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const a = renderHook(() => useInboxMessages("thr_one", "A"), { wrapper: wrapper(client) });
+    if (timing === "after") a.unmount();
+    const b = renderHook(() => useInboxMessages("thr_one", "B"), { wrapper: wrapper(client) });
+    try {
+      await waitFor(() => expect(b.result.current.isFetching).toBe(false));
+      expect(b.result.current.data).toEqual(page);
+      expect(a.result.current.data).toBeUndefined();
+      rpcClient.call.mockImplementation((_method: string, input: { query: string }) => {
+        if (input.query === "A") return abandoned;
+        return fresh;
+      });
+      const queryCleanup = trackCacheSubscriptions(client.getQueryCache());
+      const mutationCleanup = trackCacheSubscriptions(client.getMutationCache());
+      const invalidate = vi.spyOn(client, "invalidateQueries");
+      await act(async () => {
+        for (let index = 0; index < signals; index += 1)
+          realtime.handler?.({ family: "inbox", threadId: "thr_one" });
+      });
+      if (timing === "before") {
+        expect(rpcClient.call).toHaveBeenCalledTimes(2);
+        expect(invalidate).not.toHaveBeenCalled();
+        a.unmount();
+      }
+      // A remains unresolved: neither B's refresh nor listener disposal can wait for it.
+      expect(client.getQueryCache().find({ queryKey: queryKeys.inbox.scope("thr_one", "A") })?.getObserversCount()).toBe(0);
+      await waitFor(() => expect(rpcClient.call).toHaveBeenCalledTimes(3));
+      expect(rpcClient.call).toHaveBeenLastCalledWith("listHumanMessages", { threadId: "thr_one", query: "B", limit: 50 });
+      await act(async () => { resolveB(updated); });
+      await waitFor(() => {
+        expect(b.result.current.data).toEqual(updated);
+        expect(b.result.current.isFetching).toBe(false);
+      });
+      for (const cleanups of [queryCleanup, mutationCleanup]) {
+        expect(cleanups).toHaveLength(1);
+        expect(cleanups[0]).toHaveBeenCalledTimes(1);
+      }
+      await act(async () => { resolveA(page); });
+      expect(invalidate).toHaveBeenCalledTimes(1);
+      expect(rpcClient.call).toHaveBeenCalledTimes(3);
+      expect(b.result.current.data).toEqual(updated);
+    } finally {
+      a.unmount();
+      b.unmount();
+      client.clear();
+    }
+  });
+
+  it("cleans up a deferred signal when its only uncached observer unmounts", async () => {
+    rpcClient.call.mockReturnValue(new Promise<InboxPage>(() => {}));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderHook(() => useInboxMessages("thr_one", "A"), { wrapper: wrapper(client) });
+    const queryCleanup = trackCacheSubscriptions(client.getQueryCache());
+    const mutationCleanup = trackCacheSubscriptions(client.getMutationCache());
+    try {
+      act(() => {
+        for (let index = 0; index < 3; index += 1)
+          realtime.handler?.({ family: "inbox", threadId: "thr_one" });
+      });
+      view.unmount();
+      await act(async () => {});
+      for (const cleanups of [queryCleanup, mutationCleanup]) {
+        expect(cleanups).toHaveLength(1);
+        expect(cleanups[0]).toHaveBeenCalledTimes(1);
+      }
+      expect(rpcClient.call).toHaveBeenCalledTimes(1);
     } finally {
       view.unmount();
       client.clear();
@@ -424,4 +514,15 @@ function uniqueIds(messages: readonly HumanMessage[]) {
   const ids = messages.map((entry) => entry.id);
   expect(new Set(ids)).toHaveLength(ids.length);
   return ids;
+}
+
+function trackCacheSubscriptions<Listener>(cache: { subscribe: (listener: Listener) => () => void }) {
+  const subscribe = cache.subscribe.bind(cache);
+  const cleanups: ReturnType<typeof vi.fn>[] = [];
+  vi.spyOn(cache, "subscribe").mockImplementation((listener: Listener) => {
+    const cleanup = vi.fn(subscribe(listener));
+    cleanups.push(cleanup);
+    return cleanup;
+  });
+  return cleanups;
 }
