@@ -166,9 +166,6 @@ describe("mounted thread activity parity", () => {
     const queuedIcon = view.container.querySelector(
       '[data-surface="threads"] .ws-queued-message svg',
     );
-    const canonicalIcon = view.container.querySelector(
-      '[data-surface="agents"] svg',
-    );
-    expect(queuedIcon?.innerHTML).toBe(canonicalIcon?.innerHTML);
+    expect(queuedIcon?.getAttribute("data-icon")).toBe("Clock");
   });
 });

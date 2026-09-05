@@ -70,14 +70,30 @@ describe("queued message presentation and read contract", () => {
       name: "2 queued messages · next sends in 1h5m · Rate limited",
     });
     expect(status.textContent).toBe("2 · 1h5m");
-    expect(status.querySelector('[data-icon="MessageSquare"]')).toBeTruthy();
-    expect(status.querySelector("[data-message-bubble]")).toBeTruthy();
+    expect(status.querySelector('[data-icon="Clock"]')).toBeTruthy();
+    expect(status.querySelector("[data-message-bubble]")).toBeNull();
     expect(status.getAttribute("aria-describedby")).toBeTruthy();
     expect(
       document
         .getElementById(status.getAttribute("aria-describedby") ?? "")
         ?.getAttribute("aria-label"),
     ).toBe("Rate limited");
+    view.unmount();
+  });
+
+  it("keeps an unscheduled queue as a message bubble", () => {
+    const view = render(
+      <ThreadStatus
+        thread={thread}
+        hasComposerDraft={false}
+        queuedMessage={{ ...queuedMessage, count: 3, nextSendAt: null }}
+        queuedMessageNow={NOW}
+      />,
+    );
+    const status = view.getByRole("status", { name: /3 queued messages/i });
+    expect(status.querySelector('[data-icon="MessageSquare"]')).toBeTruthy();
+    expect(status.querySelector("[data-message-bubble]")).toBeTruthy();
+    expect(status.getAttribute("data-scheduled")).toBeNull();
     view.unmount();
   });
 });
