@@ -15,7 +15,7 @@ import {
 
 describe("pull-request presentation semantics", () => {
   it.each([
-    ["open", { icon: "Eye", label: "Review pending", tone: "open" }],
+    ["open", { icon: "Eye", label: "Review pending", tone: "warning" }],
     ["draft", { icon: "GitPullRequest", label: "Draft", tone: "draft" }],
     ["closed", { icon: "X", label: "Closed", tone: "closed" }],
     ["merged", { icon: "GitMerge", label: "Merged", tone: "merged" }],
@@ -244,7 +244,7 @@ describe("pull-request presentation semantics", () => {
       "changes_requested",
       { icon: "Wrench", label: "Changes requested", tone: "closed" },
     ],
-    ["blocked", { icon: "Eye", label: "Review pending", tone: "open" }],
+    ["blocked", { icon: "Eye", label: "Review pending", tone: "warning" }],
     [
       "checks_pending",
       { icon: "LoaderCircle", label: "Checks pending", tone: "muted" },
@@ -253,7 +253,7 @@ describe("pull-request presentation semantics", () => {
       "review_requested",
       { icon: "Eye", label: "Review requested", tone: "warning" },
     ],
-    ["none", { icon: "Eye", label: "Review pending", tone: "open" }],
+    ["none", { icon: "Eye", label: "Review pending", tone: "warning" }],
     ["approved", { icon: "Check", label: "Approved", tone: "success" }],
   ] as const)(
     "preserves open attention %s after state precedence",

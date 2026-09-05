@@ -73,7 +73,7 @@ export function pullRequestPresentation(input: {
     return { icon: "Eye", label: "Review requested", tone: "warning" };
   if (input.attention === "approved")
     return { icon: "Check", label: "Approved", tone: "success" };
-  return { icon: "Eye", label: "Review pending", tone: "open" };
+  return { icon: "Eye", label: "Review pending", tone: "warning" };
 }
 
 /**
