@@ -87,9 +87,9 @@ describe("Inbox query lifecycle", () => {
     const invalidate = vi.spyOn(client, "invalidateQueries");
     realtime.handler?.({ family: "inbox", threadId: "thr_other" });
     expect(invalidate).not.toHaveBeenCalled();
-    realtime.handler?.({ family: "inbox", threadId: "thr_one" });
+    await act(async () => { realtime.handler?.({ family: "inbox", threadId: "thr_one" }); });
     expect(invalidate).toHaveBeenCalledWith({
-      queryKey: queryKeys.inbox.thread("thr_one"),
+      queryKey: queryKeys.inbox.scope("thr_one", ""), exact: true,
     });
 
     const query = client.getQueryCache().find({ queryKey: queryKeys.inbox.scope("thr_one", "") });
@@ -145,6 +145,56 @@ describe("Inbox query lifecycle", () => {
   });
 
   it.each([
+    ["success", "success"], ["error", "success"], ["success", "error"], ["error", "error"],
+  ] as const)("refreshes cached active B once while active A awaits initial %s and refresh %s", async (outcome, refreshOutcome) => {
+    const initial = deferred<InboxPage>();
+    const freshA = deferred<InboxPage>();
+    const freshB = deferred<InboxPage>();
+    const calls = { A: 0, B: 0 };
+    rpcClient.call.mockImplementation((_method: string, input: { query: "A" | "B" }) => {
+      calls[input.query] += 1;
+      return input.query === "A" ? (calls.A === 1 ? initial.promise : freshA.promise)
+        : (calls.B === 1 ? Promise.resolve(page) : freshB.promise);
+    });
+    const client = new QueryClient();
+    const a = renderHook(() => useInboxMessages("thr_one", "A"), { wrapper: wrapper(client) });
+    const b = renderHook(() => useInboxMessages("thr_one", "B"), { wrapper: wrapper(client) });
+    try {
+      await waitFor(() => expect(b.result.current.isFetching).toBe(false));
+      const cleanups = [trackCacheSubscriptions(client.getQueryCache()), trackCacheSubscriptions(client.getMutationCache())];
+      await act(async () => {
+        for (let index = 0; index < 10; index += 1)
+          realtime.handler?.({ family: "inbox", threadId: "thr_one" });
+      });
+      expect(calls).toEqual({ A: 1, B: 2 });
+      expect(a.result.current.data).toBeUndefined();
+      await act(async () => {
+        if (refreshOutcome === "success") freshB.resolve(page);
+        else freshB.reject(new Error("B refresh failed"));
+      });
+      expect(calls).toEqual({ A: 1, B: 2 });
+      expect(cleanups.every((entries) => entries.length === 1 && entries[0].mock.calls.length === 0)).toBe(true);
+      await act(async () => {
+        if (outcome === "success") initial.resolve(page);
+        else initial.reject(new Error("initial failed"));
+      });
+      expect(calls).toEqual({ A: 2, B: 2 });
+      await act(async () => {
+        if (refreshOutcome === "success") freshA.resolve(page);
+        else freshA.reject(new Error("A refresh failed"));
+      });
+      for (const entries of cleanups) {
+        expect(entries).toHaveLength(1);
+        expect(entries[0]).toHaveBeenCalledTimes(1);
+      }
+      await act(async () => {});
+      expect(calls).toEqual({ A: 2, B: 2 });
+    } finally {
+      a.unmount(); b.unmount(); client.clear();
+    }
+  });
+
+  it.each([
     ["after", 1], ["before", 1], ["before", 3],
   ] as const)("refreshes cached B once for %s abandoning uncached A (%s signals)", async (timing, signals) => {
     let resolveA!: (value: InboxPage) => void;
@@ -176,8 +226,8 @@ describe("Inbox query lifecycle", () => {
           realtime.handler?.({ family: "inbox", threadId: "thr_one" });
       });
       if (timing === "before") {
-        expect(rpcClient.call).toHaveBeenCalledTimes(2);
-        expect(invalidate).not.toHaveBeenCalled();
+        expect(rpcClient.call).toHaveBeenCalledTimes(3);
+        expect(invalidate).toHaveBeenCalledTimes(1);
         a.unmount();
       }
       // A remains unresolved: neither B's refresh nor listener disposal can wait for it.
@@ -225,6 +275,76 @@ describe("Inbox query lifecycle", () => {
     } finally {
       view.unmount();
       client.clear();
+    }
+  });
+
+  it.each(["unmount", "clear"] as const)("releases pending and refreshing scopes once on %s", async (dispose) => {
+    const initial = deferred<InboxPage>();
+    const refresh = deferred<InboxPage>();
+    let bCalls = 0;
+    rpcClient.call.mockImplementation((_method: string, input: { query: string }) =>
+      input.query === "A" ? initial.promise : (++bCalls === 1 ? Promise.resolve(page) : refresh.promise));
+    const client = new QueryClient();
+    const a = renderHook(() => useInboxMessages("thr_one", "A"), { wrapper: wrapper(client) });
+    const b = renderHook(() => useInboxMessages("thr_one", "B"), { wrapper: wrapper(client) });
+    await waitFor(() => expect(b.result.current.isFetching).toBe(false));
+    const cleanups = [trackCacheSubscriptions(client.getQueryCache()), trackCacheSubscriptions(client.getMutationCache())];
+    await act(async () => {
+      for (let index = 0; index < 10; index += 1)
+        realtime.handler?.({ family: "inbox", threadId: "thr_one" });
+    });
+    expect(rpcClient.call).toHaveBeenCalledTimes(3);
+    await act(async () => {
+      if (dispose === "clear") { client.clear(); a.unmount(); b.unmount(); }
+      else { a.unmount(); b.unmount(); }
+    });
+    for (const entries of cleanups) {
+      expect(entries).toHaveLength(1);
+      expect(entries[0]).toHaveBeenCalledTimes(1);
+    }
+    await act(async () => { initial.resolve(page); refresh.reject(new Error("refresh failed")); });
+    expect(rpcClient.call).toHaveBeenCalledTimes(3);
+    for (const entries of cleanups) expect(entries[0]).toHaveBeenCalledTimes(1);
+    a.unmount(); b.unmount(); client.clear();
+  });
+
+  it("defers every active scope until the last optimistic mutation settles", async () => {
+    const ack = deferred<HumanMessage>();
+    const bookmark = deferred<HumanMessage>();
+    const calls = { A: 0, B: 0 };
+    rpcClient.call.mockImplementation((method: string, input: { query: "A" | "B" }) => {
+      if (method === "acknowledgeHumanMessage") return ack.promise;
+      if (method === "setHumanMessageBookmark") return bookmark.promise;
+      calls[input.query] += 1;
+      return Promise.resolve(page);
+    });
+    const client = new QueryClient();
+    const a = renderHook(() => ({ query: useInboxMessages("thr_one", "A"), mutations: useInboxMutations("thr_one") }), { wrapper: wrapper(client) });
+    const b = renderHook(() => useInboxMessages("thr_one", "B"), { wrapper: wrapper(client) });
+    try {
+      await waitFor(() => expect(a.result.current.query.isFetching || b.result.current.isFetching).toBe(false));
+      const cleanups = [trackCacheSubscriptions(client.getQueryCache()), trackCacheSubscriptions(client.getMutationCache())];
+      let ackResult!: Promise<unknown>;
+      let bookmarkResult!: Promise<unknown>;
+      await act(async () => {
+        ackResult = a.result.current.mutations.acknowledge.mutateAsync({ messageId: message.id, revision: 1 });
+        bookmarkResult = a.result.current.mutations.bookmark.mutateAsync({ messageId: message.id, revision: 1, bookmarked: true }).catch(() => {});
+      });
+      await act(async () => {
+        for (let index = 0; index < 10; index += 1)
+          realtime.handler?.({ family: "inbox", threadId: "thr_one" });
+      });
+      expect(calls).toEqual({ A: 1, B: 1 });
+      await act(async () => { ack.resolve({ ...message, revision: 2 }); await ackResult; });
+      expect(calls).toEqual({ A: 1, B: 1 });
+      await act(async () => { bookmark.reject(new Error("write failed")); await bookmarkResult; });
+      expect(calls).toEqual({ A: 2, B: 2 });
+      for (const entries of cleanups) {
+        expect(entries).toHaveLength(1);
+        expect(entries[0]).toHaveBeenCalledTimes(1);
+      }
+    } finally {
+      a.unmount(); b.unmount(); client.clear();
     }
   });
 
@@ -525,4 +645,11 @@ function trackCacheSubscriptions<Listener>(cache: { subscribe: (listener: Listen
     return cleanup;
   });
   return cleanups;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
 }

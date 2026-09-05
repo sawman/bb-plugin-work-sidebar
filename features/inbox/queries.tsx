@@ -25,18 +25,22 @@ const inboxMutationKey = (threadId: string, action: "acknowledge" | "bookmark") 
   ...inboxOptimisticMutationKey(threadId),
   action,
 ] as const;
-type DeferredInvalidation = { pending: boolean; invalidating: boolean };
-type DeferredClientState = {
-  threads: Map<string, DeferredInvalidation>;
-  unsubscribe: (() => void) | null;
-  unsubscribeQueries: (() => void) | null;
+type InboxScope = {
+  query: import("@tanstack/react-query").Query;
+  threadId: string;
+  pending: boolean;
+  refreshing: boolean;
+};
+type InboxCoordinator = {
+  scopes: Map<string, InboxScope>;
+  scheduled: boolean;
+  dispose: () => void;
 };
 
-// State is scoped to a QueryClient (one app-window generation) and discarded
-// as soon as a thread has no deferred work. The mutation-cache subscription is
-// necessary because an async onSettled callback is itself still mutating until
-// it returns; its final idle transition is the safe point to refetch.
-const deferredInvalidations = new WeakMap<QueryClient, DeferredClientState>();
+// Query identity owns refresh progress; only optimistic writes are thread-wide.
+// One transient coordinator per client owns both subscriptions and releases them
+// when the last scope settles, disappears, or loses its active observer.
+const inboxCoordinators = new WeakMap<QueryClient, InboxCoordinator>();
 
 function normalizedQuery(query: string) {
   return query.trim().replace(/\s+/g, " ");
@@ -46,74 +50,70 @@ function hasInboxMutation(queryClient: QueryClient, threadId: string) {
   return queryClient.isMutating({ mutationKey: inboxOptimisticMutationKey(threadId) }) > 0;
 }
 
-function clientState(queryClient: QueryClient) {
-  let state = deferredInvalidations.get(queryClient);
-  if (!state) {
-    state = { threads: new Map(), unsubscribe: null, unsubscribeQueries: null };
-    deferredInvalidations.set(queryClient, state);
-  }
-  return state;
-}
-
-function cleanupDeferredState(queryClient: QueryClient, threadId: string) {
-  const state = deferredInvalidations.get(queryClient);
-  const thread = state?.threads.get(threadId);
-  if (!state || !thread || thread.pending || thread.invalidating || hasInboxMutation(queryClient, threadId)) return;
-  state.threads.delete(threadId);
-  if (state.threads.size) return;
-  state.unsubscribe?.();
-  state.unsubscribeQueries?.();
-  deferredInvalidations.delete(queryClient);
-}
-
-function flushDeferredInvalidation(queryClient: QueryClient, threadId: string) {
-  const state = deferredInvalidations.get(queryClient);
-  const thread = state?.threads.get(threadId);
-  if (!thread || thread.invalidating || hasInboxMutation(queryClient, threadId)) return;
-  if (!thread.pending) {
-    cleanupDeferredState(queryClient, threadId);
-    return;
-  }
-  // TanStack joins an uncached fetch even with cancelRefetch enabled. Keep the
-  // signal pending until a visible initial request settles, then start a fresh
-  // page chain. Inactive searches must not block the currently observed scope;
-  // observer removal also reaches this check through the cache subscription.
-  if (queryClient.getQueryCache().findAll({ queryKey: queryKeys.inbox.thread(threadId), type: "active" })
-    .some((query) => query.state.data === undefined && query.state.fetchStatus !== "idle")) return;
-  thread.pending = false;
-  thread.invalidating = true;
-  void queryClient.invalidateQueries({ queryKey: queryKeys.inbox.thread(threadId) }).finally(() => {
-    thread.invalidating = false;
-    flushDeferredInvalidation(queryClient, threadId);
+function scheduleInboxFlush(client: QueryClient, state: InboxCoordinator) {
+  if (state.scheduled || inboxCoordinators.get(client) !== state) return;
+  state.scheduled = true;
+  // Batch the signal burst, including duplicate consumers in the same window.
+  // Cache notifications only wake existing work; they never create more work.
+  queueMicrotask(() => {
+    state.scheduled = false;
+    if (inboxCoordinators.get(client) !== state) return;
+    for (const [hash, scope] of state.scopes) {
+      const query = scope.query;
+      if (client.getQueryCache().get(hash) !== query || !query.isActive()) {
+        state.scopes.delete(hash);
+        continue;
+      }
+      if (scope.refreshing) continue;
+      if (!scope.pending) {
+        state.scopes.delete(hash);
+        continue;
+      }
+      if (hasInboxMutation(client, scope.threadId)) continue;
+      // An initial fetch cannot be replaced by invalidateQueries. Wait only
+      // for this scope, then refresh even if the initial request failed.
+      if (query.state.data === undefined && query.state.fetchStatus !== "idle") continue;
+      scope.pending = false;
+      scope.refreshing = true;
+      const settled = () => {
+        scope.refreshing = false;
+        scheduleInboxFlush(client, state);
+      };
+      void client.invalidateQueries({ queryKey: query.queryKey, exact: true }).then(settled, settled);
+    }
+    if (state.scopes.size === 0) state.dispose();
   });
 }
 
-function deferInboxInvalidation(queryClient: QueryClient, threadId: string) {
-  const state = clientState(queryClient);
-  let thread = state.threads.get(threadId);
-  if (!thread) {
-    thread = { pending: false, invalidating: false };
-    state.threads.set(threadId, thread);
-  }
-  thread.pending = true;
-  if (!state.unsubscribe) {
-    state.unsubscribe = queryClient.getMutationCache().subscribe(() => {
-      for (const currentThreadId of state.threads.keys())
-        flushDeferredInvalidation(queryClient, currentThreadId);
-    });
-  }
-  if (!state.unsubscribeQueries) {
-    state.unsubscribeQueries = queryClient.getQueryCache().subscribe(() => {
-      for (const currentThreadId of state.threads.keys())
-        flushDeferredInvalidation(queryClient, currentThreadId);
-    });
-  }
-  flushDeferredInvalidation(queryClient, threadId);
+function inboxCoordinator(client: QueryClient): InboxCoordinator {
+  const existing = inboxCoordinators.get(client);
+  if (existing) return existing;
+  const state: InboxCoordinator = { scopes: new Map(), scheduled: false, dispose: () => {} };
+  inboxCoordinators.set(client, state);
+  const wake = () => scheduleInboxFlush(client, state);
+  const unsubscribeMutations = client.getMutationCache().subscribe(wake);
+  const unsubscribeQueries = client.getQueryCache().subscribe(wake);
+  state.dispose = () => {
+    if (inboxCoordinators.get(client) !== state) return;
+    inboxCoordinators.delete(client);
+    unsubscribeMutations();
+    unsubscribeQueries();
+  };
+  return state;
 }
 
-/** Coalesce realtime and mutation-settled refreshes until the final mutation is idle. */
-export function invalidateInbox(queryClient: QueryClient, threadId: string) {
-  deferInboxInvalidation(queryClient, threadId);
+/** Coalesce per-scope refreshes behind the final thread-wide optimistic write. */
+export function invalidateInbox(client: QueryClient, threadId: string) {
+  const queries = client.getQueryCache().findAll({ queryKey: queryKeys.inbox.thread(threadId), type: "active" });
+  if (queries.length) {
+    const state = inboxCoordinator(client);
+    for (const query of queries) {
+      const scope = state.scopes.get(query.queryHash);
+      if (scope?.query === query) scope.pending = true;
+      else state.scopes.set(query.queryHash, { query, threadId, pending: true, refreshing: false });
+    }
+    scheduleInboxFlush(client, state);
+  }
   return Promise.resolve();
 }
 
