@@ -79,6 +79,10 @@ export function createInboxService({
   createId?: () => string;
   getThread(threadId: string): Promise<Thread>;
 }) {
+  let disposed = false;
+  const assertActive = () => {
+    if (disposed) throw new Error("Human Inbox service is disposed.");
+  };
   type LifecycleGuard = { generation: number; inFlightCreates: number; purgeFailed: boolean };
   const lifecycleGuards = new Map<string, LifecycleGuard>();
   const guardFor = (threadId: string) => {
@@ -117,16 +121,19 @@ export function createInboxService({
   };
   const transaction = <T>(work: () => T): T => database.transaction(work)();
   const assertLiveThread = async (threadId: string, projectId: string, generation: number) => {
+    assertActive();
     const beforeLookup = lifecycleGuards.get(threadId);
     if (beforeLookup?.purgeFailed || (beforeLookup && beforeLookup.generation !== generation))
       throw new Error("Cannot write to a thread after its Inbox lifecycle closed.");
     const thread = await getThread(threadId);
+    assertActive();
     const afterLookup = lifecycleGuards.get(threadId);
     if (afterLookup?.purgeFailed || (afterLookup && afterLookup.generation !== generation) || thread.id !== threadId || thread.projectId !== projectId || thread.archivedAt !== null)
       throw new Error("Cannot leave a Human Inbox message for an archived or unavailable thread.");
     return thread;
   };
   const assertWritableThread = (threadId: string) => {
+    assertActive();
     const guard = lifecycleGuards.get(threadId);
     if (guard?.purgeFailed || (guard && guard.generation > 0))
       throw new Error("Cannot write to a thread after its Inbox lifecycle closed.");
@@ -136,7 +143,9 @@ export function createInboxService({
     return message as InboxCreateResult;
   };
   return {
+    dispose() { disposed = true; lifecycleGuards.clear(); },
     async create(input: CreateInput): Promise<InboxCreateResult> {
+      assertActive();
       const existingGuard = lifecycleGuards.get(input.threadId);
       if (existingGuard?.purgeFailed) throw new Error("Cannot write to a thread after its Inbox lifecycle closed.");
       if (input.idempotencyKey) {
@@ -148,28 +157,29 @@ export function createInboxService({
       inFlight.inFlightCreates += 1;
       try {
         await assertLiveThread(input.threadId, input.projectId, generation);
+        assertActive();
+        if (Buffer.byteLength(input.body.trim(), "utf8") > 32 * 1024)
+          throw new Error("Human Inbox message body exceeds 32 KiB UTF-8.");
+        return transaction(() => {
+          const currentGuard = lifecycleGuards.get(input.threadId);
+          if (currentGuard?.purgeFailed || (currentGuard && currentGuard.generation !== generation))
+            throw new Error("Cannot write to a thread after its Inbox lifecycle closed.");
+          if (input.idempotencyKey) {
+            const existing = database.prepare("SELECT * FROM human_inbox_messages WHERE thread_id = ? AND idempotency_key = ?").get(input.threadId, input.idempotencyKey);
+            if (existing) return result(messageFrom(existing as Record<string, unknown>), false);
+          }
+          const id = createId(); const time = now();
+          database.prepare(
+            `INSERT INTO human_inbox_messages (id, thread_id, project_id, subject, body, agent_thread_id, provider_id, agent_label, created_at, updated_at, acknowledged_at, bookmarked_at, revision, idempotency_key)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 1, ?)`,
+          ).run(id, input.threadId, input.projectId, normalizeSubject(input.subject), input.body.trim(), input.agentThreadId ?? null, input.providerId ?? null, normalizeSubject(input.agentLabel), time, time, input.idempotencyKey ?? null);
+          retain(input.threadId, id);
+          return result(messageFrom(requireOne(input.threadId, id)), true);
+        });
       } finally {
         inFlight.inFlightCreates -= 1;
         releaseGuard(input.threadId, inFlight);
       }
-      if (Buffer.byteLength(input.body.trim(), "utf8") > 32 * 1024)
-        throw new Error("Human Inbox message body exceeds 32 KiB UTF-8.");
-      return transaction(() => {
-        const currentGuard = lifecycleGuards.get(input.threadId);
-        if (currentGuard?.purgeFailed || (currentGuard && currentGuard.generation !== generation))
-          throw new Error("Cannot write to a thread after its Inbox lifecycle closed.");
-        if (input.idempotencyKey) {
-          const existing = database.prepare("SELECT * FROM human_inbox_messages WHERE thread_id = ? AND idempotency_key = ?").get(input.threadId, input.idempotencyKey);
-          if (existing) return result(messageFrom(existing as Record<string, unknown>), false);
-        }
-        const id = createId(); const time = now();
-        database.prepare(
-          `INSERT INTO human_inbox_messages (id, thread_id, project_id, subject, body, agent_thread_id, provider_id, agent_label, created_at, updated_at, acknowledged_at, bookmarked_at, revision, idempotency_key)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 1, ?)`,
-        ).run(id, input.threadId, input.projectId, normalizeSubject(input.subject), input.body.trim(), input.agentThreadId ?? null, input.providerId ?? null, normalizeSubject(input.agentLabel), time, time, input.idempotencyKey ?? null);
-        retain(input.threadId, id);
-        return result(messageFrom(requireOne(input.threadId, id)), true);
-      });
     },
     get(threadId: string, messageId: string) { return messageFrom(requireOne(threadId, messageId)); },
     list({ threadId, query, limit, cursor }: { threadId: string; query?: string; limit: number; cursor?: string }) {
@@ -184,17 +194,26 @@ export function createInboxService({
       if (parsed) { clauses.push("(updated_at < ? OR (updated_at = ? AND id < ?))"); values.push(parsed.updatedAt, parsed.updatedAt, parsed.id); }
       const rows = database.prepare(`SELECT * FROM human_inbox_messages WHERE ${clauses.join(" AND ")} ORDER BY updated_at DESC, id DESC LIMIT ?`).all(...values, limit + 1) as Record<string, unknown>[];
       const messages: HumanMessage[] = [];
-      for (const row of rows.slice(0, limit)) {
-        const candidate = messageFrom(row);
-        if (Buffer.byteLength(JSON.stringify({ messages: [...messages, candidate] }), "utf8") > 256 * 1024) break;
-        messages.push(candidate);
-      }
       const counts = database.prepare(
         `SELECT SUM(CASE WHEN acknowledged_at IS NULL THEN 1 ELSE 0 END) AS active,
           SUM(CASE WHEN acknowledged_at IS NOT NULL AND bookmarked_at IS NOT NULL THEN 1 ELSE 0 END) AS saved
          FROM human_inbox_messages WHERE thread_id = ?`,
       ).get(threadId) as { active: number | null; saved: number | null };
-      return { messages, cursor: rows.length > messages.length && messages.length ? cursorFor(messages.at(-1)!) : null, activeCount: counts.active ?? 0, savedCount: counts.saved ?? 0 };
+      const response = () => ({
+        messages,
+        cursor: rows.length > messages.length && messages.length ? cursorFor(messages.at(-1)!) : null,
+        activeCount: counts.active ?? 0,
+        savedCount: counts.saved ?? 0,
+      });
+      for (const row of rows.slice(0, limit)) {
+        messages.push(messageFrom(row));
+        // Include the cursor and counts in the exact returned JSON envelope.
+        if (Buffer.byteLength(JSON.stringify(response()), "utf8") > 256 * 1024) {
+          messages.pop();
+          break;
+        }
+      }
+      return response();
     },
     acknowledge(threadId: string, messageId: string, expectedRevision?: number) {
       return transaction(() => {
@@ -253,6 +272,7 @@ export function createInboxService({
       onCleanupError?: (threadId: string) => void;
     } = {}) {
       try {
+        if (disposed || !isActive()) return;
         const threads = database.prepare("SELECT DISTINCT thread_id FROM human_inbox_messages").all() as Array<{ thread_id: string }>;
         for (const { thread_id } of threads) {
           try {
@@ -267,11 +287,11 @@ export function createInboxService({
                 || !("code" in error) || error.code !== "thread_not_found") throw error;
               thread = null;
             }
-            if (!isActive()) return;
+            if (disposed || !isActive()) return;
             if (thread === null || thread.archivedAt !== null) this.purge(thread_id);
             else transaction(() => retain(thread_id));
           } catch {
-            if (isActive()) onCleanupError?.(thread_id);
+            if (!disposed && isActive()) onCleanupError?.(thread_id);
           }
         }
       } catch {

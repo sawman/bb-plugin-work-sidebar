@@ -2,6 +2,7 @@ import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { describe, expect, it, vi } from "vitest";
 import plugin, { createServerLifecycle, rpcContract } from "../../../server.js";
 import { pluginStorageDatabase } from "../../../shared/server-storage.js";
+import * as inboxService from "../server.js";
 import { createInboxLifecycleSubscription } from "../server-registration.js";
 
 const thread = {
@@ -86,4 +87,58 @@ describe("Inbox registration", () => {
     expect(host.harness.inspection.logEntries).toEqual([]);
     await host.harness.lifecycle.dispose();
   });
+});
+
+it.each([1, 2])("rejects pending create after registration disposal at lookup %s", async (boundary) => {
+  let resolve!: (value: typeof thread) => void;
+  let started!: () => void;
+  const pending = new Promise<typeof thread>((done) => { resolve = done; });
+  const entered = new Promise<void>((done) => { started = done; });
+  let calls = 0;
+  const get = vi.fn(() => {
+    if (++calls === boundary) { started(); return pending; }
+    return Promise.resolve(thread);
+  });
+  const host = createFakePluginHost({ sdk: { threads: { get } } });
+  const lifecycle = createServerLifecycle();
+  await plugin(host.bb, lifecycle);
+  const database = pluginStorageDatabase(host.bb);
+  const creating = host.harness.behavior.callAgentTool("leave_human_message", { body: "late" }, { threadId: thread.id, projectId: thread.projectId });
+  await entered;
+  lifecycle.dispose();
+  const prepare = vi.spyOn(database, "prepare");
+  resolve(thread);
+  await expect(creating).rejects.toThrow(/disposed/);
+  expect(prepare).not.toHaveBeenCalled();
+  prepare.mockRestore();
+  expect(database.prepare("SELECT * FROM human_inbox_messages").all()).toEqual([]);
+  expect(get).toHaveBeenCalledTimes(boundary);
+  expect(host.harness.inspection.realtimeSignals).toEqual([]);
+  await host.harness.lifecycle.dispose();
+});
+
+it("does not publish when disposal follows commit before the tool continuation", async () => {
+  const lifecycle = createServerLifecycle();
+  const original = inboxService.createInboxService;
+  const factory = vi.spyOn(inboxService, "createInboxService").mockImplementation((options) => {
+    const service = original(options);
+    const create = service.create.bind(service);
+    service.create = async (input) => {
+      const message = await create(input);
+      lifecycle.dispose();
+      return message;
+    };
+    return service;
+  });
+  const host = createFakePluginHost({ sdk: { threads: { get: async () => thread } } });
+  try {
+    await plugin(host.bb, lifecycle);
+    const creating = host.harness.behavior.callAgentTool("leave_human_message", { body: "committed while active" }, { threadId: thread.id, projectId: thread.projectId });
+    await expect(creating).rejects.toThrow(/disposed/);
+    expect(host.harness.inspection.realtimeSignals).toEqual([]);
+    expect(pluginStorageDatabase(host.bb).prepare("SELECT body FROM human_inbox_messages").all()).toEqual([{ body: "committed while active" }]);
+  } finally {
+    factory.mockRestore();
+    await host.harness.lifecycle.dispose();
+  }
 });

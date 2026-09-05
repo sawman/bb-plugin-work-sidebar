@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MAX_HUMAN_MESSAGES_PER_THREAD, createInboxService } from "../server.js";
 
 const threadId = "thr_one";
@@ -47,6 +47,66 @@ describe("Inbox server service", () => {
     await expect(inbox.create({ threadId, projectId, body: "after unarchive" })).resolves.toMatchObject({ body: "after unarchive" });
     expect(inbox.lifecycleGuardCount()).toBe(0);
 
+  });
+
+  it("retains the generation through commit when purge follows a successful lookup", async () => {
+    const { database } = fixture();
+    const inbox = createInboxService({
+      database, getThread: () => Promise.resolve({ id: threadId, projectId, archivedAt: null }),
+    });
+    const creating = inbox.create({ threadId, projectId, body: "must not reappear" });
+    // assertLiveThread has accepted the live response; create has not resumed yet.
+    await Promise.resolve();
+    inbox.purge(threadId);
+    await expect(creating).rejects.toThrow(/lifecycle/);
+    expect(database.prepare("SELECT * FROM human_inbox_messages").all()).toEqual([]);
+    expect(inbox.lifecycleGuardCount()).toBe(0);
+    await expect(inbox.create({ threadId, projectId, body: "unarchived" })).resolves.toMatchObject({ body: "unarchived" });
+  });
+
+  it.each(["lookup pending", "lookup accepted"])("blocks disposed service creates with %s", async (stage) => {
+    const { database } = fixture();
+    let resolve!: (value: { id: string; projectId: string; archivedAt: null }) => void;
+    const inbox = createInboxService({ database, getThread: () => new Promise((done) => { resolve = done; }) });
+    const creating = inbox.create({ threadId, projectId, body: "late" });
+    if (stage === "lookup accepted") {
+      resolve({ id: threadId, projectId, archivedAt: null });
+      await Promise.resolve();
+    }
+    inbox.dispose();
+    const prepare = vi.spyOn(database, "prepare");
+    if (stage === "lookup pending") resolve({ id: threadId, projectId, archivedAt: null });
+    await expect(creating).rejects.toThrow(/disposed/);
+    await expect(inbox.create({ threadId, projectId, body: "new after dispose", idempotencyKey: "retry" })).rejects.toThrow(/disposed/);
+    expect(prepare).not.toHaveBeenCalled();
+    prepare.mockRestore();
+    expect(database.prepare("SELECT * FROM human_inbox_messages").all()).toEqual([]);
+    expect(inbox.lifecycleGuardCount()).toBe(0);
+  });
+
+  it.each([false, true])("bounds the complete list JSON and preserves pagination (extra row: %s)", async (extraRow) => {
+    const { create, inbox, database } = fixture();
+    for (let i = 0; i < 8; i += 1) await create("x".repeat(32 * 1024));
+    const rows = database.prepare("SELECT id FROM human_inbox_messages ORDER BY updated_at DESC, id DESC").all() as { id: string }[];
+    const messages = rows.map(({ id }) => inbox.get(threadId, id));
+    const excess = Buffer.byteLength(JSON.stringify({ messages }), "utf8") - 256 * 1024;
+    // The messages-only envelope fits exactly; response metadata must force a split.
+    database.prepare("UPDATE human_inbox_messages SET body = ? WHERE id = ?").run("x".repeat(32 * 1024 - excess), rows[0]!.id);
+    if (extraRow) await create("older", { threadId: "thr_other", projectId: "other" });
+    if (extraRow) database.prepare("UPDATE human_inbox_messages SET thread_id = ?, updated_at = '2020-01-01' WHERE thread_id = 'thr_other'").run(threadId);
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = inbox.list({ threadId, limit: 100, cursor });
+      expect(Buffer.byteLength(JSON.stringify(page), "utf8")).toBeLessThanOrEqual(256 * 1024);
+      expect(page.activeCount).toBe(extraRow ? 9 : 8);
+      expect(page.savedCount).toBe(0);
+      expect(page.messages.length).toBeGreaterThan(0);
+      seen.push(...page.messages.map(({ id }) => id));
+      cursor = page.cursor ?? undefined;
+    } while (cursor);
+    expect(seen).toHaveLength(extraRow ? 9 : 8);
+    expect(new Set(seen).size).toBe(seen.length);
   });
 
   it("allows synchronous mutations while an ordinary live create lookup is pending", async () => {

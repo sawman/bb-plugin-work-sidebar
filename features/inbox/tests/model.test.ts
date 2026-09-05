@@ -13,3 +13,13 @@ describe("Inbox Markdown segmentation", () => {
     ]);
   });
 });
+
+it.each(["````markdown", "~~~~markdown", "   `````text"])("keeps literal Mermaid inside %s untouched", (opener) => {
+  const closer = opener.trim().match(/^[`~]+/)![0];
+  const literal = `${opener}\nexample\n\`\`\`mermaid\ngraph TD\nA-->B\n\`\`\`\n${closer}`;
+  expect(splitInboxMarkdown(literal)).toEqual([{ kind: "markdown", content: literal }]);
+  expect(splitInboxMarkdown(`${literal}\n\`\`\`mermaid\nC-->D\n\`\`\``)).toEqual([
+    { kind: "markdown", content: `${literal}\n` },
+    { kind: "mermaid", content: "C-->D" },
+  ]);
+});

@@ -2,18 +2,13 @@ import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { rpcContract } from "../../contracts.js";
 import type { ServerLifecycle } from "../../server-lifecycle.js";
 import { pluginStorageDatabase } from "../../shared/server-storage.js";
-import {
-  createInboxService,
-} from "./server.js";
+import { createInboxService } from "./server.js";
 import {
   leaveHumanMessageSchema,
   readHumanMessagesSchema,
   updateHumanMessageSchema,
 } from "./schemas.js";
-
-type InboxHandlers = Pick<PluginRpcHandlers<typeof rpcContract>,
-  "listHumanMessages" | "acknowledgeHumanMessage" | "setHumanMessageBookmark">;
-
+type InboxHandlers = Pick<PluginRpcHandlers<typeof rpcContract>, "listHumanMessages" | "acknowledgeHumanMessage" | "setHumanMessageBookmark">;
 export const INBOX_AGENT_TOOL_NAMES = [
   "leave_human_message",
   "read_human_messages",
@@ -39,24 +34,22 @@ export function createInboxRegistration(
   bb: BbPluginApi,
   lifecycle: ServerLifecycle,
 ): InboxHandlers & { registerTools(): void } {
-  const inbox = createInboxService({
+  const inbox = lifecycle.own(createInboxService({
     database: pluginStorageDatabase(bb),
     getThread: async (threadId) => {
       const thread = await bb.sdk.threads.get({ threadId });
       return { id: thread.id, projectId: thread.projectId, archivedAt: thread.archivedAt };
     },
-  });
-  let active = true;
-  lifecycle.own({ dispose() { active = false; } });
+  }));
   const cleanupWarnings = new Set<string>();
   const cleanupError = (threadId: string) => {
-    if (!active || lifecycle.isDisposed) return;
+    if (lifecycle.isDisposed) return;
     if (cleanupWarnings.has(threadId)) return;
     cleanupWarnings.add(threadId);
     bb.log.warn(`Inbox cleanup failed for ${threadId}; a later lifecycle event will retry.`);
   };
   void inbox.reconcile({
-    isActive: () => active && !lifecycle.isDisposed,
+    isActive: () => !lifecycle.isDisposed,
     onCleanupError: cleanupError,
   });
   lifecycle.own(createInboxLifecycleSubscription({
@@ -69,7 +62,13 @@ export function createInboxRegistration(
       }
     },
   }));
-  const publish = (threadId: string) => bb.realtime.publish("work-sidebar:changed", { family: "inbox", threadId });
+  const assertActive = () => {
+    if (lifecycle.isDisposed) throw new Error("Human Inbox registration is disposed.");
+  };
+  const publish = (threadId: string) => {
+    assertActive();
+    bb.realtime.publish("work-sidebar:changed", { family: "inbox", threadId });
+  };
   const changed = <T extends { revision: number }>(before: number, after: T, threadId: string) => {
     if (before !== after.revision) publish(threadId);
     return after;
@@ -90,7 +89,9 @@ export function createInboxRegistration(
         description: "Leave one concise, durable Inbox message for the human in this thread.",
         parameters: leaveHumanMessageSchema,
         async execute(input, context) {
+          assertActive();
           const thread = await bb.sdk.threads.get({ threadId: context.threadId });
+          assertActive();
           const message = await inbox.create({
             ...input,
             threadId: context.threadId,
@@ -99,6 +100,7 @@ export function createInboxRegistration(
             providerId: thread.providerId ?? null,
             agentLabel: thread.title ?? thread.titleFallback ?? null,
           });
+          assertActive();
           if (message.changed) publish(context.threadId);
           return JSON.stringify({ id: message.id, revision: message.revision });
         },
