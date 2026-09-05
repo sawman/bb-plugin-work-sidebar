@@ -56,5 +56,10 @@ describe("R1 app bundle ownership", () => {
     expect(bundle).toContain("comment_task");
     expect(bundle).toContain("get_sidebar_tasks");
     expect(bundle).toContain("Pending/recovery dispatch states require explicit reconciliation");
+    expect(bundle).toContain("leave_human_message");
+    expect(bundle).toContain("human_inbox_messages");
+    expect(readFileSync(resolve(repositoryRoot, "dist/app.js"), "utf8")).not.toContain(
+      "human_inbox_messages",
+    );
   });
 });

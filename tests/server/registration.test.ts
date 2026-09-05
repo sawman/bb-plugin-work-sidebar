@@ -197,6 +197,9 @@ describe("R2 server registration and disposal", () => {
     });
     expect(host.harness.inspection.registrations.rpcMethods).toEqual([
       "getAgentDetails",
+      "listHumanMessages",
+      "acknowledgeHumanMessage",
+      "setHumanMessageBookmark",
       "getChanges",
       "getChangesFingerprint",
       "checkoutStackBranch",

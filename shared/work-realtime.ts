@@ -1,5 +1,5 @@
 export type WorkSidebarRealtimeFamily =
-  "work" | "changes" | "tracker" | "tasks";
+  "work" | "changes" | "tracker" | "tasks" | "inbox";
 
 type RootScopedWorkEvent = Readonly<{
   family: "work";
@@ -18,6 +18,7 @@ const families = new Set<WorkSidebarRealtimeFamily>([
   "changes",
   "tracker",
   "tasks",
+  "inbox",
 ]);
 
 /** Reject legacy, unscoped, and malformed broadcast payloads at the boundary. */

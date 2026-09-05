@@ -232,6 +232,9 @@ describe("agent-facing Tasks workflow tools", () => {
       "create_execution_task",
       "bind_execution_owner",
       "get_sidebar_tasks",
+      "leave_human_message",
+      "read_human_messages",
+      "update_human_message",
     ]);
     expect(host.harness.inspection.registrations.agentConfigurationProvider?.({
       thread: { id: THREAD_ID, title: "Task tools", parentThreadId: null, sourceThreadId: null },
@@ -249,6 +252,9 @@ describe("agent-facing Tasks workflow tools", () => {
       "create_work_task",
       "create_execution_task",
       "bind_execution_owner",
+      "leave_human_message",
+      "read_human_messages",
+      "update_human_message",
     ]);
     expect(WORK_AGENT_INSTRUCTIONS).toContain("Pending/recovery dispatch states require explicit reconciliation");
     expect(WORK_AGENT_INSTRUCTIONS).toContain("Builtin Tasks 0.1.2 cannot preserve root parenting");

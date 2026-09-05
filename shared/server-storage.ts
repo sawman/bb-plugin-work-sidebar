@@ -42,6 +42,27 @@ const workSidebarStorageMigrations = [
      key TEXT PRIMARY KEY,
      value TEXT NOT NULL
    );`,
+  `CREATE TABLE IF NOT EXISTS human_inbox_messages (
+     id TEXT PRIMARY KEY,
+     thread_id TEXT NOT NULL,
+     project_id TEXT NOT NULL,
+     subject TEXT,
+     body TEXT NOT NULL,
+     agent_thread_id TEXT,
+     provider_id TEXT,
+     agent_label TEXT,
+     created_at TEXT NOT NULL,
+     updated_at TEXT NOT NULL,
+     acknowledged_at TEXT,
+     bookmarked_at TEXT,
+     revision INTEGER NOT NULL CHECK (revision > 0),
+     idempotency_key TEXT,
+     UNIQUE(thread_id, idempotency_key)
+   );
+   CREATE INDEX IF NOT EXISTS human_inbox_messages_thread_updated
+     ON human_inbox_messages(thread_id, updated_at DESC, id DESC);
+   CREATE INDEX IF NOT EXISTS human_inbox_messages_thread_saved
+     ON human_inbox_messages(thread_id, bookmarked_at, acknowledged_at, updated_at DESC);`,
 ];
 
 export function pluginStorageDatabase(bb: Pick<BbPluginApi, "storage">) {

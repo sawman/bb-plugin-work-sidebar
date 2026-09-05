@@ -5,6 +5,7 @@ import { executionTaskSummarySchema, sidebarTaskProjectSchema, sidebarTaskSchema
 import { threadArchiveSchemas, threadHierarchySchemas, threadPreferenceSchemas } from "./features/threads/schemas.js";
 import { trackerRpcSchemas } from "./features/tracker/schemas.js";
 import { changesRpcSchemas, githubStackBranchSchema } from "./features/changes/schemas.js";
+import { inboxRpcSchemas } from "./features/inbox/schemas.js";
 import {
   workBindingSchema,
   workCardInputSchema,
@@ -24,6 +25,7 @@ export type GitHubStackBranch = z.infer<typeof githubStackBranchSchema>;
 export type GitHubStackSignal = z.infer<typeof sidebarStackLayer>;
 export const rpcSchemas = {
   ...agentRpcSchemas,
+  ...inboxRpcSchemas,
   ...changesRpcSchemas,
   ...threadPreferenceSchemas, ...threadHierarchySchemas,
   sidebarTasks: {

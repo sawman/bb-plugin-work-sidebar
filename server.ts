@@ -2,6 +2,8 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { rpcContract } from "./contracts.js";
 import { createAgentRegistration } from "./features/agents/server-registration.js";
 import { createChangesRegistration } from "./features/changes/server-registration.js";
+import { INBOX_AGENT_TOOL_NAMES, createInboxRegistration } from "./features/inbox/server-registration.js";
+import { INBOX_AGENT_INSTRUCTIONS } from "./features/inbox/server.js";
 import { createPullRequestRegistration, fetchGitHubStack } from "./features/pull-requests/server-registration.js";
 import { createTasksRegistration, WORK_AGENT_INSTRUCTIONS } from "./features/tasks/server-registration.js";
 import { createThreadRegistration } from "./features/threads/server-registration.js";
@@ -12,12 +14,10 @@ import { createServerLifecycle, type ServerLifecycle } from "./server-lifecycle.
 import type { ServerCompositionDependencies } from "./shared/server-composition-dependencies.js";
 
 /** Server entrypoint: lifecycle ownership plus feature registration only. */
-export default function plugin(
-  bb: BbPluginApi,
-  lifecycle: ServerLifecycle = createServerLifecycle(),
-) {
+export default function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle = createServerLifecycle()) {
   bb.onDispose(() => lifecycle.dispose());
   const tasks = createTasksRegistration(bb, lifecycle);
+  const inbox = createInboxRegistration(bb, lifecycle);
   const agents = createAgentRegistration(bb);
   const pullRequests = createPullRequestRegistration(bb, lifecycle);
   const dependencies: ServerCompositionDependencies = { bb, lifecycle, pullRequests, tasks };
@@ -28,6 +28,9 @@ export default function plugin(
   const tracker = createTrackerRegistration(dependencies);
   bb.rpc.register(rpcContract, {
     getAgentDetails: agents.getAgentDetails,
+    listHumanMessages: inbox.listHumanMessages,
+    acknowledgeHumanMessage: inbox.acknowledgeHumanMessage,
+    setHumanMessageBookmark: inbox.setHumanMessageBookmark,
     getChanges: changes.getChanges,
     getChangesFingerprint: changes.getChangesFingerprint,
     checkoutStackBranch: changes.checkoutStackBranch,
@@ -91,11 +94,15 @@ export default function plugin(
     reorderTask: tasks.reorderTask,
   });
   tasks.registerTools();
+  inbox.registerTools();
   bb.agents.configure(() => ({
-    tools: ["get_sidebar_tasks", "get_task", "update_task", "comment_task", "get_work_context", "create_work_task", "create_execution_task",
-      "bind_execution_owner"],
+    tools: [
+      "get_sidebar_tasks", "get_task", "update_task", "comment_task",
+      "get_work_context", "create_work_task", "create_execution_task",
+      "bind_execution_owner", ...INBOX_AGENT_TOOL_NAMES,
+    ],
     skills: [],
-    instructions: WORK_AGENT_INSTRUCTIONS,
+    instructions: `${WORK_AGENT_INSTRUCTIONS}\n\n${INBOX_AGENT_INSTRUCTIONS}`,
   }));
 }
 export { fetchGitHubStack, createServerLifecycle, rpcContract };

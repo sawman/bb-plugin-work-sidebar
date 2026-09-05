@@ -22,6 +22,7 @@ function longestPhysicalLine(path: string): number {
 
 const registrationBudgets: Record<string, { lines: number; declarations: number }> = {
   "features/agents/server-registration.ts": { lines: 40, declarations: 1 },
+  "features/inbox/server-registration.ts": { lines: 130, declarations: 3 },
   "features/changes/server-registration.ts": { lines: 160, declarations: 6 },
   // Registration wires feature-owned services. GitHub command, stack
   // enrichment, and authored-list polling stay below this adapter.
