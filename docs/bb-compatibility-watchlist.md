@@ -21,8 +21,8 @@ release, so no replacement feature task was created.
 | Watchlist item | 0.42.0 result |
 | --- | --- |
 | ACP AskUserQuestion continuation | Still absent upstream; the local patch was rebased, tested, deployed, and BB restarted. |
-| Thread-filtered Tasks read | Still absent; the Tasks contract exposes only task-to-thread `listTaskThreads`, not a thread-to-task read. Open issue/PR search remains empty. |
-| Parented Tasks dispatch | Still absent; `runDispatch` receives no CLI context and the delegate spawn omits `parentThreadId`. |
+| Thread-filtered Tasks read | Still absent upstream. The local Tasks patch now supplies the indexed read while this remains on the watchlist. |
+| Parented Tasks dispatch | Still absent upstream. The local Tasks patch now forwards the CLI caller thread while this remains on the watchlist. |
 | Durable per-thread composer draft | Still absent; the SDK explicitly says sidebar-wide thread state cannot report unsubmitted per-client drafts. |
 | Explicit inverse HTTP navigation | Still absent; `UrlLink`/`openUrl` expose no explicit in-app or external intent, and the browser preference remains host-private. |
 | Browser-capable left-sidebar URL host | Still absent; the enhanced thread-list remains under the app-wide URL host without a browser opener, unlike the right panel host. |
@@ -46,24 +46,23 @@ audit intentionally did not create speculative work.
   guarantees a durable answer continuation, otherwise rebase it and retain its
   cross-provider test matrix.
 
-- [ ] **Thread-filtered Tasks read (BBPLUG-252).** The sidebar currently has
-  to read every active project task and call `listTaskThreads(taskId)` for each
-  one. BB Tasks has an indexed `task_threads.thread_id` table, but its public
-  API has no forward, thread-scoped read. Request an indexed endpoint such as
-  `listTasksForThread({ threadId, statuses, includeCompleted, limit })` that
-  returns task summaries and their linked threads in one operation. This is the
-  prerequisite for a real long-task-list optimization; neither plugin-local
-  caching nor a bulk reverse lookup fixes the initial scan. Open upstream
+- [ ] **Thread-filtered Tasks read (BBPLUG-252).** Upstream BB Tasks still
+  lacks a thread-scoped indexed read. The deployed local Tasks patch supplies
+  `listTasksForThread({ threadId, statuses, includeCompleted, limit })` over
+  the indexed `task_threads.thread_id` path, returning summaries and matching
+  links in one bounded operation. Work Sidebar has not yet migrated its
+  project-wide Tasks pane to use it; that requires a separate product decision.
+  Remove the patch only after upstream exposes the equivalent. Open upstream
   searches found no matching issue or PR on 2026-09-05:
   [issues](https://github.com/search?q=repo%3Aget-bb%2Fbb+is%3Aopen+%22listTasksForThread%22&type=issues)
   and
   [pull requests](https://github.com/search?q=repo%3Aget-bb%2Fbb+is%3Aopen+%22listTasksForThread%22&type=pullrequests).
-- [ ] **Parented builtin Tasks dispatch (BBPLUG-230).** Builtin
-  `bb tasks dispatch` does not propagate the invoking thread ID as
-  `parentThreadId`. Current workaround: use `bb thread spawn --parent-self
-  --new-environment worktree`, then run `bb tasks attach <key>` from the
-  spawned child. Remove this item when the Tasks delegate RPC and CLI forward
-  `parentThreadId`. Related upstream issue:
+- [ ] **Parented builtin Tasks dispatch (BBPLUG-230).** Upstream builtin
+  `bb tasks dispatch` still drops the invoking thread ID. The deployed local
+  Tasks patch forwards the CLI context through the delegate RPC to
+  `threads.spawn({ parentThreadId })`, so standard dispatch now produces a
+  child thread. Retire the patch when upstream ships the same lifecycle.
+  Related upstream issue:
   [#2836](https://github.com/get-bb/bb/issues/2836) covers spawn/handoff
   parenting, but it does not yet cover the Tasks dispatcher.
 - [ ] **Durable per-thread composer draft.** The BB SDK/host does not provide

@@ -1,0 +1,450 @@
+diff --git a/plugins/tasks/api/api.test.ts b/plugins/tasks/api/api.test.ts
+index 59ff51a..5b478e5 100644
+--- a/plugins/tasks/api/api.test.ts
++++ b/plugins/tasks/api/api.test.ts
+@@ -10,6 +10,58 @@ import { tasksRpcContract } from "../shared/contract";
+ import { createComment, createStore, registerTasksApi } from ".";
+ 
+ describe("Tasks RPC domain API", () => {
++  it("returns bounded thread-scoped tasks and their matching links", async () => {
++    const { bb, harness } = createFakePluginHost({ pluginId: "tasks" });
++    const store = createStore(bb);
++    registerTasksApi(bb, store);
++    const project = store.tasks.createProject({
++      name: "Thread lookup",
++      prefix: "TLK",
++      color: "blue",
++    });
++    const active = store.tasks.createTask({
++      projectId: project.id,
++      title: "Active",
++      status: "todo",
++    });
++    const finished = store.tasks.createTask({
++      projectId: project.id,
++      title: "Finished",
++      status: "done",
++    });
++    for (const task of [active, finished]) {
++      store.tasks.upsertTaskThread({
++        taskId: task.id,
++        threadId: "thr_lookup",
++        presetName: "Attached",
++        title: "Lookup worker",
++        liveStatus: "idle",
++      });
++    }
++
++    const activeOnly = tasksRpcContract.listTasksForThread.output.parse(
++      await harness.callRpc("listTasksForThread", { threadId: "thr_lookup" }),
++    );
++    expect(activeOnly.tasks.map((task) => task.id)).toEqual([active.id]);
++    expect(activeOnly.taskThreads.map((thread) => thread.taskId)).toEqual([
++      active.id,
++    ]);
++
++    const completed = tasksRpcContract.listTasksForThread.output.parse(
++      await harness.callRpc("listTasksForThread", {
++        threadId: "thr_lookup",
++        statuses: ["done"],
++        includeCompleted: true,
++        limit: 1,
++      }),
++    );
++    expect(completed.tasks.map((task) => task.id)).toEqual([finished.id]);
++    await expect(
++      harness.callRpc("listTasksForThread", { threadId: "not-a-thread" }),
++    ).rejects.toMatchObject({ code: "invalid_input" });
++    await harness.dispose();
++  });
++
+   it("deletes through the typed RPC policy and rejects saved-description references", async () => {
+     const { bb, harness } = createFakePluginHost({ pluginId: "tasks" });
+     const store = createStore(bb);
+diff --git a/plugins/tasks/api/index.ts b/plugins/tasks/api/index.ts
+index 9e00744..ba58a94 100644
+--- a/plugins/tasks/api/index.ts
++++ b/plugins/tasks/api/index.ts
+@@ -922,6 +922,10 @@ export function registerHandlers(
+     listTaskThreads(input) {
+       return { taskThreads: store.tasks.listTaskThreads(input.taskId) };
+     },
++    listTasksForThread(input) {
++      const result = store.tasks.listTasksForThread(input);
++      return { ...result, tasks: apiTasks(store, result.tasks) };
++    },
+     async listTaskPullRequests(input) {
+       return listTaskPullRequests(bb, store, input.taskId);
+     },
+diff --git a/plugins/tasks/cli/cli.test.ts b/plugins/tasks/cli/cli.test.ts
+index 60ae986..76896b1 100644
+--- a/plugins/tasks/cli/cli.test.ts
++++ b/plugins/tasks/cli/cli.test.ts
+@@ -82,6 +82,53 @@ function stdout(result: {
+ }
+ 
+ describe("bb tasks CLI", () => {
++  it("parents dispatches initiated from a thread", async () => {
++    const { bb, harness } = createFakePluginHost({
++      pluginId: "tasks",
++      sdk: {
++        threads: {
++          spawn: async () => ({ id: "thr_child" }),
++          get: async () =>
++            makeThreadResponse({ id: "thr_child", status: "starting" }),
++        },
++      },
++    });
++    const store = createStore(bb);
++    registerTasksCli(bb, store, { name: "tasks", version: "test" });
++    const project = store.tasks.createProject({
++      name: "CLI parent",
++      prefix: "CLP",
++      color: "blue",
++      linkedBbProjectId: "proj_bb",
++    });
++    store.tasks.createTask({ projectId: project.id, title: "Child" });
++    store.tasks.createPreset({
++      name: "CLI worker",
++      providerId: "codex",
++      modelId: "gpt-5.6",
++      reasoningLevel: "high",
++      serviceTier: null,
++      permissionMode: "full",
++      environmentKind: "project-default",
++      baseBranch: null,
++      machineId: null,
++      instructions: "",
++      builtin: false,
++    });
++
++    expect(
++      stdout(
++        await harness.runCli(["dispatch", "CLP-1", "--preset", "CLI worker"], {
++          threadId: "thr_parent",
++        }),
++      ),
++    ).toBe("thr_child");
++    expect(harness.sdk.callsTo("threads.spawn")).toEqual([
++      [expect.objectContaining({ parentThreadId: "thr_parent" })],
++    ]);
++    await harness.dispose();
++  });
++
+   it("lists seed-demo in help while retaining the explicit confirmation guard", async () => {
+     const { bb, harness } = createFakePluginHost({ pluginId: "tasks" });
+     await plugin(bb);
+diff --git a/plugins/tasks/cli/index.ts b/plugins/tasks/cli/index.ts
+index 347a778..f4ab53b 100644
+--- a/plugins/tasks/cli/index.ts
++++ b/plugins/tasks/cli/index.ts
+@@ -1806,6 +1806,7 @@ async function runDispatch(
+   bb: BbPluginApi,
+   store: TasksApiStore,
+   domain: TasksDomain,
++  ctx: PluginCliContext,
+   argv: string[],
+ ): Promise<string> {
+   const args = parseArgs(argv);
+@@ -1823,6 +1824,7 @@ async function runDispatch(
+         taskId: task.id,
+         presetId: preset.id,
+         extraInstructions: option(args, "instructions"),
++        ...(ctx.threadId === undefined ? {} : { parentThreadId: ctx.threadId }),
+       }),
+     ),
+   );
+@@ -2093,7 +2095,7 @@ export function registerTasksCli(
+             break;
+           case "dispatch":
+           case "delegate":
+-            stdout = await runDispatch(bb, store, domain, rest);
++            stdout = await runDispatch(bb, store, domain, ctx, rest);
+             break;
+           case "attach":
+             stdout = await runAttach(bb, store, domain, ctx, rest);
+diff --git a/plugins/tasks/db.test.ts b/plugins/tasks/db.test.ts
+index c0ce2d1..19e70e6 100644
+--- a/plugins/tasks/db.test.ts
++++ b/plugins/tasks/db.test.ts
+@@ -691,6 +691,68 @@ describe("tasks storage", () => {
+     }
+   });
+ 
++  it("reads only one thread's bounded tasks through the reverse index", async () => {
++    const { harness, store } = setup();
++    try {
++      const project = createProject(store, "REV");
++      const active = store.createTask({
++        projectId: project.id,
++        title: "Current thread work",
++        status: "in_progress",
++      });
++      const completed = store.createTask({
++        projectId: project.id,
++        title: "Finished thread work",
++        status: "done",
++      });
++      const unrelated = store.createTask({
++        projectId: project.id,
++        title: "Other thread work",
++        status: "todo",
++      });
++      for (const [taskId, threadId] of [
++        [active.id, "thr_current"],
++        [completed.id, "thr_current"],
++        [unrelated.id, "thr_other"],
++      ] as const) {
++        store.upsertTaskThread({
++          taskId,
++          threadId,
++          presetName: "Attached",
++          title: threadId,
++          liveStatus: "idle",
++        });
++      }
++
++      expect(
++        store
++          .listTasksForThread({ threadId: "thr_current" })
++          .tasks.map((task) => task.id),
++      ).toEqual([active.id]);
++      expect(
++        store
++          .listTasksForThread({
++            threadId: "thr_current",
++            includeCompleted: true,
++          })
++          .tasks.map((task) => task.id)
++          .sort(),
++      ).toEqual([active.id, completed.id].sort());
++      expect(
++        store
++          .listTasksForThread({
++            threadId: "thr_current",
++            includeCompleted: true,
++            statuses: ["done"],
++            limit: 1,
++          })
++          .taskThreads.map((thread) => thread.taskId),
++      ).toEqual([completed.id]);
++    } finally {
++      await harness.dispose();
++    }
++  });
++
+   it("finds the latest agent comment by reply time and ignores other activity", async () => {
+     const { db, harness, store } = setup();
+     try {
+diff --git a/plugins/tasks/db/store.ts b/plugins/tasks/db/store.ts
+index 6c11a21..9f30a83 100644
+--- a/plugins/tasks/db/store.ts
++++ b/plugins/tasks/db/store.ts
+@@ -25,6 +25,8 @@ import type {
+   DeleteFolderResult,
+   Folder,
+   Label,
++  ListTasksForThreadFilters,
++  ListTasksForThreadResult,
+   ListTasksFilters,
+   ListTasksPage,
+   Preset,
+@@ -1064,6 +1066,61 @@ export function createTasksStore(db: PluginDatabase) {
+     return tasks;
+   }
+ 
++  function listTasksForThread(
++    filters: ListTasksForThreadFilters,
++  ): ListTasksForThreadResult {
++    const limit = filters.limit ?? TASKS_PAGE_DEFAULT_LIMIT;
++    if (!Number.isInteger(limit) || limit < 1 || limit > TASKS_PAGE_MAX_LIMIT) {
++      throw new Error(
++        `Thread task limit must be an integer from 1 to ${TASKS_PAGE_MAX_LIMIT}`,
++      );
++    }
++    const parameters: Record<string, SqlParameter> = {
++      threadId: filters.threadId,
++      limit,
++    };
++    const clauses = ["tt.thread_id = @threadId"];
++    if (filters.statuses !== undefined) {
++      if (filters.statuses.length === 0) return { tasks: [], taskThreads: [] };
++      const names = filters.statuses.map((status, index) => {
++        const name = `status${index}`;
++        parameters[name] = status;
++        return `@${name}`;
++      });
++      clauses.push(`t.status IN (${names.join(", ")})`);
++    }
++    if (filters.includeCompleted !== true) {
++      clauses.push("t.status NOT IN ('done', 'canceled')");
++    }
++    const where = clauses.join(" AND ");
++    const orderBy = "t.updated_at DESC, t.id DESC";
++    const tasks = db
++      .prepare<Record<string, SqlParameter>, TaskRow>(
++        `
++          ${taskSelect}
++          JOIN task_threads tt ON tt.task_id = t.id
++          WHERE ${where}
++          ORDER BY ${orderBy}
++          LIMIT @limit
++        `,
++      )
++      .all(parameters)
++      .map(taskFromRow);
++    const taskThreads = db
++      .prepare<Record<string, SqlParameter>, TaskThreadRow>(
++        `
++          SELECT tt.* FROM task_threads tt
++          JOIN tasks t ON t.id = tt.task_id
++          WHERE ${where}
++          ORDER BY ${orderBy}
++          LIMIT @limit
++        `,
++      )
++      .all(parameters)
++      .map(taskThreadFromRow);
++    return { tasks, taskThreads };
++  }
++
+   function listSubtasks(parentTaskId: string): Task[] {
+     requireTask(parentTaskId);
+     return db
+@@ -1827,6 +1884,7 @@ export function createTasksStore(db: PluginDatabase) {
+     getTaskByKey,
+     listTasksPage,
+     listTasks,
++    listTasksForThread,
+     listSubtasks,
+     getSubtaskDoneCounts,
+     updateTask,
+diff --git a/plugins/tasks/db/types.ts b/plugins/tasks/db/types.ts
+index c498f4e..ae58bad 100644
+--- a/plugins/tasks/db/types.ts
++++ b/plugins/tasks/db/types.ts
+@@ -186,6 +186,18 @@ export interface ListTasksPage {
+   nextCursor: string | null;
+ }
+ 
++export interface ListTasksForThreadFilters {
++  threadId: string;
++  statuses?: readonly TaskStatus[];
++  includeCompleted?: boolean;
++  limit?: number;
++}
++
++export interface ListTasksForThreadResult {
++  tasks: Task[];
++  taskThreads: TaskThread[];
++}
++
+ export interface UpdateTaskPositionInput {
+   status: TaskStatus;
+   beforeTaskId?: string | null;
+diff --git a/plugins/tasks/delegate/contract.ts b/plugins/tasks/delegate/contract.ts
+index c2e2180..6d89168 100644
+--- a/plugins/tasks/delegate/contract.ts
++++ b/plugins/tasks/delegate/contract.ts
+@@ -13,6 +13,7 @@ export const delegationRpcContract = defineRpcContract({
+         taskId: idSchema,
+         presetId: idSchema,
+         extraInstructions: z.string().optional(),
++        parentThreadId: threadIdSchema.optional(),
+       })
+       .strict(),
+     output: z.object({ threadId: threadIdSchema }).strict(),
+diff --git a/plugins/tasks/delegate/delegate.test.ts b/plugins/tasks/delegate/delegate.test.ts
+index 7277ee6..ae569c4 100644
+--- a/plugins/tasks/delegate/delegate.test.ts
++++ b/plugins/tasks/delegate/delegate.test.ts
+@@ -127,6 +127,43 @@ describe("task delegation", () => {
+     await harness.dispose();
+   });
+ 
++  it("forwards an explicit parent thread to the spawned worker", async () => {
++    const { bb, harness } = createFakePluginHost({
++      pluginId: "tasks",
++      sdk: {
++        threads: {
++          spawn: async () => ({ id: "thr_child" }),
++          get: async () =>
++            makeThreadResponse({ id: "thr_child", status: "starting" }),
++        },
++      },
++    });
++    const store = createStore(bb);
++    const project = store.tasks.createProject({
++      name: "Parented dispatch",
++      prefix: "PAR",
++      color: "blue",
++      linkedBbProjectId: "proj_bb",
++    });
++    const task = store.tasks.createTask({
++      projectId: project.id,
++      title: "Child",
++    });
++    registerDelegation(bb, store);
++    const preset = createTestPreset(store);
++
++    await harness.callRpc("delegate", {
++      taskId: task.id,
++      presetId: preset.id,
++      parentThreadId: "thr_parent",
++    });
++
++    expect(harness.sdk.callsTo("threads.spawn")).toEqual([
++      [expect.objectContaining({ parentThreadId: "thr_parent" })],
++    ]);
++    await harness.dispose();
++  });
++
+   it("corrects the attached row when a delegated thread becomes active immediately", async () => {
+     const { bb, harness } = createFakePluginHost({
+       pluginId: "tasks",
+diff --git a/plugins/tasks/delegate/index.ts b/plugins/tasks/delegate/index.ts
+index 1549610..f610f3a 100644
+--- a/plugins/tasks/delegate/index.ts
++++ b/plugins/tasks/delegate/index.ts
+@@ -345,6 +345,9 @@ export function handlers(
+             ? {}
+             : { serviceTier: execution.serviceTier }),
+           permissionMode: execution.permissionMode,
++          ...(input.parentThreadId === undefined
++            ? {}
++            : { parentThreadId: input.parentThreadId }),
+           title,
+           prompt,
+         })
+diff --git a/plugins/tasks/shared/contract.ts b/plugins/tasks/shared/contract.ts
+index 35bb964..863cb85 100644
+--- a/plugins/tasks/shared/contract.ts
++++ b/plugins/tasks/shared/contract.ts
+@@ -520,6 +520,27 @@ export const tasksRpcContract = defineRpcContract({
+       })
+       .strict(),
+   },
++  listTasksForThread: {
++    input: z
++      .object({
++        threadId: z.string().startsWith("thr_"),
++        statuses: z.array(taskStatusSchema).optional(),
++        includeCompleted: z.boolean().default(false),
++        limit: z
++          .number()
++          .int()
++          .min(1)
++          .max(TASKS_PAGE_MAX_LIMIT)
++          .default(TASKS_PAGE_DEFAULT_LIMIT),
++      })
++      .strict(),
++    output: z
++      .object({
++        tasks: z.array(taskSchema),
++        taskThreads: z.array(taskThreadSchema),
++      })
++      .strict(),
++  },
+   boardMove: {
+     input: z
+       .object({

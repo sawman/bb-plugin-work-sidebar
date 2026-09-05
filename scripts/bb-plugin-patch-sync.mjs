@@ -91,6 +91,17 @@ const stagingRoot = join(
   `bb-${version}-${new Date().toISOString().replaceAll(/[:.]/g, "-")}`,
 );
 
+// Node 25 starts without a browser localStorage implementation unless this is
+// supplied. Official plugin UI suites share that storage and are racy under
+// file parallelism, so every cataloged plugin suite is isolated and serial.
+const pluginTestEnvironment = {
+  ...standaloneBbEnvironment,
+  NODE_OPTIONS: [
+    standaloneBbEnvironment.NODE_OPTIONS,
+    `--localstorage-file=${join(workspace, "plugin-tests.localstorage.json")}`,
+  ].filter(Boolean).join(" "),
+};
+
 try {
   run("git", ["clone", "--depth", "1", "--branch", plan.sourceRef, registry.coreRepository, sourceRoot]);
   const actualCommit = execFileSync("git", ["rev-parse", "HEAD"], {
@@ -145,15 +156,26 @@ try {
     });
   }
   for (const entry of plan.patches) {
-    run(join(sourceRoot, "node_modules/.bin/turbo"), [
+    run("pnpm", [
+      "--filter",
+      entry.turboFilter,
+      "exec",
+      "vitest",
       "run",
-      "test",
-      `--filter=${entry.turboFilter}`,
-      "--force",
-    ], { cwd: sourceRoot });
+      "--no-file-parallelism",
+    ], { cwd: sourceRoot, env: pluginTestEnvironment });
     run(join(sourceRoot, "node_modules/.bin/turbo"), [
       "run",
       "typecheck",
+      `--filter=${entry.turboFilter}`,
+      "--force",
+    ], { cwd: sourceRoot });
+    // Some official plugins import the SDK runtime rather than vendoring its
+    // declarations. Build their dependency closure before the standalone CLI
+    // build so module resolution tests the artifact we will actually stage.
+    run(join(sourceRoot, "node_modules/.bin/turbo"), [
+      "run",
+      "build",
       `--filter=${entry.turboFilter}`,
       "--force",
     ], { cwd: sourceRoot });

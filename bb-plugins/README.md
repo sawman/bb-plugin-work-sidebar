@@ -18,6 +18,7 @@ matching BB version.
 | --- | --- | --- |
 | `ask-user-question` | [ACP answer continuation](ask-user-question/README.md) | rebased and deployed on BB 0.42.0 |
 | `automations` | [Personal-project availability](automations/README.md) | rebased and deployed on BB 0.42.0 |
+| `tasks` | [Thread workflow](tasks/README.md) | cataloged for BB 0.42.0 |
 
 Run `npm run bb-plugins:sync` for the non-mutating local CI pass. It stages
 only verified artifacts. `npm run bb-plugins:sync -- --deploy` reruns that

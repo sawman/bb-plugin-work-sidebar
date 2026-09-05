@@ -69,6 +69,13 @@
           "pluginPath": "plugins/automations",
           "sourcePatch": "bb-plugins/automations/personal-projects.patch",
           "turboFilter": "bb-plugin-automations"
+        },
+        {
+          "id": "tasks-thread-workflow",
+          "pluginId": "tasks",
+          "pluginPath": "plugins/tasks",
+          "sourcePatch": "bb-plugins/tasks/thread-workflow.patch",
+          "turboFilter": "bb-plugin-tasks"
         }
       ]
     }
