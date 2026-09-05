@@ -11,10 +11,10 @@ index 64a9f5e..1e012e2 100644
              },
            }),
 diff --git a/apps/server/src/services/interactions/pending-interactions.ts b/apps/server/src/services/interactions/pending-interactions.ts
-index 57bd573..ef064d7 100644
+index db329b5..056a0ee 100644
 --- a/apps/server/src/services/interactions/pending-interactions.ts
 +++ b/apps/server/src/services/interactions/pending-interactions.ts
-@@ -111,6 +111,7 @@ interface RequestPluginInteractionArgs {
+@@ -112,6 +112,7 @@ interface RequestPluginInteractionArgs {
    rendererId: string;
    title: string;
    payload: JsonValue;
@@ -22,7 +22,7 @@ index 57bd573..ef064d7 100644
    timeoutMs: number;
    signal?: AbortSignal;
  }
-@@ -269,6 +270,15 @@ function notifyInteractionChanged({
+@@ -270,6 +271,15 @@ function notifyInteractionChanged({
    );
  }
  
@@ -38,7 +38,7 @@ index 57bd573..ef064d7 100644
  export class PendingInteractionLifecycle {
    private readonly deps: CreateLifecycleDeps;
    private readonly pluginWaiters = new Map<string, PluginInteractionWaiter>();
-@@ -348,9 +358,14 @@ export class PendingInteractionLifecycle {
+@@ -349,9 +359,14 @@ export class PendingInteractionLifecycle {
    }
  
    hasPendingThreadInteraction(threadId: string): boolean {
@@ -56,7 +56,7 @@ index 57bd573..ef064d7 100644
    }
  
    registerPendingInteraction(
-@@ -488,6 +503,7 @@ export class PendingInteractionLifecycle {
+@@ -490,6 +505,7 @@ export class PendingInteractionLifecycle {
          payload: JSON.stringify({
            kind: "plugin",
            title: args.title,
@@ -64,7 +64,7 @@ index 57bd573..ef064d7 100644
            data: args.payload,
          }),
        });
-@@ -527,7 +543,7 @@ export class PendingInteractionLifecycle {
+@@ -529,7 +545,7 @@ export class PendingInteractionLifecycle {
        appendPendingInteractionTimelineEvent(this.deps, interaction);
        notifyInteractionChanged({
          deps: this.deps,
@@ -74,10 +74,10 @@ index 57bd573..ef064d7 100644
        });
      } catch (error) {
 diff --git a/apps/server/src/services/plugins/plugin-api.ts b/apps/server/src/services/plugins/plugin-api.ts
-index a011d04..c046cdc 100644
+index 79db557..df26b97 100644
 --- a/apps/server/src/services/plugins/plugin-api.ts
 +++ b/apps/server/src/services/plugins/plugin-api.ts
-@@ -401,6 +401,7 @@ export function createPluginApi(options: {
+@@ -441,6 +441,7 @@ export function createPluginApi(options: {
      rendererId: string;
      title: string;
      payload: JsonValue;
@@ -85,7 +85,7 @@ index a011d04..c046cdc 100644
      timeoutMs: number;
      signal?: AbortSignal;
    }) => Promise<PluginInteractionResult>;
-@@ -575,6 +576,7 @@ export function createPluginApi(options: {
+@@ -619,6 +620,7 @@ export function createPluginApi(options: {
        rendererId: request.rendererId,
        title: request.title.trim(),
        payload,
@@ -94,7 +94,7 @@ index a011d04..c046cdc 100644
        signal: requestOptions?.signal,
      });
 diff --git a/apps/server/test/internal/internal-events-tool-calls.test.ts b/apps/server/test/internal/internal-events-tool-calls.test.ts
-index 40146d7..0b38cdf 100644
+index adbfc67..70f3c64 100644
 --- a/apps/server/test/internal/internal-events-tool-calls.test.ts
 +++ b/apps/server/test/internal/internal-events-tool-calls.test.ts
 @@ -92,13 +92,17 @@ describe("internal event and tool-call routes", () => {
@@ -133,7 +133,7 @@ index 40146d7..0b38cdf 100644
            await expect(readJson(response)).resolves.toEqual({
              success: true,
 diff --git a/apps/server/test/services/pending-interactions.test.ts b/apps/server/test/services/pending-interactions.test.ts
-index 9b0d67d..da17a1b 100644
+index 0f1d954..ecbc3fc 100644
 --- a/apps/server/test/services/pending-interactions.test.ts
 +++ b/apps/server/test/services/pending-interactions.test.ts
 @@ -65,6 +65,7 @@ function requestPluginInteraction(
@@ -189,7 +189,7 @@ index 9b0d67d..da17a1b 100644
      await withTestHarness(async (harness) => {
        const thread = seedPluginInteractionThread(harness.deps, "memory-only");
 diff --git a/apps/server/test/services/plugins/plugin-agent-tools.test.ts b/apps/server/test/services/plugins/plugin-agent-tools.test.ts
-index 7e972ae..807eb47 100644
+index 1f352a4..a4714fb 100644
 --- a/apps/server/test/services/plugins/plugin-agent-tools.test.ts
 +++ b/apps/server/test/services/plugins/plugin-agent-tools.test.ts
 @@ -176,6 +176,7 @@ describe("bb.agents.registerTool", () => {
@@ -209,23 +209,23 @@ index 7e972ae..807eb47 100644
      };
      const found = service.findAgentTool("search_issues")!;
 diff --git a/apps/server/test/threads/thread-send-dispatch.test.ts b/apps/server/test/threads/thread-send-dispatch.test.ts
-index ad620a8..88c8016 100644
+index b568fde..af3c3dc 100644
 --- a/apps/server/test/threads/thread-send-dispatch.test.ts
 +++ b/apps/server/test/threads/thread-send-dispatch.test.ts
-@@ -14,7 +14,12 @@ import {
+@@ -16,7 +16,12 @@ import {
    type ThreadChangedMessage,
  } from "@bb/domain";
  import { groupHostDaemonEvents } from "@bb/host-daemon-contract";
 +import type { PluginHookName } from "@get-bb/plugin-sdk";
- import { describe, expect, it, vi } from "vitest";
+ import { afterEach, describe, expect, it, vi } from "vitest";
 +import {
 +  setPluginHookProvider,
 +  type PluginHookRegistration,
 +} from "../../src/services/plugins/plugin-hook-registry.js";
  import type { TelemetryService } from "../../src/services/system/telemetry.js";
- import { sendQueuedMessage } from "../../src/services/threads/queued-messages.js";
- import { queueParentSystemMessage } from "../../src/services/threads/parent-system-messages.js";
-@@ -126,6 +131,153 @@ function parseThreadMessages(
+ import * as threadEvents from "../../src/services/threads/thread-events.js";
+ import { runQueuedMessageDispatch } from "../../src/services/threads/queued-message-dispatch.js";
+@@ -137,6 +142,160 @@ function parseThreadMessages(
    });
  }
  
@@ -323,8 +323,10 @@ index ad620a8..88c8016 100644
 +      ).resolves.toMatchObject({
 +        ok: true,
 +        delivery: "queued",
-+        waitingOn: { kind: "interaction" },
 +      });
++      expect(
++        JSON.parse(listQueuedThreadMessages(harness.db, thread.id)[0]!.waitingOn!),
++      ).toEqual({ kind: "interaction" });
 +
 +      cancelPluginForm(harness, thread.id);
 +      await expect(pending).resolves.toMatchObject({ outcome: "cancelled" });
@@ -361,10 +363,15 @@ index ad620a8..88c8016 100644
 +        ).resolves.toMatchObject({
 +          ok: true,
 +          delivery: "queued",
-+          waitingOn: {
-+            kind: "plugin",
-+            pluginId: "provider-retry",
-+          },
++        });
++        expect(
++          JSON.parse(
++            listQueuedThreadMessages(harness.db, thread.id)[0]!.waitingOn!,
++          ),
++        ).toEqual({
++          kind: "plugin",
++          pluginId: "provider-retry",
++          reason: "Provider is cooling down",
 +        });
 +
 +        cancelPluginForm(harness, thread.id);
@@ -392,10 +399,10 @@ index 06e87b8..d4378f4 100644
  });
  type PluginPendingInteractionPayload = z.infer<
 diff --git a/packages/plugin-sdk/src/backend-contract.ts b/packages/plugin-sdk/src/backend-contract.ts
-index ee8f3b2..2a3888a 100644
+index aa1fc9e..4832d94 100644
 --- a/packages/plugin-sdk/src/backend-contract.ts
 +++ b/packages/plugin-sdk/src/backend-contract.ts
-@@ -621,6 +621,12 @@ export interface PluginInteractionRequest {
+@@ -695,6 +695,12 @@ export interface PluginInteractionRequest {
    rendererId: string;
    title: string;
    payload: JsonValue;
@@ -408,7 +415,7 @@ index ee8f3b2..2a3888a 100644
    /** Defaults to ten minutes; capped at one hour. */
    timeoutMs?: number;
  }
-@@ -696,6 +702,8 @@ export type PluginAgentToolResult =
+@@ -770,6 +776,8 @@ export type PluginAgentToolResult =
  export interface PluginAgentToolContext {
    threadId: string;
    projectId: string;
@@ -418,10 +425,10 @@ index ee8f3b2..2a3888a 100644
     * is torn down mid-call). */
    signal: AbortSignal;
 diff --git a/packages/plugin-sdk/src/testing/fake-plugin-host.ts b/packages/plugin-sdk/src/testing/fake-plugin-host.ts
-index 117292b..11269fc 100644
+index dc006d8..df01463 100644
 --- a/packages/plugin-sdk/src/testing/fake-plugin-host.ts
 +++ b/packages/plugin-sdk/src/testing/fake-plugin-host.ts
-@@ -2247,6 +2247,7 @@ function createFakePluginHostInternal(
+@@ -2621,6 +2621,7 @@ function createFakePluginHostInternal(
        return record.execute(parsed.value, {
          threadId: ctx?.threadId ?? "thread-test",
          projectId: ctx?.projectId ?? "project-test",
@@ -689,18 +696,14 @@ index 4e03f6a..c06b4ed 100644
    );
  }
 diff --git a/plugins/ask-user-question/src/server-harness.test.ts b/plugins/ask-user-question/src/server-harness.test.ts
-index bf0dc30..3f5a7de 100644
+index 75817df..6cc4bc3 100644
 --- a/plugins/ask-user-question/src/server-harness.test.ts
 +++ b/plugins/ask-user-question/src/server-harness.test.ts
-@@ -3,17 +3,48 @@ import {
-   createFakePluginHost,
+@@ -4,16 +4,45 @@ import {
    type FakePluginHost,
+   makePluginAgentConfigurationContext,
  } from "@get-bb/plugin-sdk/testing";
--import type { PluginAgentConfigurationContext } from "@get-bb/plugin-sdk";
-+import type {
-+  PluginAgentConfigurationContext,
-+  PluginAgentToolContext,
-+} from "@get-bb/plugin-sdk";
++import type { PluginAgentToolContext } from "@get-bb/plugin-sdk";
  import plugin, { RENDERER_ID, TOOL_NAME } from "./server.js";
  import { TOOL_INPUT_JSON_SCHEMA } from "./tool-definition.js";
  import type { InteractionPayload, ToolResult } from "./contracts.js";
@@ -744,7 +747,7 @@ index bf0dc30..3f5a7de 100644
  function configurationContext(
    providerId: string,
    supportsNativeUserQuestion = false,
-@@ -64,6 +95,24 @@ const questions = [
+@@ -42,6 +71,24 @@ const questions = [
    },
  ];
  
@@ -769,7 +772,7 @@ index bf0dc30..3f5a7de 100644
  async function resultText(
    result: Awaited<ReturnType<FakePluginHost["harness"]["callAgentTool"]>>,
  ): Promise<string> {
-@@ -85,7 +134,7 @@ describe("provider gating", () => {
+@@ -63,7 +110,7 @@ describe("provider gating", () => {
      },
    );
  
@@ -778,7 +781,7 @@ index bf0dc30..3f5a7de 100644
      "registers the tool for %s with Claude's exact advertised schema",
      async (providerId) => {
        const host = createHost();
-@@ -96,6 +145,14 @@ describe("provider gating", () => {
+@@ -74,6 +121,14 @@ describe("provider gating", () => {
        const [tool] = resolved.tools;
        expect(tool?.name).toBe(TOOL_NAME);
        expect(tool?.inputSchema).toEqual(TOOL_INPUT_JSON_SCHEMA);
@@ -793,7 +796,7 @@ index bf0dc30..3f5a7de 100644
      },
    );
  
-@@ -126,6 +183,366 @@ describe("provider gating", () => {
+@@ -104,6 +159,366 @@ describe("provider gating", () => {
  });
  
  describe("asking a question", () => {

@@ -15,12 +15,11 @@ missing, deleted, or unreadable projects. The source patch is
 
 ## Current deployment
 
-- Target: `builtin:automations` inside BB `0.41.0`, SDK `0.4.34`.
-- Verified source baseline: `desktop-v0.41.0` at
-  `ee4a5777bf1efb255a87cd9dc91fd3ae92830268`.
+- Target: `builtin:automations` inside BB `0.42.0`, SDK `0.4.47`.
+- Verified source baseline: `desktop-v0.42.0` at
+  `960255b98ce3dccdcb5754eb67a7f989236602a1`.
 - Validation: 81 focused tests, typecheck, and plugin build.
-- Deployed by the cataloged 0.41.0 sync pass on 2026-09-04; the built-in plugin
-  reloaded successfully and its automation sweep is running.
+- Rebased and deployed through the cataloged 0.42.0 sync pass.
 
 ## Update procedure
 

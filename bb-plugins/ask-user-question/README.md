@@ -31,17 +31,18 @@ The versioned release criteria and live smoke matrix are in
 
 ## Current deployment
 
-- Target: `builtin:ask-user-question` inside BB `0.41.0`, SDK `0.4.34`.
-- Verified source baseline: `desktop-v0.41.0` at
-  `ee4a5777bf1efb255a87cd9dc91fd3ae92830268`.
+- Target: `builtin:ask-user-question` inside BB `0.42.0`, SDK `0.4.47`.
+- Verified source baseline: `desktop-v0.42.0` at
+  `960255b98ce3dccdcb5754eb67a7f989236602a1`.
 - Installed files replaced: all six built-in plugin `dist/*` artifacts plus
-  `server/dist/start-server.js` and its source map. Restart BB after deploying
-  the core artifact.
+  `server/dist/start-server.js` and its source map. BB was restarted after the
+  0.42.0 deployment and the installed artifacts were inspected for the patched
+  continuation markers.
 - Canonical rollback payload:
   [`rollback/bb-0.41.0/`](rollback/bb-0.41.0/), verified by its
   [`manifest.json`](rollback/bb-0.41.0/manifest.json). The local pre-deploy
   copy under `~/.bb/patch-backups/` is only a convenience mirror.
-- Validation: 87 focused plugin tests, 72 focused core tests, plugin and core
+- Validation: 87 focused plugin tests, 101 focused core tests, plugin and core
   typechecks, builds, installed-artifact inspection, and a live ACP Reply
   round-trip.
 

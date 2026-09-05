@@ -38,7 +38,7 @@ const hostShims = {
 describe("R1 package and compile boundary", () => {
   it("pins the SDK and keeps host shims out of the plugin bundle", () => {
     expect(packageJson.engines?.bbPluginSdk).toBe(">=0.4.21");
-    expect(packageJson.devDependencies?.["@get-bb/plugin-sdk"]).toBe("0.4.34");
+    expect(packageJson.devDependencies?.["@get-bb/plugin-sdk"]).toBe("0.4.47");
     expect(packageJson.dependencies?.["@get-bb/plugin-sdk"]).toBeUndefined();
 
     for (const [name, version] of Object.entries(hostShims)) {
@@ -62,7 +62,7 @@ describe("R1 package and compile boundary", () => {
     expect(packageJson.devDependencies?.["@tanstack/react-query"]).toBeUndefined();
     expect(packageJson.devDependencies?.zustand).toBeUndefined();
 
-    expect(rootLockPackage.devDependencies?.["@get-bb/plugin-sdk"]).toBe("0.4.34");
+    expect(rootLockPackage.devDependencies?.["@get-bb/plugin-sdk"]).toBe("0.4.47");
     expect(rootLockPackage.dependencies?.["@tanstack/react-query"]).toBe(packageJson.dependencies?.["@tanstack/react-query"]);
     expect(rootLockPackage.dependencies?.zustand).toBe(packageJson.dependencies?.zustand);
     expect(packageJson.dependencies?.["react-diff-view"]).toBeUndefined();

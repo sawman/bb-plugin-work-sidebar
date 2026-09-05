@@ -35,6 +35,42 @@
           "turboFilter": "bb-plugin-automations"
         }
       ]
+    },
+    "0.42.0": {
+      "sourceRef": "desktop-v0.42.0",
+      "sourceCommit": "960255b98ce3dccdcb5754eb67a7f989236602a1",
+      "patches": [
+        {
+          "id": "ask-user-question-acp-continuation",
+          "pluginId": "ask-user-question",
+          "pluginPath": "plugins/ask-user-question",
+          "sourcePatch": "bb-plugins/ask-user-question/acp-continuation.patch",
+          "coreArtifacts": [
+            {
+              "sourcePath": "apps/server/dist/start-server.js",
+              "targetPath": "server/dist/start-server.js"
+            },
+            {
+              "sourcePath": "apps/server/dist/start-server.js.map",
+              "targetPath": "server/dist/start-server.js.map"
+            }
+          ],
+          "coreTests": [
+            "test/internal/internal-events-tool-calls.test.ts",
+            "test/services/pending-interactions.test.ts",
+            "test/services/plugins/plugin-agent-tools.test.ts",
+            "test/threads/thread-send-dispatch.test.ts"
+          ],
+          "turboFilter": "bb-plugin-ask-user-question"
+        },
+        {
+          "id": "automations-personal-projects",
+          "pluginId": "automations",
+          "pluginPath": "plugins/automations",
+          "sourcePatch": "bb-plugins/automations/personal-projects.patch",
+          "turboFilter": "bb-plugin-automations"
+        }
+      ]
     }
   }
 }
