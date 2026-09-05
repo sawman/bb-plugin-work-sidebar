@@ -6,6 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { ActionTooltip } from "../../components/ui/action-tooltip";
+import { CountedDisclosure } from "../../components/ui/counted-disclosure";
 import { Icon } from "../../components/ui/icon";
 import { taskStatusPresentation } from "./model";
 import { TaskPriorityIcon } from "./priority";
@@ -165,35 +166,22 @@ export function TaskWorkflowSection({
   defaultOpen?: boolean;
   children: ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
-  const label = `${title}: ${count} task${count === 1 ? "" : "s"}`;
   return (
-    <section
+    <CountedDisclosure
       className="ws-task-workflow-section"
-      data-tone={tone}
-      aria-labelledby={id}
+      triggerId={id}
+      triggerClassName="ws-task-workflow-disclosure"
+      metaClassName="ws-task-workflow-disclosure-meta"
+      countClassName="ws-task-workflow-count"
+      iconClassName="ws-task-workflow-icon"
+      tone={tone}
+      title={title}
+      count={count}
+      countUnit="task"
+      defaultOpen={defaultOpen}
     >
-      <h3>
-        <button
-          id={id}
-          type="button"
-          className="ws-task-workflow-disclosure"
-          aria-expanded={open}
-          aria-label={label}
-          onClick={() => setOpen((current) => !current)}
-        >
-          <span>{title}</span>
-          <span className="ws-task-workflow-disclosure-meta" aria-hidden>
-            <span className="ws-task-workflow-count">{count}</span>
-            <Icon
-              className="ws-task-workflow-icon"
-              name={open ? "ChevronUp" : "ChevronDown"}
-            />
-          </span>
-        </button>
-      </h3>
-      {open ? children : null}
-    </section>
+      {children}
+    </CountedDisclosure>
   );
 }
 

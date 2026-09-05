@@ -4286,3 +4286,198 @@ button.ws-provider-health:focus-visible {
   font: var(--ws-text-subtext);
   line-height: inherit;
 }
+.ws-inbox-card {
+  overflow: hidden;
+}
+
+.ws-inbox-content {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.ws-inbox-message-actions button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  min-height: 1.65rem;
+  min-width: 1.65rem;
+  padding: 0.2rem;
+}
+
+.ws-inbox-message-actions button:focus-visible,
+.ws-inbox-message-toggle:focus-visible,
+.ws-inbox-group button:focus-visible,
+.ws-inbox-load-more:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.ws-inbox-group {
+  border-top: 1px solid var(--border);
+}
+
+.ws-inbox-group h3,
+.ws-inbox-results h3 {
+  font: inherit;
+  line-height: inherit;
+  margin: 0;
+}
+
+.ws-inbox-group h3 button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--foreground);
+  cursor: pointer;
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.55rem 0;
+  text-align: left;
+  width: 100%;
+}
+
+.ws-inbox-group-count,
+.ws-inbox-unread-count {
+  color: var(--muted-foreground);
+  font: var(--ws-text-metadata);
+  line-height: inherit;
+  margin-left: auto;
+}
+
+.ws-inbox-group .ws-counted-disclosure-panel {
+  padding-bottom: 0.25rem;
+}
+
+.ws-inbox-message-list {
+  display: grid;
+  gap: 0.55rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ws-inbox-message {
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.6rem;
+}
+
+.ws-inbox-message[data-busy="true"] {
+  opacity: 0.65;
+}
+
+.ws-inbox-message-heading,
+.ws-inbox-message-meta {
+  align-items: center;
+  display: flex;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.ws-inbox-message-heading strong {
+  overflow-wrap: anywhere;
+}
+
+.ws-inbox-message-actions {
+  display: flex;
+  gap: 0.15rem;
+  margin-left: auto;
+}
+
+.ws-inbox-message-meta {
+  color: var(--muted-foreground);
+  flex-wrap: wrap;
+  font: var(--ws-text-metadata);
+  line-height: inherit;
+}
+
+.ws-inbox-message .ws-copy-badge {
+  justify-self: start;
+}
+
+.ws-inbox-message-toggle {
+  background: transparent;
+  border: 0;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  justify-self: start;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.ws-inbox-message-content {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ws-inbox-message-content > * {
+  margin-block: 0.35rem;
+}
+
+.ws-inbox-state,
+.ws-inbox-empty,
+.ws-inbox-mutation-error {
+  color: var(--muted-foreground);
+  font: var(--ws-text-subtext);
+  line-height: inherit;
+  margin: 0;
+}
+
+.ws-inbox-state {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.ws-inbox-state button,
+.ws-inbox-load-more {
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: 0.3rem;
+  color: var(--foreground);
+  cursor: pointer;
+  justify-self: start;
+  padding: 0.3rem 0.5rem;
+}
+
+.ws-inbox-results {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.ws-inbox-load-more {
+  justify-self: stretch;
+}
+
+.ws-inbox-mermaid {
+  border: 1px solid var(--border);
+  border-radius: 0.3rem;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 0.45rem;
+}
+
+.ws-inbox-mermaid pre {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.ws-inbox-mermaid svg {
+  display: block;
+  max-width: 100%;
+}
+
+.ws-inbox-mermaid-fallback {
+  color: var(--muted-foreground);
+  display: block;
+  font: var(--ws-text-metadata);
+  line-height: inherit;
+  margin-top: 0.35rem;
+}

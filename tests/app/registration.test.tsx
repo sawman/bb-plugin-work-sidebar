@@ -100,6 +100,12 @@ describe("R2 app registration and Query lifecycle", () => {
           textScale: 0.9,
           workingProviderAnimation: "fast-spin",
         }),
+        listHumanMessages: () => ({
+          messages: [],
+          cursor: null,
+          activeCount: 0,
+          savedCount: 0,
+        }),
       } as never,
     });
     const right = renderSlot(app.threadPanelActions[0]!, {
@@ -111,6 +117,12 @@ describe("R2 app registration and Query lifecycle", () => {
           rowHeight: 40,
           textScale: 0.9,
           workingProviderAnimation: "fast-spin",
+        }),
+        listHumanMessages: () => ({
+          messages: [],
+          cursor: null,
+          activeCount: 0,
+          savedCount: 0,
         }),
       } as never,
     });
@@ -167,7 +179,7 @@ describe("R2 app registration and Query lifecycle", () => {
     // roster-wide PR directory and normalized fact directory are durable
     // sidebar reads. Queue changes arrive through realtime; PR consumers
     // observe these one-way Query entries.
-    expect(client.getQueryCache().getAll()).toHaveLength(24);
+    expect(client.getQueryCache().getAll()).toHaveLength(25);
     expect(
       client
         .getQueryCache()

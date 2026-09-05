@@ -83,7 +83,8 @@ Add frontend tests that fail before implementation for:
 - acknowledge, bookmark, unbookmark, rollback, conflict
   recovery, and busy-state suppression;
 - copyable full IDs and edit metadata;
-- Markdown/emoji and Mermaid success/error/theme/unmount behavior;
+- Markdown/emoji, exact Mermaid-fence segmentation, labelled source fallback,
+  and closed-group unmount behavior;
 - keyboard search, disclosure, actions, focus return, and zero axe violations;
 - exact card placement after Status and before Work items.
 
@@ -95,8 +96,9 @@ Add frontend tests that fail before implementation for:
   invalidation.
 - Compose `InboxCard` into Work and use existing SurfaceCard, disclosure,
   search, tooltip, confirmation, copy, and icon primitives.
-- Render normal segments through host `Markdown`; dynamically load the narrow
-  Mermaid adapter only for visible diagrams.
+- Render normal segments through host `Markdown`; retain fenced Mermaid as a
+  labelled source fallback because the single BB app bundle inlines Mermaid
+  (250,023 bytes baseline versus 3,718,895 bytes with the dependency).
 - Add plugin-local semantic CSS over host tokens for Inbox-only layout.
 
 ### REFACTOR
@@ -161,7 +163,7 @@ verify even after failure.
   migration remains harmless and preserves rollback safety.
 - R37.2 can be reverted independently because it consumes only typed RPCs and
   adds no host-global UI registration.
-- If Mermaid causes bundle or runtime regressions, retain Markdown and show
-  Mermaid fences as code while the rendering adapter is disabled; message
-  storage and actions must remain available.
+- Mermaid rendering is deferred by the bundle boundary: retain Markdown and
+  show Mermaid fences as labelled source while the adapter is disabled;
+  message storage and actions remain available.
 - No rollback may retain two Inbox implementations or a stale agent tool.

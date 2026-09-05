@@ -8,6 +8,7 @@ import { GoalCard } from "./goal-card";
 import { PlanCard } from "./plan-card";
 import { StatusCard } from "./status-card";
 import { WorkItemCard } from "./work-item-card";
+import { InboxCard } from "../inbox/views";
 
 export function WorkContextCards({
   threadId,
@@ -26,6 +27,7 @@ export function WorkContextCards({
   return (
     <section className="ws-work-context-cards" aria-label="Work context">
       <StatusCard threadId={threadId} />
+      <InboxCard threadId={threadId} />
       <WorkItemCard
         threadId={threadId}
         projectId={projectId}

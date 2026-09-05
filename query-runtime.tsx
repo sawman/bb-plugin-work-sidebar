@@ -112,6 +112,24 @@ export const queryKeys = {
       providerId,
     ],
   },
+  inbox: {
+    thread: (threadId: string): QueryKey => [
+      ...pluginQueryRoot,
+      "inbox",
+      threadId,
+    ],
+    page: (
+      threadId: string,
+      query: string,
+      cursor: string | null,
+    ): QueryKey => [
+      ...pluginQueryRoot,
+      "inbox",
+      threadId,
+      query.trim().replace(/\s+/g, " "),
+      cursor ?? "first",
+    ],
+  },
 } as const;
 
 export const queryPolicies = {
@@ -205,6 +223,15 @@ export const queryPolicies = {
     staleTime: 0,
     gcTime: 2 * 60_000,
     retry: 1,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+  },
+  inbox: {
+    staleTime: 0,
+    // Inbox is durable and realtime-backed, but must not retain an unbounded
+    // per-thread/search/cursor cache after Work is no longer observed.
+    gcTime: 10 * 60_000,
+    retry: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   },

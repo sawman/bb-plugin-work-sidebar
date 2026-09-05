@@ -86,6 +86,12 @@ function fixture(overrides: Partial<Rpc> = {}): Rpc {
     sidebarTasks: () => taskResult,
     sidebarTaskLinks: () => ({ available: true, links: {}, error: null }),
     getWorkContext: () => aggregate,
+    listHumanMessages: () => ({
+      messages: [],
+      cursor: null,
+      activeCount: 0,
+      savedCount: 0,
+    }),
     getChanges: () => ({
       currentPullRequest: null,
       stack: null,
@@ -277,7 +283,7 @@ describe("registered Work context cards", () => {
     );
 
     await waitFor(() =>
-      expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(5),
+      expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(6),
     );
     const cardOrder = Array.from(
       slot.container.querySelectorAll("[data-card]"),
@@ -287,6 +293,7 @@ describe("registered Work context cards", () => {
     getPluginQueryClient().clear();
     expect(cardOrder).toEqual([
       "status",
+      "inbox",
       "work items",
       "goal",
       "plan",
@@ -311,7 +318,7 @@ describe("registered Work context cards", () => {
     );
     for (const name of ["Status", "Background", "Goal", "Plan"])
       expect(slot.getAllByText(name).length).toBeGreaterThan(0);
-    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(5);
+    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(6);
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();
   });
@@ -679,7 +686,7 @@ describe("registered Work context cards", () => {
     );
     await waitFor(() => expect(slot.getByText("Attached task")).toBeTruthy());
     expect(slot.getByText("Ship cards")).toBeTruthy();
-    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(5);
+    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(6);
     expect(slot.container.querySelector(".ws-thread-task-card")).toBeTruthy();
     expect(slot.getByRole("heading", { name: "Needs you" })).toBeTruthy();
     const priority = slot.getByRole("img", { name: "High priority" });

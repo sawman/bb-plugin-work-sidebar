@@ -84,6 +84,12 @@ const context = {
 function fixture(overrides: Partial<Rpc> = {}): Rpc {
   return {
     getWorkContext: () => context,
+    listHumanMessages: () => ({
+      messages: [],
+      cursor: null,
+      activeCount: 0,
+      savedCount: 0,
+    }),
     getChanges: () => ({
       currentPullRequest: null,
       stack: null,

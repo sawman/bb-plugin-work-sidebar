@@ -70,6 +70,12 @@ function rpcFixtures(
     sidebarTasks,
     sidebarTaskLinks,
     getWorkContext: () => workContext,
+    listHumanMessages: () => ({
+      messages: [],
+      cursor: null,
+      activeCount: 0,
+      savedCount: 0,
+    }),
     getChanges: () => ({
       currentPullRequest: null,
       stack: null,

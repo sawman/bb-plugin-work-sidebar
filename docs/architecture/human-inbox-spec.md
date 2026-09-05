@@ -87,10 +87,11 @@ BB's normal browser preference through the host Markdown renderer.
 ### Rendering
 
 Ordinary content uses BB's `Markdown` renderer, including native full-colour
-emoji. A fenced block whose info string is exactly `mermaid` renders as a
-Mermaid diagram. Mermaid runs with strict security, follows the current theme,
-and never accepts raw script/HTML execution. Invalid or unavailable diagrams
-fall back to a labelled code block instead of blanking the message or card.
+emoji. A fenced block whose info string is exactly `mermaid` is split into a
+labelled, accessible source block. Mermaid rendering is deferred because the
+BB plugin builder emits one app bundle; shipping the dependency would make
+the sidebar bundle materially larger. A future genuinely deferred adapter
+must use strict security and never accept raw script/HTML execution.
 
 ## 4. Functional requirements
 
@@ -199,10 +200,12 @@ for another still-mounted client.
 ### Markdown and Mermaid boundary
 
 `InboxMessageContent` splits only complete fenced `mermaid` blocks. All other
-text is passed unchanged to BB `Markdown`. The Mermaid adapter is dynamically
-loaded only when a visible message contains a diagram. It owns theme-safe
-initialization, cancellation after unmount, stable diagram IDs, and fallback.
-No generic Markdown system or second syntax highlighter is introduced.
+text is passed unchanged to BB `Markdown`. Mermaid rendering is intentionally
+disabled for the first frontend slice: BB emits one app bundle, and the
+measured Mermaid dependency grew `dist/app.js` from 250,023 to 3,718,895
+bytes. Fenced blocks therefore remain labelled, accessible source code until
+the host exposes a genuinely deferred renderer boundary. No generic Markdown
+system or second syntax highlighter is introduced.
 
 ## 7. Error and edge-case behavior
 
@@ -218,8 +221,8 @@ No generic Markdown system or second syntax highlighter is introduced.
 - A message archived during an in-flight list may appear in that response, but
   the archive invalidation and next read return empty; a late create checks
   current thread archival state before commit and is rejected.
-- If Mermaid cannot load, ordinary Markdown and every message action remain
-  functional.
+- Mermaid fences remain an accessible labelled source fallback; ordinary
+  Markdown and every message action remain functional.
 - The empty card explains that agents leave only key messages; it does not ask
   the human to create content in this one-way surface.
 
@@ -236,8 +239,9 @@ No generic Markdown system or second syntax highlighter is introduced.
   priority; each retention tier and all-bookmarked overflow are tested.
 - Archive/delete events purge only the affected thread, including cascade
   event sequences, and repeated events are harmless.
-- Ordinary Markdown, links, coloured emoji, valid Mermaid, invalid Mermaid,
-  unmount-during-render, and light/dark theme changes have regression coverage.
+- Ordinary Markdown, links, coloured emoji, exact Mermaid-fence segmentation,
+  labelled source fallback, and closed-group unmount behavior have regression
+  coverage.
 - App bundle inspection proves SQLite, Node builtins, server services, and
   contract composition do not enter the browser bundle.
 - Focused tests pass twice, the serial full suite passes twice, typecheck, SDK
