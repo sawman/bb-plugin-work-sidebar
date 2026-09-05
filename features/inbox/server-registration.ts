@@ -3,7 +3,6 @@ import { rpcContract } from "../../contracts.js";
 import type { ServerLifecycle } from "../../server-lifecycle.js";
 import { pluginStorageDatabase } from "../../shared/server-storage.js";
 import {
-  INBOX_AGENT_INSTRUCTIONS,
   createInboxService,
 } from "./server.js";
 import {
@@ -64,7 +63,6 @@ export function createInboxRegistration(
     subscribe: (event, handler) => bb.events.on(event, handler),
     purge: (threadId) => {
       try {
-        inbox.markThreadClosed(threadId);
         inbox.purge(threadId);
       } catch {
         cleanupError(threadId);

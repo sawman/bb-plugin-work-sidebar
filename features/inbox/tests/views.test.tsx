@@ -107,6 +107,70 @@ describe("Inbox Work card", () => {
     client.clear();
   });
 
+  it("keeps loaded rows and disclosure state mounted while loading a later cursor", async () => {
+    let resolveLaterPage!: (value: { messages: (typeof active)[]; cursor: null; activeCount: number; savedCount: number }) => void;
+    rpcClient.call.mockImplementation((method: string, input: { cursor?: string }) => {
+      if (method !== "listHumanMessages") return Promise.resolve(active);
+      if (!input.cursor) return Promise.resolve({ messages: [active, saved], cursor: "later", activeCount: 1, savedCount: 1 });
+      return new Promise((resolve) => { resolveLaterPage = resolve; });
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
+    await view.findByText("msg_active");
+    const savedDisclosure = view.getByRole("button", { name: /Saved messages/ });
+    fireEvent.click(savedDisclosure);
+    expect(savedDisclosure.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(view.getByRole("button", { name: "Load more messages" }));
+    expect(view.getByText("msg_active")).toBeTruthy();
+    expect(savedDisclosure.getAttribute("aria-expanded")).toBe("false");
+    resolveLaterPage({ messages: [{ ...active, id: "msg_later" }], cursor: null, activeCount: 2, savedCount: 1 });
+    expect(await view.findByText("msg_later")).toBeTruthy();
+    expect(savedDisclosure.getAttribute("aria-expanded")).toBe("false");
+    view.unmount();
+    client.clear();
+  });
+
+  it("keeps loaded rows visible and retries a failed later page", async () => {
+    let laterAttempts = 0;
+    rpcClient.call.mockImplementation((method: string, input: { cursor?: string }) => {
+      if (method !== "listHumanMessages") return Promise.resolve(active);
+      if (!input.cursor) return Promise.resolve({ messages: [active, saved], cursor: "later", activeCount: 1, savedCount: 1 });
+      laterAttempts += 1;
+      return laterAttempts === 1
+        ? Promise.reject(new Error("later page unavailable"))
+        : Promise.resolve({ messages: [{ ...active, id: "msg_retried" }], cursor: null, activeCount: 2, savedCount: 1 });
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
+    await view.findByText("msg_active");
+    fireEvent.click(view.getByRole("button", { name: "Load more messages" }));
+    expect((await view.findByRole("alert")).textContent).toContain("later page unavailable");
+    expect(view.getByText("msg_active")).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Retry loading messages" }));
+    expect(await view.findByText("msg_retried")).toBeTruthy();
+    view.unmount();
+    client.clear();
+  });
+
+  it("scopes busy and mutation errors to the row whose action was invoked", async () => {
+    let rejectAcknowledgement!: (error: Error) => void;
+    rpcClient.call.mockImplementation((method: string) => method === "listHumanMessages"
+      ? Promise.resolve({ messages: [active, saved], cursor: null, activeCount: 1, savedCount: 1 })
+      : new Promise((_resolve, reject) => { rejectAcknowledgement = reject; }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
+    const activeRow = (await view.findByText("msg_active")).closest("li")!;
+    const savedRow = view.getByText("msg_saved").closest("li")!;
+    fireEvent.click(within(activeRow).getByRole("button", { name: /Bookmark message/ }));
+    await waitFor(() => expect(activeRow.getAttribute("data-busy")).toBe("true"));
+    expect((within(savedRow).getByRole("button", { name: /Remove bookmark/ }) as HTMLButtonElement).disabled).toBe(false);
+    rejectAcknowledgement(new Error("Message changed"));
+    expect((await within(activeRow).findByRole("alert")).textContent).toContain("Message changed");
+    expect(within(savedRow).queryByRole("alert")).toBeNull();
+    view.unmount();
+    client.clear();
+  });
+
   it("unmounts closed group bodies and restores them on reopen", async () => {
     const diagramMessage = { ...active, body: "```mermaid\nflowchart TD\n A-->B\n```" };
     const view = renderCard([diagramMessage]);

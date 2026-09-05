@@ -20,7 +20,17 @@ export type InboxPage = Readonly<{
 }>;
 
 export const inboxOptimisticMutationKey = (threadId: string) => ["work-sidebar", "inbox", threadId, "optimistic"] as const;
-const deferredRealtime = new WeakMap<QueryClient, Set<string>>();
+type DeferredInvalidation = { pending: boolean; invalidating: boolean };
+type DeferredClientState = {
+  threads: Map<string, DeferredInvalidation>;
+  unsubscribe: (() => void) | null;
+};
+
+// State is scoped to a QueryClient (one app-window generation) and discarded
+// as soon as a thread has no deferred work. The mutation-cache subscription is
+// necessary because an async onSettled callback is itself still mutating until
+// it returns; its final idle transition is the safe point to refetch.
+const deferredInvalidations = new WeakMap<QueryClient, DeferredClientState>();
 
 function normalizedQuery(query: string) {
   return query.trim().replace(/\s+/g, " ");
@@ -49,23 +59,66 @@ function pageQuery(
   };
 }
 
-function hasOtherInboxMutation(queryClient: QueryClient, threadId: string, settling: boolean) {
-  return queryClient.isMutating({ mutationKey: inboxOptimisticMutationKey(threadId) }) > (settling ? 1 : 0);
+function hasInboxMutation(queryClient: QueryClient, threadId: string) {
+  return queryClient.isMutating({ mutationKey: inboxOptimisticMutationKey(threadId) }) > 0;
 }
 
-function deferredFor(queryClient: QueryClient) {
-  let state = deferredRealtime.get(queryClient);
-  if (!state) { state = new Set(); deferredRealtime.set(queryClient, state); }
+function clientState(queryClient: QueryClient) {
+  let state = deferredInvalidations.get(queryClient);
+  if (!state) {
+    state = { threads: new Map(), unsubscribe: null };
+    deferredInvalidations.set(queryClient, state);
+  }
   return state;
 }
 
-export function invalidateInbox(queryClient: QueryClient, threadId: string, settling = false) {
-  if (hasOtherInboxMutation(queryClient, threadId, settling)) {
-    deferredFor(queryClient).add(threadId);
-    return Promise.resolve();
+function cleanupDeferredState(queryClient: QueryClient, threadId: string) {
+  const state = deferredInvalidations.get(queryClient);
+  const thread = state?.threads.get(threadId);
+  if (!state || !thread || thread.pending || thread.invalidating || hasInboxMutation(queryClient, threadId)) return;
+  state.threads.delete(threadId);
+  if (state.threads.size) return;
+  state.unsubscribe?.();
+  deferredInvalidations.delete(queryClient);
+}
+
+function flushDeferredInvalidation(queryClient: QueryClient, threadId: string) {
+  const state = deferredInvalidations.get(queryClient);
+  const thread = state?.threads.get(threadId);
+  if (!thread || thread.invalidating || hasInboxMutation(queryClient, threadId)) return;
+  if (!thread.pending) {
+    cleanupDeferredState(queryClient, threadId);
+    return;
   }
-  deferredFor(queryClient).delete(threadId);
-  return queryClient.invalidateQueries({ queryKey: queryKeys.inbox.thread(threadId) });
+  thread.pending = false;
+  thread.invalidating = true;
+  void queryClient.invalidateQueries({ queryKey: queryKeys.inbox.thread(threadId) }).finally(() => {
+    thread.invalidating = false;
+    flushDeferredInvalidation(queryClient, threadId);
+  });
+}
+
+function deferInboxInvalidation(queryClient: QueryClient, threadId: string) {
+  const state = clientState(queryClient);
+  let thread = state.threads.get(threadId);
+  if (!thread) {
+    thread = { pending: false, invalidating: false };
+    state.threads.set(threadId, thread);
+  }
+  thread.pending = true;
+  if (!state.unsubscribe) {
+    state.unsubscribe = queryClient.getMutationCache().subscribe(() => {
+      for (const currentThreadId of state.threads.keys())
+        flushDeferredInvalidation(queryClient, currentThreadId);
+    });
+  }
+  flushDeferredInvalidation(queryClient, threadId);
+}
+
+/** Coalesce realtime and mutation-settled refreshes until the final mutation is idle. */
+export function invalidateInbox(queryClient: QueryClient, threadId: string) {
+  deferInboxInvalidation(queryClient, threadId);
+  return Promise.resolve();
 }
 
 export function useInboxRealtime(threadId: string) {
@@ -112,6 +165,7 @@ export function useInboxMessages(threadId: string, query: string) {
     data,
     error,
     isPending: pending,
+    isInitialPending: !data && pending,
     isFetching: fetching,
     hasNextPage: Boolean(lastPage?.cursor),
     fetchNextPage: () => {
@@ -119,6 +173,7 @@ export function useInboxMessages(threadId: string, query: string) {
         setPagination((current) => ({ ...current, cursors: [...current.cursors, lastPage.cursor!] }));
     },
     refetch: () => Promise.all(queries.map((query) => query.refetch())),
+    retryFailedPage: () => queries.find((query) => query.error)?.refetch(),
     cursorKey,
   };
 }
@@ -170,7 +225,7 @@ export function useInboxMutations(threadId: string) {
   const rpc = useRpc<typeof rpcContract>();
   const queryClient = useQueryClient();
   const mutationOptions = {
-    onSettled: () => invalidateInbox(queryClient, threadId, true),
+    onSettled: () => invalidateInbox(queryClient, threadId),
   };
   const acknowledge = useMutation({
     mutationKey: inboxOptimisticMutationKey(threadId),

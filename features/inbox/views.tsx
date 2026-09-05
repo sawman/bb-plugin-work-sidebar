@@ -53,8 +53,8 @@ export function InboxCard({ threadId }: { threadId: string }) {
           searchOnly
           selectedValues={[]}
         />
-        {query.isPending ? <InboxLoading /> : null}
-        {query.error ? (
+        {query.isInitialPending ? <InboxLoading /> : null}
+        {query.error && !query.data ? (
           <div className="ws-inbox-state" role="alert">
             <span>Could not load Inbox: {query.error.message}</span>
             <button type="button" onClick={() => void query.refetch()}>
@@ -62,7 +62,7 @@ export function InboxCard({ threadId }: { threadId: string }) {
             </button>
           </div>
         ) : null}
-        {!query.isPending && !query.error ? (
+        {query.data ? (
           searchActive ? (
             <InboxResults
               messages={messages}
@@ -108,6 +108,14 @@ export function InboxCard({ threadId }: { threadId: string }) {
               ) : null}
             </>
           )
+        ) : null}
+        {query.error && query.data ? (
+          <div className="ws-inbox-state" role="alert">
+            <span>Could not load more Inbox messages: {query.error.message}</span>
+            <button type="button" onClick={() => void query.retryFailedPage()}>
+              Retry loading messages
+            </button>
+          </div>
         ) : null}
       </div>
     </SurfaceCard>
@@ -162,7 +170,14 @@ function InboxMessageRow({
   mutations: ReturnType<typeof useInboxMutations>;
 }) {
   const [expanded, setExpanded] = useState(true);
-  const busy = mutations.acknowledge.isPending || mutations.bookmark.isPending;
+  const acknowledgeBusy = mutations.acknowledge.isPending && mutations.acknowledge.variables?.messageId === message.id;
+  const bookmarkBusy = mutations.bookmark.isPending && mutations.bookmark.variables?.messageId === message.id;
+  const busy = acknowledgeBusy || bookmarkBusy;
+  const error = mutations.acknowledge.variables?.messageId === message.id
+    ? mutations.acknowledge.error
+    : mutations.bookmark.variables?.messageId === message.id
+      ? mutations.bookmark.error
+      : null;
   const acknowledge = () => mutations.acknowledge.mutate({ messageId: message.id, revision: message.revision });
   const bookmark = () => mutations.bookmark.mutate({ messageId: message.id, bookmarked: !message.bookmarkedAt, revision: message.revision });
   return (
@@ -210,7 +225,7 @@ function InboxMessageRow({
         {expanded ? "Collapse message body" : "Show message body"}
       </button>
       {expanded ? <InboxMessageContent content={message.body} /> : null}
-      {mutations.acknowledge.error || mutations.bookmark.error ? <p className="ws-inbox-mutation-error" role="alert">{(mutations.acknowledge.error ?? mutations.bookmark.error)?.message} Refresh and retry.</p> : null}
+      {error ? <p className="ws-inbox-mutation-error" role="alert">{error.message} Refresh and retry.</p> : null}
     </li>
   );
 }

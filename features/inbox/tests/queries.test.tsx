@@ -148,6 +148,58 @@ describe("Inbox query lifecycle", () => {
     client.clear();
   });
 
+  it("flushes a signal received during asynchronous invalidation after the mutation is idle", async () => {
+    let resolveMutation!: (value: HumanMessage) => void;
+    let resolveInvalidation!: () => void;
+    const invalidated = new Promise<void>((resolve) => { resolveInvalidation = resolve; });
+    rpcClient.call.mockImplementation((method: string) => method === "listHumanMessages"
+      ? Promise.resolve(page)
+      : new Promise((resolve) => { resolveMutation = resolve; }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderHook(() => ({ query: useInboxMessages("thr_one", ""), mutations: useInboxMutations("thr_one") }), { wrapper: wrapper(client) });
+    await waitFor(() => expect(view.result.current.query.data).toEqual(page));
+    const invalidate = vi.spyOn(client, "invalidateQueries").mockImplementation(() => invalidated);
+    const mutation = view.result.current.mutations.acknowledge.mutateAsync({ messageId: message.id, revision: message.revision });
+    await waitFor(() => expect(client.isMutating({ mutationKey: ["work-sidebar", "inbox", "thr_one", "optimistic"] })).toBe(1));
+    realtime.handler?.({ family: "inbox", threadId: "thr_one" });
+    resolveMutation({ ...message, acknowledgedAt: "2026-09-06T00:00:01.000Z", revision: 2 });
+    await mutation;
+    await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(1));
+    realtime.handler?.({ family: "inbox", threadId: "thr_one" });
+    resolveInvalidation();
+    await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(2));
+    view.unmount();
+    client.clear();
+  });
+
+  it("coalesces signals across concurrent same-thread mutations until the last one is idle", async () => {
+    let resolveAcknowledgement!: (value: HumanMessage) => void;
+    let resolveBookmark!: (value: HumanMessage) => void;
+    rpcClient.call.mockImplementation((method: string) => {
+      if (method === "listHumanMessages") return Promise.resolve(page);
+      return new Promise((resolve) => {
+        if (method === "acknowledgeHumanMessage") resolveAcknowledgement = resolve;
+        else resolveBookmark = resolve;
+      });
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderHook(() => ({ query: useInboxMessages("thr_one", ""), mutations: useInboxMutations("thr_one") }), { wrapper: wrapper(client) });
+    await waitFor(() => expect(view.result.current.query.data).toEqual(page));
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const acknowledgement = view.result.current.mutations.acknowledge.mutateAsync({ messageId: message.id, revision: message.revision });
+    const bookmark = view.result.current.mutations.bookmark.mutateAsync({ messageId: message.id, bookmarked: true, revision: message.revision });
+    await waitFor(() => expect(client.isMutating({ mutationKey: ["work-sidebar", "inbox", "thr_one", "optimistic"] })).toBe(2));
+    realtime.handler?.({ family: "inbox", threadId: "thr_one" });
+    resolveAcknowledgement({ ...message, acknowledgedAt: "2026-09-06T00:00:01.000Z", revision: 2 });
+    await acknowledgement;
+    expect(invalidate).not.toHaveBeenCalled();
+    resolveBookmark({ ...message, bookmarkedAt: "2026-09-06T00:00:02.000Z", revision: 2 });
+    await bookmark;
+    await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(1));
+    view.unmount();
+    client.clear();
+  });
+
   it("projects optimistic counts consistently across every cached cursor page", async () => {
     const secondPage = { ...page, cursor: null, messages: [{ ...message, id: "msg_two" }] };
     let resolveMutation!: (value: typeof message) => void;

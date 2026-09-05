@@ -25,7 +25,7 @@ describe("Inbox server service", () => {
     await expect(create("late")).rejects.toThrow(/archived/);
   });
 
-  it("rejects a create and mutation that cross a lifecycle tombstone", async () => {
+  it("invalidates interleaved creates, releases successful lifecycle guards, and permits a later unarchive", async () => {
     let releaseLookup!: () => void;
     const lookup = new Promise<void>((resolve) => { releaseLookup = resolve; });
     const { database } = fixture();
@@ -37,16 +37,52 @@ describe("Inbox server service", () => {
     });
     const creating = inbox.create({ threadId, projectId, body: "late" });
     await Promise.resolve();
-    inbox.markThreadClosed(threadId);
     inbox.purge(threadId);
+    expect(inbox.lifecycleGuardCount()).toBe(1);
     releaseLookup();
     await expect(creating).rejects.toThrow(/archived|lifecycle/);
+    expect(inbox.lifecycleGuardCount()).toBe(0);
 
-    const live = createInboxService({ database, getThread: async (id) => ({ id, projectId, archivedAt: null }) });
-    const row = await live.create({ threadId: "thr_mutation", projectId, body: "body" });
-    live.markThreadClosed("thr_mutation");
-    expect(() => live.acknowledge("thr_mutation", row.id, row.revision)).toThrow(/lifecycle/);
-    expect(database.prepare("SELECT body FROM human_inbox_messages WHERE id = ?").get(row.id)).toEqual({ body: "body" });
+    threads.set(threadId, { id: threadId, projectId, archivedAt: null });
+    await expect(inbox.create({ threadId, projectId, body: "after unarchive" })).resolves.toMatchObject({ body: "after unarchive" });
+    expect(inbox.lifecycleGuardCount()).toBe(0);
+
+  });
+
+  it("allows synchronous mutations while an ordinary live create lookup is pending", async () => {
+    let releaseLookup!: () => void;
+    const lookup = new Promise<void>((resolve) => { releaseLookup = resolve; });
+    const { database, create } = fixture();
+    const existing = await create("existing");
+    const inbox = createInboxService({
+      database,
+      createId: () => "msg_pending",
+      getThread: async (id) => { await lookup; return { id, projectId, archivedAt: null }; },
+    });
+    const creating = inbox.create({ threadId, projectId, body: "pending" });
+    await Promise.resolve();
+    expect(inbox.acknowledge(threadId, existing.id, existing.revision)).toMatchObject({ acknowledgedAt: expect.any(String) });
+    releaseLookup();
+    await expect(creating).resolves.toMatchObject({ body: "pending" });
+  });
+
+  it("keeps a failed purge guard until a successful retry, without retaining successful tombstones", async () => {
+    const { database, inbox, create } = fixture();
+    const row = await create("before failure", { idempotencyKey: "before-failure" });
+    database.exec(`CREATE TRIGGER fail_inbox_purge BEFORE DELETE ON human_inbox_messages
+      WHEN OLD.thread_id = 'thr_one' BEGIN SELECT RAISE(FAIL, 'purge failed'); END`);
+    expect(() => inbox.purge(threadId)).toThrow("purge failed");
+    await expect(create("blocked after failure")).rejects.toThrow(/lifecycle/);
+    await expect(create("idempotent retry after failure", { idempotencyKey: "before-failure" })).rejects.toThrow(/lifecycle/);
+    expect(() => inbox.acknowledge(threadId, row.id, row.revision)).toThrow(/lifecycle/);
+    expect(database.prepare("SELECT body FROM human_inbox_messages WHERE id = ?").get(row.id)).toEqual({ body: "before failure" });
+    expect(inbox.lifecycleGuardCount()).toBe(1);
+
+    database.exec("DROP TRIGGER fail_inbox_purge");
+    inbox.purge(threadId);
+    expect(inbox.lifecycleGuardCount()).toBe(0);
+    await expect(create("fresh after cleanup")).resolves.toMatchObject({ body: "fresh after cleanup" });
+    expect(inbox.lifecycleGuardCount()).toBe(0);
   });
 
   it("protects thread scope and CAS, reopens edits, and makes ack/save no-ops idempotent", async () => {

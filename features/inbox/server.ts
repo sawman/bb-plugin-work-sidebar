@@ -79,7 +79,20 @@ export function createInboxService({
   createId?: () => string;
   getThread(threadId: string): Promise<Thread>;
 }) {
-  const closedThreads = new Set<string>();
+  type LifecycleGuard = { generation: number; inFlightCreates: number; purgeFailed: boolean };
+  const lifecycleGuards = new Map<string, LifecycleGuard>();
+  const guardFor = (threadId: string) => {
+    let guard = lifecycleGuards.get(threadId);
+    if (!guard) {
+      guard = { generation: 0, inFlightCreates: 0, purgeFailed: false };
+      lifecycleGuards.set(threadId, guard);
+    }
+    return guard;
+  };
+  const releaseGuard = (threadId: string, guard: LifecycleGuard) => {
+    if (!guard.purgeFailed && guard.inFlightCreates === 0 && lifecycleGuards.get(threadId) === guard)
+      lifecycleGuards.delete(threadId);
+  };
   const one = (threadId: string, id: string) =>
     database.prepare("SELECT * FROM human_inbox_messages WHERE thread_id = ? AND id = ?").get(threadId, id) as Record<string, unknown> | undefined;
   const requireOne = (threadId: string, id: string, expectedRevision?: number) => {
@@ -103,15 +116,20 @@ export function createInboxService({
     for (const row of stale) remove.run(threadId, row.id);
   };
   const transaction = <T>(work: () => T): T => database.transaction(work)();
-  const assertLiveThread = async (threadId: string, projectId: string) => {
-    if (closedThreads.has(threadId)) throw new Error("Cannot write to a thread after its Inbox lifecycle closed.");
+  const assertLiveThread = async (threadId: string, projectId: string, generation: number) => {
+    const beforeLookup = lifecycleGuards.get(threadId);
+    if (beforeLookup?.purgeFailed || (beforeLookup && beforeLookup.generation !== generation))
+      throw new Error("Cannot write to a thread after its Inbox lifecycle closed.");
     const thread = await getThread(threadId);
-    if (closedThreads.has(threadId) || thread.id !== threadId || thread.projectId !== projectId || thread.archivedAt !== null)
+    const afterLookup = lifecycleGuards.get(threadId);
+    if (afterLookup?.purgeFailed || (afterLookup && afterLookup.generation !== generation) || thread.id !== threadId || thread.projectId !== projectId || thread.archivedAt !== null)
       throw new Error("Cannot leave a Human Inbox message for an archived or unavailable thread.");
     return thread;
   };
   const assertWritableThread = (threadId: string) => {
-    if (closedThreads.has(threadId)) throw new Error("Cannot write to a thread after its Inbox lifecycle closed.");
+    const guard = lifecycleGuards.get(threadId);
+    if (guard?.purgeFailed || (guard && guard.generation > 0))
+      throw new Error("Cannot write to a thread after its Inbox lifecycle closed.");
   };
   const result = (message: HumanMessage, changed: boolean): InboxCreateResult => {
     Object.defineProperty(message, "changed", { value: changed, enumerable: false });
@@ -119,15 +137,27 @@ export function createInboxService({
   };
   return {
     async create(input: CreateInput): Promise<InboxCreateResult> {
+      const existingGuard = lifecycleGuards.get(input.threadId);
+      if (existingGuard?.purgeFailed) throw new Error("Cannot write to a thread after its Inbox lifecycle closed.");
       if (input.idempotencyKey) {
         const existing = database.prepare("SELECT * FROM human_inbox_messages WHERE thread_id = ? AND idempotency_key = ?").get(input.threadId, input.idempotencyKey);
         if (existing) return result(messageFrom(existing as Record<string, unknown>), false);
       }
-      await assertLiveThread(input.threadId, input.projectId);
+      const generation = existingGuard?.generation ?? 0;
+      const inFlight = guardFor(input.threadId);
+      inFlight.inFlightCreates += 1;
+      try {
+        await assertLiveThread(input.threadId, input.projectId, generation);
+      } finally {
+        inFlight.inFlightCreates -= 1;
+        releaseGuard(input.threadId, inFlight);
+      }
       if (Buffer.byteLength(input.body.trim(), "utf8") > 32 * 1024)
         throw new Error("Human Inbox message body exceeds 32 KiB UTF-8.");
       return transaction(() => {
-        assertWritableThread(input.threadId);
+        const currentGuard = lifecycleGuards.get(input.threadId);
+        if (currentGuard?.purgeFailed || (currentGuard && currentGuard.generation !== generation))
+          throw new Error("Cannot write to a thread after its Inbox lifecycle closed.");
         if (input.idempotencyKey) {
           const existing = database.prepare("SELECT * FROM human_inbox_messages WHERE thread_id = ? AND idempotency_key = ?").get(input.threadId, input.idempotencyKey);
           if (existing) return result(messageFrom(existing as Record<string, unknown>), false);
@@ -202,11 +232,19 @@ export function createInboxService({
         return messageFrom(requireOne(threadId, messageId));
       });
     },
-    markThreadClosed(threadId: string) { closedThreads.add(threadId); },
     purge(threadId: string) {
-      closedThreads.add(threadId);
-      database.prepare("DELETE FROM human_inbox_messages WHERE thread_id = ?").run(threadId);
+      const guard = guardFor(threadId);
+      guard.generation += 1;
+      try {
+        database.prepare("DELETE FROM human_inbox_messages WHERE thread_id = ?").run(threadId);
+        guard.purgeFailed = false;
+        releaseGuard(threadId, guard);
+      } catch (error) {
+        guard.purgeFailed = true;
+        throw error;
+      }
     },
+    lifecycleGuardCount() { return lifecycleGuards.size; },
     async reconcile({
       isActive = () => true,
       onCleanupError,
