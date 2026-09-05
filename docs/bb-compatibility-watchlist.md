@@ -9,7 +9,27 @@ removing any item below. Re-run the linked searches against the current open
 issues and pull requests, then confirm the shipped API through a typed plugin
 test—not just a changelog entry.
 
-Last checked: 2026-09-04 against BB Tasks 0.1.2 / SDK 0.4.34.
+Last checked: 2026-09-05 against BB 0.42.0 / SDK 0.4.47.
+
+## BB 0.42.0 audit
+
+Audited the immutable `desktop-v0.42.0` source at
+`960255b98ce3dccdcb5754eb67a7f989236602a1`, the installed SDK declarations,
+and the linked upstream searches. No watchlist item is fulfilled in this
+release, so no replacement feature task was created.
+
+| Watchlist item | 0.42.0 result |
+| --- | --- |
+| ACP AskUserQuestion continuation | Still absent upstream; the local patch was rebased, tested, deployed, and BB restarted. |
+| Thread-filtered Tasks read | Still absent; the Tasks contract exposes only task-to-thread `listTaskThreads`, not a thread-to-task read. Open issue/PR search remains empty. |
+| Parented Tasks dispatch | Still absent; `runDispatch` receives no CLI context and the delegate spawn omits `parentThreadId`. |
+| Durable per-thread composer draft | Still absent; the SDK explicitly says sidebar-wide thread state cannot report unsubmitted per-client drafts. |
+| Explicit inverse HTTP navigation | Still absent; `UrlLink`/`openUrl` expose no explicit in-app or external intent, and the browser preference remains host-private. |
+| Browser-capable left-sidebar URL host | Still absent; the enhanced thread-list remains under the app-wide URL host without a browser opener, unlike the right panel host. |
+
+The SDK did add experimental sidebar-footer and plugin-app-URL surfaces. They
+do not satisfy an existing requested feature or compatibility item, so this
+audit intentionally did not create speculative work.
 
 ## Check later
 
@@ -17,9 +37,9 @@ Last checked: 2026-09-04 against BB Tasks 0.1.2 / SDK 0.4.34.
   `ask-user-question` plugin now avoids holding an interactive MCP tool call
   open for every ACP provider (`providerId.startsWith("acp-")`). It returns
   immediately after showing the question, then delivers the submitted answer
-  through `threads.send({ mode: "steer-if-active" })`; this prevents ACP
+  through `threads.send({ mode: "auto" })`; this prevents ACP
   clients from timing out and leaves no manual Resume step. It is deployed into
-  BB 0.41.0 as of 2026-09-04 and cataloged with an exact source ref, patch,
+  BB 0.42.0 as of 2026-09-05 and cataloged with an exact source ref, patch,
   regression suite, and rollback artifacts in
   [`bb-plugins/ask-user-question/`](bb-plugins/ask-user-question/). On every
   BB release, run `npm run bb-plugins:sync`: remove this patch only when ACP
@@ -34,7 +54,7 @@ Last checked: 2026-09-04 against BB Tasks 0.1.2 / SDK 0.4.34.
   returns task summaries and their linked threads in one operation. This is the
   prerequisite for a real long-task-list optimization; neither plugin-local
   caching nor a bulk reverse lookup fixes the initial scan. Open upstream
-  searches found no matching issue or PR on 2026-09-03:
+  searches found no matching issue or PR on 2026-09-05:
   [issues](https://github.com/search?q=repo%3Aget-bb%2Fbb+is%3Aopen+%22listTasksForThread%22&type=issues)
   and
   [pull requests](https://github.com/search?q=repo%3Aget-bb%2Fbb+is%3Aopen+%22listTasksForThread%22&type=pullrequests).
@@ -65,7 +85,7 @@ Last checked: 2026-09-04 against BB Tasks 0.1.2 / SDK 0.4.34.
   in-app-browser preference and (b) explicit in-app and external HTTP intents,
   so modified PR links can reliably do the opposite and Settings can state the
   live result. Do not read or transiently mutate BB's private local-storage
-  preference as a workaround. Upstream source as of SDK 0.4.34 stores this as
+  preference as a workaround. Upstream source as of SDK 0.4.47 stores this as
   `bb.openLinksInAppBrowser`; it is not a plugin contract.
 - [ ] **Browser-capable left-sidebar URL host.** The enhanced thread-list
   slot is mounted beneath BB's app-wide `AppNavigationUrlHost`, whose
