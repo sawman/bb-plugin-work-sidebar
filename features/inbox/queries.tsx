@@ -29,6 +29,7 @@ type DeferredInvalidation = { pending: boolean; invalidating: boolean };
 type DeferredClientState = {
   threads: Map<string, DeferredInvalidation>;
   unsubscribe: (() => void) | null;
+  unsubscribeQueries: (() => void) | null;
 };
 
 // State is scoped to a QueryClient (one app-window generation) and discarded
@@ -48,7 +49,7 @@ function hasInboxMutation(queryClient: QueryClient, threadId: string) {
 function clientState(queryClient: QueryClient) {
   let state = deferredInvalidations.get(queryClient);
   if (!state) {
-    state = { threads: new Map(), unsubscribe: null };
+    state = { threads: new Map(), unsubscribe: null, unsubscribeQueries: null };
     deferredInvalidations.set(queryClient, state);
   }
   return state;
@@ -61,6 +62,7 @@ function cleanupDeferredState(queryClient: QueryClient, threadId: string) {
   state.threads.delete(threadId);
   if (state.threads.size) return;
   state.unsubscribe?.();
+  state.unsubscribeQueries?.();
   deferredInvalidations.delete(queryClient);
 }
 
@@ -72,6 +74,10 @@ function flushDeferredInvalidation(queryClient: QueryClient, threadId: string) {
     cleanupDeferredState(queryClient, threadId);
     return;
   }
+  // TanStack joins an uncached fetch even with cancelRefetch enabled. Keep the
+  // signal pending until that request settles, then start a fresh page chain.
+  if (queryClient.getQueryCache().findAll({ queryKey: queryKeys.inbox.thread(threadId) })
+    .some((query) => query.state.data === undefined && query.state.fetchStatus !== "idle")) return;
   thread.pending = false;
   thread.invalidating = true;
   void queryClient.invalidateQueries({ queryKey: queryKeys.inbox.thread(threadId) }).finally(() => {
@@ -90,6 +96,12 @@ function deferInboxInvalidation(queryClient: QueryClient, threadId: string) {
   thread.pending = true;
   if (!state.unsubscribe) {
     state.unsubscribe = queryClient.getMutationCache().subscribe(() => {
+      for (const currentThreadId of state.threads.keys())
+        flushDeferredInvalidation(queryClient, currentThreadId);
+    });
+  }
+  if (!state.unsubscribeQueries) {
+    state.unsubscribeQueries = queryClient.getQueryCache().subscribe(() => {
       for (const currentThreadId of state.threads.keys())
         flushDeferredInvalidation(queryClient, currentThreadId);
     });

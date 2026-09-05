@@ -27,13 +27,21 @@ function normalizeSubject(subject: string | null | undefined): string | null {
   return value || null;
 }
 
+// Zod's string max counts UTF-16 code units. Do not split a surrogate pair
+// at the boundary; apply on reads too so legacy metadata cannot reject a page.
+function normalizeAgentLabel(label: string | null | undefined): string | null {
+  const value = label?.trim() ?? "";
+  const bounded = value.slice(0, 160).replace(/[\uD800-\uDBFF]$/, "");
+  return bounded || null;
+}
+
 function messageFrom(row: Record<string, unknown>): HumanMessage {
   return {
     id: String(row.id), threadId: String(row.thread_id), projectId: String(row.project_id),
     subject: row.subject === null ? null : String(row.subject), body: String(row.body),
     agentThreadId: row.agent_thread_id === null ? null : String(row.agent_thread_id),
     providerId: row.provider_id === null ? null : String(row.provider_id),
-    agentLabel: row.agent_label === null ? null : String(row.agent_label),
+    agentLabel: normalizeAgentLabel(row.agent_label === null ? null : String(row.agent_label)),
     createdAt: String(row.created_at), updatedAt: String(row.updated_at),
     acknowledgedAt: row.acknowledged_at === null ? null : String(row.acknowledged_at),
     bookmarkedAt: row.bookmarked_at === null ? null : String(row.bookmarked_at),
@@ -172,7 +180,11 @@ export function createInboxService({
           database.prepare(
             `INSERT INTO human_inbox_messages (id, thread_id, project_id, subject, body, agent_thread_id, provider_id, agent_label, created_at, updated_at, acknowledged_at, bookmarked_at, revision, idempotency_key)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 1, ?)`,
-          ).run(id, input.threadId, input.projectId, normalizeSubject(input.subject), input.body.trim(), input.agentThreadId ?? null, input.providerId ?? null, normalizeSubject(input.agentLabel), time, time, input.idempotencyKey ?? null);
+          ).run(
+            id, input.threadId, input.projectId, normalizeSubject(input.subject), input.body.trim(),
+            input.agentThreadId ?? null, input.providerId ?? null, normalizeAgentLabel(input.agentLabel),
+            time, time, input.idempotencyKey ?? null,
+          );
           retain(input.threadId, id);
           return result(messageFrom(requireOne(input.threadId, id)), true);
         });

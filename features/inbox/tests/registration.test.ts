@@ -47,6 +47,52 @@ describe("Inbox registration", () => {
     await host.harness.lifecycle.dispose();
   });
 
+  it.each([
+    ["title", "x".repeat(161), "x".repeat(160)],
+    ["titleFallback", "x".repeat(500), "x".repeat(160)],
+    ["title", "x".repeat(159) + "😀tail", "x".repeat(159)],
+    ["titleFallback", "x".repeat(158) + "😀tail", "x".repeat(158) + "😀"],
+  ])("bounds host %s metadata before storage and RPC output", async (source, label, expected) => {
+    const hostThread = { ...thread, title: source === "title" ? label : null, titleFallback: label };
+    const host = createFakePluginHost({ sdk: { threads: { get: async () => hostThread } } });
+    try {
+      await plugin(host.bb);
+      const created = await host.harness.behavior.callAgentTool("leave_human_message", { body: "Ship it" }, { threadId: thread.id, projectId: thread.projectId });
+      const messageId = JSON.parse(toolText(created)).id;
+      expect(pluginStorageDatabase(host.bb).prepare("SELECT agent_label FROM human_inbox_messages WHERE id = ?").get(messageId)).toEqual({ agent_label: expected });
+      const listed = await host.harness.behavior.callRpc("listHumanMessages", { threadId: thread.id });
+      expect(listed).toMatchObject({ messages: [{ id: messageId, agentLabel: expected }] });
+    } finally {
+      await host.harness.lifecycle.dispose();
+    }
+  });
+
+  it("normalizes existing oversized labels for list, read, retry and mutation output", async () => {
+    const host = createFakePluginHost({ sdk: { threads: { get: async () => thread } } });
+    try {
+      await plugin(host.bb);
+      const context = { threadId: thread.id, projectId: thread.projectId };
+      const input = { body: "Legacy record", idempotencyKey: "legacy" };
+      const created = await host.harness.behavior.callAgentTool("leave_human_message", input, context);
+      const messageId = JSON.parse(toolText(created)).id;
+      await host.harness.behavior.callAgentTool("leave_human_message", { body: "Healthy neighbor" }, context);
+      pluginStorageDatabase(host.bb).prepare("UPDATE human_inbox_messages SET agent_label = ? WHERE id = ?").run("x".repeat(159) + "😀legacy", messageId);
+      const listed = await host.harness.behavior.callRpc("listHumanMessages", { threadId: thread.id });
+      expect(listed).toMatchObject({ messages: expect.arrayContaining([
+        expect.objectContaining({ id: messageId, agentLabel: "x".repeat(159) }),
+        expect.objectContaining({ body: "Healthy neighbor", agentLabel: "Inbox agent" }),
+      ]) });
+      const read = await host.harness.behavior.callAgentTool("read_human_messages", { messageId }, context);
+      expect(JSON.parse(toolText(read)).agentLabel).toBe("x".repeat(159));
+      const retry = await host.harness.behavior.callAgentTool("leave_human_message", input, context);
+      expect(JSON.parse(toolText(retry)).id).toBe(messageId);
+      const acknowledged = await host.harness.behavior.callRpc("acknowledgeHumanMessage", { threadId: thread.id, messageId });
+      expect(acknowledged).toMatchObject({ agentLabel: "x".repeat(159) });
+    } finally {
+      await host.harness.lifecycle.dispose();
+    }
+  });
+
   it("does not publish realtime for an unchanged idempotent create retry", async () => {
     const host = createFakePluginHost({ sdk: { threads: { get: vi.fn(async () => thread) } } });
     await plugin(host.bb);

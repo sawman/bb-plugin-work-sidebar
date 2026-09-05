@@ -99,6 +99,45 @@ describe("Inbox query lifecycle", () => {
     client.clear();
   });
 
+  it.each([
+    ["success", 1], ["error", 1], ["success", 3],
+  ] as const)("refetches once after an uncached initial fetch settles with %s (%s signals)", async (outcome, signals) => {
+    let resolveInitial!: (value: InboxPage) => void;
+    let rejectInitial!: (error: Error) => void;
+    let resolveFresh!: (value: InboxPage) => void;
+    const initial = new Promise<InboxPage>((resolve, reject) => {
+      resolveInitial = resolve;
+      rejectInitial = reject;
+    });
+    const fresh = new Promise<InboxPage>((resolve) => { resolveFresh = resolve; });
+    rpcClient.call.mockReturnValueOnce(initial).mockReturnValueOnce(fresh);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderHook(() => useInboxMessages("thr_one", ""), { wrapper: wrapper(client) });
+    try {
+      expect(rpcClient.call).toHaveBeenCalledTimes(1);
+      expect(view.result.current.data).toBeUndefined();
+      await act(async () => {
+        for (let index = 0; index < signals; index += 1)
+          realtime.handler?.({ family: "inbox", threadId: "thr_one" });
+      });
+      expect(rpcClient.call).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        if (outcome === "success") resolveInitial({ ...page, messages: [], activeCount: 0 });
+        else rejectInitial(new Error("Initial request failed"));
+      });
+      await waitFor(() => expect(rpcClient.call).toHaveBeenCalledTimes(2));
+      await act(async () => { resolveFresh(page); });
+      await waitFor(() => {
+        expect(view.result.current.data).toEqual(page);
+        expect(view.result.current.isFetching).toBe(false);
+      });
+      expect(rpcClient.call).toHaveBeenCalledTimes(2);
+    } finally {
+      view.unmount();
+      client.clear();
+    }
+  });
+
   it("rolls back optimistic acknowledgement when a revision conflict is returned", async () => {
     let rejectMutation!: (error: Error) => void;
     rpcClient.call.mockImplementation((method: string) => {
