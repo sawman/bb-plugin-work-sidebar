@@ -1,6 +1,6 @@
 # Agent-to-human Inbox red-green-refactor plan
 
-Status: Ready for execution  
+Status: Complete
 Specification: [human-inbox-spec.md](human-inbox-spec.md)
 
 BB Tasks is the executable queue. This document fixes slice boundaries,

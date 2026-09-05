@@ -936,13 +936,14 @@ readable; BB Tasks, not either document, is the executable work queue.
 
 #### Loop R37 — agent-to-human Inbox
 
-The next product slice is specified in
+The implemented product slice is specified in
 [human-inbox-spec.md](human-inbox-spec.md), with strict executable loops in
 [human-inbox-rgr-plan.md](human-inbox-rgr-plan.md). It adds a one-way,
-thread-scoped human Inbox with stable IDs, agent CRUD tools, acknowledgement,
-bookmarks, bounded searchable SQLite history, Markdown/Mermaid rendering, and
-archive/delete cleanup. The durable execution tasks are BBPLUG-361 through
-BBPLUG-364; BB Tasks remains the executable work queue.
+thread-scoped human Inbox with stable IDs, agent create/read/update tools,
+acknowledgement, bookmarks, bounded searchable SQLite history, Markdown plus
+accessible Mermaid-source fallback, and archive/delete cleanup. The durable
+execution tasks are BBPLUG-361 through BBPLUG-365; BB Tasks remains the
+executable work queue.
 
 ### BB child execution protocol
 

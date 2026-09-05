@@ -1,7 +1,7 @@
 # Agent-to-human Inbox specification
 
-Status: Proposed for implementation  
-Owner: Work Sidebar  
+Status: Implemented
+Owner: Work Sidebar
 Product surface: right Work panel and agent tools
 
 ## 1. Goal
