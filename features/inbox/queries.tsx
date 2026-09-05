@@ -19,6 +19,9 @@ export type InboxPage = Readonly<{
   savedCount: number;
 }>;
 
+export const inboxOptimisticMutationKey = (threadId: string) => ["work-sidebar", "inbox", threadId, "optimistic"] as const;
+const deferredRealtime = new WeakMap<QueryClient, Set<string>>();
+
 function normalizedQuery(query: string) {
   return query.trim().replace(/\s+/g, " ");
 }
@@ -46,7 +49,22 @@ function pageQuery(
   };
 }
 
-export function invalidateInbox(queryClient: QueryClient, threadId: string) {
+function hasOtherInboxMutation(queryClient: QueryClient, threadId: string, settling: boolean) {
+  return queryClient.isMutating({ mutationKey: inboxOptimisticMutationKey(threadId) }) > (settling ? 1 : 0);
+}
+
+function deferredFor(queryClient: QueryClient) {
+  let state = deferredRealtime.get(queryClient);
+  if (!state) { state = new Set(); deferredRealtime.set(queryClient, state); }
+  return state;
+}
+
+export function invalidateInbox(queryClient: QueryClient, threadId: string, settling = false) {
+  if (hasOtherInboxMutation(queryClient, threadId, settling)) {
+    deferredFor(queryClient).add(threadId);
+    return Promise.resolve();
+  }
+  deferredFor(queryClient).delete(threadId);
   return queryClient.invalidateQueries({ queryKey: queryKeys.inbox.thread(threadId) });
 }
 
@@ -152,10 +170,10 @@ export function useInboxMutations(threadId: string) {
   const rpc = useRpc<typeof rpcContract>();
   const queryClient = useQueryClient();
   const mutationOptions = {
-    onSettled: () => invalidateInbox(queryClient, threadId),
+    onSettled: () => invalidateInbox(queryClient, threadId, true),
   };
   const acknowledge = useMutation({
-    mutationKey: [...queryKeys.inbox.thread(threadId), "acknowledge"],
+    mutationKey: inboxOptimisticMutationKey(threadId),
     mutationFn: ({ messageId, revision }: { messageId: string; revision: number }) =>
       rpc.call("acknowledgeHumanMessage", {
         threadId,
@@ -177,7 +195,7 @@ export function useInboxMutations(threadId: string) {
     ...mutationOptions,
   });
   const bookmark = useMutation({
-    mutationKey: [...queryKeys.inbox.thread(threadId), "bookmark"],
+    mutationKey: inboxOptimisticMutationKey(threadId),
     mutationFn: ({ messageId, bookmarked, revision }: { messageId: string; bookmarked: boolean; revision: number }) =>
       rpc.call("setHumanMessageBookmark", {
         threadId,

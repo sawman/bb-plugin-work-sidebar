@@ -64,6 +64,7 @@ export function createInboxRegistration(
     subscribe: (event, handler) => bb.events.on(event, handler),
     purge: (threadId) => {
       try {
+        inbox.markThreadClosed(threadId);
         inbox.purge(threadId);
       } catch {
         cleanupError(threadId);
@@ -100,7 +101,7 @@ export function createInboxRegistration(
             providerId: thread.providerId ?? null,
             agentLabel: thread.title ?? thread.titleFallback ?? null,
           });
-          publish(context.threadId);
+          if (message.changed) publish(context.threadId);
           return JSON.stringify({ id: message.id, revision: message.revision });
         },
       });

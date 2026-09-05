@@ -12,6 +12,7 @@ type CreateInput = {
   agentLabel?: string | null;
   idempotencyKey?: string;
 };
+export type InboxCreateResult = HumanMessage & { changed: boolean };
 
 export const MAX_HUMAN_MESSAGES_PER_THREAD = 500;
 export const INBOX_AGENT_INSTRUCTIONS = [
@@ -78,6 +79,7 @@ export function createInboxService({
   createId?: () => string;
   getThread(threadId: string): Promise<Thread>;
 }) {
+  const closedThreads = new Set<string>();
   const one = (threadId: string, id: string) =>
     database.prepare("SELECT * FROM human_inbox_messages WHERE thread_id = ? AND id = ?").get(threadId, id) as Record<string, unknown> | undefined;
   const requireOne = (threadId: string, id: string, expectedRevision?: number) => {
@@ -102,24 +104,33 @@ export function createInboxService({
   };
   const transaction = <T>(work: () => T): T => database.transaction(work)();
   const assertLiveThread = async (threadId: string, projectId: string) => {
+    if (closedThreads.has(threadId)) throw new Error("Cannot write to a thread after its Inbox lifecycle closed.");
     const thread = await getThread(threadId);
-    if (thread.id !== threadId || thread.projectId !== projectId || thread.archivedAt !== null)
+    if (closedThreads.has(threadId) || thread.id !== threadId || thread.projectId !== projectId || thread.archivedAt !== null)
       throw new Error("Cannot leave a Human Inbox message for an archived or unavailable thread.");
     return thread;
   };
+  const assertWritableThread = (threadId: string) => {
+    if (closedThreads.has(threadId)) throw new Error("Cannot write to a thread after its Inbox lifecycle closed.");
+  };
+  const result = (message: HumanMessage, changed: boolean): InboxCreateResult => {
+    Object.defineProperty(message, "changed", { value: changed, enumerable: false });
+    return message as InboxCreateResult;
+  };
   return {
-    async create(input: CreateInput): Promise<HumanMessage> {
+    async create(input: CreateInput): Promise<InboxCreateResult> {
       if (input.idempotencyKey) {
         const existing = database.prepare("SELECT * FROM human_inbox_messages WHERE thread_id = ? AND idempotency_key = ?").get(input.threadId, input.idempotencyKey);
-        if (existing) return messageFrom(existing as Record<string, unknown>);
+        if (existing) return result(messageFrom(existing as Record<string, unknown>), false);
       }
       await assertLiveThread(input.threadId, input.projectId);
       if (Buffer.byteLength(input.body.trim(), "utf8") > 32 * 1024)
         throw new Error("Human Inbox message body exceeds 32 KiB UTF-8.");
       return transaction(() => {
+        assertWritableThread(input.threadId);
         if (input.idempotencyKey) {
           const existing = database.prepare("SELECT * FROM human_inbox_messages WHERE thread_id = ? AND idempotency_key = ?").get(input.threadId, input.idempotencyKey);
-          if (existing) return messageFrom(existing as Record<string, unknown>);
+          if (existing) return result(messageFrom(existing as Record<string, unknown>), false);
         }
         const id = createId(); const time = now();
         database.prepare(
@@ -127,7 +138,7 @@ export function createInboxService({
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 1, ?)`,
         ).run(id, input.threadId, input.projectId, normalizeSubject(input.subject), input.body.trim(), input.agentThreadId ?? null, input.providerId ?? null, normalizeSubject(input.agentLabel), time, time, input.idempotencyKey ?? null);
         retain(input.threadId);
-        return messageFrom(requireOne(input.threadId, id));
+        return result(messageFrom(requireOne(input.threadId, id)), true);
       });
     },
     get(threadId: string, messageId: string) { return messageFrom(requireOne(threadId, messageId)); },
@@ -157,6 +168,7 @@ export function createInboxService({
     },
     acknowledge(threadId: string, messageId: string, expectedRevision?: number) {
       return transaction(() => {
+        assertWritableThread(threadId);
         const row = requireOne(threadId, messageId, expectedRevision);
         if (row.acknowledged_at !== null) return messageFrom(row);
         const time = now();
@@ -168,6 +180,7 @@ export function createInboxService({
     },
     bookmark(threadId: string, messageId: string, bookmarked: boolean, expectedRevision?: number) {
       return transaction(() => {
+        assertWritableThread(threadId);
         const row = requireOne(threadId, messageId, expectedRevision);
         if ((row.bookmarked_at !== null) === bookmarked) return messageFrom(row);
         const time = now();
@@ -177,6 +190,7 @@ export function createInboxService({
     },
     update(threadId: string, messageId: string, changes: { subject?: string | null; body?: string; expectedRevision?: number }) {
       return transaction(() => {
+        assertWritableThread(threadId);
         const row = requireOne(threadId, messageId, changes.expectedRevision);
         const subject = changes.subject === undefined ? row.subject : normalizeSubject(changes.subject);
         const body = changes.body === undefined ? String(row.body) : changes.body.trim();
@@ -188,7 +202,11 @@ export function createInboxService({
         return messageFrom(requireOne(threadId, messageId));
       });
     },
-    purge(threadId: string) { database.prepare("DELETE FROM human_inbox_messages WHERE thread_id = ?").run(threadId); },
+    markThreadClosed(threadId: string) { closedThreads.add(threadId); },
+    purge(threadId: string) {
+      closedThreads.add(threadId);
+      database.prepare("DELETE FROM human_inbox_messages WHERE thread_id = ?").run(threadId);
+    },
     async reconcile({
       isActive = () => true,
       onCleanupError,

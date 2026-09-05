@@ -25,6 +25,30 @@ describe("Inbox server service", () => {
     await expect(create("late")).rejects.toThrow(/archived/);
   });
 
+  it("rejects a create and mutation that cross a lifecycle tombstone", async () => {
+    let releaseLookup!: () => void;
+    const lookup = new Promise<void>((resolve) => { releaseLookup = resolve; });
+    const { database } = fixture();
+    const threads = new Map([[threadId, { id: threadId, projectId, archivedAt: null as string | null }]]);
+    const inbox = createInboxService({
+      database,
+      getThread: async (id) => { await lookup; return threads.get(id)!; },
+      createId: () => "msg_race",
+    });
+    const creating = inbox.create({ threadId, projectId, body: "late" });
+    await Promise.resolve();
+    inbox.markThreadClosed(threadId);
+    inbox.purge(threadId);
+    releaseLookup();
+    await expect(creating).rejects.toThrow(/archived|lifecycle/);
+
+    const live = createInboxService({ database, getThread: async (id) => ({ id, projectId, archivedAt: null }) });
+    const row = await live.create({ threadId: "thr_mutation", projectId, body: "body" });
+    live.markThreadClosed("thr_mutation");
+    expect(() => live.acknowledge("thr_mutation", row.id, row.revision)).toThrow(/lifecycle/);
+    expect(database.prepare("SELECT body FROM human_inbox_messages WHERE id = ?").get(row.id)).toEqual({ body: "body" });
+  });
+
   it("protects thread scope and CAS, reopens edits, and makes ack/save no-ops idempotent", async () => {
     const { create, inbox } = fixture();
     const message = await create("body");

@@ -9,6 +9,7 @@ import {
   useInboxMutations,
   type InboxPage,
 } from "../queries";
+import type { HumanMessage } from "../schemas";
 
 const { rpcClient, realtime } = vi.hoisted(() => ({
   rpcClient: { call: vi.fn() },
@@ -123,6 +124,26 @@ describe("Inbox query lifecycle", () => {
       await expect(rejection).resolves.toMatchObject({ message: "Message changed; refresh and retry." });
     });
     expect(client.getQueryData(queryKeys.inbox.page("thr_one", "", null))).toEqual(page);
+    view.unmount();
+    client.clear();
+  });
+
+  it("defers same-thread realtime until optimistic mutations settle and flushes once", async () => {
+    let resolveMutation!: (value: HumanMessage) => void;
+    rpcClient.call.mockImplementation((method: string) => method === "listHumanMessages"
+      ? Promise.resolve(page)
+      : new Promise((resolve) => { resolveMutation = resolve; }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderHook(() => ({ query: useInboxMessages("thr_one", ""), mutations: useInboxMutations("thr_one") }), { wrapper: wrapper(client) });
+    await waitFor(() => expect(view.result.current.query.data).toEqual(page));
+    const invalidate = vi.spyOn(client, "invalidateQueries");
+    const pending = view.result.current.mutations.acknowledge.mutateAsync({ messageId: message.id, revision: message.revision });
+    await waitFor(() => expect(client.isMutating({ mutationKey: ["work-sidebar", "inbox", "thr_one", "optimistic"] })).toBe(1));
+    realtime.handler?.({ family: "inbox", threadId: "thr_one" });
+    expect(invalidate).not.toHaveBeenCalled();
+    resolveMutation({ ...message, acknowledgedAt: "2026-09-06T00:00:01.000Z", revision: 2 });
+    await pending;
+    await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(1));
     view.unmount();
     client.clear();
   });

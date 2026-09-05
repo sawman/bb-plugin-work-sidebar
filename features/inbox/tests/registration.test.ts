@@ -46,6 +46,16 @@ describe("Inbox registration", () => {
     await host.harness.lifecycle.dispose();
   });
 
+  it("does not publish realtime for an unchanged idempotent create retry", async () => {
+    const host = createFakePluginHost({ sdk: { threads: { get: vi.fn(async () => thread) } } });
+    await plugin(host.bb);
+    const input = { subject: "Decision", body: "Ship it", idempotencyKey: "same-retry" };
+    await host.harness.behavior.callAgentTool("leave_human_message", input, { threadId: thread.id, projectId: thread.projectId });
+    await host.harness.behavior.callAgentTool("leave_human_message", input, { threadId: thread.id, projectId: thread.projectId });
+    expect(host.harness.inspection.realtimeSignals).toHaveLength(1);
+    await host.harness.lifecycle.dispose();
+  });
+
   it("purges archive/delete events once per exact thread and ignores them after disposal", () => {
     const handlers = new Map<string, (event: { thread: { id: string } }) => void>();
     const purge = vi.fn();
