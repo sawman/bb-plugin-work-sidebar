@@ -144,6 +144,27 @@ decision appear different.
 - Avoid one-line JSX components and deeply nested conditional markup; extract
   named components with one responsibility.
 
+### BB upgrade protocol
+
+Treat every BB desktop update as a compatibility and product-opportunity
+checkpoint before relying on the upgraded host:
+
+1. Read [`bb-plugins/README.md`](../bb-plugins/README.md) and run the
+   cataloged non-mutating patch preflight. Rebase, deploy, or retire every
+   local built-in-plugin patch against the exact `desktop-v<installed-version>`
+   source; never assume an old patch still applies or is still needed.
+2. Run `bb plugin types --check .`, inspect the current SDK declarations, and
+   update this plugin's exact SDK pin, lockfile, compatibility tests, and any
+   changed host API use before building or reloading Work Sidebar.
+3. Review [`docs/bb-compatibility-watchlist.md`](../docs/bb-compatibility-watchlist.md)
+   against the release and current SDK. Retire fulfilled workarounds, and turn
+   newly available host capabilities into a scoped BB Task when they unlock a
+   requested feature. The watchlist is compatibility evidence, not a work
+   queue.
+4. Record the checked BB/SDK versions, patch disposition, SDK changes, and
+   watchlist results in the patch catalog or task comment. Do not deploy until
+   the relevant source, contract, and artifact checks pass.
+
 ## Remote Git identity
 
 - Before any remote Git operation, switch the GitHub CLI to the `sawman`
