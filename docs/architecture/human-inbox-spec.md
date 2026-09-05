@@ -68,22 +68,21 @@ Each message presents:
 - created and edited timestamps;
 - an acknowledge control;
 - a bookmark toggle;
-- a delete control with confirmation.
 
 The body can be expanded without changing acknowledgement state. Links follow
 BB's normal browser preference through the host Markdown renderer.
 
-### Acknowledge, save, edit, and delete semantics
+### Acknowledge, save, and edit semantics
 
 - Acknowledge sets `acknowledgedAt` and removes the row from Inbox.
 - Bookmark sets `bookmarkedAt`. An acknowledged bookmarked message remains in
   Saved.
 - Removing the bookmark from an acknowledged message leaves it in hidden,
   searchable history until retention removes it.
-- Delete immediately and irreversibly removes one message.
 - Agent edits preserve the message ID, update `updatedAt`, and clear
   `acknowledgedAt`, because changed key information needs attention again.
-- An agent delete uses the same hard-delete operation.
+- Individual deletion is deliberately unavailable. Acknowledged messages form
+  bounded, searchable history until retention or thread lifecycle cleanup.
 
 ### Rendering
 
@@ -109,7 +108,7 @@ Each persisted message contains:
 - integer `revision`, incremented on every content or state mutation.
 
 The server validates that the calling agent can create only for its current
-thread and can update/delete only a message belonging to that thread. UI RPCs
+thread and can update only a message belonging to that thread. UI RPCs
 also require the requested thread ID and reject cross-thread message IDs.
 
 ### Agent tools and guidance
@@ -118,7 +117,7 @@ The plugin registers three native tools for every normal agent session:
 
 - `leave_human_message` creates a message and returns its ID;
 - `read_human_messages` gets one ID or searches/lists the current thread;
-- `update_human_message` updates or deletes a current-thread message.
+- `update_human_message` updates a current-thread message.
 
 The tools are one-way communication aids, not agent-to-agent messaging. The
 agent instruction contribution says:
@@ -140,7 +139,6 @@ The browser-safe contract exposes strict JSON methods:
 - `listHumanMessages({ threadId, query, limit, cursor })`;
 - `acknowledgeHumanMessage({ threadId, messageId })`;
 - `setHumanMessageBookmark({ threadId, messageId, bookmarked })`;
-- `deleteHumanMessage({ threadId, messageId })`.
 
 List results include active/saved counts, a bounded result page, and an opaque
 cursor. Search and default projections share one query family keyed by thread,
@@ -227,11 +225,11 @@ No generic Markdown system or second syntax highlighter is introduced.
 
 ## 8. Acceptance criteria
 
-- Agent create/read/update/delete tools work for Codex, Claude Code, and ACP
+- Agent create/read/update tools work for Codex, Claude Code, and ACP
   providers through the same plugin registration and strict schemas.
 - A created message appears in the currently mounted Work Inbox through one
   targeted realtime invalidation, without manual refresh.
-- Acknowledge, bookmark/unbookmark, delete, edit/reopen, search, pagination,
+- Acknowledge, bookmark/unbookmark, edit/reopen, search, pagination,
   revision conflicts, idempotent retries, and copyable IDs are covered by
   pure, server, Query, mounted, and accessibility tests.
 - The 501st insert evicts exactly one record according to the documented
@@ -250,7 +248,7 @@ No generic Markdown system or second syntax highlighter is introduced.
 
 - Human-to-agent replies or replacing chat/question interactions.
 - Agent-to-agent mailboxes or cross-thread routing.
+- Individual message deletion before retention or thread cleanup.
 - Notifications outside BB, email delivery, or mobile push.
 - Retaining Inbox records after archive or delete.
 - Unlimited/pinned-forever storage beyond the 500-record thread cap.
-

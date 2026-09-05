@@ -27,7 +27,7 @@ commit before dispatching the next worker.
 
 Add slice-owned server tests that fail before implementation for:
 
-- strict message/create/update/read/delete schemas and JSON boundaries;
+- strict message/create/update/read schemas and JSON boundaries;
 - create idempotency and stable `msg_` IDs;
 - thread ownership and archived-thread rejection;
 - revision compare-and-set conflict behavior;
@@ -58,7 +58,7 @@ BBPLUG-362 before implementation.
 
 - Keep SQL and retention policy in the Inbox slice; shared storage owns only
   migration ordering and handle creation.
-- Make create/update/delete transactions single-entry service methods and
+- Make create/update/state transactions single-entry service methods and
   remove test-only mutation shortcuts.
 - Keep `server.ts` registration-only and lifecycle-own all generation state.
 
@@ -80,7 +80,7 @@ Add frontend tests that fail before implementation for:
 - independent loading, empty, error/retry, populated, search, and mutation
   states without sibling-card resize or failure;
 - Inbox/Saved disclosure counts and acknowledged-history search;
-- acknowledge, bookmark, unbookmark, delete confirmation, rollback, conflict
+- acknowledge, bookmark, unbookmark, rollback, conflict
   recovery, and busy-state suppression;
 - copyable full IDs and edit metadata;
 - Markdown/emoji and Mermaid success/error/theme/unmount behavior;
@@ -145,7 +145,7 @@ the smallest fix, and is re-reviewed until clean.
 6. `npm run theme-control -- matrix -- <Inbox verification command>`.
 7. Verify `bb plugin source work-sidebar --json` resolves to this checkout.
 8. `bb plugin reload work-sidebar`.
-9. Live create/edit/realtime/search/ack/save/delete/archive checks in narrow
+9. Live create/edit/realtime/search/ack/save/archive checks in narrow
    and wide panels.
 10. `git diff --check` and clean tree.
 
@@ -165,4 +165,3 @@ verify even after failure.
   Mermaid fences as code while the rendering adapter is disabled; message
   storage and actions must remain available.
 - No rollback may retain two Inbox implementations or a stale agent tool.
-
