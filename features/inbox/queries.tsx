@@ -21,6 +21,10 @@ export type InboxPage = Readonly<{
 }>;
 
 export const inboxOptimisticMutationKey = (threadId: string) => ["work-sidebar", "inbox", threadId, "optimistic"] as const;
+const inboxMutationKey = (threadId: string, action: "acknowledge" | "bookmark") => [
+  ...inboxOptimisticMutationKey(threadId),
+  action,
+] as const;
 type DeferredInvalidation = { pending: boolean; invalidating: boolean };
 type DeferredClientState = {
   threads: Map<string, DeferredInvalidation>;
@@ -148,6 +152,7 @@ export function useInboxMessages(threadId: string, query: string) {
     isInitialPending: !data && queryResult.isPending,
     isFetching: queryResult.isFetching,
     isFetchingNextPage: queryResult.isFetchingNextPage,
+    isFetchNextPageError: queryResult.isFetchNextPageError,
     hasNextPage: queryResult.hasNextPage,
     fetchNextPage: () => void queryResult.fetchNextPage(),
     refetch: queryResult.refetch,
@@ -202,13 +207,16 @@ type InboxMutationVariables = { messageId: string };
 export function useInboxMessageMutationState(threadId: string, messageId: string) {
   const states = useMutationState({
     filters: { mutationKey: inboxOptimisticMutationKey(threadId) },
-    select: (mutation) => mutation.state,
+    select: (mutation) => ({ ...mutation.state, mutationId: mutation.mutationId }),
   });
   const matching = states.filter((state) => (state.variables as InboxMutationVariables | undefined)?.messageId === messageId);
-  const latestError = matching
-    .filter((state) => state.status === "error" && state.error)
-    .sort((left, right) => right.submittedAt - left.submittedAt)[0]?.error ?? null;
-  return { busy: matching.some((state) => state.status === "pending"), error: latestError };
+  const latest = [...matching].sort((left, right) =>
+    right.submittedAt - left.submittedAt || right.mutationId - left.mutationId,
+  )[0];
+  return {
+    busy: matching.some((state) => state.status === "pending"),
+    error: latest?.status === "error" ? latest.error : null,
+  };
 }
 
 function rollback(queryClient: QueryClient, snapshots: Snapshot) {
@@ -223,7 +231,7 @@ export function useInboxMutations(threadId: string) {
     onSettled: () => invalidateInbox(queryClient, threadId),
   };
   const acknowledge = useMutation({
-    mutationKey: inboxOptimisticMutationKey(threadId),
+    mutationKey: inboxMutationKey(threadId, "acknowledge"),
     mutationFn: ({ messageId, revision }: { messageId: string; revision: number }) =>
       rpc.call("acknowledgeHumanMessage", {
         threadId,
@@ -245,7 +253,7 @@ export function useInboxMutations(threadId: string) {
     ...mutationOptions,
   });
   const bookmark = useMutation({
-    mutationKey: inboxOptimisticMutationKey(threadId),
+    mutationKey: inboxMutationKey(threadId, "bookmark"),
     mutationFn: ({ messageId, bookmarked, revision }: { messageId: string; bookmarked: boolean; revision: number }) =>
       rpc.call("setHumanMessageBookmark", {
         threadId,

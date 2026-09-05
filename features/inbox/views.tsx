@@ -110,11 +110,19 @@ export function InboxCard({ threadId }: { threadId: string }) {
             </>
           )
         ) : null}
-        {query.error && query.data ? (
+        {query.error && query.data && query.isFetchNextPageError ? (
           <div className="ws-inbox-state" role="alert">
             <span>Could not load more Inbox messages: {query.error.message}</span>
             <button type="button" onClick={() => void query.retryFailedPage()}>
               Retry loading messages
+            </button>
+          </div>
+        ) : null}
+        {query.error && query.data && !query.isFetchNextPageError ? (
+          <div className="ws-inbox-state" role="alert">
+            <span>Could not refresh Inbox: {query.error.message}</span>
+            <button type="button" onClick={() => void query.refetch()}>
+              Retry Inbox
             </button>
           </div>
         ) : null}

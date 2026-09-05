@@ -152,6 +152,74 @@ describe("Inbox Work card", () => {
     client.clear();
   });
 
+  it("clears a mounted mutation error after retry succeeds", async () => {
+    let mutationAttempts = 0;
+    let resolveRetry!: (value: Omit<typeof active, "bookmarkedAt" | "revision"> & { bookmarkedAt: string; revision: number }) => void;
+    rpcClient.call.mockImplementation((method: string) => {
+      if (method === "listHumanMessages") return Promise.resolve({ messages: [active], cursor: null, activeCount: 1, savedCount: 0 });
+      mutationAttempts += 1;
+      return mutationAttempts === 1
+        ? Promise.reject(new Error("Action unavailable"))
+        : new Promise((resolve) => { resolveRetry = resolve; });
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
+    const row = (await view.findByText("msg_active")).closest("li")!;
+    fireEvent.click(within(row).getByRole("button", { name: /Bookmark message/ }));
+    expect((await within(row).findByRole("alert")).textContent).toContain("Action unavailable");
+    fireEvent.click(within(row).getByRole("button", { name: /Bookmark message/ }));
+    await waitFor(() => expect(row.getAttribute("data-busy")).toBe("true"));
+    resolveRetry({ ...active, bookmarkedAt: "2026-09-06T00:02:00.000Z", revision: 2 });
+    await waitFor(() => expect(within(row).queryByRole("alert")).toBeNull());
+    view.unmount();
+    client.clear();
+  });
+
+  it("lets the latest cross-action success clear an earlier failure", async () => {
+    let resolveBookmark!: (value: Omit<typeof active, "bookmarkedAt" | "revision"> & { bookmarkedAt: string; revision: number }) => void;
+    rpcClient.call.mockImplementation((method: string) => {
+      if (method === "listHumanMessages") return Promise.resolve({ messages: [active], cursor: null, activeCount: 1, savedCount: 0 });
+      return method === "acknowledgeHumanMessage"
+        ? Promise.reject(new Error("Acknowledgement unavailable"))
+        : new Promise((resolve) => { resolveBookmark = resolve; });
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
+    const row = (await view.findByText("msg_active")).closest("li")!;
+    fireEvent.click(within(row).getByRole("button", { name: /Acknowledge message/ }));
+    expect((await within(row).findByRole("alert")).textContent).toContain("Acknowledgement unavailable");
+    fireEvent.click(within(row).getByRole("button", { name: /Bookmark message/ }));
+    await waitFor(() => expect(row.getAttribute("data-busy")).toBe("true"));
+    resolveBookmark({ ...active, bookmarkedAt: "2026-09-06T00:02:00.000Z", revision: 2 });
+    await waitFor(() => expect(within(row).queryByRole("alert")).toBeNull());
+    view.unmount();
+    client.clear();
+  });
+
+  it("keeps loaded rows and offers a refresh retry after a background failure", async () => {
+    let refreshAttempts = 0;
+    rpcClient.call.mockImplementation((method: string) => {
+      if (method !== "listHumanMessages") return Promise.resolve(active);
+      refreshAttempts += 1;
+      return refreshAttempts === 1
+        ? Promise.resolve({ messages: [active], cursor: null, activeCount: 1, savedCount: 0 })
+        : refreshAttempts === 2
+          ? Promise.reject(new Error("Refresh unavailable"))
+          : Promise.resolve({ messages: [active], cursor: null, activeCount: 1, savedCount: 0 });
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
+    await view.findByText("msg_active");
+    await act(async () => { await client.refetchQueries(); });
+    expect((await view.findByRole("alert")).textContent).toContain("Could not refresh Inbox: Refresh unavailable");
+    expect(view.getByText("msg_active")).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Retry Inbox" }));
+    await waitFor(() => expect(refreshAttempts).toBe(3));
+    await waitFor(() => expect(view.queryByText(/Could not refresh Inbox/)).toBeNull());
+    view.unmount();
+    client.clear();
+  });
+
   it("scopes busy and mutation errors to the row whose action was invoked", async () => {
     let rejectAcknowledgement!: (error: Error) => void;
     rpcClient.call.mockImplementation((method: string) => method === "listHumanMessages"
