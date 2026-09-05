@@ -163,8 +163,11 @@ export function useSidebarThreadOrganization({
   const groupIds = useMemo(() => {
     if (!active) return EMPTY_GROUP_IDS;
     const result = new Map<string, string>();
+    // Stored group preferences can outlive an archived or deleted host thread.
+    // Only extant non-archived hierarchy records may keep a group occupied.
+    const knownThreadIds = new Set(hierarchyThreads.map((thread) => thread.id));
     const includeDescendants = (threadId: string, groupId: string) => {
-      if (result.has(threadId)) return;
+      if (!knownThreadIds.has(threadId) || result.has(threadId)) return;
       result.set(threadId, groupId);
       for (const child of allChildren.get(threadId) ?? [])
         includeDescendants(child.id, groupId);
@@ -173,7 +176,7 @@ export function useSidebarThreadOrganization({
       for (const threadId of group.threadIds)
         includeDescendants(threadId, group.id);
     return result;
-  }, [active, allChildren, groups]);
+  }, [active, allChildren, groups, hierarchyThreads]);
   const threadPartitions = useMemo(() => {
     if (!active) return EMPTY_THREAD_PARTITIONS;
     const activeThreads: PluginSidebarThread[] = [];

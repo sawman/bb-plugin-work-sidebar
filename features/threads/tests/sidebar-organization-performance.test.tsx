@@ -6,6 +6,44 @@ import { useSidebarThreadOrganization } from "../sidebar-organization";
 import { threadInteractionStore } from "../store";
 
 describe("Threads organization lifecycle", () => {
+  it("does not let stale stored thread ids keep an otherwise empty group occupied", () => {
+    const saveGroups = vi.fn();
+    const staleGroup = {
+      id: "group_stale",
+      name: "Stale",
+      threadIds: ["thr_removed"],
+    };
+    const liveGroup = {
+      id: "group_live",
+      name: "Live",
+      threadIds: ["thr_live"],
+    };
+    const threads = [{ id: "thr_live" }] as PluginSidebarThread[];
+    const view = renderHook(() =>
+      useSidebarThreadOrganization({
+        active: true,
+        threads,
+        hierarchyThreads: threads,
+        projects: [],
+        order: [],
+        groups: [staleGroup, liveGroup],
+        activeGroupPosition: 0,
+        searchQuery: "",
+        saveGroups,
+        saveOrder: vi.fn(),
+      }),
+    );
+
+    expect(view.result.current.occupiedGroupIds).not.toContain(staleGroup.id);
+    expect(view.result.current.occupiedGroupIds).toContain(liveGroup.id);
+
+    act(() => view.result.current.removeGroup(staleGroup));
+    expect(saveGroups).toHaveBeenCalledWith([liveGroup], 0);
+
+    act(() => view.result.current.removeGroup(liveGroup));
+    expect(saveGroups).toHaveBeenCalledTimes(1);
+  });
+
   it("does not traverse host records or subscribe to presentation state while its tab is inactive", () => {
     const threads: PluginSidebarThread[] = [];
     const projects: { id: string; name: string; isPersonal: boolean }[] = [];
