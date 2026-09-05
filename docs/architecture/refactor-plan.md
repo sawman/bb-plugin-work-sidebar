@@ -934,6 +934,16 @@ readable; BB Tasks, not either document, is the executable work queue.
   `git diff --check`; commit BBPLUG-327 locally from the isolated managed
   worktree without reload or push.
 
+#### Loop R37 — agent-to-human Inbox
+
+The next product slice is specified in
+[human-inbox-spec.md](human-inbox-spec.md), with strict executable loops in
+[human-inbox-rgr-plan.md](human-inbox-rgr-plan.md). It adds a one-way,
+thread-scoped human Inbox with stable IDs, agent CRUD tools, acknowledgement,
+bookmarks, bounded searchable SQLite history, Markdown/Mermaid rendering, and
+archive/delete cleanup. The durable execution tasks are BBPLUG-361 through
+BBPLUG-364; BB Tasks remains the executable work queue.
+
 ### BB child execution protocol
 
 G0 is complete. Each new code-editing loop receives one direct BB execution
