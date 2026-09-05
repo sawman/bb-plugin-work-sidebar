@@ -226,6 +226,72 @@ describe("Inbox query lifecycle", () => {
     client.clear();
   });
 
+  it.each([
+    ["acknowledge", "pending"], ["acknowledge", "succeeded"],
+    ["bookmark", "pending"], ["bookmark", "succeeded"],
+  ] as const)("rolls back only failed %s while another mutation is %s", async (action, otherState) => {
+    const firstRecord = action === "acknowledge" ? message : { ...message, acknowledgedAt: message.createdAt };
+    const activeCount = action === "acknowledge" ? 1 : 0;
+    const second = { ...message, id: "msg_two", acknowledgedAt: message.createdAt };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const keys = [queryKeys.inbox.scope("thr_one", ""), queryKeys.inbox.scope("thr_one", "history")];
+    for (const key of keys) client.setQueryData(key, {
+      pages: [
+        { messages: [firstRecord], cursor: "next", activeCount, savedCount: 0 },
+        { messages: [second], cursor: null, activeCount, savedCount: 0 },
+      ], pageParams: [null, "next"],
+    });
+    let rejectFirst!: (error: Error) => void;
+    let resolveSecond!: (value: HumanMessage) => void;
+    rpcClient.call.mockImplementation((_method: string, input: { messageId: string }) => new Promise((resolve, reject) => {
+      if (input.messageId === message.id) rejectFirst = reject;
+      else resolveSecond = resolve;
+    }));
+    const view = renderHook(() => useInboxMutations("thr_one"), { wrapper: wrapper(client) });
+    const first = (action === "acknowledge"
+      ? view.result.current.acknowledge.mutateAsync({ messageId: message.id, revision: 1 })
+      : view.result.current.bookmark.mutateAsync({ messageId: message.id, bookmarked: true, revision: 1 })
+    ).catch(() => undefined);
+    await waitFor(() => expect(rejectFirst).toBeTypeOf("function"));
+    const other = view.result.current.bookmark.mutateAsync({ messageId: second.id, bookmarked: true, revision: 1 });
+    await waitFor(() => expect(resolveSecond).toBeTypeOf("function"));
+    if (otherState === "succeeded") { resolveSecond({ ...second, bookmarkedAt: message.createdAt, revision: 2 }); await other; }
+    // A cache update during the mutations must also survive rollback.
+    for (const key of keys) client.setQueryData<InfiniteData<InboxPage>>(key, (data) => ({
+      ...data!, pages: data!.pages.map((p) => ({ ...p, cursor: "fresh-cursor", activeCount: p.activeCount + 3 })),
+    }));
+    rejectFirst(new Error("conflict"));
+    await first;
+    for (const key of keys) {
+      const data = client.getQueryData<InfiniteData<InboxPage>>(key)!;
+      expect(data.pages[0]!.messages[0]).toEqual(firstRecord);
+      expect(data.pages[1]!.messages[0]).toMatchObject({ id: second.id, bookmarkedAt: expect.any(String), revision: 2 });
+      expect(data.pages.map((p) => [p.activeCount, p.savedCount, p.cursor])).toEqual([[activeCount + 3, 1, "fresh-cursor"], [activeCount + 3, 1, "fresh-cursor"]]);
+    }
+    if (otherState === "pending") { resolveSecond(second); await other; }
+    view.unmount(); client.clear();
+  });
+
+  it.each(["fetchNextPage", "retryFailedPage"] as const)("guards %s during a realtime refetch and resumes with its refreshed cursor", async (action) => {
+    let finishRefresh!: (value: InboxPage) => void;
+    rpcClient.call.mockResolvedValueOnce({ ...page, cursor: "stale" })
+      .mockImplementationOnce(() => new Promise((resolve) => { finishRefresh = resolve; }))
+      .mockResolvedValue({ ...page, messages: [makeMessage(2)], cursor: null });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderHook(() => useInboxMessages("thr_one", ""), { wrapper: wrapper(client) });
+    await waitFor(() => expect(view.result.current.hasNextPage).toBe(true));
+    const staleCallback = view.result.current[action];
+    act(() => realtime.handler?.({ family: "inbox", threadId: "thr_one" }));
+    await waitFor(() => expect(view.result.current.isFetching).toBe(true));
+    act(() => staleCallback());
+    expect(rpcClient.call).toHaveBeenCalledTimes(2);
+    await act(async () => finishRefresh({ ...page, cursor: "fresh" }));
+    await waitFor(() => expect(view.result.current.isFetching).toBe(false));
+    act(() => view.result.current[action]());
+    await waitFor(() => expect(rpcClient.call).toHaveBeenLastCalledWith("listHumanMessages", expect.objectContaining({ cursor: "fresh" })));
+    view.unmount(); client.clear();
+  });
+
   it("resets pagination before a changed thread or debounced query can reuse a cursor", async () => {
     rpcClient.call
       .mockResolvedValueOnce({ ...page, cursor: "next" })

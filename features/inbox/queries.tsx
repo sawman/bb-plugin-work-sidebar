@@ -114,6 +114,7 @@ export function useInboxRealtime(threadId: string) {
 
 export function useInboxMessages(threadId: string, query: string) {
   const rpc = useRpc<typeof rpcContract>();
+  const queryClient = useQueryClient();
   useInboxRealtime(threadId);
   const normalized = normalizedQuery(query);
   const queryResult = useInfiniteQuery({
@@ -145,6 +146,11 @@ export function useInboxMessages(threadId: string, query: string) {
         savedCount: lastPage?.savedCount ?? 0,
       }
     : undefined;
+  const fetchNextPage = () => {
+    // Read live cache state: a click callback may predate the refetch render.
+    if (queryClient.isFetching({ queryKey: queryKeys.inbox.scope(threadId, normalized), exact: true })) return;
+    void queryResult.fetchNextPage({ cancelRefetch: false });
+  };
   return {
     data,
     error: queryResult.error,
@@ -154,50 +160,57 @@ export function useInboxMessages(threadId: string, query: string) {
     isFetchingNextPage: queryResult.isFetchingNextPage,
     isFetchNextPageError: queryResult.isFetchNextPageError,
     hasNextPage: queryResult.hasNextPage,
-    fetchNextPage: () => void queryResult.fetchNextPage(),
+    fetchNextPage,
     refetch: queryResult.refetch,
-    retryFailedPage: () => void queryResult.fetchNextPage(),
+    retryFailedPage: fetchNextPage,
   };
 }
 
 type InboxData = InfiniteData<InboxPage, string | null>;
-type Snapshot = readonly [QueryKey, InboxData | undefined][];
+type RecordChange = { before: HumanMessage; after: HumanMessage };
+type Snapshot = readonly [QueryKey, readonly RecordChange[]][];
+
+function mapCachedMessages(data: InboxData, update: (message: HumanMessage) => HumanMessage): InboxData {
+  let activeDelta = 0;
+  let savedDelta = 0;
+  const changedIds = new Set<string>();
+  const pages = data.pages.map((page) => ({
+    ...page,
+    messages: page.messages.map((message) => {
+      const next = update(message);
+      if (next === message || changedIds.has(message.id)) return next;
+      changedIds.add(message.id);
+      activeDelta += Number(next.acknowledgedAt === null) - Number(message.acknowledgedAt === null);
+      savedDelta += Number(next.acknowledgedAt !== null && next.bookmarkedAt !== null)
+        - Number(message.acknowledgedAt !== null && message.bookmarkedAt !== null);
+      return next;
+    }),
+  }));
+  return {
+    ...data,
+    pages: pages.map((page) => ({
+      ...page,
+      activeCount: Math.max(0, page.activeCount + activeDelta),
+      savedCount: Math.max(0, page.savedCount + savedDelta),
+    })),
+  };
+}
 
 function updateCachedMessages(
   queryClient: QueryClient,
   threadId: string,
   update: (message: HumanMessage) => HumanMessage,
-) {
-  const snapshots: Snapshot = queryClient
-    .getQueriesData<InboxData>({ queryKey: queryKeys.inbox.thread(threadId) })
-    .map(([key, page]) => [key, page]);
-  for (const [key, data] of snapshots) {
-    if (!data) continue;
-    let activeDelta = 0;
-    let savedDelta = 0;
-    const changedIds = new Set<string>();
-    const pages = data.pages.map((page) => ({
-      ...page,
-      messages: page.messages.map((message) => {
+): Snapshot {
+  return queryClient.getQueriesData<InboxData>({ queryKey: queryKeys.inbox.thread(threadId) })
+    .map(([key]) => {
+      const changes: RecordChange[] = [];
+      queryClient.setQueryData<InboxData>(key, (data) => data && mapCachedMessages(data, (message) => {
         const next = update(message);
-        if (next === message || changedIds.has(message.id)) return next;
-        changedIds.add(message.id);
-        activeDelta += Number(next.acknowledgedAt === null) - Number(message.acknowledgedAt === null);
-        savedDelta += Number(next.acknowledgedAt !== null && next.bookmarkedAt !== null)
-          - Number(message.acknowledgedAt !== null && message.bookmarkedAt !== null);
+        if (next !== message) changes.push({ before: message, after: next });
         return next;
-      }),
-    }));
-    queryClient.setQueryData<InboxData>(key, {
-      ...data,
-      pages: pages.map((page) => ({
-        ...page,
-        activeCount: Math.max(0, page.activeCount + activeDelta),
-        savedCount: Math.max(0, page.savedCount + savedDelta),
-      })),
+      }));
+      return [key, changes] as const;
     });
-  }
-  return snapshots;
 }
 
 type InboxMutationVariables = { messageId: string };
@@ -220,8 +233,20 @@ export function useInboxMessageMutationState(threadId: string, messageId: string
 }
 
 function rollback(queryClient: QueryClient, snapshots: Snapshot) {
-  for (const [key, data] of snapshots)
-    queryClient.setQueryData(key, data);
+  for (const [key, changes] of snapshots) {
+    const byId = new Map(changes.map((change) => [change.before.id, change]));
+    queryClient.setQueryData<InboxData>(key, (data) => data && mapCachedMessages(data, (message) => {
+      const change = byId.get(message.id);
+      // A newer revision belongs to a later write; final invalidation resolves it.
+      if (!change || message.revision !== change.after.revision) return message;
+      return {
+        ...message,
+        acknowledgedAt: change.before.acknowledgedAt,
+        bookmarkedAt: change.before.bookmarkedAt,
+        revision: change.before.revision,
+      };
+    }));
+  }
 }
 
 export function useInboxMutations(threadId: string) {

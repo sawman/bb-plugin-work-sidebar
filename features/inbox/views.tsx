@@ -68,7 +68,7 @@ export function InboxCard({ threadId }: { threadId: string }) {
             <InboxResults
               messages={messages}
               hasNextPage={query.hasNextPage}
-              fetching={query.isFetchingNextPage}
+              fetching={query.isFetching}
               onLoadMore={query.fetchNextPage}
               mutations={mutations}
             />
@@ -105,7 +105,7 @@ export function InboxCard({ threadId }: { threadId: string }) {
                 )}
               </CountedDisclosure>
               {query.hasNextPage ? (
-                <LoadMoreButton fetching={query.isFetchingNextPage} onClick={query.fetchNextPage} />
+                <LoadMoreButton fetching={query.isFetching} onClick={query.fetchNextPage} />
               ) : null}
             </>
           )
@@ -113,7 +113,7 @@ export function InboxCard({ threadId }: { threadId: string }) {
         {query.error && query.data && query.isFetchNextPageError ? (
           <div className="ws-inbox-state" role="alert">
             <span>Could not load more Inbox messages: {query.error.message}</span>
-            <button type="button" onClick={() => void query.retryFailedPage()}>
+            <button type="button" disabled={query.isFetching} onClick={() => void query.retryFailedPage()}>
               Retry loading messages
             </button>
           </div>

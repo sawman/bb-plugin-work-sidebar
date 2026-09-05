@@ -107,6 +107,30 @@ describe("Inbox Work card", () => {
     client.clear();
   });
 
+  it.each([false, true])("disables Load more throughout a background fetch (search=%s)", async (search) => {
+    const loaded = { messages: [active], cursor: "next", activeCount: 1, savedCount: 0 };
+    rpcClient.call.mockResolvedValue(loaded);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
+    await view.findByText("msg_active");
+    if (search) {
+      fireEvent.change(view.getByRole("searchbox"), { target: { value: "history" } });
+      await view.findByRole("region", { name: "Inbox search results" });
+    }
+    let finish!: (value: typeof loaded) => void;
+    rpcClient.call.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    act(() => { void client.invalidateQueries({ queryKey: ["work-sidebar", "inbox", "thr_one"] }); });
+    await waitFor(() => expect(client.isFetching()).toBe(1));
+    const button = view.container.querySelector<HTMLButtonElement>(".ws-inbox-load-more")!;
+    await waitFor(() => expect(button.disabled).toBe(true));
+    const calls = rpcClient.call.mock.calls.length;
+    fireEvent.click(button);
+    expect(rpcClient.call).toHaveBeenCalledTimes(calls);
+    await act(async () => finish(loaded));
+    await waitFor(() => expect(button.disabled).toBe(false));
+    view.unmount(); client.clear();
+  });
+
   it("keeps loaded rows and disclosure state mounted while loading a later cursor", async () => {
     let resolveLaterPage!: (value: { messages: (typeof active)[]; cursor: null; activeCount: number; savedCount: number }) => void;
     rpcClient.call.mockImplementation((method: string, input: { cursor?: string }) => {

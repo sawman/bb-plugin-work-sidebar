@@ -101,17 +101,17 @@ export function createInboxService({
     if (expectedRevision !== undefined && Number(row.revision) !== expectedRevision) conflict();
     return row;
   };
-  const retain = (threadId: string) => {
+  const retain = (threadId: string, incomingId: string | null = null) => {
     const count = database.prepare(
       "SELECT COUNT(*) AS count FROM human_inbox_messages WHERE thread_id = ?",
     ).get(threadId) as { count: number };
     const excess = count.count - MAX_HUMAN_MESSAGES_PER_THREAD;
     if (excess <= 0) return;
     const stale = database.prepare(
-      `SELECT id FROM human_inbox_messages WHERE thread_id = ?
+      `SELECT id FROM human_inbox_messages WHERE thread_id = ? AND (? IS NULL OR id != ?)
        ORDER BY CASE WHEN acknowledged_at IS NOT NULL AND bookmarked_at IS NULL THEN 0 WHEN acknowledged_at IS NULL AND bookmarked_at IS NULL THEN 1 ELSE 2 END,
          created_at ASC, id ASC LIMIT ?`,
-    ).all(threadId, excess) as Array<{ id: string }>;
+    ).all(threadId, incomingId, incomingId, excess) as Array<{ id: string }>;
     const remove = database.prepare("DELETE FROM human_inbox_messages WHERE thread_id = ? AND id = ?");
     for (const row of stale) remove.run(threadId, row.id);
   };
@@ -167,7 +167,7 @@ export function createInboxService({
           `INSERT INTO human_inbox_messages (id, thread_id, project_id, subject, body, agent_thread_id, provider_id, agent_label, created_at, updated_at, acknowledged_at, bookmarked_at, revision, idempotency_key)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, 1, ?)`,
         ).run(id, input.threadId, input.projectId, normalizeSubject(input.subject), input.body.trim(), input.agentThreadId ?? null, input.providerId ?? null, normalizeSubject(input.agentLabel), time, time, input.idempotencyKey ?? null);
-        retain(input.threadId);
+        retain(input.threadId, id);
         return result(messageFrom(requireOne(input.threadId, id)), true);
       });
     },
@@ -256,9 +256,19 @@ export function createInboxService({
         const threads = database.prepare("SELECT DISTINCT thread_id FROM human_inbox_messages").all() as Array<{ thread_id: string }>;
         for (const { thread_id } of threads) {
           try {
-            const thread = await getThread(thread_id);
+            let thread: Thread | null;
+            try {
+              thread = await getThread(thread_id);
+            } catch (error) {
+              // SDK HTTP errors carry status/code. Never infer deletion from text
+              // or from an unrelated missing host/resource.
+              if (typeof error !== "object" || error === null
+                || !("status" in error) || error.status !== 404
+                || !("code" in error) || error.code !== "thread_not_found") throw error;
+              thread = null;
+            }
             if (!isActive()) return;
-            if (thread.archivedAt !== null) this.purge(thread_id);
+            if (thread === null || thread.archivedAt !== null) this.purge(thread_id);
             else transaction(() => retain(thread_id));
           } catch {
             if (isActive()) onCleanupError?.(thread_id);

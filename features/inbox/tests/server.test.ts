@@ -139,6 +139,68 @@ describe("Inbox server service", () => {
     expect(database.prepare("SELECT id FROM human_inbox_messages WHERE id = 'msg_victim'").get()).toBeUndefined();
   });
 
+  it("retains an incoming create when all 500 existing records are bookmarked", async () => {
+    const { database, inbox, create } = fixture();
+    const insert = database.prepare("INSERT INTO human_inbox_messages VALUES (?, ?, ?, NULL, ?, NULL, NULL, NULL, ?, ?, NULL, ?, 1, NULL)");
+    for (let i = 0; i < 500; i += 1) insert.run(`seed_${String(i).padStart(3, "0")}`, threadId, projectId, "saved", "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z", "2026-01-01T00:00:00.000Z");
+    const incoming = await create("incoming", { idempotencyKey: "incoming-retry" });
+    expect(inbox.get(threadId, incoming.id).body).toBe("incoming");
+    expect(database.prepare("SELECT COUNT(*) AS count FROM human_inbox_messages").get()).toEqual({ count: 500 });
+    expect(database.prepare("SELECT id FROM human_inbox_messages WHERE id = 'seed_000'").get()).toBeUndefined();
+    expect(inbox.get(threadId, "seed_001").bookmarkedAt).not.toBeNull();
+    await expect(create("retry", { idempotencyKey: "incoming-retry" })).resolves.toEqual(incoming);
+  });
+
+  it.each([
+    ["missing", { status: 404, code: "thread_not_found" }, true],
+    ["transient", { status: 503, code: "unavailable" }, false],
+    ["ambiguous text", new Error("Thread not found during connection retry"), false],
+    ["unrelated missing resource", { status: 404, code: "host_not_found" }, false],
+  ])("reconciles %s lookup results without losing transient data", async (_label, error, purged) => {
+    const { database, create } = fixture();
+    const existing = await create("keep unless definitively deleted");
+    let warnings = 0;
+    const inbox = createInboxService({ database, getThread: async () => { throw error; } });
+    await inbox.reconcile({ onCleanupError: () => { warnings += 1; } });
+    expect(database.prepare("SELECT id FROM human_inbox_messages WHERE id = ?").get(existing.id))
+      .toEqual(purged ? undefined : { id: existing.id });
+    expect(warnings).toBe(purged ? 0 : 1);
+  });
+
+  it("retries a failed missing-thread purge and retains other threads", async () => {
+    const { database, create } = fixture();
+    const existing = await create("deleted thread");
+    await create("live thread", { threadId: "thr_live", projectId: "other" });
+    const inbox = createInboxService({ database, getThread: async (id) => {
+      if (id === threadId) throw { status: 404, code: "thread_not_found" };
+      return { id, projectId: "other", archivedAt: null };
+    } });
+    database.exec(`CREATE TRIGGER fail_missing_purge BEFORE DELETE ON human_inbox_messages
+      WHEN OLD.thread_id = 'thr_one' BEGIN SELECT RAISE(FAIL, 'purge failed'); END`);
+    const warnings: string[] = [];
+    await inbox.reconcile({ onCleanupError: (id) => warnings.push(id) });
+    expect(warnings).toEqual([threadId]);
+    expect(inbox.get(threadId, existing.id).body).toBe("deleted thread");
+    expect(inbox.lifecycleGuardCount()).toBe(1);
+    database.exec("DROP TRIGGER fail_missing_purge");
+    await inbox.reconcile();
+    expect(inbox.lifecycleGuardCount()).toBe(0);
+    expect(database.prepare("SELECT thread_id FROM human_inbox_messages").all()).toEqual([{ thread_id: "thr_live" }]);
+  });
+
+  it("does not purge a missing thread after reconciliation is disposed", async () => {
+    const { database, create } = fixture();
+    const existing = await create("keep after disposal");
+    let rejectLookup!: (error: unknown) => void;
+    const inbox = createInboxService({ database, getThread: () => new Promise((_resolve, reject) => { rejectLookup = reject; }) });
+    let active = true;
+    const reconcile = inbox.reconcile({ isActive: () => active });
+    active = false;
+    rejectLookup({ status: 404, code: "thread_not_found" });
+    await reconcile;
+    expect(inbox.get(threadId, existing.id).body).toBe("keep after disposal");
+  });
+
   it("hard-caps all-bookmarked records and purges lifecycle rows exactly", async () => {
     const { database, inbox } = fixture();
     const insert = database.prepare("INSERT INTO human_inbox_messages VALUES (?, ?, ?, NULL, ?, NULL, NULL, NULL, ?, ?, NULL, ?, 1, NULL)");
