@@ -35,6 +35,7 @@ import {
 import { tasksSidebarStore } from "./store";
 import { useTasksMutations } from "./mutations";
 import { useTasksRead, useTasksRealtimeInvalidation } from "./queries";
+import { useOpenTask } from "./task-navigation";
 
 const EMPTY_TASKS: SidebarTask[] = [];
 const EMPTY_QUEUE: ReturnType<typeof projectTaskQueue> = [];
@@ -69,6 +70,7 @@ export function TasksLeftSidebar({
   settingsControl,
 }: TasksLeftSidebarProps) {
   const rpc = useRpc<typeof rpcContract>();
+  const openTask = useOpenTask();
   const { data, isPending, isError, error, refetch } = useTasksRead({
     projectId: factProjectId,
   });
@@ -451,6 +453,7 @@ export function TasksLeftSidebar({
                 }
                 onMoveTask={move}
                 onOpenThread={onOpenThread}
+                onOpenTask={openTask}
                 onUpdateStatus={updateStatus}
                 onDelete={remove}
                 activeThreadId={activeThreadId}

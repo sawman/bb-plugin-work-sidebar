@@ -134,12 +134,12 @@ export function useThreadRowPointerDrag({
           onReparentThread(thread.id, parentId);
         else if (!targetId && zone === "recycle-bin") onArchive();
         else if (!targetId && zone && zone !== groupId)
-          onMoveToGroup(thread.id, zone === "active" ? null : zone);
+          void Promise.resolve(onMoveToGroup(thread.id, zone === "active" ? null : zone)).catch(() => undefined);
         else if (targetGroup && targetGroup !== (groupId ?? "active"))
-          onMoveToGroup(
+          void Promise.resolve(onMoveToGroup(
             thread.id,
             targetGroup === "active" ? null : targetGroup,
-          );
+          )).catch(() => undefined);
         else if (
           targetId &&
           targetId !== thread.id &&

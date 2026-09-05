@@ -130,17 +130,18 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
         typeof threadPreferences.saveGroups.mutateAsync
       >[0]["groups"],
       activeGroupPosition = groupPreferences.activeGroupPosition,
-    ) => {
-      void threadPreferences.saveGroups
+    ) =>
+      threadPreferences.saveGroups
         .mutateAsync({ groups, activeGroupPosition, disclosures: groupPreferences.disclosures ?? {} })
+        .then(() => undefined)
         .catch((error: unknown) => {
           toast.error(
             error instanceof Error
               ? error.message
               : "Could not save thread groups",
           );
-        });
-    },
+          throw error;
+        }),
     [groupPreferences.activeGroupPosition, threadPreferences.saveGroups],
   );
   const saveOrder = useCallback(

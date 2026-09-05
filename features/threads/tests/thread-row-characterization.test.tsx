@@ -326,7 +326,7 @@ describe("R21D ThreadRow characterization", () => {
     expect(view.queryByRole("img", { name: "Unsent draft" })).toBeNull();
   });
 
-  it("preserves modifier selection, native row attributes, rename, and every BB-owned menu action", () => {
+  it("preserves modifier selection, native row attributes, rename, and every BB-owned menu action", async () => {
     const onSelect = vi.fn(() => true);
     const view = renderRow({ onSelect });
     const link = view.getByRole("link", { name: /One/ });
@@ -367,12 +367,12 @@ describe("R21D ThreadRow characterization", () => {
     expect(host.actions.rename).toHaveBeenCalledWith(thread.id, "Renamed");
 
     const afterRename = renderRow();
-    openMenu(afterRename);
+    fireEvent.contextMenu(afterRename.container.querySelector("a")!);
     fireEvent.click(
       afterRename.getByRole("menuitem", { name: "Archive" }),
     );
-    expect(host.actions.archive).toHaveBeenCalledWith(thread.id);
-    openMenu(afterRename);
+    await waitFor(() => expect(host.actions.archive).toHaveBeenCalledWith(thread.id));
+    fireEvent.contextMenu(afterRename.container.querySelector("a")!);
     fireEvent.click(afterRename.getByRole("menuitem", { name: "Delete" }));
     expect(host.actions.requestDelete).toHaveBeenCalledWith(thread.id);
   });

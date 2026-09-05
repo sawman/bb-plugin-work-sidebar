@@ -46,6 +46,7 @@ export type TaskRowProps = {
   ): void;
   onMoveTask(taskId: string, direction: -1 | 1): void;
   onOpenThread(threadId: string, split?: boolean): void;
+  onOpenTask(taskKey: string): void;
   onUpdateStatus(taskId: string, status: SidebarTask["status"]): Promise<void>;
   onDelete(task: SidebarTask): Promise<void>;
   activeThreadId: string | null;
@@ -83,6 +84,7 @@ export function TaskRow(props: TaskRowProps) {
     onDropTask,
     onMoveTask,
     onOpenThread,
+    onOpenTask,
     onUpdateStatus,
     onDelete,
     activeThreadId,
@@ -210,9 +212,15 @@ export function TaskRow(props: TaskRowProps) {
                 {(tooltipId) => <button
                   className={`ws-task-assign ${assigned ? "ws-task-assigned" : ""}`}
                   type="button"
-                  aria-pressed={selectedTaskIds.has(task.id)}
                   aria-describedby={[ownerState ? bindingDescriptionId : null, tooltipId].filter(Boolean).join(" ")}
-                  onClick={(event) => onSelect(task.id, event)}
+                  aria-label={`Open ${task.key} in Tasks`}
+                  onClick={(event) => {
+                    if (event.shiftKey || event.ctrlKey || event.metaKey) {
+                      onSelect(task.id, event);
+                      return;
+                    }
+                    onOpenTask(task.key);
+                  }}
                 >
                   <span className="ws-task-title ws-sidebar-row-title">
                     {task.title}

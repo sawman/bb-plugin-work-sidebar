@@ -1815,6 +1815,45 @@ describe("R18 registered left sidebar parity", () => {
     crossGroup.lifecycle.unmount();
   });
 
+  it("persists group cleanup before archiving a grouped thread tree", async () => {
+    const saved = deferred<{ groups: unknown[] }>();
+    const saveThreadGroups = vi.fn<
+      (input: { groups: unknown[] }) => Promise<{ groups: unknown[] }>
+    >(({ groups }) => Promise.resolve({ groups }));
+    const slot = await leftSlot({
+      threads: [thread("thr_parent", "Parent"), thread("thr_child", "Child", "thr_parent")],
+      groups: [{ id: "group_later", name: "Later", threadIds: ["thr_parent"] }],
+      rpc: { saveThreadGroups },
+    });
+
+    await slot.findByRole("link", { name: /Parent/ });
+    await waitFor(() => expect(saveThreadGroups).toHaveBeenCalledTimes(1));
+    saveThreadGroups.mockClear();
+    saveThreadGroups.mockImplementation(() => saved.promise);
+    const parent = slot.getByRole("link", { name: /Parent/ });
+    fireEvent.contextMenu(parent);
+    fireEvent.click(await slot.findByRole("menuitem", { name: "Archive" }));
+
+    await waitFor(() =>
+      expect(saveThreadGroups).toHaveBeenCalledWith(expect.objectContaining({
+        groups: [{ id: "group_later", name: "Later", threadIds: [] }],
+      })),
+    );
+    expect(slot.inspection.sidebarActionCalls).not.toContainEqual({
+      method: "archive",
+      threadId: "thr_parent",
+    });
+
+    saved.resolve({ groups: [] });
+    await waitFor(() =>
+      expect(slot.inspection.sidebarActionCalls).toContainEqual({
+        method: "archive",
+        threadId: "thr_parent",
+      }),
+    );
+    slot.lifecycle.unmount();
+  });
+
   it("reparents through the existing hierarchy mutation, promotes through To Top, and leaves rejected hierarchy drops unchanged", async () => {
     const moveThread = vi.fn(
       (input: { threadId: string; parentThreadId: string | null }) => ({

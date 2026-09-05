@@ -67,7 +67,7 @@ export function ThreadRow({
     onDropTargetChange,
     onMoveToGroup,
     onDropThread,
-    onArchive: () => (onMoveToRecycleBin ?? rowActions.archiveTree)(thread.id),
+    onArchive: () => void (onMoveToRecycleBin ?? rowActions.archiveTree)(thread.id),
     onReparentThread: (sourceId, parentThreadId) => {
       void hierarchy
         .move(sourceId, parentThreadId)

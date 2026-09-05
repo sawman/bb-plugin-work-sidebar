@@ -3997,6 +3997,18 @@ button.ws-provider-health:focus-visible {
   flex: 1;
   gap: 0.12rem;
 }
+.ws-task-workflow-open {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.ws-task-workflow-open:disabled {
+  cursor: default;
+}
 .ws-task-workflow-title-line {
   display: flex;
   min-width: 0;

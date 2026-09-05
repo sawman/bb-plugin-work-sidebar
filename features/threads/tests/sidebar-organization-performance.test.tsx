@@ -7,7 +7,7 @@ import { threadInteractionStore } from "../store";
 
 describe("Threads organization lifecycle", () => {
   it("does not let stale stored thread ids keep an otherwise empty group occupied", () => {
-    const saveGroups = vi.fn();
+    const saveGroups = vi.fn(async () => undefined);
     const staleGroup = {
       id: "group_stale",
       name: "Stale",

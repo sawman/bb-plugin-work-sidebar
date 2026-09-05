@@ -153,6 +153,75 @@ function fixture(overrides: Partial<Rpc> = {}): Rpc {
 }
 
 describe("registered Work context cards", () => {
+  it("opens BB goal and queue rows in the host-owned Tasks detail view", async () => {
+    getPluginQueryClient().clear();
+    const app = await loadPluginApp(() => import("../../../app"));
+    const slot = renderSlot(
+      app.threadPanelActions[0]!,
+      { threadId: "thr_one", params: null },
+      {
+        rpc: fixture({
+          sidebarTasks: () => ({
+            available: true,
+            projects: [{ id: "project_1", name: "Work" }],
+            error: null,
+            tasks: [{
+              id: "task_goal",
+              projectId: "project_1",
+              projectName: "Work",
+              key: "WORK-9",
+              title: "Open the current goal",
+              status: "todo",
+              priority: "high",
+              dueDate: null,
+              parentTaskId: null,
+              position: 1,
+              linkedThreadIds: ["thr_one"],
+              assignee: "agent",
+            }, {
+              id: "task_queue",
+              projectId: "project_1",
+              projectName: "Work",
+              key: "WORK-10",
+              title: "Open the queued task",
+              status: "todo",
+              priority: "none",
+              dueDate: null,
+              parentTaskId: null,
+              position: 2,
+              linkedThreadIds: ["thr_one"],
+              assignee: "agent",
+            }],
+          }),
+          getWorkItemQueue: () => ({
+            rootThreadId: "thr_one",
+            configured: true,
+            queue: {
+              current: { source: "bb_task", id: "task_goal" },
+              backlog: [],
+            },
+          }),
+        }),
+      },
+    );
+
+    await slot.findByRole("button", { name: "Open WORK-9 in Tasks" });
+    fireEvent.click(slot.getByRole("button", { name: "Open WORK-9 in Tasks" }));
+    fireEvent.click(slot.getByRole("button", { name: "Open WORK-10 in Tasks" }));
+    expect(slot.inspection.navigateCalls).toContainEqual({
+      method: "toPluginPanel",
+      path: "tasks",
+      options: { subPath: "task/WORK-9" },
+    });
+    expect(slot.inspection.navigateCalls).toContainEqual({
+      method: "toPluginPanel",
+      path: "tasks",
+      options: { subPath: "task/WORK-10" },
+    });
+    slot.lifecycle.unmount();
+    getPluginQueryClient().clear();
+  });
+
   it("renders one unified Work items card instead of separate Outcome, Linear, and Tasks cards", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));

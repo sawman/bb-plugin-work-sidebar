@@ -6,7 +6,7 @@ import { ActionTooltip } from "../../components/ui/action-tooltip";
 import { Icon } from "../../components/ui/icon";
 import { SearchCombobox } from "../../components/ui/combobox";
 import type { TaskStatus } from "../tasks/model";
-import { TaskPriorityIcon } from "../tasks/priority";
+import { useOpenTask } from "../tasks/task-navigation";
 import {
   TaskStatusControl,
   TaskWorkflowSection,
@@ -24,6 +24,7 @@ import {
   useWorkStatus,
 } from "./queries";
 import { CardState } from "./card-state";
+import { WorkItemGoalRow } from "./work-item-goal-row";
 import {
   projectWorkItem,
   promoteWorkItem,
@@ -78,6 +79,7 @@ export function WorkItemCard({
   const queueMutation = useWorkItemQueueMutation(threadId);
   const executionMutation = useMoveWorkItemToExecution(threadId);
   const rpc = useRpc<typeof rpcContract>();
+  const openTask = useOpenTask();
   const [trackerQuery, setTrackerQuery] = useState("");
   const trackerSearch = useTrackerSearch(threadId, useDebouncedValue(trackerQuery));
   const trackerMutations = useTrackerMutations(rpc, threadId);
@@ -281,6 +283,7 @@ export function WorkItemCard({
             "Could not update BB task",
           )
         }
+        onOpenTask={openTask}
         onAddToQueue={(reference) => {
           if (reference.source === "bb_task") {
             void report(
@@ -461,6 +464,7 @@ function WorkQueue({
   onAddToQueue,
   onMoveToExecution,
   onTaskStatus,
+  onOpenTask,
 }: {
   queue: WorkQueueValue;
   labelForReference(reference: WorkItemReference): string;
@@ -477,6 +481,7 @@ function WorkQueue({
   onAddToQueue(reference: WorkItemReference): void;
   onMoveToExecution(reference: WorkItemReference): void;
   onTaskStatus(taskId: string, status: TaskStatus): void;
+  onOpenTask(taskKey: string): void;
 }) {
   const idPrefix = useId();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -543,6 +548,7 @@ function WorkQueue({
                     onStatus={onTaskStatus}
                   />
                 }
+                onOpenTask={onOpenTask}
               />
             ) : null}
             {queue.backlog.map((reference) => (
@@ -560,6 +566,7 @@ function WorkQueue({
                     onMoveToTasks={() => onMoveToExecution(reference)}
                   />
                 }
+                onOpenTask={onOpenTask}
               />
             ))}
           </div>
@@ -655,46 +662,6 @@ function LinearStatusControl({
         {linked.statusOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
       </select>
     </label>
-  );
-}
-
-function WorkItemGoalRow({
-  reference,
-  label,
-  task,
-  actions,
-}: {
-  reference: WorkItemReference;
-  label: string;
-  task: TaskSummary | undefined;
-  actions: ReactNode;
-}) {
-  return (
-    <article
-      className="ws-task-workflow-row ws-work-item-goal-row"
-      data-state={task?.status}
-      aria-label={`${task?.key ?? reference.id}: ${task?.title ?? label}`}
-    >
-      <span className="ws-task-workflow-copy ws-work-item-reference">
-        <span className="ws-task-workflow-title-line">
-          <span className="ws-task-workflow-priority">
-            {task ? <TaskPriorityIcon priority={task.priority} /> : null}
-          </span>
-          <CopyBadge
-            value={task?.key ?? reference.id}
-            label={task ? "current goal BB task" : "current goal Linear issue"}
-            className="ws-task-workflow-key"
-            variant="text"
-          >
-            {task?.key ?? reference.id}
-          </CopyBadge>
-          <span className="ws-task-workflow-title ws-work-item-reference-title">
-            {task?.title ?? label}
-          </span>
-        </span>
-      </span>
-      {actions}
-    </article>
   );
 }
 

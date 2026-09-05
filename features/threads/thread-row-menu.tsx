@@ -35,7 +35,7 @@ export function ThreadRowMenu({
   isAvailable: boolean;
   groupId: string | null;
   groups: readonly SidebarThreadGroup[];
-  onMoveToGroup(threadId: string, groupId: string | null): void;
+  onMoveToGroup(threadId: string, groupId: string | null): void | Promise<void>;
   onMoveToRecycleBin?(threadId: string): void;
   onFocusReturn(): void;
   actions: ThreadRowActions;
@@ -81,7 +81,7 @@ export function ThreadRowMenu({
         <ContextMenuItem
           className="ws-thread-menu-destination"
           disabled={groupId === null}
-          onSelect={() => onMoveToGroup(threadId, null)}
+          onSelect={() => void Promise.resolve(onMoveToGroup(threadId, null)).catch(() => undefined)}
         >
           Active
         </ContextMenuItem>
@@ -90,7 +90,7 @@ export function ThreadRowMenu({
             key={group.id}
             className="ws-thread-menu-destination"
             disabled={group.id === groupId}
-            onSelect={() => onMoveToGroup(threadId, group.id)}
+            onSelect={() => void Promise.resolve(onMoveToGroup(threadId, group.id)).catch(() => undefined)}
           >
             {group.name}
           </ContextMenuItem>
@@ -101,7 +101,7 @@ export function ThreadRowMenu({
         >
           Recycle Bin
         </ContextMenuItem>
-        <ContextMenuItem data-tone="destructive" onSelect={actions.archiveTree}>
+        <ContextMenuItem data-tone="destructive" onSelect={() => void actions.archiveTree()}>
           Archive
         </ContextMenuItem>
         <ContextMenuItem

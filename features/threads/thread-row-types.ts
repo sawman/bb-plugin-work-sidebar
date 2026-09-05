@@ -38,7 +38,7 @@ export type ThreadRowProps = {
     thread: PluginSidebarThread,
     event: ReactMouseEvent<HTMLAnchorElement>,
   ): boolean;
-  onMoveToGroup(threadId: string, groupId: string | null): void;
+  onMoveToGroup(threadId: string, groupId: string | null): void | Promise<void>;
   onMoveToRecycleBin?(threadId: string): void;
   project?: ThreadProject;
   provider?: ThreadProvider;

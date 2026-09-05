@@ -43,7 +43,7 @@ type SidebarOrganizationInput = {
   groups: readonly SidebarThreadGroup[];
   activeGroupPosition: number;
   searchQuery: string;
-  saveGroups(groups: SidebarThreadGroup[], activeGroupPosition?: number): void;
+  saveGroups(groups: SidebarThreadGroup[], activeGroupPosition?: number): void | Promise<void>;
   saveOrder(order: string[]): void;
   bin?(threadId: string, originGroupId: string | null): Promise<unknown>;
   restore?(
@@ -73,7 +73,7 @@ export type SidebarThreadOrganization = {
   ): boolean;
   setDragThreadId(threadId: string | null): void;
   setDropTarget(target: ThreadDropTarget): void;
-  moveToGroup(threadId: string, destination: string | null): void;
+  moveToGroup(threadId: string, destination: string | null): void | Promise<void>;
   moveToRecycleBin(threadId: string): Promise<void>;
   restoreFromRecycleBin(threadId: string): void;
   reorder(
@@ -82,7 +82,7 @@ export type SidebarThreadOrganization = {
     placement: "before" | "after",
   ): void;
   binSelected(): Promise<void>;
-  saveGroups(groups: SidebarThreadGroup[]): void;
+  saveGroups(groups: SidebarThreadGroup[]): void | Promise<void>;
   addGroup(name: string): boolean;
   moveGroup(groupId: string, direction: -1 | 1): void;
   reorderGroup(
@@ -269,7 +269,7 @@ export function useSidebarThreadOrganization({
     state.setDrag(state.dragThreadId, target);
   }, []);
   const moveToGroup = useCallback(
-    (threadId: string, destination: string | null) => {
+    async (threadId: string, destination: string | null) => {
       const thread = threads.find((candidate) => candidate.id === threadId);
       if (!thread) return;
       const subtree = new Set(visibleThreadTreeIds([thread], allChildren));
@@ -285,7 +285,7 @@ export function useSidebarThreadOrganization({
           threadIds: [...new Set([...next[index].threadIds, threadId])],
         };
       }
-      saveGroups(next);
+      await saveGroups(next);
     },
     [allChildren, groups, saveGroups, threads],
   );
@@ -404,7 +404,7 @@ export function useSidebarThreadOrganization({
         return false;
       }
       const id = `group_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-      saveGroups([...groups, { id, name, threadIds: [] }]);
+      void Promise.resolve(saveGroups([...groups, { id, name, threadIds: [] }])).catch(() => undefined);
       return true;
     },
     [groups, saveGroups],
@@ -425,11 +425,11 @@ export function useSidebarThreadOrganization({
         toast.error("A group with that name already exists.");
         return false;
       }
-      saveGroups(
+      void Promise.resolve(saveGroups(
         groups.map((candidate) =>
           candidate.id === group.id ? { ...candidate, name } : candidate,
         ),
-      );
+      )).catch(() => undefined);
       return true;
     },
     [groups, saveGroups],
@@ -442,7 +442,7 @@ export function useSidebarThreadOrganization({
         groupId,
         direction,
       );
-      if (next) saveGroups(next.groups, next.activeGroupPosition);
+      if (next) void Promise.resolve(saveGroups(next.groups, next.activeGroupPosition)).catch(() => undefined);
     },
     [activeGroupPosition, groups, saveGroups],
   );
@@ -455,7 +455,7 @@ export function useSidebarThreadOrganization({
         targetId,
         placement,
       );
-      if (next) saveGroups(next.groups, next.activeGroupPosition);
+      if (next) void Promise.resolve(saveGroups(next.groups, next.activeGroupPosition)).catch(() => undefined);
     },
     [activeGroupPosition, groups, saveGroups],
   );
@@ -465,10 +465,10 @@ export function useSidebarThreadOrganization({
       const remainingPositions = groupPositions.filter(
         (position) => position.id !== group.id,
       );
-      saveGroups(
+      void Promise.resolve(saveGroups(
         groups.filter((candidate) => candidate.id !== group.id),
         remainingPositions.findIndex((position) => !position.group),
-      );
+      )).catch(() => undefined);
     },
     [groupPositions, groups, occupiedGroupIds, saveGroups],
   );

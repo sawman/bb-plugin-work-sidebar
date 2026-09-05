@@ -10,6 +10,7 @@ import { Icon } from "../../components/ui/icon";
 import { taskStatusPresentation } from "./model";
 import { TaskPriorityIcon } from "./priority";
 import { AssigneePicker } from "./assignee-picker";
+import { useOpenTask } from "./task-navigation";
 import type { SidebarTask } from "../../work-model";
 import {
   MAX_COMPLETED_TASK_PREVIEW,
@@ -37,6 +38,7 @@ export function TaskWorkflowCard({
   onMakeGoal?(taskId: string): void;
 }) {
   const idPrefix = useId();
+  const openTask = useOpenTask();
   return (
     <div className="ws-task-workflow">
       <WorkflowSection
@@ -50,6 +52,7 @@ export function TaskWorkflowCard({
         onAssigneeChange={onAssigneeChange}
         detachableTaskIds={detachableTaskIds}
         onDetach={onDetach}
+        onOpenTask={openTask}
       />
       <WorkflowSection
         id={`${idPrefix}-queue`}
@@ -61,6 +64,7 @@ export function TaskWorkflowCard({
         onAssigneeChange={onAssigneeChange}
         detachableTaskIds={detachableTaskIds}
         onDetach={onDetach}
+        onOpenTask={openTask}
         onMakeGoal={onMakeGoal}
         showAssociationActions
       />
@@ -75,6 +79,7 @@ export function TaskWorkflowCard({
         onAssigneeChange={onAssigneeChange}
         detachableTaskIds={detachableTaskIds}
         onDetach={onDetach}
+        onOpenTask={openTask}
       />
     </div>
   );
@@ -93,6 +98,7 @@ function WorkflowSection({
   onAssigneeChange,
   detachableTaskIds,
   onDetach,
+  onOpenTask,
   onMakeGoal,
   showAssociationActions = false,
 }: {
@@ -108,6 +114,7 @@ function WorkflowSection({
   onAssigneeChange(taskId: string, assignee: SidebarTask["assignee"]): void;
   detachableTaskIds: ReadonlySet<string>;
   onDetach(taskId: string): void;
+  onOpenTask(taskKey: string): void;
   onMakeGoal?(taskId: string): void;
   showAssociationActions?: boolean;
 }) {
@@ -132,6 +139,7 @@ function WorkflowSection({
               onAssigneeChange={onAssigneeChange}
               detachable={showAssociationActions && detachableTaskIds.has(item.task.id)}
               onDetach={onDetach}
+              onOpenTask={onOpenTask}
               onMakeGoal={onMakeGoal}
             />
           ))}
@@ -196,6 +204,7 @@ function WorkflowRow({
   onAssigneeChange,
   detachable,
   onDetach,
+  onOpenTask,
   onMakeGoal,
 }: {
   item: TaskWorkflowItem;
@@ -204,6 +213,7 @@ function WorkflowRow({
   onAssigneeChange(taskId: string, assignee: SidebarTask["assignee"]): void;
   detachable: boolean;
   onDetach(taskId: string): void;
+  onOpenTask(taskKey: string): void;
   onMakeGoal?(taskId: string): void;
 }) {
   const { task } = item;
@@ -216,7 +226,12 @@ function WorkflowRow({
       data-state={task.status}
       aria-label={`${task.key}: ${task.title}. ${accessibleStatus}.`}
     >
-      <span className="ws-task-workflow-copy">
+      <button
+        type="button"
+        className="ws-task-workflow-copy ws-task-workflow-open"
+        aria-label={`Open ${task.key} in Tasks`}
+        onClick={() => onOpenTask(task.key)}
+      >
         <span className="ws-task-workflow-title-line">
           <span className="ws-task-workflow-priority">
             <TaskPriorityIcon priority={task.priority ?? "none"} />
@@ -224,7 +239,7 @@ function WorkflowRow({
           <span className="ws-task-workflow-key">{task.key}</span>
           <span className="ws-task-workflow-title">{task.title}</span>
         </span>
-      </span>
+      </button>
       <span
         className="ws-task-workflow-actions"
         role="group"

@@ -27,10 +27,20 @@ export function useThreadRowActions({
       await actions.rename(thread.id, next);
     setRenaming(false);
   };
-  const archiveTree = () => {
-    // BB owns recursive archive and destructive delete confirmation.
-    if (groupId) onMoveToGroup(thread.id, null);
-    actions.archive(thread.id);
+  const archiveTree = async () => {
+    // BB owns recursive archive. Persist removing this tree from a custom
+    // group first, so no archived thread retains a stale group membership.
+    if (!groupId) {
+      actions.archive(thread.id);
+      return;
+    }
+    try {
+      await onMoveToGroup(thread.id, null);
+      await actions.archive(thread.id);
+    } catch {
+      // Persistence already surfaced the failure. Do not archive on a stale
+      // group mutation.
+    }
   };
   return {
     renaming,

@@ -272,10 +272,12 @@ describe("R9 production ThreadRow host behavior", () => {
     fireEvent.click(
       await slot.findByRole("menuitem", { name: "Archive" }),
     );
-    expect(slot.inspection.sidebarActionCalls).toContainEqual({
-      method: "archive",
-      threadId: "thr_parent",
-    });
+    await waitFor(() =>
+      expect(slot.inspection.sidebarActionCalls).toContainEqual({
+        method: "archive",
+        threadId: "thr_parent",
+      }),
+    );
     expect(slot.inspection.sidebarActionCalls).toContainEqual({
       method: "requestDelete",
       threadId: "thr_parent",
