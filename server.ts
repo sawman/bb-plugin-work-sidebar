@@ -27,6 +27,7 @@ export default function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle = cre
   const workContext = createWorkContextRegistration(dependencies);
   const tracker = createTrackerRegistration(dependencies);
   bb.rpc.register(rpcContract, {
+    sidebarBranchDivergence: threads.sidebarBranchDivergence,
     getAgentDetails: agents.getAgentDetails,
     listHumanMessages: inbox.listHumanMessages,
     acknowledgeHumanMessage: inbox.acknowledgeHumanMessage,

@@ -106,6 +106,7 @@ describe("R2 app registration and Query lifecycle", () => {
           activeCount: 0,
           savedCount: 0,
         }),
+        sidebarBranchDivergence: () => ({ divergences: {} }),
       } as never,
     });
     const right = renderSlot(app.threadPanelActions[0]!, {
@@ -179,7 +180,13 @@ describe("R2 app registration and Query lifecycle", () => {
     // roster-wide PR directory and normalized fact directory are durable
     // sidebar reads. Queue changes arrive through realtime; PR consumers
     // observe these one-way Query entries.
-    expect(client.getQueryCache().getAll()).toHaveLength(25);
+    expect(client.getQueryCache().getAll()).toHaveLength(26);
+    expect(
+      client.getQueryCache().find({
+        queryKey: ["work-sidebar", "sidebar", "threads", "branch-divergence"],
+        exact: false,
+      })?.getObserversCount(),
+    ).toBe(1);
     expect(
       client
         .getQueryCache()

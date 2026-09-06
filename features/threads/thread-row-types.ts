@@ -6,13 +6,12 @@ import type {
   ThreadProviderDirectory,
 } from "@/components/threads/thread-provider-logo";
 import type { ThreadDropTarget } from "./store";
-import type { QueuedMessage } from "./schemas";
+import type { QueuedMessage, SidebarBranchDivergence } from "./schemas";
 import type { ThreadAgentRollup } from "./thread-agent-rollup";
 import type {
   ThreadPullRequest,
   ThreadPullRequestDirectory,
 } from "../pull-requests/queries";
-
 export type { ThreadDropTarget } from "./store";
 
 export type ThreadProject = {
@@ -44,6 +43,7 @@ export type ThreadRowProps = {
   provider?: ThreadProvider;
   pullRequest?: ThreadPullRequest | null;
   pullRequestLoading?: boolean;
+  branchDivergence?: SidebarBranchDivergence | null;
   onNavigate(): void;
   reorderDisabled: boolean;
   dragThreadId: string | null;
@@ -86,4 +86,5 @@ export type WorkThreadTreeProps = Omit<
   queuedMessagesByThread?: ReadonlyMap<string, QueuedMessage>;
   pullRequestsByThread?: ThreadPullRequestDirectory;
   pullRequestsLoading?: boolean;
+  branchDivergences?: Readonly<Record<string, SidebarBranchDivergence | null>>;
 };

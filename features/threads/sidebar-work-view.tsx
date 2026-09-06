@@ -7,6 +7,7 @@ import type { RecycleBinEntry } from "./recycle-bin";
 import type { QueuedMessage } from "./schemas";
 import type { GroupActivityPriority } from "./group-activity-priority";
 import type { ThreadPullRequestDirectory } from "../pull-requests/queries";
+import type { SidebarBranchDivergenceDirectory } from "./queries";
 
 type SidebarWorkViewProps = {
   toolbar: ReactNode;
@@ -27,6 +28,7 @@ type SidebarWorkViewProps = {
   disclosuresReady: boolean;
   pullRequestsByThread?: ThreadPullRequestDirectory;
   pullRequestsLoading: boolean;
+  branchDivergences?: SidebarBranchDivergenceDirectory;
 };
 
 function useQueuedMessageClock(messages: ReadonlyMap<string, QueuedMessage>) {
@@ -62,6 +64,7 @@ export function SidebarWorkView({
   disclosuresReady,
   pullRequestsByThread,
   pullRequestsLoading,
+  branchDivergences,
 }: SidebarWorkViewProps) {
   const queuedMessageNow = useQueuedMessageClock(queuedMessagesByThread);
   return (
@@ -87,6 +90,7 @@ export function SidebarWorkView({
           disclosuresReady={disclosuresReady}
           pullRequestsByThread={pullRequestsByThread}
           pullRequestsLoading={pullRequestsLoading}
+          branchDivergences={branchDivergences}
         />
       </div>
     </>

@@ -30,6 +30,7 @@ export function WorkThreadTree({
   queuedMessageNow,
   pullRequestsByThread,
   pullRequestsLoading,
+  branchDivergences,
   depth = 0,
 }: WorkThreadTreeProps) {
   const children = childrenByThread.get(thread.id) ?? [];
@@ -66,6 +67,7 @@ export function WorkThreadTree({
         provider={providersById.get(thread.providerId)}
         pullRequest={pullRequestsByThread?.[thread.id] ?? null}
         pullRequestLoading={pullRequestsLoading}
+        branchDivergence={branchDivergences?.[thread.id]}
         onNavigate={onNavigate}
         reorderDisabled={reorderDisabled}
         dragThreadId={dragThreadId}
@@ -110,6 +112,7 @@ export function WorkThreadTree({
               queuedMessageNow={queuedMessageNow}
               pullRequestsByThread={pullRequestsByThread}
               pullRequestsLoading={pullRequestsLoading}
+              branchDivergences={branchDivergences}
               depth={depth + 1}
             />
           </div>

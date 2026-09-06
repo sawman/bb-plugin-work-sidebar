@@ -40,6 +40,7 @@ export function ThreadRow({
   provider,
   pullRequest = null,
   pullRequestLoading = false,
+  branchDivergence,
   onNavigate,
   reorderDisabled,
   dragThreadId,
@@ -216,6 +217,7 @@ export function ThreadRow({
                   }
                   pullRequest={pullRequest}
                   pullRequestLoading={pullRequestLoading}
+                  branchDivergence={branchDivergence}
                 />
               }
               trailing={

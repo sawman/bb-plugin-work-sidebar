@@ -945,6 +945,28 @@ accessible Mermaid-source fallback, and archive/delete cleanup. The durable
 execution tasks are BBPLUG-361 through BBPLUG-365; BB Tasks remains the
 executable work queue.
 
+#### Loop R38 — thread branch divergence
+
+- **Red:** add a Threads server-model test for same-named remote resolution,
+  `origin` preference, ambiguous/no-upstream handling, duplicate-environment
+  coalescing, bounded concurrency, and per-environment failure isolation. Add
+  Query and row tests for one roster-scoped request, visible-only polling,
+  finite GC, manual refresh, compact ahead/behind rendering, truncation, and
+  tooltip/accessibility behavior.
+- **Green:** add one strict roster RPC backed by BB's host-aware environment
+  branch and status APIs. Resolve the current branch's matching remote, compare
+  through `environments.status`, and render non-zero `↑`/`↓` counts beside the
+  existing branch label. Unsupported, detached, missing, and ambiguous remote
+  states omit the indicator without affecting the row.
+- **Refactor/removal:** keep the remote facts in one Threads-owned TanStack
+  Query, key it by the normalized active roster, limit server work to distinct
+  environment/branch pairs, and avoid per-row hooks, local Git processes, or
+  Zustand copies.
+- **Validation/evidence:** focused server/query/row tests pass twice; the full
+  serial suite, typecheck, SDK check, build, verified-source reload, theme
+  probe, and diff check pass. Commit and push only after the integrated
+  checkout is clean.
+
 ### BB child execution protocol
 
 G0 is complete. Each new code-editing loop receives one direct BB execution

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type PropsWithChildren } from "react";
@@ -8,6 +8,7 @@ import { queryKeys } from "../../../query-runtime";
 import { trackerKeys } from "../../tracker/model";
 import { normalizeThreadGroups } from "../model";
 import {
+  BRANCH_DIVERGENCE_REFRESH_MS,
   QUEUED_MESSAGE_REFRESH_MS,
   threadQueryKeys,
   threadQueryPolicies,
@@ -15,6 +16,7 @@ import {
   saveSidebarAppearance,
   useArchivedThreadsQuery,
   useQueuedMessagesQuery,
+  useSidebarBranchDivergenceQuery,
   useThreadHierarchyMutation,
   type ThreadsRpc,
 } from "../queries";
@@ -33,7 +35,56 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+afterEach(() => vi.useRealTimers());
+
 describe("R9 Threads query ownership", () => {
+  it("shares one roster divergence read and polls only while Threads is visible", async () => {
+    expect(threadQueryPolicies.branchDivergence).toMatchObject({
+      staleTime: 30_000,
+      gcTime: 5 * 60_000,
+      retry: false,
+      refetchOnWindowFocus: false,
+    });
+    vi.useFakeTimers();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const rpc = {
+      call: vi.fn(async () => ({
+        divergences: {
+          thr_one: { upstream: "origin/feature/one", ahead: 2, behind: 1 },
+        },
+      })),
+    };
+    const targets = [
+      { threadId: "thr_one", environmentId: "env_one", branchName: "feature/one" },
+    ];
+    const view = renderHook(
+      ({ active }: { active: boolean }) =>
+        useSidebarBranchDivergenceQuery(
+          rpc as unknown as ThreadsRpc,
+          targets,
+          active,
+        ),
+      { initialProps: { active: false }, wrapper: queryWrapper(client) },
+    );
+    expect(rpc.call).not.toHaveBeenCalled();
+    view.rerender({ active: true });
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(rpc.call).toHaveBeenCalledWith("sidebarBranchDivergence", { targets });
+    expect(view.result.current.data?.thr_one).toEqual({
+      upstream: "origin/feature/one",
+      ahead: 2,
+      behind: 1,
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(BRANCH_DIVERGENCE_REFRESH_MS));
+    expect(rpc.call).toHaveBeenCalledTimes(2);
+    view.rerender({ active: false });
+    await act(async () => vi.advanceTimersByTimeAsync(BRANCH_DIVERGENCE_REFRESH_MS * 2));
+    expect(rpc.call).toHaveBeenCalledTimes(2);
+    view.unmount();
+    client.clear();
+    vi.useRealTimers();
+  });
+
   it("observes queued messages only while the Work tab is active", async () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },

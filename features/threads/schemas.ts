@@ -64,7 +64,41 @@ export const queuedMessageSchema = z
   .strict();
 export type QueuedMessage = z.infer<typeof queuedMessageSchema>;
 
+const branchDivergenceTargetSchema = z
+  .object({
+    threadId: z.string().startsWith("thr_"),
+    environmentId: z.string().startsWith("env_"),
+    branchName: z.string().trim().min(1).max(240),
+  })
+  .strict();
+export type SidebarBranchDivergenceTarget = z.infer<
+  typeof branchDivergenceTargetSchema
+>;
+export const sidebarBranchDivergenceSchema = z
+  .object({
+    upstream: z.string().trim().min(1).max(260),
+    ahead: z.number().int().nonnegative(),
+    behind: z.number().int().nonnegative(),
+  })
+  .strict();
+export type SidebarBranchDivergence = z.infer<
+  typeof sidebarBranchDivergenceSchema
+>;
+
 export const threadPreferenceSchemas = {
+  sidebarBranchDivergence: {
+    input: z
+      .object({ targets: z.array(branchDivergenceTargetSchema).max(200) })
+      .strict(),
+    output: z
+      .object({
+        divergences: z.record(
+          z.string().startsWith("thr_"),
+          sidebarBranchDivergenceSchema.nullable(),
+        ),
+      })
+      .strict(),
+  },
   sidebarQueuedMessages: {
     input: z.null(),
     output: z.object({ messages: z.array(queuedMessageSchema) }).strict(),

@@ -12,6 +12,7 @@ import { SidebarThreadTree } from "./sidebar-thread-tree";
 import { ThreadGroupSummary } from "./thread-group-summary";
 import type { GroupActivityPriority } from "./group-activity-priority";
 import type { ThreadPullRequestDirectory } from "../pull-requests/queries";
+import type { SidebarBranchDivergenceDirectory } from "./queries";
 type SidebarGroupTreeProps = {
   organization: SidebarThreadOrganization;
   activeThreadId: string | null;
@@ -29,6 +30,7 @@ type SidebarGroupTreeProps = {
   disclosures: Readonly<Record<string, boolean>>; onDisclosureChange(id: string, open: boolean): void; disclosuresReady: boolean;
   pullRequestsByThread?: ThreadPullRequestDirectory;
   pullRequestsLoading: boolean;
+  branchDivergences?: SidebarBranchDivergenceDirectory;
 };
 
 const sourceId = (event: DragEvent<HTMLElement>, dragThreadId: string | null) => dragThreadId ?? event.dataTransfer.getData("text/plain");
@@ -49,11 +51,13 @@ export function SidebarThreadGroups({
   allThreads,
   disclosures, onDisclosureChange, disclosuresReady,
   pullRequestsByThread, pullRequestsLoading,
+  branchDivergences,
 }: SidebarGroupTreeProps) {
   const sharedTreeProps = {
     organization, activeThreadId, providersById, onNavigate, subtextRefreshKey,
     staleWorkingMinutes, queuedMessagesByThread, queuedMessageNow,
     pullRequestsByThread, pullRequestsLoading,
+    branchDivergences,
   };
   const dropTargetId =
     organization.dropTarget?.kind === "group"

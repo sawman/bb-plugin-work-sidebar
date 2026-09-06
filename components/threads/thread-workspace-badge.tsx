@@ -1,6 +1,7 @@
 import { CopyBadge } from "../ui/copy-badge";
 import { BranchName } from "../ui/branch-name";
 import { Icon } from "../ui/icon";
+import { ActionTooltip } from "../ui/action-tooltip";
 
 export type ThreadWorkspaceProject = {
   name: string;
@@ -19,6 +20,57 @@ type ThreadLocation = {
   kind: "personal" | "repository" | "worktree";
   value: string;
 };
+
+type BranchDivergence = {
+  upstream: string;
+  ahead: number;
+  behind: number;
+};
+
+function commitLabel(count: number) {
+  return `${count} commit${count === 1 ? "" : "s"}`;
+}
+
+function BranchDivergenceIndicator({
+  divergence,
+}: {
+  divergence?: BranchDivergence | null;
+}) {
+  if (!divergence || (divergence.ahead === 0 && divergence.behind === 0))
+    return null;
+  const details = [
+    divergence.ahead > 0 ? `${divergence.ahead} ahead` : null,
+    divergence.behind > 0 ? `${divergence.behind} behind` : null,
+  ].filter(Boolean).join(" · ");
+  const accessible = [
+    divergence.ahead > 0
+      ? `${commitLabel(divergence.ahead)} ahead`
+      : null,
+    divergence.behind > 0
+      ? `${commitLabel(divergence.behind)} behind`
+      : null,
+  ].filter(Boolean).join(" and ");
+  return (
+    <ActionTooltip label={details}>
+      {(tooltipId) => (
+        <span
+          className="ws-thread-branch-divergence"
+          role="img"
+          aria-label={`${accessible} ${divergence.upstream}`}
+          aria-describedby={tooltipId}
+          data-upstream={divergence.upstream}
+        >
+          {divergence.ahead > 0 ? (
+            <span data-direction="ahead">↑{divergence.ahead}</span>
+          ) : null}
+          {divergence.behind > 0 ? (
+            <span data-direction="behind">↓{divergence.behind}</span>
+          ) : null}
+        </span>
+      )}
+    </ActionTooltip>
+  );
+}
 
 function fallbackLocation({
   project,
@@ -58,23 +110,24 @@ export function ThreadWorkspaceBadge({
   workspaceDisplayKind,
   project,
   projectLabel,
+  divergence,
 }: {
   branchName: string | null;
   environmentName?: string | null;
   workspaceDisplayKind?: WorkspaceDisplayKind;
   project?: ThreadWorkspaceProject;
   projectLabel: string;
+  divergence?: BranchDivergence | null;
 }) {
   const branch = branchName?.trim() || null;
   const workspace = environmentName?.trim() || null;
   if (branch) {
     return (
       <span className="ws-thread-location" data-location-kind="branch">
-        <BranchName
-          name={branch}
-          className="ws-thread-location-content"
-          icon="GitBranch"
-        />
+        <span className="ws-thread-location-content">
+          <BranchName name={branch} icon="GitBranch" />
+          <BranchDivergenceIndicator divergence={divergence} />
+        </span>
       </span>
     );
   }

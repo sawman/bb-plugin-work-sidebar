@@ -17,6 +17,7 @@ import {
 } from "./thread-runtime";
 import { adaptSidebarThreadActivity } from "@/shared/thread-activity";
 import { ThreadQueuedStatus } from "./thread-queued-status";
+import type { SidebarBranchDivergence } from "./schemas";
 
 export function ThreadRuntimeProvider({
   thread,
@@ -65,6 +66,7 @@ export function ThreadMetadata({
   stackNumber,
   pullRequest,
   pullRequestLoading,
+  branchDivergence,
 }: {
   thread: PluginSidebarThread;
   project?: ThreadProject;
@@ -72,6 +74,7 @@ export function ThreadMetadata({
   stackNumber?: ReactNode;
   pullRequest: ThreadPullRequest | null;
   pullRequestLoading: boolean;
+  branchDivergence?: SidebarBranchDivergence | null;
 }) {
   const pullRequestStatus = pullRequest
     ? pullRequestSummaryPresentation({
@@ -99,6 +102,7 @@ export function ThreadMetadata({
         workspaceDisplayKind={thread.environment?.workspaceDisplayKind}
         project={project}
         projectLabel={projectLabel}
+        divergence={branchDivergence}
       />
       {pullRequestLoading && (
         <span

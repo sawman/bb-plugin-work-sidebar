@@ -5,9 +5,11 @@ import { createRecycleBinExpiryHandler } from "./recycle-bin-expiry.js";
 import { createSdkThreadHierarchyService, type WorkBindingReader } from "./hierarchy-server.js";
 import { registerThreadSettings } from "./settings-registration.js";
 import { createQueuedMessageRegistration } from "./queued-messages-server.js";
+import { createBranchDivergenceReader } from "./branch-divergence-server.js";
 type ThreadHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
-  "sidebarQueuedMessages" | "getSidebarOrder" | "saveSiblingOrder" | "getLaterThreads" | "saveLaterThreads" | "getThreadGroups" | "saveThreadGroups" | "getSidebarAppearance" | "saveSidebarAppearance" | "moveSidebarThread"
+  "sidebarBranchDivergence" | "sidebarQueuedMessages" | "getSidebarOrder" | "saveSiblingOrder" | "getLaterThreads" | "saveLaterThreads"
+    | "getThreadGroups" | "saveThreadGroups" | "getSidebarAppearance" | "saveSidebarAppearance" | "moveSidebarThread"
     | "getRecycleBin" | "binSidebarThread" | "restoreBinnedSidebarThread" | "expireRecycleBinThreads" | "sidebarArchivedThreads" | "unarchiveSidebarThread"
 >;
 
@@ -18,7 +20,9 @@ export function createThreadRegistration(bb: BbPluginApi, work: WorkBindingReade
   const preferences = createThreadPreferencesService({ get: (key) => bb.storage.kv.get<unknown>(key), set: (key, value) => bb.storage.kv.set(key, value), publish: (channel, payload) => bb.realtime.publish(channel, payload) });
   const hierarchy = createSdkThreadHierarchyService(bb, work, preferences);
   const queuedMessages = createQueuedMessageRegistration(bb);
+  const branchDivergence = createBranchDivergenceReader(bb.sdk.environments);
   return {
+    async sidebarBranchDivergence({ targets }) { return { divergences: await branchDivergence(targets) }; },
     sidebarQueuedMessages: queuedMessages.sidebarQueuedMessages,
     async getSidebarOrder() {
       return { threadIds: await preferences.order() };

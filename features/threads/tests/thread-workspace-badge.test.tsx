@@ -33,6 +33,7 @@ describe("thread workspace metadata", () => {
           workspaceDisplayKind="managed-worktree"
           project={{ name: "Work sidebar", isPersonal: false }}
           projectLabel="Work sidebar"
+          divergence={{ upstream: "origin/bb/r24-location", ahead: 12, behind: 3 }}
         />
       </>,
     );
@@ -51,7 +52,7 @@ describe("thread workspace metadata", () => {
       { kind: "personal", icon: "Laptop", text: "Personal" },
       { kind: "worktree", icon: "Columns2", text: "Detached worktree" },
       { kind: "worktree", icon: "Columns2", text: "R24 checkout" },
-      { kind: "branch", icon: "GitBranch", text: "bb/r24-location" },
+      { kind: "branch", icon: "GitBranch", text: "bb/r24-location↑12↓3" },
     ]);
 
     const copyable = screen.getAllByRole("button");
@@ -68,5 +69,22 @@ describe("thread workspace metadata", () => {
       expect.any(HTMLElement),
       expect.any(HTMLElement),
     ]);
+    expect(screen.getByRole("img", {
+      name: "12 commits ahead and 3 commits behind origin/bb/r24-location",
+    })).toBeTruthy();
+    expect(document.querySelector(
+      '[data-tooltip-label="12 ahead · 3 behind"]',
+    )).toBeTruthy();
+  });
+
+  it("omits a divergence marker when the branch matches its remote", () => {
+    render(
+      <ThreadWorkspaceBadge
+        branchName="main"
+        projectLabel="Project"
+        divergence={{ upstream: "origin/main", ahead: 0, behind: 0 }}
+      />,
+    );
+    expect(document.querySelector(".ws-thread-branch-divergence")).toBeNull();
   });
 });

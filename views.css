@@ -1378,6 +1378,27 @@
   overflow: hidden;
   white-space: nowrap;
 }
+.ws-thread-location-content > .ws-branch-name {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+}
+.ws-thread-branch-divergence {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.12rem;
+  font: var(--ws-text-metadata);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+.ws-thread-branch-divergence [data-direction="ahead"] {
+  color: var(--diff-added);
+}
+.ws-thread-branch-divergence [data-direction="behind"] {
+  color: var(--warning);
+}
 .ws-thread-location svg {
   width: 0.58rem;
   height: 0.58rem;

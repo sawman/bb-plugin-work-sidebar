@@ -31,6 +31,7 @@ import {
   threadQueryKeys,
   useThreadPreferences,
   useRecycleBin,
+  useSidebarThreadBranchDivergence,
 } from "./queries";
 import { useSidebarQueuedMessages } from "./queued-messages";
 import { useSidebarThreadOrganization } from "./sidebar-organization";
@@ -47,13 +48,10 @@ const SIDEBAR_TABS: readonly { id: SidebarView; label: string }[] = (
 ).map((id) => ({ id, label: sidebarViewLabel(id) }));
 const EMPTY_TASK_OWNER_THREADS: ReadonlyMap<string, { title: string; providerId: string; provider?: ThreadProvider }> = new Map();
 const EMPTY_PULL_REQUEST_THREADS: readonly PullRequestThreadReference[] = [];
-function EmptyOriginal() {
-  return null;
-}
+function EmptyOriginal() { return null; }
 
 export function ThreadsSidebarController(props: PluginThreadListProps) {
-  const Original =
-    props.Original ?? props.experimental_Original ?? EmptyOriginal;
+  const Original = props.Original ?? props.experimental_Original ?? EmptyOriginal;
   const { status, threads, projects } = experimental_useSidebarThreads();
   const providerDirectory = experimental_useProviders();
   const pluginSettings = useSettings();
@@ -68,6 +66,10 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     [recycleBin.bin.data],
   );
   const liveThreads = useMemo(() => threads.filter((thread) => !thread.isArchived && !binnedIds.has(thread.id)), [binnedIds, threads]);
+  const {
+    data: branchDivergences,
+    refetch: refetchBranchDivergences,
+  } = useSidebarThreadBranchDivergence(liveThreads, view === "work");
   // One project-roster read owns the normalized PR facts for the entire
   // frontend generation. Consumers only observe this cache; none issue
   // per-row PR reads.
@@ -120,10 +122,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     [liveThreads, providersById, view],
   );
   const groupPreferences = threadPreferences.groups.data ?? { groups: [], activeGroupPosition: 0, disclosures: {} };
-  const threadCount = useMemo(
-    () => threadCountPresentation(liveThreads),
-    [liveThreads],
-  );
+  const threadCount = useMemo(() => threadCountPresentation(liveThreads), [liveThreads]);
   const saveGroups = useCallback(
     (
       groups: Parameters<
@@ -193,12 +192,14 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
       queryClient.invalidateQueries({
         queryKey: threadQueryKeys.recycleBin(),
       }),
+      refetchBranchDivergences(),
     ]);
   }, [
     queryClient,
     refetchTaskLinks,
     threadPreferences.groups,
     threadPreferences.order,
+    refetchBranchDivergences,
   ]);
   const activateView = useCallback(
     (nextView: SidebarView) => {
@@ -215,9 +216,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     },
     [actions, props],
   );
-
   if (status !== "ready") return <Original />;
-
   const taskLinks = taskLinksData?.links ?? {};
   const textScale = threadPreferences.appearance.data?.textScale ?? DEFAULT_TEXT_SCALE;
   const workingProviderAnimation = threadPreferences.appearance.data?.workingProviderAnimation ?? DEFAULT_WORKING_PROVIDER_ANIMATION;
@@ -340,6 +339,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
           disclosuresReady={threadPreferences.groups.isSuccess}
           pullRequestsByThread={threadPullRequests.data}
           pullRequestsLoading={threadPullRequests.isPending}
+          branchDivergences={branchDivergences}
         />
             <ThreadHierarchyPickerHost />
           </ThreadHierarchyProvider>

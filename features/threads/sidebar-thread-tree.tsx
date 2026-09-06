@@ -7,6 +7,7 @@ import { WorkThreadTree } from "./thread-tree";
 import { threadAgentRollups } from "./thread-agent-rollup";
 import type { QueuedMessage } from "./schemas";
 import type { ThreadPullRequestDirectory } from "../pull-requests/queries";
+import type { SidebarBranchDivergenceDirectory } from "./queries";
 
 type SidebarThreadTreeProps = {
   organization: SidebarThreadOrganization;
@@ -22,6 +23,7 @@ type SidebarThreadTreeProps = {
   label: string;
   pullRequestsByThread?: ThreadPullRequestDirectory;
   pullRequestsLoading: boolean;
+  branchDivergences?: SidebarBranchDivergenceDirectory;
 };
 
 /** Renders one group tree while keeping row interaction ownership in Threads. */
@@ -39,6 +41,7 @@ export function SidebarThreadTree({
   label,
   pullRequestsByThread,
   pullRequestsLoading,
+  branchDivergences,
 }: SidebarThreadTreeProps) {
   const agentRollups = useMemo(
     () => threadAgentRollups(roots, childrenByThread),
@@ -76,6 +79,7 @@ export function SidebarThreadTree({
             queuedMessageNow={queuedMessageNow}
             pullRequestsByThread={pullRequestsByThread}
             pullRequestsLoading={pullRequestsLoading}
+            branchDivergences={branchDivergences}
           />
         ))}
       </SidebarTable>

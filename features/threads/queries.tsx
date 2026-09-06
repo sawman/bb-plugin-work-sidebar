@@ -4,10 +4,11 @@ import {
   useQueryClient,
   type QueryClient,
 } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   useRealtime,
   useRpc,
+  type PluginSidebarThread,
   type PluginRpcClient,
 } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
@@ -24,6 +25,10 @@ import { invalidateTaskQueries } from "../tasks/mutations";
 import { invalidateTracker } from "../tracker/queries";
 import { invalidateWorkContextCards } from "../work-context/queries";
 import type { RecycleBinEntry } from "./recycle-bin";
+import type {
+  SidebarBranchDivergence,
+  SidebarBranchDivergenceTarget,
+} from "./schemas";
 
 const root = ["work-sidebar", "sidebar", "threads"] as const;
 export const threadQueryKeys = {
@@ -31,6 +36,8 @@ export const threadQueryKeys = {
   order: () => [...root, "order"] as const,
   groups: () => [...root, "groups"] as const,
   appearance: () => [...root, "appearance"] as const,
+  branchDivergence: (fingerprint: string) =>
+    [...root, "branch-divergence", fingerprint] as const,
   queuedMessages: () => [...root, "queued-messages"] as const,
   archived: () => [...root, "archived"] as const,
   recycleBin: () => [...root, "recycle-bin"] as const,
@@ -40,6 +47,12 @@ export const threadQueryPolicies = {
   groups: queryPolicies.sidebarOrderPreferences,
   appearance: queryPolicies.sidebarOrderPreferences,
   queuedMessages: queryPolicies.queuedMessages,
+  branchDivergence: {
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  },
 } as const;
 export type ThreadsRpc = PluginRpcClient<typeof rpcContract>;
 export type SidebarAppearance = {
@@ -55,6 +68,70 @@ export type SidebarAppearanceUpdate =
   | { workingProviderAnimation: WorkingProviderAnimation }
   | { groupActivityPriority: GroupActivityPriority }
   | { openPrLinksExternallyWithModifier: boolean };
+
+export type SidebarBranchDivergenceDirectory = Readonly<
+  Record<string, SidebarBranchDivergence | null>
+>;
+
+export const BRANCH_DIVERGENCE_REFRESH_MS = 60_000;
+
+function branchDivergenceFingerprint(
+  targets: readonly SidebarBranchDivergenceTarget[],
+) {
+  return targets
+    .map(({ threadId, environmentId, branchName }) =>
+      `${threadId}\0${environmentId}\0${branchName}`,
+    )
+    .sort()
+    .join("\u0001");
+}
+
+export function useSidebarBranchDivergenceQuery(
+  rpc: ThreadsRpc,
+  targets: readonly SidebarBranchDivergenceTarget[],
+  active: boolean,
+) {
+  const fingerprint = branchDivergenceFingerprint(targets);
+  return useQuery({
+    queryKey: threadQueryKeys.branchDivergence(fingerprint),
+    queryFn: async () =>
+      (await rpc.call("sidebarBranchDivergence", { targets: [...targets] }))
+        .divergences,
+    ...threadQueryPolicies.branchDivergence,
+    enabled: active && targets.length > 0,
+    refetchInterval:
+      active && targets.length > 0 ? BRANCH_DIVERGENCE_REFRESH_MS : false,
+    refetchIntervalInBackground: false,
+  });
+}
+
+export function useSidebarBranchDivergence(
+  targets: readonly SidebarBranchDivergenceTarget[],
+  active: boolean,
+) {
+  return useSidebarBranchDivergenceQuery(
+    useRpc<typeof rpcContract>(),
+    targets,
+    active,
+  );
+}
+
+export function useSidebarThreadBranchDivergence(
+  threads: readonly PluginSidebarThread[],
+  active: boolean,
+) {
+  const targets = useMemo(
+    () => threads.flatMap((thread) => {
+      const environmentId = thread.environment?.id;
+      const branchName = thread.environment?.branchName?.trim();
+      return environmentId && branchName
+        ? [{ threadId: thread.id, environmentId, branchName }]
+        : [];
+    }),
+    [threads],
+  );
+  return useSidebarBranchDivergence(targets, active);
+}
 
 export function useThreadHierarchyMutation(rpc: ThreadsRpc) {
   const client = useQueryClient();
