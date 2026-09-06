@@ -10,14 +10,15 @@ const workSection = readFileSync(new URL("../../../components/ui/work-section.ts
 describe("Inbox architecture boundaries", () => {
   it("uses the shared search/disclosure primitives and host typography tokens", () => {
     expect(views).toContain("SearchCombobox");
-    expect(views).toContain("open={false}");
+    expect(views).toContain("hideResults");
     expect(views).not.toContain("portal");
-    expect(views).not.toContain("hideResults");
+    expect(views).toContain('aria-label="Search Inbox"');
     expect(views).not.toMatch(/<input\b/);
     expect(views).toContain("WorkSection");
     expect(workflow).toContain("WorkSection");
     expect(workSection).toContain("CountedDisclosure");
     expect(styles).toContain(".ws-work-section-trigger");
+    expect(styles).toContain(".ws-inbox-search-trigger");
     expect(styles).not.toContain(".ws-inbox-group h3");
     expect(views).not.toContain("ws-inbox-group");
     expect(styles).not.toContain("--bb-");

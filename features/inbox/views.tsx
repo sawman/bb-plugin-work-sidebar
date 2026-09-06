@@ -17,6 +17,7 @@ import type { HumanMessage } from "./schemas";
 export function InboxCard({ threadId }: { threadId: string }) {
   const [searchDraft, setSearchDraft] = useState("");
   const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   useEffect(() => {
     const timer = window.setTimeout(() => setSearch(searchDraft), 250);
     return () => window.clearTimeout(timer);
@@ -27,33 +28,29 @@ export function InboxCard({ threadId }: { threadId: string }) {
   const messages = query.data?.messages ?? [];
   const inboxMessages = useMemo(() => messages.filter(messageIsInbox), [messages]);
   const savedMessages = useMemo(() => messages.filter(messageIsSaved), [messages]);
+  const closeSearch = () => {
+    setSearchDraft("");
+    setSearch("");
+    setSearchOpen(false);
+  };
 
   return (
     <SurfaceCard className="ws-inbox-card" data-card="inbox">
       <SurfaceCardHeading
         title="Inbox"
-        trailing={query.data && query.data.activeCount > 0 ? (
-          <span className="ws-inbox-unread-count" aria-label={`${query.data.activeCount} unread messages`}>
-            {query.data.activeCount}
-          </span>
-        ) : undefined}
+        trailing={(
+          <InboxHeadingActions
+            activeCount={query.data?.activeCount ?? 0}
+            open={searchOpen}
+            query={searchDraft}
+            onClose={closeSearch}
+            onOpenChange={setSearchOpen}
+            onQueryChange={setSearchDraft}
+          />
+        )}
       />
       <h2 className="ws-sr-only">Inbox</h2>
       <div className="ws-inbox-content">
-        <SearchCombobox
-          ariaLabel="Search Inbox messages"
-          emptyMessage=""
-          listboxLabel="Search Inbox messages"
-          onOpenChange={() => undefined}
-          onQueryChange={setSearchDraft}
-          onSelectionChange={() => undefined}
-          open={false}
-          options={[]}
-          placeholder="Search messages"
-          query={searchDraft}
-          searchOnly
-          selectedValues={[]}
-        />
         {query.isInitialPending ? <InboxLoading /> : null}
         {query.error && !query.data ? (
           <div className="ws-inbox-state" role="alert">
@@ -75,7 +72,7 @@ export function InboxCard({ threadId }: { threadId: string }) {
           ) : (
             <>
               <WorkSection
-                title="Inbox messages"
+                title="Messages"
                 count={query.data?.activeCount ?? 0}
                 countUnit="message"
                 defaultOpen
@@ -87,7 +84,7 @@ export function InboxCard({ threadId }: { threadId: string }) {
                 )}
               </WorkSection>
               <WorkSection
-                title="Saved messages"
+                title="Saved"
                 count={query.data?.savedCount ?? 0}
                 countUnit="message"
                 defaultOpen
@@ -122,6 +119,67 @@ export function InboxCard({ threadId }: { threadId: string }) {
         ) : null}
       </div>
     </SurfaceCard>
+  );
+}
+
+function InboxHeadingActions({
+  activeCount,
+  open,
+  query,
+  onClose,
+  onOpenChange,
+  onQueryChange,
+}: {
+  activeCount: number;
+  open: boolean;
+  query: string;
+  onClose(): void;
+  onOpenChange(open: boolean): void;
+  onQueryChange(value: string): void;
+}) {
+  return (
+    <span className="ws-inbox-heading-actions">
+      {activeCount > 0 ? (
+        <span className="ws-inbox-unread-count" aria-label={`${activeCount} unread messages`}>
+          {activeCount}
+        </span>
+      ) : null}
+      {open ? (
+        <SearchCombobox
+          ariaLabel="Search Inbox messages"
+          autoFocus
+          emptyMessage=""
+          hideResults
+          inputClassName="ws-inbox-search-input"
+          listboxLabel="Search Inbox messages"
+          onDismiss={onClose}
+          onOpenChange={onOpenChange}
+          onQueryChange={onQueryChange}
+          onSelectionChange={() => undefined}
+          open
+          options={[]}
+          placeholder="Search messages…"
+          query={query}
+          searchOnly
+          selectedValues={[]}
+        />
+      ) : null}
+      <ActionTooltip label={open ? "Close search" : "Search"}>
+        {(tooltipId) => (
+          <button
+            type="button"
+            className="ws-inbox-search-trigger"
+            data-active={open || undefined}
+            aria-label="Search Inbox"
+            aria-describedby={tooltipId}
+            aria-expanded={open}
+            onClick={() => open ? onClose() : onOpenChange(true)}
+          >
+            <Icon name="Search" aria-hidden />
+          </button>
+        )}
+      </ActionTooltip>
+    </span>
   );
 }
 

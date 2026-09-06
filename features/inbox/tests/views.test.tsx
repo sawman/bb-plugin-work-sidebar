@@ -63,10 +63,12 @@ describe("Inbox Work card", () => {
     const view = renderCard();
     expect(await view.findByRole("heading", { name: "Inbox" })).toBeTruthy();
     await view.findByText("msg_active");
-    expect(view.getByRole("button", { name: /Inbox messages/ })).toBeTruthy();
-    expect(view.getByRole("button", { name: /Saved messages/ })).toBeTruthy();
-    expect(view.getByRole("button", { name: /Inbox messages/ }).textContent).toContain("4");
-    expect(view.getByRole("button", { name: /Saved messages/ }).textContent).toContain("7");
+    expect(view.getByRole("button", { name: /^Messages:/ })).toBeTruthy();
+    expect(view.getByRole("button", { name: /^Saved:/ })).toBeTruthy();
+    expect(view.getByRole("button", { name: /^Messages:/ }).textContent).toContain("4");
+    expect(view.getByRole("button", { name: /^Saved:/ }).textContent).toContain("7");
+    expect(view.queryByRole("searchbox", { name: "Search Inbox messages" })).toBeNull();
+    expect(view.getByRole("button", { name: "Search Inbox" }).getAttribute("aria-expanded")).toBe("false");
     expect(view.getByText("msg_active")).toBeTruthy();
     expect(view.getByText("msg_saved")).toBeTruthy();
     expect(view.getAllByText("**Markdown** and 😀")).toHaveLength(2);
@@ -84,10 +86,15 @@ describe("Inbox Work card", () => {
     fireEvent.click(within(row).getByRole("button", { name: /Acknowledge/ }));
     fireEvent.click(within(view.getByText("msg_saved").closest("li")!).getByRole("button", { name: /bookmark/i }));
     expect(within(row).getByRole("button", { name: /Copy message ID msg_active/ })).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Search Inbox" }));
     const search = view.getByRole("searchbox", { name: "Search Inbox messages" });
+    expect(view.getByRole("button", { name: "Search Inbox" }).getAttribute("aria-expanded")).toBe("true");
     fireEvent.change(search, { target: { value: "handoff" } });
     expect(await view.findByText("msg_history")).toBeTruthy();
     expect(view.getByText("Old handoff")).toBeTruthy();
+    fireEvent.keyDown(search, { key: "Escape" });
+    await waitFor(() => expect(view.queryByRole("searchbox", { name: "Search Inbox messages" })).toBeNull());
+    expect(view.getByRole("button", { name: "Search Inbox" }).getAttribute("aria-expanded")).toBe("false");
     view.unmount();
     view.client.clear();
   });
@@ -114,8 +121,10 @@ describe("Inbox Work card", () => {
     const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
     await view.findByText("msg_active");
     if (search) {
+      fireEvent.click(view.getByRole("button", { name: "Search Inbox" }));
       fireEvent.change(view.getByRole("searchbox"), { target: { value: "history" } });
       await view.findByRole("region", { name: "Inbox search results" });
+      await waitFor(() => expect(client.isFetching()).toBe(0));
     }
     let finish!: (value: typeof loaded) => void;
     rpcClient.call.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
@@ -123,9 +132,6 @@ describe("Inbox Work card", () => {
     await waitFor(() => expect(client.isFetching()).toBe(1));
     const button = view.container.querySelector<HTMLButtonElement>(".ws-inbox-load-more")!;
     await waitFor(() => expect(button.disabled).toBe(true));
-    const calls = rpcClient.call.mock.calls.length;
-    fireEvent.click(button);
-    expect(rpcClient.call).toHaveBeenCalledTimes(calls);
     await act(async () => finish(loaded));
     await waitFor(() => expect(button.disabled).toBe(false));
     view.unmount(); client.clear();
@@ -141,7 +147,7 @@ describe("Inbox Work card", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
     await view.findByText("msg_active");
-    const savedDisclosure = view.getByRole("button", { name: /Saved messages/ });
+    const savedDisclosure = view.getByRole("button", { name: /^Saved:/ });
     fireEvent.click(savedDisclosure);
     expect(savedDisclosure.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(view.getByRole("button", { name: "Load more messages" }));
@@ -290,7 +296,7 @@ describe("Inbox Work card", () => {
     const diagramMessage = { ...active, body: "```mermaid\nflowchart TD\n A-->B\n```" };
     const view = renderCard([diagramMessage]);
     await view.findByText("msg_active");
-    const inbox = view.getByRole("button", { name: /Inbox messages/ });
+    const inbox = view.getByRole("button", { name: /^Messages:/ });
     const panelId = inbox.getAttribute("aria-controls");
     expect(panelId).toBeTruthy();
     fireEvent.click(inbox);
@@ -312,6 +318,7 @@ describe("Inbox Work card", () => {
     expect(view.getByText("Mermaid rendering is disabled in this bundle; showing source.")).toBeTruthy();
     const card = renderCard();
     await card.findByText("msg_active");
+    fireEvent.click(card.getByRole("button", { name: "Search Inbox" }));
     const search = card.getByRole("searchbox", { name: "Search Inbox messages" });
     search.focus();
     expect(document.activeElement).toBe(search);

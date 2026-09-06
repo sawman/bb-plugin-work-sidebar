@@ -4296,6 +4296,41 @@ button.ws-provider-health:focus-visible {
   overflow: hidden;
 }
 
+.ws-inbox-heading-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.ws-inbox-search-trigger {
+  display: inline-grid;
+  width: 1rem;
+  height: 1rem;
+  place-items: center;
+  border: 0;
+  border-radius: calc(var(--radius) - 3px);
+  padding: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.ws-inbox-search-trigger:hover,
+.ws-inbox-search-trigger[data-active="true"] {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+.ws-inbox-search-trigger svg {
+  width: 0.68rem;
+  height: 0.68rem;
+}
+
+.ws-inbox-search-input {
+  width: 8.5rem;
+  max-width: min(8.5rem, calc(100vw - 8rem));
+}
+
 .ws-inbox-content {
   display: grid;
   gap: 0.55rem;

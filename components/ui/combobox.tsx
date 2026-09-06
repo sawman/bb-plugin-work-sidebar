@@ -142,6 +142,7 @@ export function SearchCombobox({
   const inputIsSearchOnly = searchOnly;
   const showPopup = open && (Boolean(anchor || anchorRef) || portal);
   const inputInContent = showPopup && Boolean(anchor || anchorRef);
+  const showInlineContent = open && (!hideResults || Boolean(header) || Boolean(footer));
 
   const setQuery = (next: string) => {
     if (query === undefined) setUncontrolledQuery(next);
@@ -428,7 +429,7 @@ export function SearchCombobox({
   return (
     <div ref={rootRef} className="ws-search-shell" onBlur={dismissOnBlur}>
       {!inputInContent && input}
-      {open ? content : null}
+      {showInlineContent ? content : null}
     </div>
   );
 }
