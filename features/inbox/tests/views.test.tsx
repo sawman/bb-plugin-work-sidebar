@@ -77,6 +77,15 @@ describe("Inbox Work card", () => {
     view.client.clear();
   });
 
+  it("keeps both empty-state labels terse and punctuation-free", async () => {
+    const view = renderCard([]);
+    expect(await view.findByText("No unread messages")).toBeTruthy();
+    expect(view.getByText("No saved messages")).toBeTruthy();
+    expect(view.queryByText(/Agents leave/)).toBeNull();
+    view.unmount();
+    view.client.clear();
+  });
+
   it("searches acknowledged history and performs acknowledge/bookmark/copy actions", async () => {
     const view = renderCard();
     await view.findByText("msg_active");

@@ -80,7 +80,7 @@ export function InboxCard({ threadId }: { threadId: string }) {
                 {inboxMessages.length ? (
                   <InboxMessageList messages={inboxMessages} mutations={mutations} />
                 ) : (
-                  <p className="ws-inbox-empty">No unread messages. Agents leave only key answers, decisions, and handoffs here.</p>
+                  <p className="ws-inbox-empty">No unread messages</p>
                 )}
               </WorkSection>
               <WorkSection
@@ -92,7 +92,7 @@ export function InboxCard({ threadId }: { threadId: string }) {
                 {savedMessages.length ? (
                   <InboxMessageList messages={savedMessages} mutations={mutations} />
                 ) : (
-                  <p className="ws-inbox-empty">No saved messages.</p>
+                  <p className="ws-inbox-empty">No saved messages</p>
                 )}
               </WorkSection>
               {query.hasNextPage ? (
