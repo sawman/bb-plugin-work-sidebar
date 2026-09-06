@@ -4318,6 +4318,7 @@ button.ws-provider-health:focus-visible {
 }
 
 .ws-inbox-heading-actions {
+  --ws-inbox-heading-control-size: 1rem;
   display: inline-flex;
   align-items: center;
   gap: 0.28rem;
@@ -4325,8 +4326,8 @@ button.ws-provider-health:focus-visible {
 
 .ws-inbox-search-trigger {
   display: inline-grid;
-  width: 1rem;
-  height: 1rem;
+  width: var(--ws-inbox-heading-control-size);
+  height: var(--ws-inbox-heading-control-size);
   place-items: center;
   border: 0;
   border-radius: calc(var(--radius) - 3px);
@@ -4349,6 +4350,7 @@ button.ws-provider-health:focus-visible {
 
 .ws-inbox-search-input {
   width: 8.5rem;
+  height: var(--ws-inbox-heading-control-size);
   max-width: min(8.5rem, calc(100vw - 8rem));
 }
 

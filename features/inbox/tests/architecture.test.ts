@@ -19,6 +19,13 @@ describe("Inbox architecture boundaries", () => {
     expect(workSection).toContain("CountedDisclosure");
     expect(styles).toContain(".ws-work-section-trigger");
     expect(styles).toContain(".ws-inbox-search-trigger");
+    expect(styles).toContain("--ws-inbox-heading-control-size: 1rem");
+    expect(styles).toMatch(
+      /\.ws-inbox-search-trigger\s*\{[\s\S]*?height: var\(--ws-inbox-heading-control-size\)/,
+    );
+    expect(styles).toMatch(
+      /\.ws-inbox-search-input\s*\{[\s\S]*?height: var\(--ws-inbox-heading-control-size\)/,
+    );
     expect(styles).not.toContain(".ws-inbox-group h3");
     expect(views).not.toContain("ws-inbox-group");
     expect(styles).not.toContain("--bb-");
