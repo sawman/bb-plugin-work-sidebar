@@ -1685,8 +1685,8 @@ describe("registered Work context cards", () => {
     expect(
       goalTrigger.querySelector("span")?.textContent,
     ).toBe("Goals");
-    expect(goalTrigger.classList.contains("ws-task-workflow-disclosure")).toBe(true);
-    expect(goalTrigger.querySelector(".ws-task-workflow-count")?.textContent).toBe(
+    expect(goalTrigger.classList.contains("ws-work-section-trigger")).toBe(true);
+    expect(goalTrigger.querySelector(".ws-work-section-count")?.textContent).toBe(
       "0",
     );
     expect(goalTrigger.compareDocumentPosition(control)).toBe(

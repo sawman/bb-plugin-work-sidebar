@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Markdown } from "@get-bb/plugin-sdk/app";
 import { ActionTooltip } from "../../components/ui/action-tooltip";
 import { CopyBadge } from "../../components/ui/copy-badge";
-import { CountedDisclosure } from "../../components/ui/counted-disclosure";
 import { Icon } from "../../components/ui/icon";
 import { SearchCombobox } from "../../components/ui/combobox";
 import { SurfaceCard, SurfaceCardHeading } from "../../components/ui/surface-card";
+import { WorkSection } from "../../components/ui/work-section";
 import { messageIsInbox, messageIsSaved, messageLabel, splitInboxMarkdown } from "./model";
 import {
   useInboxMessages,
@@ -74,10 +74,7 @@ export function InboxCard({ threadId }: { threadId: string }) {
             />
           ) : (
             <>
-              <CountedDisclosure
-                className="ws-inbox-group"
-                triggerClassName="ws-inbox-group-trigger"
-                countClassName="ws-inbox-group-count"
+              <WorkSection
                 title="Inbox messages"
                 count={query.data?.activeCount ?? 0}
                 countUnit="message"
@@ -88,11 +85,8 @@ export function InboxCard({ threadId }: { threadId: string }) {
                 ) : (
                   <p className="ws-inbox-empty">No unread messages. Agents leave only key answers, decisions, and handoffs here.</p>
                 )}
-              </CountedDisclosure>
-              <CountedDisclosure
-                className="ws-inbox-group"
-                triggerClassName="ws-inbox-group-trigger"
-                countClassName="ws-inbox-group-count"
+              </WorkSection>
+              <WorkSection
                 title="Saved messages"
                 count={query.data?.savedCount ?? 0}
                 countUnit="message"
@@ -103,7 +97,7 @@ export function InboxCard({ threadId }: { threadId: string }) {
                 ) : (
                   <p className="ws-inbox-empty">No saved messages.</p>
                 )}
-              </CountedDisclosure>
+              </WorkSection>
               {query.hasNextPage ? (
                 <LoadMoreButton fetching={query.isFetching} onClick={query.fetchNextPage} />
               ) : null}

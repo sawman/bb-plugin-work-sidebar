@@ -6,8 +6,8 @@ import {
   type ReactNode,
 } from "react";
 import { ActionTooltip } from "../../components/ui/action-tooltip";
-import { CountedDisclosure } from "../../components/ui/counted-disclosure";
 import { Icon } from "../../components/ui/icon";
+import { WorkSection } from "../../components/ui/work-section";
 import { taskStatusPresentation } from "./model";
 import { TaskPriorityIcon } from "./priority";
 import { AssigneePicker } from "./assignee-picker";
@@ -167,13 +167,9 @@ export function TaskWorkflowSection({
   children: ReactNode;
 }) {
   return (
-    <CountedDisclosure
+    <WorkSection
       className="ws-task-workflow-section"
-      triggerId={id}
-      triggerClassName="ws-task-workflow-disclosure"
-      metaClassName="ws-task-workflow-disclosure-meta"
-      countClassName="ws-task-workflow-count"
-      iconClassName="ws-task-workflow-icon"
+      id={id}
       tone={tone}
       title={title}
       count={count}
@@ -181,7 +177,7 @@ export function TaskWorkflowSection({
       defaultOpen={defaultOpen}
     >
       {children}
-    </CountedDisclosure>
+    </WorkSection>
   );
 }
 

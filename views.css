@@ -2190,6 +2190,50 @@ button.ws-change-file-row:hover {
   font: var(--ws-text-subtext);
   line-height: 1.35;
 }
+.ws-work-section {
+  display: grid;
+  min-width: 0;
+  gap: 0.25rem;
+}
+.ws-work-section > h3,
+.ws-work-section-trigger {
+  margin: 0;
+  color: var(--muted-foreground);
+  font: var(--ws-text-label);
+  line-height: inherit;
+}
+.ws-work-section[data-tone="attention"] > h3 {
+  color: var(--foreground);
+}
+.ws-work-section-trigger {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+.ws-work-section-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+}
+.ws-work-section-count {
+  min-width: 1.15rem;
+  color: var(--muted-foreground);
+  font: var(--ws-text-metadata);
+  line-height: inherit;
+  text-align: right;
+}
+.ws-work-section-icon {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: 0 0 auto;
+}
 .ws-plan-item {
   font: var(--ws-text-subtext);
   line-height: inherit;
@@ -3934,44 +3978,6 @@ button.ws-provider-health:focus-visible {
   display: grid;
   gap: 0.55rem;
 }
-.ws-task-workflow-section {
-  display: grid;
-  gap: 0.25rem;
-}
-.ws-task-workflow-section > h3,
-.ws-task-workflow-disclosure {
-  margin: 0;
-  color: var(--muted-foreground);
-  font: var(--ws-text-label);
-  line-height: inherit;
-}
-.ws-task-workflow-section[data-tone="attention"] > h3 {
-  color: var(--foreground);
-}
-.ws-task-workflow-disclosure {
-  display: flex;
-  min-width: 0;
-  width: 100%;
-  align-items: center;
-  justify-content: space-between;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-}
-.ws-task-workflow-disclosure-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.22rem;
-}
-.ws-task-workflow-count {
-  min-width: 1.15rem;
-  color: var(--muted-foreground);
-  font: var(--ws-text-metadata);
-  line-height: inherit;
-  text-align: right;
-}
 .ws-task-workflow-list {
   display: grid;
   gap: 0.2rem;
@@ -4292,7 +4298,7 @@ button.ws-provider-health:focus-visible {
 
 .ws-inbox-content {
   display: grid;
-  gap: 0.65rem;
+  gap: 0.55rem;
 }
 
 .ws-inbox-message-actions button {
@@ -4310,46 +4316,20 @@ button.ws-provider-health:focus-visible {
 
 .ws-inbox-message-actions button:focus-visible,
 .ws-inbox-message-toggle:focus-visible,
-.ws-inbox-group button:focus-visible,
 .ws-inbox-load-more:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
-
-.ws-inbox-group {
-  border-top: 1px solid var(--border);
-}
-
-.ws-inbox-group h3,
 .ws-inbox-results h3 {
   font: inherit;
   line-height: inherit;
   margin: 0;
 }
-
-.ws-inbox-group h3 button {
-  align-items: center;
-  background: transparent;
-  border: 0;
-  color: var(--foreground);
-  cursor: pointer;
-  display: flex;
-  gap: 0.35rem;
-  padding: 0.55rem 0;
-  text-align: left;
-  width: 100%;
-}
-
-.ws-inbox-group-count,
 .ws-inbox-unread-count {
   color: var(--muted-foreground);
   font: var(--ws-text-metadata);
   line-height: inherit;
   margin-left: auto;
-}
-
-.ws-inbox-group .ws-counted-disclosure-panel {
-  padding-bottom: 0.25rem;
 }
 
 .ws-inbox-message-list {
