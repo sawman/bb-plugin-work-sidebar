@@ -21,6 +21,17 @@ missing, deleted, or unreadable projects. The source patch is
 - Validation: 81 focused tests, typecheck, and plugin build.
 - Rebased and deployed through the cataloged 0.42.0 sync pass.
 
+## BB 0.42.1 upgrade
+
+- Verified source baseline: `desktop-v0.42.1` at
+  `a4aa07f9ee3fdeb5716a26a368246ea1ef9e0b78`.
+- BB 0.42.1 does not change the Automations plugin or SDK 0.4.47. The patch
+  still applies unchanged.
+- The full 0.42.1 preflight passed 81 plugin tests, typecheck, and build, and
+  staged BB 0.42.1 / SDK 0.4.47 artifacts. The desktop bundle is downloaded but
+  is not the running host yet, so the current live deployment remains the
+  0.42.0 build above.
+
 ## Update procedure
 
 Use the cataloged sync job from the repository root:

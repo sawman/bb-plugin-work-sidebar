@@ -46,6 +46,18 @@ The versioned release criteria and live smoke matrix are in
   typechecks, builds, installed-artifact inspection, and a live ACP Reply
   round-trip.
 
+## BB 0.42.1 upgrade
+
+- Verified source baseline: `desktop-v0.42.1` at
+  `a4aa07f9ee3fdeb5716a26a368246ea1ef9e0b78`.
+- BB 0.42.1 does not change this plugin, the relevant server tool-call path,
+  or SDK 0.4.47. The patch still applies unchanged.
+- The full 0.42.1 preflight passed 101 core tests and 87 plugin tests, both
+  typechecks, and both builds. Verified artifacts are staged with BB 0.42.1 /
+  SDK 0.4.47 metadata. The desktop bundle is downloaded but is not the running
+  host yet, so deployment and a live Reply check remain post-update steps; the
+  current live deployment remains the 0.42.0 build above.
+
 ## Update procedure
 
 1. Check whether ACP has gained a durable interactive-call continuation. If it

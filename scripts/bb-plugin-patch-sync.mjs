@@ -23,6 +23,8 @@ const appRoot = process.env.BB_APP_ROOT ??
   "/Applications/bb.app/Contents/Resources/app.asar.unpacked/node_modules/bb-app";
 const appPackage = JSON.parse(await readFile(join(appRoot, "package.json"), "utf8"));
 const version = appPackage.version;
+const targetBbCli = process.env.BB_PATCH_BB_CLI ??
+  join(appRoot, "host-daemon/dist/bb");
 const plan = registry.versions[version];
 
 if (plan === undefined) {
@@ -180,7 +182,7 @@ try {
       "--force",
     ], { cwd: sourceRoot });
     const pluginRoot = join(sourceRoot, entry.pluginPath);
-    run("bb", ["plugin", "build", "."], {
+    run(targetBbCli, ["plugin", "build", "."], {
       cwd: pluginRoot,
       env: standaloneBbEnvironment,
     });

@@ -31,6 +31,16 @@ the UI specifically needs a per-thread task list.
 - Coverage includes database filtering and link scoping, typed RPC validation
   and label hydration, direct delegation, and CLI parent forwarding.
 
+## BB 0.42.1 upgrade
+
+- Verified source baseline: `desktop-v0.42.1` at
+  `a4aa07f9ee3fdeb5716a26a368246ea1ef9e0b78`.
+- BB 0.42.1 does not change the Tasks plugin or SDK 0.4.47. The patch still
+  applies unchanged and remains necessary.
+- The full 0.42.1 preflight passed 368 plugin tests, typecheck, and build, and
+  staged BB 0.42.1 / SDK 0.4.47 artifacts. The desktop bundle is downloaded but
+  is not the running host yet; deploy only after the update is activated.
+
 ## Update procedure
 
 Run the cataloged sync job from the repository root. It applies this patch to

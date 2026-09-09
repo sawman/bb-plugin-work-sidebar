@@ -9,7 +9,22 @@ removing any item below. Re-run the linked searches against the current open
 issues and pull requests, then confirm the shipped API through a typed plugin
 test—not just a changelog entry.
 
-Last checked: 2026-09-05 against BB 0.42.0 / SDK 0.4.47.
+Last checked: 2026-09-09 against BB 0.42.1 / SDK 0.4.47.
+
+## BB 0.42.1 audit
+
+Audited the immutable `desktop-v0.42.1` source at
+`a4aa07f9ee3fdeb5716a26a368246ea1ef9e0b78`. The release leaves the three
+patched built-in plugin areas and SDK 0.4.47 unchanged from 0.42.0, and all
+three patches apply without modification. No watchlist item is fulfilled.
+Issues #1978, #2200, and #2836 remain open, and current repository searches
+found no open issue or pull request for `listTasksForThread` or the ACP answer
+continuation.
+
+The desktop updater has downloaded 0.42.1, but the running app, server, and CLI
+still report 0.42.0. The 0.42.1 catalog entry is therefore prepared for the
+post-restart sync; the existing 0.42.0 patched artifacts remain live until the
+update is activated.
 
 ## BB 0.42.0 audit
 
