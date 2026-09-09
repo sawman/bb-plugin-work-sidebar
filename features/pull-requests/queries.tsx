@@ -19,7 +19,10 @@ import {
 // This remains type-only: the app bundle sees neither the server contract
 // composer nor the root SDK runtime.
 export type PullRequestRpc = PluginRpcClient<typeof rpcContract>;
-export type AuthoredPullRequestPolling = { intervalMs: number };
+export type AuthoredPullRequestPolling = {
+  intervalMs: number;
+  authoredLogin?: string;
+};
 export type ThreadPullRequest = z.infer<typeof threadPullRequest>;
 export type ThreadPullRequestDirectory = Record<string, ThreadPullRequest | null>;
 
@@ -27,11 +30,16 @@ const root = ["work-sidebar", "pull-requests"] as const;
 const THREAD_DIRECTORY_BATCH_SIZE = 200;
 
 export const pullRequestKeys = {
-  authored: (): QueryKey => [...root, "authored"],
-  authoredStacks: (baseRevision?: number): QueryKey => [
+  authored: (authoredLogin?: string): QueryKey => [
+    ...root,
+    "authored",
+    ...(authoredLogin ? ["login", authoredLogin.toLowerCase()] : []),
+  ],
+  authoredStacks: (baseRevision?: number, authoredLogin?: string): QueryKey => [
     ...root,
     "authored",
     "stacks",
+    ...(authoredLogin ? ["login", authoredLogin.toLowerCase()] : []),
     ...(baseRevision == null ? [] : [baseRevision]),
   ],
   threadDirectory: (): QueryKey => [...root, "thread-directory"],
@@ -397,8 +405,9 @@ export function useAuthoredPullRequests(
   const client = useQueryClient();
   const facts = useSharedPullRequestFactDirectory();
   const forceRefresh = useRef(false);
+  const authoredLogin = polling.authoredLogin?.trim() ?? "";
   const base = useQuery({
-    queryKey: pullRequestKeys.authored(),
+    queryKey: pullRequestKeys.authored(authoredLogin),
     queryFn: () => authoredPullRequests(rpc, forceRefresh.current),
     ...pullRequestPolicies.authored,
     refetchInterval: pullRequestPolicies.authored.refetchInterval(polling),
@@ -407,7 +416,10 @@ export function useAuthoredPullRequests(
     // A successful base read defines the stack projection generation. This
     // prevents a slightly later base response from hiding valid enrichment
     // until the next polling interval.
-    queryKey: pullRequestKeys.authoredStacks(base.dataUpdatedAt),
+    queryKey: pullRequestKeys.authoredStacks(
+      base.dataUpdatedAt,
+      authoredLogin,
+    ),
     queryFn: () => authoredPullRequestStacks(rpc),
     enabled: base.isSuccess,
     ...pullRequestPolicies.authoredStacks,
@@ -427,7 +439,10 @@ export function useAuthoredPullRequests(
       const refreshedBase = await base.refetch({ throwOnError: true });
       await Promise.all([
         client.fetchQuery({
-          queryKey: pullRequestKeys.authoredStacks(refreshedBase.dataUpdatedAt),
+          queryKey: pullRequestKeys.authoredStacks(
+            refreshedBase.dataUpdatedAt,
+            authoredLogin,
+          ),
           queryFn: () => authoredPullRequestStacks(rpc),
           ...pullRequestPolicies.authoredStacks,
         }),

@@ -27,8 +27,8 @@ export function createPullRequestRegistration(
   lifecycle: ServerLifecycle,
 ): PullRequestRegistration {
   const commands = createGitHubCommandService(lifecycle);
-  const polling = createGitHubPollingService(bb, commands.read);
   const authored = createAuthoredPullRequestService(bb, lifecycle, commands);
+  const polling = createGitHubPollingService(bb, commands.read);
   const threadStack = createThreadStackService(bb, lifecycle, commands.read);
   const registration: PullRequestRegistration = { ...polling, ...authored, ...threadStack };
   return registration;

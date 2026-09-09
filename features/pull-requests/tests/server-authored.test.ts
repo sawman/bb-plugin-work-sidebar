@@ -5,6 +5,68 @@ import { createAuthoredPullRequestService } from "../server-authored";
 import type { GitHubCommandService } from "../server-github-read";
 
 describe("authored pull-request stack wire projection", () => {
+  it("uses a validated configured GitHub login and clears authored caches when it changes", async () => {
+    const host = createFakePluginHost({
+      settings: { githubAuthoredLogin: "octocat" },
+    });
+    const lifecycle = createServerLifecycle();
+    const read = vi.fn(async (args: readonly string[]) => {
+      if (args[0] === "search") return "[]";
+      throw new Error(`unexpected GitHub command: ${args.join(" ")}`);
+    });
+    const handlers = createAuthoredPullRequestService(
+      host.bb,
+      lifecycle,
+      { read, execute: vi.fn() } as unknown as GitHubCommandService,
+    );
+
+    await expect(
+      handlers.sidebarAuthoredPullRequests({ force: false }),
+    ).resolves.toMatchObject({ available: true, pullRequests: [] });
+    expect(read).toHaveBeenLastCalledWith(
+      expect.arrayContaining(["--author", "octocat"]),
+      12_000_000,
+      expect.any(Number),
+    );
+
+    await host.harness.behavior.setSettings({
+      githubAuthoredLogin: "hubot",
+    });
+    await expect(
+      handlers.sidebarAuthoredPullRequests({ force: false }),
+    ).resolves.toMatchObject({ available: true, pullRequests: [] });
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(read).toHaveBeenLastCalledWith(
+      expect.arrayContaining(["--author", "hubot"]),
+      12_000_000,
+      expect.any(Number),
+    );
+
+    await expect(
+      host.harness.behavior.setSettings({ githubAuthoredLogin: "-invalid" }),
+    ).rejects.toThrow(/GitHub login/i);
+    await host.harness.lifecycle.dispose();
+  });
+
+  it("uses the active GitHub CLI identity when no login is configured", async () => {
+    const host = createFakePluginHost();
+    const lifecycle = createServerLifecycle();
+    const read = vi.fn(async () => "[]");
+    const handlers = createAuthoredPullRequestService(
+      host.bb,
+      lifecycle,
+      { read, execute: vi.fn() } as unknown as GitHubCommandService,
+    );
+
+    await handlers.sidebarAuthoredPullRequests({ force: false });
+    expect(read).toHaveBeenCalledWith(
+      expect.arrayContaining(["--author", "@me"]),
+      12_000_000,
+      expect.any(Number),
+    );
+    await host.harness.lifecycle.dispose();
+  });
+
   it("reports cached GraphQL and REST budgets with the shared health state", async () => {
     const host = createFakePluginHost();
     const lifecycle = createServerLifecycle();

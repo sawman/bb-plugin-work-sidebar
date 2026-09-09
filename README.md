@@ -38,6 +38,10 @@ To enable Linear, install and configure Taskboard, then select Linear for the
 BB project. A missing or disabled Taskboard is a supported degraded mode—not
 an installation failure for Work Sidebar.
 
+The left Pull Requests pane uses the active GitHub CLI account by default.
+Set **GitHub authored PR login** in the plugin settings to show another
+GitHub user's open pull requests instead.
+
 ## What it adds
 
 - Enhanced Threads, Tasks, and Pull Requests panes on the left.

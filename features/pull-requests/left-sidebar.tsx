@@ -58,12 +58,14 @@ export function PullRequestsLeftSidebar({
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   const { values: settings } = useSettings();
+  const authoredLogin = String(settings?.githubAuthoredLogin ?? "").trim();
   const [localSearchQuery, setLocalSearchQuery] = useState("");
   const effectiveSearchQuery = localSearchQuery || searchQuery;
   // Left sidebar tabs intentionally warm independently so opening PRs can use
   // the shared authored cache immediately instead of starting a cold fetch.
   const list = useAuthoredPullRequests(rpc, {
     intervalMs: Number(settings?.githubLeftListRefreshSeconds ?? "300") * 1_000,
+    authoredLogin,
   });
   const draft = useSetAuthoredPullRequestDraft(rpc);
   const healthQuery = useGitHubApiHealth(rpc, {
@@ -151,6 +153,11 @@ export function PullRequestsLeftSidebar({
   const changingDraftUrl = draft.isPending
     ? (draft.variables?.url ?? null)
     : null;
+  const emptyDescription = effectiveSearchQuery
+    ? `No pull requests match “${effectiveSearchQuery}”.`
+    : authoredLogin
+      ? `Open pull requests by ${authoredLogin} appear here.`
+      : "Open pull requests for the active GitHub CLI account appear here.";
 
   if (!active) return null;
   return (
@@ -194,11 +201,11 @@ export function PullRequestsLeftSidebar({
       </div>
       <div className="ws-view-content">
         {list.isPending && (
-          <div className="ws-empty">Loading your open pull requests…</div>
+          <div className="ws-empty">Loading open pull requests…</div>
         )}
         {list.isError && (
           <div className="ws-callout">
-            <strong>Could not load your open pull requests</strong>
+            <strong>Could not load open pull requests</strong>
             <span>{list.error?.message}</span>
           </div>
         )}
@@ -254,11 +261,7 @@ export function PullRequestsLeftSidebar({
             {!visible.length && (
               <div className="ws-empty">
                 <strong>No open pull requests</strong>
-                <span>
-                  {effectiveSearchQuery
-                    ? `No pull requests match “${effectiveSearchQuery}”.`
-                    : "Open pull requests you author on GitHub appear here."}
-                </span>
+                <span>{emptyDescription}</span>
               </div>
             )}
           </>

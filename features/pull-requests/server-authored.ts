@@ -1,4 +1,5 @@
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
+import { z } from "zod";
 import { rpcContract } from "../../contracts.js";
 import type { ServerLifecycle } from "../../server-lifecycle.js";
 import { clearGitHubReadCache, githubReadHealth } from "../../shared/github/read-cache.js";
@@ -91,9 +92,14 @@ function createArchiveLookup(read: GitHubReadRunner) {
   };
 }
 
-function createAuthoredReader(lifecycle: ServerLifecycle, read: GitHubReadRunner) {
+function createAuthoredReader(
+  lifecycle: ServerLifecycle,
+  read: GitHubReadRunner,
+  readAuthor: () => Promise<string>,
+) {
   return async (): Promise<AuthoredPullRequest[]> => {
-    const value = JSON.parse(await read(["search", "prs", "--author", "@me", "--state", "open", "--limit", "1000", "--json", "number,title,url,repository,state,isDraft"], 12_000_000, GITHUB_SEARCH_CACHE_MS)) as unknown;
+    const author = await readAuthor();
+    const value = JSON.parse(await read(["search", "prs", "--author", author, "--state", "open", "--limit", "1000", "--json", "number,title,url,repository,state,isDraft"], 12_000_000, GITHUB_SEARCH_CACHE_MS)) as unknown;
     if (!Array.isArray(value)) throw new Error("GitHub returned an invalid authored pull request list");
     const base = value.flatMap((entry): AuthoredPullRequest[] => {
       if (!isRecord(entry) || typeof entry.number !== "number" || typeof entry.title !== "string" || typeof entry.url !== "string" || !isRecord(entry.repository) || typeof entry.repository.nameWithOwner !== "string") return [];
@@ -202,10 +208,32 @@ export function createAuthoredPullRequestService(
   lifecycle: ServerLifecycle,
   commands: GitHubCommandService,
 ): AuthoredHandlers {
+  const settings = bb.settings.define({
+    githubAuthoredLogin: {
+      type: "string",
+      label: "GitHub authored PR login",
+      description:
+        "GitHub login whose open PRs appear on the left. Leave blank to use the active GitHub CLI account.",
+      default: "",
+      experimental_schema: z
+        .string()
+        .max(39, "GitHub login must be at most 39 characters")
+        .refine(
+          (value) =>
+            value === "" ||
+            /^(?!.*--)[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/.test(
+              value,
+            ),
+          "GitHub login may contain letters, numbers, and single hyphens, and cannot start or end with a hyphen",
+        ),
+    },
+  });
+  const readAuthor = async () =>
+    (await settings.get()).githubAuthoredLogin || "@me";
   const archivedRepositories = createArchiveLookup(commands.read);
   const authored = createPullRequestService<AuthoredPullRequest>({
     now: () => Date.now(),
-    readAuthored: createAuthoredReader(lifecycle, commands.read),
+    readAuthored: createAuthoredReader(lifecycle, commands.read, readAuthor),
     readStacks: createAuthoredStackReader(commands.read),
     archivedRepositories: async (items) => archivedRepositories(items.map((item) => item.repository)),
     setDraft: async (url, draft) => {
@@ -219,6 +247,10 @@ export function createAuthoredPullRequestService(
     commands,
     () => authored.clear(),
   );
+  settings.onChange((next, previous) => {
+    if (next.githubAuthoredLogin !== previous.githubAuthoredLogin)
+      authored.clear();
+  });
   bb.onDispose(() => authored.dispose());
   return {
     async getGitHubApiHealth() {

@@ -53,6 +53,46 @@ function deferred<T>() {
 describe("R5 pull-request queries", () => {
   afterEach(() => vi.useRealTimers());
 
+  it("scopes authored query state to the configured GitHub login", async () => {
+    const call = vi.fn(async (method: string) => {
+      if (method === "sidebarAuthoredPullRequests")
+        return { available: true, pullRequests: authored, error: null };
+      if (method === "sidebarAuthoredPullRequestStacks")
+        return { available: true, pullRequests: authored, error: null };
+      throw new Error(`unexpected ${method}`);
+    });
+    const rpc = { call } as unknown as PullRequestRpc;
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const view = renderHook(
+      ({ login }: { login: string }) =>
+        useAuthoredPullRequests(rpc, {
+          intervalMs: 300_000,
+          authoredLogin: login,
+        }),
+      { wrapper: wrapper(client), initialProps: { login: "octocat" } },
+    );
+    await waitFor(() => expect(view.result.current.data).toEqual(authored));
+    expect(client.getQueryData(pullRequestKeys.authored("octocat"))).toEqual(
+      authored,
+    );
+
+    view.rerender({ login: "hubot" });
+    await waitFor(() =>
+      expect(
+        call.mock.calls.filter(
+          ([method]) => method === "sidebarAuthoredPullRequests",
+        ),
+      ).toHaveLength(2),
+    );
+    expect(client.getQueryData(pullRequestKeys.authored("hubot"))).toEqual(
+      authored,
+    );
+    view.unmount();
+    client.clear();
+  });
+
   it("owns one normalized roster directory that passive consumers reuse", async () => {
     const directory = {
       thr_a: {

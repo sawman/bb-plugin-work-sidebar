@@ -181,12 +181,21 @@ describe("R2 server registration and disposal", () => {
     expect(
       Object.keys(host.harness.inspection.registrations.settingsDescriptors),
     ).toEqual([
+      "githubAuthoredLogin",
       "githubActivePollSeconds",
       "githubBackgroundPollSeconds",
       "githubLeftListRefreshSeconds",
       "githubMaxRestPollsPerMinute",
       "stuckThreadMinutes",
     ]);
+    expect(
+      host.harness.inspection.registrations.settingsDescriptors
+        .githubAuthoredLogin,
+    ).toMatchObject({
+      type: "string",
+      default: "",
+      label: "GitHub authored PR login",
+    });
     expect(
       host.harness.inspection.registrations.settingsDescriptors
         .stuckThreadMinutes,
