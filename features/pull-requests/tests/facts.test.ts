@@ -12,15 +12,15 @@ import {
 const authored = {
   number: 1402,
   title: "Review lifecycle",
-  url: "https://github.com/SystemEarth/systemearth/pull/1402",
-  repository: "SystemEarth/systemearth",
+  url: "https://github.com/example-org/example-repo/pull/1402",
+  repository: "example-org/example-repo",
   state: "open" as const,
   draft: false,
   head: "feature/review",
   base: "main",
   checks: "passing" as const,
   review: "changes_requested" as const,
-  changeRequesters: ["yojo-se"],
+  changeRequesters: ["reviewer-a"],
   reviewCommentCount: 2,
   stack: null,
 };
@@ -28,7 +28,7 @@ const authored = {
 const thread = {
   number: 1402,
   title: "Review lifecycle",
-  url: "https://github.com/SystemEarth/systemearth/pull/1402",
+  url: "https://github.com/example-org/example-repo/pull/1402",
   state: "open" as const,
   head: "feature/review",
   base: "main",
@@ -49,8 +49,8 @@ const thread = {
   signal: {
     checks: "passing" as const,
     review: "review_required" as const,
-    changeRequesters: ["yojo-se"],
-    requestedReviewers: ["yojo-se"],
+    changeRequesters: ["reviewer-a"],
+    requestedReviewers: ["reviewer-a"],
     reviewCommentCount: 2,
   },
   stackNumber: 17,
@@ -58,15 +58,15 @@ const thread = {
 
 describe("pull-request fact directory", () => {
   it("normalizes one fact identity across authored and thread envelopes", () => {
-    expect(pullRequestFactKey(authored)).toBe("systemearth/systemearth#1402");
+    expect(pullRequestFactKey(authored)).toBe("example-org/example-repo#1402");
     const facts = mergePullRequestFacts(undefined, [
       factFromAuthoredPullRequest(authored),
       factFromThreadPullRequest(thread),
     ]);
 
-    expect(Object.keys(facts.facts)).toEqual(["systemearth/systemearth#1402"]);
-    expect(facts.facts["systemearth/systemearth#1402"]).toMatchObject({
-      signal: { review: "review_required", requestedReviewers: ["yojo-se"] },
+    expect(Object.keys(facts.facts)).toEqual(["example-org/example-repo#1402"]);
+    expect(facts.facts["example-org/example-repo#1402"]).toMatchObject({
+      signal: { review: "review_required", requestedReviewers: ["reviewer-a"] },
       checks: { totalCount: 4 },
       mergeability: { state: "mergeable" },
     });
@@ -78,7 +78,7 @@ describe("pull-request fact directory", () => {
       factFromThreadPullRequest(thread),
     ]);
     expect(resolvePullRequestFact(authored, facts)).toMatchObject({
-      signal: { review: "review_required", requestedReviewers: ["yojo-se"] },
+      signal: { review: "review_required", requestedReviewers: ["reviewer-a"] },
       attention: "review_requested",
     });
   });
@@ -92,10 +92,10 @@ describe("pull-request fact directory", () => {
       }),
     ]);
 
-    expect(directory.facts["systemearth/systemearth#1402"]?.signal.review).toBe(
+    expect(directory.facts["example-org/example-repo#1402"]?.signal.review).toBe(
       "review_required",
     );
-    expect(directory.facts["systemearth/systemearth#1402"]?.checks).toMatchObject({
+    expect(directory.facts["example-org/example-repo#1402"]?.checks).toMatchObject({
       totalCount: 4,
     });
   });

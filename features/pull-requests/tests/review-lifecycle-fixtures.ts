@@ -1,39 +1,39 @@
 /**
- * Real review-history shapes that must render identically in every PR surface.
+ * Representative review-history shapes that must render identically in every PR surface.
  * They intentionally model decisions rather than any row-specific RPC shape.
  */
 export const reviewLifecycleCorpus = [
   {
-    name: "#1402 re-requests the same change requester",
+    name: "a re-request from the same change requester requires review",
     decision: "CHANGES_REQUESTED",
-    requested: ["yojo-se"],
-    reviewerStates: [["yojo-se", "CHANGES_REQUESTED"]],
+    requested: ["reviewer-a"],
+    reviewerStates: [["reviewer-a", "CHANGES_REQUESTED"]],
     expected: "review_required",
   },
   {
     name: "a different reviewer request remains changes requested",
     decision: "CHANGES_REQUESTED",
     requested: ["someone-else"],
-    reviewerStates: [["yojo-se", "CHANGES_REQUESTED"]],
+    reviewerStates: [["reviewer-a", "CHANGES_REQUESTED"]],
     expected: "changes_requested",
   },
   {
-    name: "#1408 retains approval after a later comment",
+    name: "approval survives a later comment",
     decision: "APPROVED",
     requested: [],
-    reviewerStates: [["hendra-systemearth", "APPROVED"]],
+    reviewerStates: [["reviewer-b", "APPROVED"]],
     expected: "approved",
   },
   {
-    name: "#1221 keeps GitHub approval above historical change requests",
+    name: "GitHub approval overrides historical change requests",
     decision: "APPROVED",
     requested: [],
-    reviewerStates: [["yojo-se", "CHANGES_REQUESTED"]],
+    reviewerStates: [["reviewer-a", "CHANGES_REQUESTED"]],
     expected: "approved",
   },
 ] as const;
 
 export const commentedAfterApprovalHistory = [
-  ["yojo-se", "APPROVED", "2026-08-31T15:25:13Z"],
-  ["yojo-se", "COMMENTED", "2026-09-01T07:55:36Z"],
+  ["reviewer-a", "APPROVED", "2026-08-31T15:25:13Z"],
+  ["reviewer-a", "COMMENTED", "2026-09-01T07:55:36Z"],
 ] as const;

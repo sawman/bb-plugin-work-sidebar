@@ -215,7 +215,7 @@ describe("R13 Changes error presentation", () => {
           draft: false,
           checks: "passing",
           review: "review_requested",
-          requestedReviewers: ["yojo-se", "platform-team"],
+          requestedReviewers: ["reviewer-a", "platform-team"],
           reviewCommentCount: 12,
         }}
         expanded={false}
@@ -226,7 +226,7 @@ describe("R13 Changes error presentation", () => {
     );
 
     const review = screen.getByRole("img", {
-      name: "Review: yojo-se, platform-team, 12 review comments",
+      name: "Review: reviewer-a, platform-team, 12 review comments",
     });
     expect(review.getAttribute("data-size")).toBe("metadata");
     expect(review.querySelector("b")?.textContent).toBe("12");

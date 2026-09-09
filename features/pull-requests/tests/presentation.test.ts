@@ -139,26 +139,26 @@ describe("pull-request presentation semantics", () => {
       pullRequestReviewDetail({
         checks: "passing",
         review: "review_required",
-        requestedReviewers: ["yojo-se", "platform-team", "extra"],
+        requestedReviewers: ["reviewer-a", "platform-team", "extra"],
         reviewCommentCount: 0,
       }),
-    ).toBe("Review: yojo-se, platform-team, extra");
+    ).toBe("Review: reviewer-a, platform-team, extra");
     expect(
       pullRequestReviewDetail({
         checks: "passing",
         review: "changes_requested",
-        changeRequesters: ["yojo-se"],
+        changeRequesters: ["reviewer-a"],
         reviewCommentCount: 0,
       }),
-    ).toBe("Changes: yojo-se");
+    ).toBe("Changes: reviewer-a");
     expect(
       pullRequestReviewDetail({
         checks: "passing",
         review: "approved",
-        approvers: ["hendra-systemearth"],
+        approvers: ["reviewer-b"],
         reviewCommentCount: 0,
       }),
-    ).toBe("Approved: hendra-systemearth");
+    ).toBe("Approved: reviewer-b");
   });
 
   it("keeps comment counts, merged layers, archived repositories, and GitHub health semantic", () => {

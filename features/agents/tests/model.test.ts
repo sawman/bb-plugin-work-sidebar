@@ -96,7 +96,7 @@ describe("Agents projection model", () => {
         branchName: "bb/r24-agents",
         workspaceDisplayKind: "managed-worktree",
       },
-      host: { id: "host_1", name: "Matthew's Mac" },
+      host: { id: "host_1", name: "Developer Mac" },
     }))).toEqual({
       label: "bb/r24-agents",
       detail: "R24 Agents worktree",
@@ -119,12 +119,12 @@ describe("Agents projection model", () => {
     });
 
     expect(agentWorkspacePresentation(thread("thr_host", "thr_root", {
-      host: { id: "host_1", name: "Matthew's Mac" },
+      host: { id: "host_1", name: "Developer Mac" },
     }))).toEqual({
-      label: "Matthew's Mac",
+      label: "Developer Mac",
       detail: "Host workspace",
       kind: "host",
-      copyValue: "Host workspace Matthew's Mac",
+      copyValue: "Host workspace Developer Mac",
     });
     expect(agentWorkspacePresentation(thread("thr_unknown", "thr_root"))).toBeNull();
   });

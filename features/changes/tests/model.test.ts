@@ -110,9 +110,9 @@ describe("R13 Changes model", () => {
             draft: false,
             checks: "passing",
             review: "approved",
-            approvers: ["hendra-systemearth"],
-            changeRequesters: ["yojo-se"],
-            requestedReviewers: ["yojo-se"],
+            approvers: ["reviewer-b"],
+            changeRequesters: ["reviewer-a"],
+            requestedReviewers: ["reviewer-a"],
             reviewCommentCount: 1,
           },
         ],
@@ -125,9 +125,9 @@ describe("R13 Changes model", () => {
       draft: false,
       checks: "failed",
       review: "changes_requested",
-      approvers: ["hendra-systemearth"],
-      changeRequesters: ["yojo-se"],
-      requestedReviewers: ["yojo-se"],
+      approvers: ["reviewer-b"],
+      changeRequesters: ["reviewer-a"],
+      requestedReviewers: ["reviewer-a"],
       reviewCommentCount: 2,
     });
   });
@@ -143,7 +143,7 @@ describe("R13 Changes model", () => {
       stashCount: null,
       pr: {
         number: 1402,
-        url: "https://github.com/SystemEarth/systemearth/pull/1402",
+        url: "https://github.com/example-org/example-repo/pull/1402",
         state: "open",
         title: "Review lifecycle",
         isDraft: false,
@@ -159,7 +159,7 @@ describe("R13 Changes model", () => {
       factFromThreadPullRequest({
         number: 1402,
         title: "Review lifecycle",
-        url: "https://github.com/SystemEarth/systemearth/pull/1402",
+        url: "https://github.com/example-org/example-repo/pull/1402",
         state: "open",
         head: "feature/one",
         base: "main",
@@ -180,8 +180,8 @@ describe("R13 Changes model", () => {
         signal: {
           checks: "passing",
           review: "review_required",
-          changeRequesters: ["yojo-se"],
-          requestedReviewers: ["yojo-se"],
+          changeRequesters: ["reviewer-a"],
+          requestedReviewers: ["reviewer-a"],
           reviewCommentCount: 2,
         },
         stackNumber: 17,
@@ -196,7 +196,7 @@ describe("R13 Changes model", () => {
       ),
     ).toMatchObject({
       review: "review_required",
-      requestedReviewers: ["yojo-se"],
+      requestedReviewers: ["reviewer-a"],
     });
   });
 });

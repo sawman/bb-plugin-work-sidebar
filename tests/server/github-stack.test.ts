@@ -50,13 +50,13 @@ describe("GitHub Stack enrichment ownership", () => {
                 reviewRequests: { totalCount: 0 },
                 reviews: {
                   nodes: [{
-                    author: { login: "hendra-systemearth" },
+                    author: { login: "reviewer-b" },
                     state: "APPROVED",
                     submittedAt: "2026-09-03T08:00:22Z",
                   }, {
-                    // #1221 shape: a later comment is not a new review
+                    // A later comment is not a new review
                     // decision and must not erase the earlier approval.
-                    author: { login: "hendra-systemearth" },
+                    author: { login: "reviewer-b" },
                     state: "COMMENTED",
                     submittedAt: "2026-09-03T09:00:22Z",
                   }],
@@ -82,7 +82,7 @@ describe("GitHub Stack enrichment ownership", () => {
       number: 7,
       checks: "passing",
       review: "approved",
-      approvers: ["hendra-systemearth"],
+      approvers: ["reviewer-b"],
     })]);
     expect(lifecycle.githubReadCache.size).toBe(0);
   });
@@ -100,21 +100,21 @@ describe("GitHub Stack enrichment ownership", () => {
               reviewRequests: {
                 totalCount: 2,
                 nodes: [
-                  { requestedReviewer: { login: "yojo-se" } },
+                  { requestedReviewer: { login: "reviewer-a" } },
                   { requestedReviewer: { slug: "platform-team" } },
                 ],
               },
               reviews: {
                 nodes: [
                   {
-                    author: { login: "yojo-se" },
+                    author: { login: "reviewer-a" },
                     state: "CHANGES_REQUESTED",
                     submittedAt: "2026-09-03T15:21:11Z",
                   },
                   {
-                    // The production #1402 corpus contains later comment-only
-                    // reviews. They must not erase yojo-se's change request.
-                    author: { login: "matthew-se" },
+                    // Later comment-only reviews must not erase reviewer-a's
+                    // change request.
+                    author: { login: "commenter" },
                     state: "COMMENTED",
                     submittedAt: "2026-09-03T16:49:15Z",
                   },
@@ -144,8 +144,8 @@ describe("GitHub Stack enrichment ownership", () => {
       base: "main",
       checks: "passing",
       review: "review_required",
-      changeRequesters: ["yojo-se"],
-      requestedReviewers: ["yojo-se", "platform-team"],
+      changeRequesters: ["reviewer-a"],
+      requestedReviewers: ["reviewer-a", "platform-team"],
     });
     expect(run).toHaveBeenCalledTimes(1);
     expect(run.mock.calls[0]?.[0].join(" ")).toContain(
@@ -171,7 +171,7 @@ describe("GitHub Stack enrichment ownership", () => {
           data: {
             repository: {
               p0: {
-                reviews: { totalCount: 101, nodes: [{ author: { login: "yojo-se" }, state: "CHANGES_REQUESTED" }] },
+                reviews: { totalCount: 101, nodes: [{ author: { login: "reviewer-a" }, state: "CHANGES_REQUESTED" }] },
               },
             },
           },
@@ -179,14 +179,14 @@ describe("GitHub Stack enrichment ownership", () => {
       }
       if (args.some((value) => value.endsWith("/reviews?per_page=100"))) {
         return JSON.stringify([[
-          { user: { login: "yojo-se" }, state: "CHANGES_REQUESTED" },
-          { user: { login: "matthew-se" }, state: "COMMENTED" },
+          { user: { login: "reviewer-a" }, state: "CHANGES_REQUESTED" },
+          { user: { login: "commenter" }, state: "COMMENTED" },
         ]]);
       }
       return JSON.stringify({
         head: { ref: "feature/review-heavy", sha: null },
         base: { ref: "main" },
-        requested_reviewers: [{ login: "yojo-se" }],
+        requested_reviewers: [{ login: "reviewer-a" }],
         requested_teams: [],
       });
     });
@@ -197,8 +197,8 @@ describe("GitHub Stack enrichment ownership", () => {
         base: "main",
         checks: "unknown",
         review: "review_required",
-        changeRequesters: ["yojo-se"],
-        requestedReviewers: ["yojo-se"],
+        changeRequesters: ["reviewer-a"],
+        requestedReviewers: ["reviewer-a"],
       }]]),
     );
     expect(
@@ -312,7 +312,7 @@ describe("GitHub Stack enrichment ownership", () => {
     );
 
     await expect(
-      readGitHubPullRequestDiff("SystemEarth", "systemearth", 1184, run),
+      readGitHubPullRequestDiff("example-org", "example-repo", 1184, run),
     ).resolves.toEqual({
       additions: 20,
       deletions: 4,
@@ -339,7 +339,7 @@ describe("GitHub Stack enrichment ownership", () => {
         "api",
         "--method",
         "GET",
-        "repos/SystemEarth/systemearth/pulls/1184/files?per_page=100",
+        "repos/example-org/example-repo/pulls/1184/files?per_page=100",
         "-H",
         "Accept: application/vnd.github+json",
         "-H",
@@ -418,7 +418,7 @@ describe("GitHub Stack enrichment ownership", () => {
             pullRequest: {
               number: 1279,
               title: "Upgrade Pulumi",
-              url: "https://github.com/SystemEarth/systemearth/pull/1279",
+              url: "https://github.com/example-org/example-repo/pull/1279",
               state: "open",
               headRefName: "deps/upgrade-pulumi",
               baseRefName: "main",
