@@ -11,6 +11,7 @@
 - Kept Markdown code monospace while making inline and fenced code inherit the same 0.61rem size and line height as surrounding message text.
 - Normalized rich Markdown descendants as one compact rendering boundary: headings keep emphasis without growing, block spacing is controlled, lists and quotes are compact, and tables, code blocks, and media cannot overflow the card.
 - Added an icon-only copy-ID button with clipboard success/error feedback.
+- Follow-up: moved copy-ID onto the truncating message title itself and removed the separate copy icon, preserving the terse tooltip and exact clipboard/toast behavior while freeing one action slot.
 - Kept the absolute created timestamp as the accessible label for the compact `<time>` element.
 - Hoisted the absolute timestamp formatter so a long Inbox does not allocate one formatter per row.
 

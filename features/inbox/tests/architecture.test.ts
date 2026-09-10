@@ -33,6 +33,8 @@ describe("Inbox architecture boundaries", () => {
     expect(views).not.toContain("ws-inbox-message-meta");
     expect(views).not.toContain("message.agentLabel");
     expect(views).not.toContain("<CopyBadge");
+    expect(views).not.toContain('icon="Copy"');
+    expect(views).toContain("ws-inbox-message-title-copy");
     expect(styles).toMatch(
       /\.ws-inbox-message\s*\{[\s\S]*?font: var\(--ws-text-metadata\)/,
     );

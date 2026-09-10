@@ -124,10 +124,11 @@ describe("Inbox Work card", () => {
 
     expect(heading.contains(time)).toBe(true);
     expect(heading.contains(copy)).toBe(true);
+    expect(copy.textContent).toBe("Active answer");
+    expect(copy.querySelector("svg")).toBeNull();
     expect(row.textContent).not.toContain("Codex");
     expect(row.textContent).not.toContain("Created");
     expect(row.textContent).not.toContain("msg_active");
-    expect(copy.querySelector('[data-icon="Copy"]')).toBeTruthy();
     expect(bookmark.querySelector('[data-icon="Bookmark"] path')).toBeTruthy();
     expect(bookmark.querySelector('[data-icon="Bookmark"] circle')).toBeNull();
     expect(formatMessageAge("2026-09-10T00:00:00.000Z", Date.parse("2026-09-10T05:00:00.000Z"))).toBe("5h");

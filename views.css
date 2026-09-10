@@ -4408,14 +4408,39 @@ button.ws-provider-health:focus-visible {
   min-width: 0;
 }
 
-.ws-inbox-message-heading strong {
-  flex: 1;
+.ws-inbox-message-heading > .ws-action-tooltip:has(.ws-inbox-message-title-copy) {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ws-inbox-message-title-copy {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: start;
+}
+
+.ws-inbox-message-title-copy strong {
+  display: block;
   font: var(--ws-text-subtext);
   line-height: inherit;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ws-inbox-message-title-copy:focus-visible {
+  border-radius: calc(var(--radius) - 3px);
+  outline: 1px solid var(--ring);
+  outline-offset: 1px;
 }
 
 .ws-inbox-message-actions {

@@ -290,7 +290,19 @@ function InboxMessageRow({
   return (
     <li className="ws-inbox-message" data-message-id={message.id} data-busy={busy ? "true" : undefined}>
       <div className="ws-inbox-message-heading">
-        <strong>{messageLabel(message)}</strong>
+        <ActionTooltip label="Copy ID">
+          {(tooltipId) => (
+            <button
+              type="button"
+              className="ws-inbox-message-title-copy"
+              aria-describedby={tooltipId}
+              aria-label={`Copy message ID ${message.id}`}
+              onClick={copyId}
+            >
+              <strong>{messageLabel(message)}</strong>
+            </button>
+          )}
+        </ActionTooltip>
         <time
           dateTime={message.createdAt}
           aria-label={`Created ${formatTimestamp(message.createdAt)}`}
@@ -298,12 +310,6 @@ function InboxMessageRow({
           {formatMessageAge(message.createdAt)}
         </time>
         <div className="ws-inbox-message-actions">
-          <InboxMessageAction
-            tooltip="Copy ID"
-            ariaLabel={`Copy message ID ${message.id}`}
-            icon="Copy"
-            onClick={copyId}
-          />
           <InboxMessageAction
             tooltip={message.acknowledgedAt ? "Acknowledged" : "Acknowledge"}
             ariaLabel={`Acknowledge message ${message.id}`}
