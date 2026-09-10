@@ -19,6 +19,7 @@ export function CountedDisclosure({
   countClassName = "",
   iconClassName = "",
   tone,
+  metaSpacing,
   children,
 }: {
   title: string;
@@ -33,6 +34,7 @@ export function CountedDisclosure({
   countClassName?: string;
   iconClassName?: string;
   tone?: string;
+  metaSpacing?: "relaxed";
   children: ReactNode;
 }) {
   const id = useId();
@@ -44,6 +46,7 @@ export function CountedDisclosure({
     <section
       className={`ws-counted-disclosure ${className}`.trim()}
       data-tone={tone}
+      data-meta-spacing={metaSpacing}
       data-expanded={open ? "true" : "false"}
       aria-labelledby={resolvedTriggerId}
     >

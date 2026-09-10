@@ -2243,6 +2243,13 @@ button.ws-change-file-row:hover {
   align-items: center;
   gap: 0.22rem;
 }
+.ws-counted-disclosure[data-meta-spacing="relaxed"]
+  .ws-counted-disclosure-meta {
+  gap: 0.32rem;
+}
+.ws-counted-disclosure-panel:empty {
+  display: none;
+}
 .ws-work-section-count {
   min-width: 1.15rem;
   color: var(--muted-foreground);

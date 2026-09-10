@@ -81,24 +81,22 @@ export function InboxCard({ threadId }: { threadId: string }) {
                 count={query.data?.activeCount ?? 0}
                 countUnit="message"
                 defaultOpen
+                metaSpacing="relaxed"
               >
                 {inboxMessages.length ? (
                   <InboxMessageList messages={inboxMessages} mutations={mutations} />
-                ) : (
-                  <p className="ws-inbox-empty">No unread messages</p>
-                )}
+                ) : null}
               </WorkSection>
               <WorkSection
                 title="Saved"
                 count={query.data?.savedCount ?? 0}
                 countUnit="message"
                 defaultOpen
+                metaSpacing="relaxed"
               >
                 {savedMessages.length ? (
                   <InboxMessageList messages={savedMessages} mutations={mutations} />
-                ) : (
-                  <p className="ws-inbox-empty">No saved messages</p>
-                )}
+                ) : null}
               </WorkSection>
               {query.hasNextPage ? (
                 <LoadMoreButton fetching={query.isFetching} onClick={query.fetchNextPage} />

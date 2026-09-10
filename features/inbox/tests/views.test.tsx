@@ -54,10 +54,18 @@ const active = {
 const saved = { ...active, id: "msg_saved", subject: "Saved answer", acknowledgedAt: "2026-09-06T00:01:00.000Z", bookmarkedAt: "2026-09-06T00:02:00.000Z", revision: 2 };
 const history = { ...active, id: "msg_history", subject: "Old handoff", body: "history body", acknowledgedAt: "2026-09-06T00:03:00.000Z", revision: 2 };
 
-function renderCard(messages = [active, saved], options: { query?: string } = {}) {
+function renderCard(
+  messages = [active, saved],
+  options: { query?: string; activeCount?: number; savedCount?: number } = {},
+) {
   rpcClient.call.mockImplementation(async (method: string, input: { query?: string }) => {
     if (method === "listHumanMessages" && input.query) return { messages: [history], cursor: null, activeCount: 1, savedCount: 1 };
-    return { messages, cursor: null, activeCount: 4, savedCount: 7 };
+    return {
+      messages,
+      cursor: null,
+      activeCount: options.activeCount ?? 4,
+      savedCount: options.savedCount ?? 7,
+    };
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(
@@ -166,11 +174,15 @@ describe("Inbox Work card", () => {
     view.client.clear();
   });
 
-  it("keeps both empty-state labels terse and punctuation-free", async () => {
-    const view = renderCard([]);
-    expect(await view.findByText("No unread messages")).toBeTruthy();
-    expect(view.getByText("No saved messages")).toBeTruthy();
-    expect(view.queryByText(/Agents leave/)).toBeNull();
+  it("uses the zero group counts as the complete empty state", async () => {
+    const view = renderCard([], { activeCount: 0, savedCount: 0 });
+    const messages = await view.findByRole("button", { name: "Messages: 0 messages" });
+    const saved = view.getByRole("button", { name: "Saved: 0 messages" });
+
+    expect(messages.textContent).toContain("0");
+    expect(saved.textContent).toContain("0");
+    expect(view.queryByText("No unread messages")).toBeNull();
+    expect(view.queryByText("No saved messages")).toBeNull();
     view.unmount();
     view.client.clear();
   });

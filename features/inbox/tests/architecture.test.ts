@@ -21,6 +21,12 @@ describe("Inbox architecture boundaries", () => {
     expect(styles).toContain(".ws-inbox-search-trigger");
     expect(styles).toContain("--ws-inbox-heading-control-size: 1rem");
     expect(styles).toMatch(
+      /\.ws-counted-disclosure\[data-meta-spacing="relaxed"\][\s\S]*?\.ws-counted-disclosure-meta\s*\{[\s\S]*?gap: 0\.32rem/,
+    );
+    expect(styles).toMatch(
+      /\.ws-counted-disclosure-panel:empty\s*\{[\s\S]*?display: none/,
+    );
+    expect(styles).toMatch(
       /\.ws-inbox-search-trigger\s*\{[\s\S]*?height: var\(--ws-inbox-heading-control-size\)/,
     );
     expect(styles).toMatch(

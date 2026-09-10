@@ -8,6 +8,7 @@ export function WorkSection({
   count,
   countUnit,
   tone,
+  metaSpacing,
   defaultOpen = false,
   className = "",
   children,
@@ -17,6 +18,7 @@ export function WorkSection({
   count: number;
   countUnit: string;
   tone?: "attention";
+  metaSpacing?: "relaxed";
   defaultOpen?: boolean;
   className?: string;
   children: ReactNode;
@@ -30,6 +32,7 @@ export function WorkSection({
       countClassName="ws-work-section-count"
       iconClassName="ws-work-section-icon"
       tone={tone}
+      metaSpacing={metaSpacing}
       title={title}
       count={count}
       countUnit={countUnit}
