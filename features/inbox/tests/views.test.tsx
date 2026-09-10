@@ -77,6 +77,33 @@ describe("Inbox Work card", () => {
     view.client.clear();
   });
 
+  it("uses a compact icon action to expand and collapse each message body", async () => {
+    const view = renderCard([active]);
+    const row = (await view.findByText("msg_active")).closest("li")!;
+    const collapse = within(row).getByRole("button", { name: "Collapse message body" });
+    const bodyId = collapse.getAttribute("aria-controls");
+
+    expect(collapse.closest(".ws-inbox-message-actions")).toBeTruthy();
+    expect(collapse.querySelector('[data-icon="ChevronUp"]')).toBeTruthy();
+    expect(collapse.textContent).toBe("");
+    expect(bodyId).toBeTruthy();
+    expect(row.querySelector(`[id="${bodyId}"]`)).toBeTruthy();
+    expect(view.queryByText("Collapse message body")).toBeNull();
+
+    fireEvent.click(collapse);
+    const expand = within(row).getByRole("button", { name: "Expand message body" });
+    expect(expand.getAttribute("aria-expanded")).toBe("false");
+    expect(expand.querySelector('[data-icon="ChevronDown"]')).toBeTruthy();
+    expect(row.querySelector(`[id="${bodyId}"]`)).toBeNull();
+    expect(document.body.querySelector('[data-tooltip-label="Expand"]')).toBeTruthy();
+
+    fireEvent.click(expand);
+    expect(within(row).getByRole("button", { name: "Collapse message body" })).toBeTruthy();
+    expect(row.querySelector(`[id="${bodyId}"]`)).toBeTruthy();
+    view.unmount();
+    view.client.clear();
+  });
+
   it("keeps both empty-state labels terse and punctuation-free", async () => {
     const view = renderCard([]);
     expect(await view.findByText("No unread messages")).toBeTruthy();

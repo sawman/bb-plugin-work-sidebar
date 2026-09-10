@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { Markdown } from "@get-bb/plugin-sdk/app";
 import { ActionTooltip } from "../../components/ui/action-tooltip";
 import { CopyBadge } from "../../components/ui/copy-badge";
-import { Icon } from "../../components/ui/icon";
+import { Icon, type IconName } from "../../components/ui/icon";
 import { SearchCombobox } from "../../components/ui/combobox";
 import { SurfaceCard, SurfaceCardHeading } from "../../components/ui/surface-card";
 import { WorkSection } from "../../components/ui/work-section";
@@ -223,6 +223,43 @@ function InboxMessageList({
   return <ul className="ws-inbox-message-list">{messages.map((message) => <InboxMessageRow key={message.id} message={message} mutations={mutations} />)}</ul>;
 }
 
+function InboxMessageAction({
+  tooltip,
+  ariaLabel,
+  icon,
+  disabled = false,
+  expanded,
+  controls,
+  onClick,
+}: {
+  tooltip: string;
+  ariaLabel: string;
+  icon: IconName;
+  disabled?: boolean;
+  expanded?: boolean;
+  controls?: string;
+  onClick(): void;
+}) {
+  return (
+    <ActionTooltip label={tooltip}>
+      {(tooltipId) => (
+        <button
+          type="button"
+          className="ws-inbox-message-action"
+          aria-describedby={tooltipId}
+          aria-label={ariaLabel}
+          aria-expanded={expanded}
+          aria-controls={controls}
+          disabled={disabled}
+          onClick={onClick}
+        >
+          <Icon name={icon} aria-hidden />
+        </button>
+      )}
+    </ActionTooltip>
+  );
+}
+
 function InboxMessageRow({
   message,
   mutations,
@@ -231,6 +268,7 @@ function InboxMessageRow({
   mutations: ReturnType<typeof useInboxMutations>;
 }) {
   const [expanded, setExpanded] = useState(true);
+  const bodyId = useId();
   const { busy, error } = useInboxMessageMutationState(message.threadId, message.id);
   const acknowledge = () => mutations.acknowledge.mutate({ messageId: message.id, revision: message.revision });
   const bookmark = () => mutations.bookmark.mutate({ messageId: message.id, bookmarked: !message.bookmarkedAt, revision: message.revision });
@@ -239,32 +277,28 @@ function InboxMessageRow({
       <div className="ws-inbox-message-heading">
         <strong>{messageLabel(message)}</strong>
         <div className="ws-inbox-message-actions">
-          <ActionTooltip label={message.acknowledgedAt ? "Already acknowledged" : "Acknowledge message"}>
-            {(tooltipId) => (
-              <button
-                type="button"
-                aria-describedby={tooltipId}
-                aria-label={`Acknowledge message ${message.id}`}
-                onClick={acknowledge}
-                disabled={busy || Boolean(message.acknowledgedAt)}
-              >
-                <Icon name="Check" aria-hidden />
-              </button>
-            )}
-          </ActionTooltip>
-          <ActionTooltip label={message.bookmarkedAt ? "Remove bookmark" : "Bookmark message"}>
-            {(tooltipId) => (
-              <button
-                type="button"
-                aria-describedby={tooltipId}
-                aria-label={`${message.bookmarkedAt ? "Remove bookmark from" : "Bookmark"} message ${message.id}`}
-                onClick={bookmark}
-                disabled={busy}
-              >
-                <Icon name={message.bookmarkedAt ? "BookmarkX" : "Bookmark"} aria-hidden />
-              </button>
-            )}
-          </ActionTooltip>
+          <InboxMessageAction
+            tooltip={message.acknowledgedAt ? "Acknowledged" : "Acknowledge"}
+            ariaLabel={`Acknowledge message ${message.id}`}
+            icon="Check"
+            disabled={busy || Boolean(message.acknowledgedAt)}
+            onClick={acknowledge}
+          />
+          <InboxMessageAction
+            tooltip={message.bookmarkedAt ? "Remove bookmark" : "Bookmark"}
+            ariaLabel={`${message.bookmarkedAt ? "Remove bookmark from" : "Bookmark"} message ${message.id}`}
+            icon={message.bookmarkedAt ? "BookmarkX" : "Bookmark"}
+            disabled={busy}
+            onClick={bookmark}
+          />
+          <InboxMessageAction
+            tooltip={expanded ? "Collapse" : "Expand"}
+            ariaLabel={`${expanded ? "Collapse" : "Expand"} message body`}
+            icon={expanded ? "ChevronUp" : "ChevronDown"}
+            expanded={expanded}
+            controls={bodyId}
+            onClick={() => setExpanded((value) => !value)}
+          />
         </div>
       </div>
       <div className="ws-inbox-message-meta">
@@ -275,10 +309,7 @@ function InboxMessageRow({
       <CopyBadge value={message.id} label="message ID" title={`Copy ${message.id}`}>
         <code>{message.id}</code>
       </CopyBadge>
-      <button type="button" className="ws-inbox-message-toggle" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
-        {expanded ? "Collapse message body" : "Show message body"}
-      </button>
-      {expanded ? <InboxMessageContent content={message.body} /> : null}
+      {expanded ? <InboxMessageContent id={bodyId} content={message.body} /> : null}
       {error ? <p className="ws-inbox-mutation-error" role="alert">{error.message} Refresh and retry.</p> : null}
     </li>
   );
@@ -288,9 +319,9 @@ function formatTimestamp(value: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
-export function InboxMessageContent({ content }: { content: string }) {
+export function InboxMessageContent({ content, id }: { content: string; id?: string }) {
   return (
-    <div className="ws-inbox-message-content">
+    <div id={id} className="ws-inbox-message-content">
       {splitInboxMarkdown(content).map((segment, index) => (
         segment.kind === "mermaid" ? (
           <MermaidBlock key={`mermaid-${index}`} content={segment.content} />

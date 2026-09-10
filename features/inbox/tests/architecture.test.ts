@@ -28,6 +28,14 @@ describe("Inbox architecture boundaries", () => {
     );
     expect(styles).not.toContain(".ws-inbox-group h3");
     expect(views).not.toContain("ws-inbox-group");
+    expect(views).toContain('icon={expanded ? "ChevronUp" : "ChevronDown"}');
+    expect(views).not.toContain("ws-inbox-message-toggle");
+    expect(styles).toMatch(
+      /\.ws-inbox-message\s*\{[\s\S]*?font: var\(--ws-text-primary\)/,
+    );
+    expect(styles).toMatch(
+      /\.ws-inbox-message-content\s*\{[\s\S]*?font: var\(--ws-text-primary\)/,
+    );
     expect(styles).not.toContain("--bb-");
     expect(styles.slice(styles.lastIndexOf(".ws-inbox-card"))).not.toMatch(/font-size\s*:/);
   });

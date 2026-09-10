@@ -4359,21 +4359,7 @@ button.ws-provider-health:focus-visible {
   gap: 0.55rem;
 }
 
-.ws-inbox-message-actions button {
-  align-items: center;
-  background: transparent;
-  border: 0;
-  color: var(--muted-foreground);
-  cursor: pointer;
-  display: inline-flex;
-  justify-content: center;
-  min-height: 1.65rem;
-  min-width: 1.65rem;
-  padding: 0.2rem;
-}
-
-.ws-inbox-message-actions button:focus-visible,
-.ws-inbox-message-toggle:focus-visible,
+.ws-inbox-message-action:focus-visible,
 .ws-inbox-load-more:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
@@ -4402,7 +4388,9 @@ button.ws-provider-health:focus-visible {
   border: 1px solid var(--border);
   border-radius: 0.35rem;
   display: grid;
+  font: var(--ws-text-primary);
   gap: 0.45rem;
+  line-height: 1.35;
   min-width: 0;
   padding: 0.6rem;
 }
@@ -4420,6 +4408,8 @@ button.ws-provider-health:focus-visible {
 }
 
 .ws-inbox-message-heading strong {
+  font: var(--ws-text-primary-attention);
+  line-height: inherit;
   overflow-wrap: anywhere;
 }
 
@@ -4427,6 +4417,34 @@ button.ws-provider-health:focus-visible {
   display: flex;
   gap: 0.15rem;
   margin-left: auto;
+}
+
+.ws-inbox-message-action {
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  place-items: center;
+  border: 0;
+  border-radius: calc(var(--radius) - 3px);
+  padding: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.ws-inbox-message-action:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+.ws-inbox-message-action:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.ws-inbox-message-action svg {
+  width: 0.68rem;
+  height: 0.68rem;
 }
 
 .ws-inbox-message-meta {
@@ -4440,18 +4458,9 @@ button.ws-provider-health:focus-visible {
   justify-self: start;
 }
 
-.ws-inbox-message-toggle {
-  background: transparent;
-  border: 0;
-  color: var(--muted-foreground);
-  cursor: pointer;
-  justify-self: start;
-  padding: 0;
-  text-decoration: underline;
-  text-underline-offset: 0.15em;
-}
-
 .ws-inbox-message-content {
+  font: var(--ws-text-primary);
+  line-height: 1.45;
   min-width: 0;
   overflow-wrap: anywhere;
 }
