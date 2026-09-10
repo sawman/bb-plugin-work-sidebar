@@ -93,17 +93,17 @@ describe("Inbox Work card", () => {
     view.client.clear();
   });
 
-  it("compacts message metadata into a thread, relative time, and icon actions row", async () => {
+  it("compacts a message into one subject, relative time, and icon-actions row", async () => {
     const view = renderCard([active]);
     const row = (await view.findByText("Active answer")).closest("li")!;
-    const meta = row.querySelector(".ws-inbox-message-meta")!;
+    const heading = row.querySelector(".ws-inbox-message-heading")!;
     const copy = within(row).getByRole("button", { name: "Copy message ID msg_active" });
     const bookmark = within(row).getByRole("button", { name: "Bookmark message msg_active" });
     const time = within(row).getByText(/^(?:now|[0-9]+[mhd])$/);
 
-    expect(meta.textContent).toContain("Codex");
-    expect(meta.contains(time)).toBe(true);
-    expect(meta.contains(copy)).toBe(true);
+    expect(heading.contains(time)).toBe(true);
+    expect(heading.contains(copy)).toBe(true);
+    expect(row.textContent).not.toContain("Codex");
     expect(row.textContent).not.toContain("Created");
     expect(row.textContent).not.toContain("msg_active");
     expect(copy.querySelector('[data-icon="Copy"]')).toBeTruthy();

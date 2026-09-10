@@ -4388,7 +4388,7 @@ button.ws-provider-health:focus-visible {
   border: 1px solid var(--border);
   border-radius: 0.35rem;
   display: grid;
-  font: var(--ws-text-subtext);
+  font: var(--ws-text-metadata);
   gap: 0.45rem;
   line-height: 1.35;
   min-width: 0;
@@ -4402,13 +4402,18 @@ button.ws-provider-health:focus-visible {
 .ws-inbox-message-heading {
   align-items: center;
   display: flex;
+  gap: 0.35rem;
   min-width: 0;
 }
 
 .ws-inbox-message-heading strong {
-  font: var(--ws-text-primary-attention);
+  flex: 1;
+  font: var(--ws-text-subtext);
   line-height: inherit;
-  overflow-wrap: anywhere;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ws-inbox-message-actions {
@@ -4446,31 +4451,16 @@ button.ws-provider-health:focus-visible {
   height: 0.68rem;
 }
 
-.ws-inbox-message-meta {
-  align-items: center;
+.ws-inbox-message-heading time {
   color: var(--muted-foreground);
-  display: flex;
-  font: var(--ws-text-metadata);
-  gap: 0.35rem;
-  line-height: inherit;
-  min-width: 0;
-}
-
-.ws-inbox-message-agent {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ws-inbox-message-meta time {
   flex: none;
-  margin-left: auto;
+  font: var(--ws-text-metadata);
+  line-height: inherit;
   white-space: nowrap;
 }
 
 .ws-inbox-message-content {
-  font: var(--ws-text-subtext);
+  font: var(--ws-text-metadata);
   line-height: 1.45;
   min-width: 0;
   overflow-wrap: anywhere;

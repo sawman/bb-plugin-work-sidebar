@@ -291,9 +291,6 @@ function InboxMessageRow({
     <li className="ws-inbox-message" data-message-id={message.id} data-busy={busy ? "true" : undefined}>
       <div className="ws-inbox-message-heading">
         <strong>{messageLabel(message)}</strong>
-      </div>
-      <div className="ws-inbox-message-meta">
-        {message.agentLabel ? <span className="ws-inbox-message-agent">{message.agentLabel}</span> : null}
         <time
           dateTime={message.createdAt}
           aria-label={`Created ${formatTimestamp(message.createdAt)}`}

@@ -3,8 +3,10 @@
 ## Outcome
 
 - Registered real `Bookmark`, `BookmarkX`, and `Copy` glyphs in the shared icon primitive; Inbox actions no longer fall back to a circle.
-- Reduced a collapsed message row to two lines: subject, then truncating source-thread title + compact relative age + four icon actions.
+- Reduced a collapsed message row to one line: compact subject + relative age + four icon actions.
+- Removed the redundant source-thread title entirely.
 - Removed the visible message ID and absolute `Created`/`Edited` metadata rows.
+- Reduced body copy to the shared metadata text scale after live feedback showed subtext was still too large.
 - Added an icon-only copy-ID button with clipboard success/error feedback.
 - Kept the absolute created timestamp as the accessible label for the compact `<time>` element.
 - Hoisted the absolute timestamp formatter so a long Inbox does not allocate one formatter per row.
