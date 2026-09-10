@@ -4388,7 +4388,7 @@ button.ws-provider-health:focus-visible {
   border: 1px solid var(--border);
   border-radius: 0.35rem;
   display: grid;
-  font: var(--ws-text-primary);
+  font: var(--ws-text-subtext);
   gap: 0.45rem;
   line-height: 1.35;
   min-width: 0;
@@ -4459,7 +4459,7 @@ button.ws-provider-health:focus-visible {
 }
 
 .ws-inbox-message-content {
-  font: var(--ws-text-primary);
+  font: var(--ws-text-subtext);
   line-height: 1.45;
   min-width: 0;
   overflow-wrap: anywhere;

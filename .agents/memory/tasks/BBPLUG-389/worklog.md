@@ -2,7 +2,7 @@
 
 ## Outcome
 
-- Normalized submitted Inbox message rows and Markdown bodies onto the shared primary-text typography tokens.
+- Normalized submitted Inbox message rows and Markdown bodies onto the smaller shared subtext typography tokens; the subject retains primary-row emphasis.
 - Replaced the standalone `Collapse message body` / `Show message body` text control with an icon-only chevron action in the existing message action group.
 - Kept full accessible labels, tooltip hints, `aria-expanded`, and `aria-controls` semantics.
 - Extracted the common three-use `InboxMessageAction` primitive for acknowledge, bookmark, and disclosure controls.

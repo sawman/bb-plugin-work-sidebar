@@ -31,10 +31,10 @@ describe("Inbox architecture boundaries", () => {
     expect(views).toContain('icon={expanded ? "ChevronUp" : "ChevronDown"}');
     expect(views).not.toContain("ws-inbox-message-toggle");
     expect(styles).toMatch(
-      /\.ws-inbox-message\s*\{[\s\S]*?font: var\(--ws-text-primary\)/,
+      /\.ws-inbox-message\s*\{[\s\S]*?font: var\(--ws-text-subtext\)/,
     );
     expect(styles).toMatch(
-      /\.ws-inbox-message-content\s*\{[\s\S]*?font: var\(--ws-text-primary\)/,
+      /\.ws-inbox-message-content\s*\{[\s\S]*?font: var\(--ws-text-subtext\)/,
     );
     expect(styles).not.toContain("--bb-");
     expect(styles.slice(styles.lastIndexOf(".ws-inbox-card"))).not.toMatch(/font-size\s*:/);
