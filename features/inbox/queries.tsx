@@ -18,6 +18,7 @@ export type InboxPage = Readonly<{
   cursor: string | null;
   activeCount: number;
   savedCount: number;
+  historyCount: number;
 }>;
 
 export const inboxOptimisticMutationKey = (threadId: string) => ["work-sidebar", "inbox", threadId, "optimistic"] as const;
@@ -158,6 +159,7 @@ export function useInboxMessages(threadId: string, query: string) {
         cursor: lastPage?.cursor ?? null,
         activeCount: lastPage?.activeCount ?? 0,
         savedCount: lastPage?.savedCount ?? 0,
+        historyCount: lastPage?.historyCount ?? 0,
       }
     : undefined;
   const fetchNextPage = () => {
@@ -187,6 +189,7 @@ type Snapshot = readonly [QueryKey, readonly RecordChange[]][];
 function mapCachedMessages(data: InboxData, update: (message: HumanMessage) => HumanMessage): InboxData {
   let activeDelta = 0;
   let savedDelta = 0;
+  let historyDelta = 0;
   const changedIds = new Set<string>();
   const pages = data.pages.map((page) => ({
     ...page,
@@ -197,6 +200,8 @@ function mapCachedMessages(data: InboxData, update: (message: HumanMessage) => H
       activeDelta += Number(next.acknowledgedAt === null) - Number(message.acknowledgedAt === null);
       savedDelta += Number(next.acknowledgedAt !== null && next.bookmarkedAt !== null)
         - Number(message.acknowledgedAt !== null && message.bookmarkedAt !== null);
+      historyDelta += Number(next.acknowledgedAt !== null && next.bookmarkedAt === null)
+        - Number(message.acknowledgedAt !== null && message.bookmarkedAt === null);
       return next;
     }),
   }));
@@ -206,6 +211,7 @@ function mapCachedMessages(data: InboxData, update: (message: HumanMessage) => H
       ...page,
       activeCount: Math.max(0, page.activeCount + activeDelta),
       savedCount: Math.max(0, page.savedCount + savedDelta),
+      historyCount: Math.max(0, page.historyCount + historyDelta),
     })),
   };
 }

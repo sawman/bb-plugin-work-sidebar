@@ -88,6 +88,7 @@ describe("Inbox architecture boundaries", () => {
     expect(queries).toContain("queryKeys.inbox.thread(threadId)");
     expect(queries).toContain("activeCount");
     expect(queries).toContain("savedCount");
+    expect(queries).toContain("historyCount");
     expect(views).not.toContain("mermaid-adapter");
     expect(views).toContain('aria-label="Mermaid diagram source"');
     expect(views).toContain("Mermaid rendering is disabled in this bundle");

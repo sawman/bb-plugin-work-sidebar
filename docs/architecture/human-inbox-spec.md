@@ -46,17 +46,19 @@ The Work tab renders an `Inbox` card immediately after Status and before Work
 items. Its header shows the unread count; zero is omitted. The card does not
 mount while another right-panel tab is active.
 
-The card has two reusable disclosure groups:
+The card has three reusable disclosure groups:
 
-1. `Inbox` — unacknowledged messages, newest first.
+1. `Messages` — unacknowledged messages, newest first.
 2. `Saved` — bookmarked messages, newest update first. A bookmarked unread
-   message appears only in Inbox until it is acknowledged, avoiding duplicate
+   message appears only in Messages until it is acknowledged, avoiding duplicate
    rows.
+3. `History` — acknowledged, unbookmarked messages, newest update first. It is
+   collapsed by default so history remains available without dominating the
+   Work panel.
 
-Acknowledged, unbookmarked history is hidden from the default card but remains
-searchable. Search covers subject, Markdown body, message ID, and agent label.
-While a query is present the result list replaces the two default groups and
-includes matching active, saved, and acknowledged history.
+Search covers subject, Markdown body, message ID, and agent label. While a
+query is present the result list replaces the three default groups and includes
+matching active, saved, and acknowledged history.
 
 ### Message row
 
@@ -74,11 +76,12 @@ BB's normal browser preference through the host Markdown renderer.
 
 ### Acknowledge, save, and edit semantics
 
-- Acknowledge sets `acknowledgedAt` and removes the row from Inbox.
+- Acknowledge sets `acknowledgedAt` and moves an unbookmarked row from Messages
+  to History.
 - Bookmark sets `bookmarkedAt`. An acknowledged bookmarked message remains in
   Saved.
-- Removing the bookmark from an acknowledged message leaves it in hidden,
-  searchable history until retention removes it.
+- Removing the bookmark from an acknowledged message moves it from Saved to
+  History until retention removes it.
 - Agent edits preserve the message ID, update `updatedAt`, and clear
   `acknowledgedAt`, because changed key information needs attention again.
 - Individual deletion is deliberately unavailable. Acknowledged messages form
@@ -141,8 +144,8 @@ The browser-safe contract exposes strict JSON methods:
 - `acknowledgeHumanMessage({ threadId, messageId })`;
 - `setHumanMessageBookmark({ threadId, messageId, bookmarked })`;
 
-List results include active/saved counts, a bounded result page, and an opaque
-cursor. Search and default projections each use one finite query scope keyed
+List results include active/saved/history counts, a bounded result page, and
+an opaque cursor. Search and default projections each use one finite query scope keyed
 by thread and normalized query. Loaded cursor pages belong to that one
 sequential infinite-query chain, so a refetch starts at page one and derives
 every later cursor from its refreshed predecessor.
@@ -225,8 +228,8 @@ system or second syntax highlighter is introduced.
   current thread archival state before commit and is rejected.
 - Mermaid fences remain an accessible labelled source fallback; ordinary
   Markdown and every message action remain functional.
-- The empty card explains that agents leave only key messages; it does not ask
-  the human to create content in this one-way surface.
+- Zero group counts are the empty state; the card does not add explanatory
+  empty-copy or ask the human to create content in this one-way surface.
 
 ## 8. Acceptance criteria
 
@@ -234,7 +237,7 @@ system or second syntax highlighter is introduced.
   providers through the same plugin registration and strict schemas.
 - A created message appears in the currently mounted Work Inbox through one
   targeted realtime invalidation, without manual refresh.
-- Acknowledge, bookmark/unbookmark, edit/reopen, search, pagination,
+- Acknowledge, bookmark/unbookmark, History disclosure, edit/reopen, search, pagination,
   revision conflicts, idempotent retries, and copyable IDs are covered by
   pure, server, Query, mounted, and accessibility tests.
 - The 501st insert evicts exactly one record according to the documented

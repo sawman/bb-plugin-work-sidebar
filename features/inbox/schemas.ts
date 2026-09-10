@@ -35,6 +35,7 @@ export const inboxRpcSchemas = {
       cursor: z.string().nullable(),
       activeCount: z.number().int().nonnegative(),
       savedCount: z.number().int().nonnegative(),
+      historyCount: z.number().int().nonnegative(),
     }).strict(),
   },
   acknowledgeHumanMessage: {

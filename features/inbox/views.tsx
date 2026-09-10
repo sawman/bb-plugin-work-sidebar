@@ -6,7 +6,13 @@ import { Icon, type IconName } from "../../components/ui/icon";
 import { SearchCombobox } from "../../components/ui/combobox";
 import { SurfaceCard, SurfaceCardHeading } from "../../components/ui/surface-card";
 import { WorkSection } from "../../components/ui/work-section";
-import { messageIsInbox, messageIsSaved, messageLabel, splitInboxMarkdown } from "./model";
+import {
+  messageIsHistory,
+  messageIsInbox,
+  messageIsSaved,
+  messageLabel,
+  splitInboxMarkdown,
+} from "./model";
 import {
   useInboxMessages,
   useInboxMessageMutationState,
@@ -33,6 +39,7 @@ export function InboxCard({ threadId }: { threadId: string }) {
   const messages = query.data?.messages ?? [];
   const inboxMessages = useMemo(() => messages.filter(messageIsInbox), [messages]);
   const savedMessages = useMemo(() => messages.filter(messageIsSaved), [messages]);
+  const historyMessages = useMemo(() => messages.filter(messageIsHistory), [messages]);
   const closeSearch = () => {
     setSearchDraft("");
     setSearch("");
@@ -96,6 +103,16 @@ export function InboxCard({ threadId }: { threadId: string }) {
               >
                 {savedMessages.length ? (
                   <InboxMessageList messages={savedMessages} mutations={mutations} />
+                ) : null}
+              </WorkSection>
+              <WorkSection
+                title="History"
+                count={query.data?.historyCount ?? 0}
+                countUnit="message"
+                metaSpacing="relaxed"
+              >
+                {historyMessages.length ? (
+                  <InboxMessageList messages={historyMessages} mutations={mutations} />
                 ) : null}
               </WorkSection>
               {query.hasNextPage ? (

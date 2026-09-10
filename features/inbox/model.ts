@@ -41,12 +41,18 @@ export function splitInboxMarkdown(content: string): InboxMarkdownSegment[] {
   return segments.filter((segment) => segment.content.length > 0);
 }
 
-export function messageIsSaved(message: HumanMessage) {
+type HumanMessageState = Pick<HumanMessage, "acknowledgedAt" | "bookmarkedAt">;
+
+export function messageIsSaved(message: HumanMessageState) {
   return message.acknowledgedAt !== null && message.bookmarkedAt !== null;
 }
 
-export function messageIsInbox(message: HumanMessage) {
+export function messageIsInbox(message: HumanMessageState) {
   return message.acknowledgedAt === null;
+}
+
+export function messageIsHistory(message: HumanMessageState) {
+  return message.acknowledgedAt !== null && message.bookmarkedAt === null;
 }
 
 export function messageLabel(message: HumanMessage) {

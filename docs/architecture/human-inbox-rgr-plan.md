@@ -79,7 +79,7 @@ Add frontend tests that fail before implementation for:
 - realtime invalidating the exact current thread;
 - independent loading, empty, error/retry, populated, search, and mutation
   states without sibling-card resize or failure;
-- Inbox/Saved disclosure counts and acknowledged-history search;
+- Messages/Saved/History disclosure counts and full-history search;
 - acknowledge, bookmark, unbookmark, rollback, conflict
   recovery, and busy-state suppression;
 - copyable full IDs and edit metadata;
@@ -155,6 +155,20 @@ Only after the clean independent review and final gate may BBPLUG-364 move
 directly from in progress to done. Remote Git follows the repository identity
 protocol: switch `gh` to `sawman`, verify, push, then restore `matthew-se` and
 verify even after failure.
+
+## R37.4 — visible acknowledged history follow-up
+
+BBPLUG-391 extends the completed Inbox slice without creating another data
+source. RED coverage requires acknowledged, unbookmarked messages to remain in
+the default server projection; strict active/saved/history counts; mutually
+exclusive message classification; a collapsed History disclosure; and
+optimistic count transitions for acknowledge, bookmark, and unbookmark.
+
+GREEN adds `historyCount` to the existing strict list response and reuses the
+same cursor chain, Query cache, row, and disclosure components. Search still
+replaces all default groups. The final gate is the focused Inbox suite twice,
+the full serial suite twice, typecheck, SDK check, build/bundle inspection,
+verified-source reload, theme-control matrix, and diff check.
 
 ## Rollback
 

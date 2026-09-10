@@ -202,20 +202,22 @@ export function createInboxService({
       if (normalizedQuery) {
         clauses.push("(id LIKE ? ESCAPE '\\' OR COALESCE(subject, '') LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\' OR COALESCE(agent_label, '') LIKE ? ESCAPE '\\')");
         values.push(...Array(4).fill(`%${escapeLike(normalizedQuery)}%`));
-      } else clauses.push("(acknowledged_at IS NULL OR bookmarked_at IS NOT NULL)");
+      }
       if (parsed) { clauses.push("(updated_at < ? OR (updated_at = ? AND id < ?))"); values.push(parsed.updatedAt, parsed.updatedAt, parsed.id); }
       const rows = database.prepare(`SELECT * FROM human_inbox_messages WHERE ${clauses.join(" AND ")} ORDER BY updated_at DESC, id DESC LIMIT ?`).all(...values, limit + 1) as Record<string, unknown>[];
       const messages: HumanMessage[] = [];
       const counts = database.prepare(
         `SELECT SUM(CASE WHEN acknowledged_at IS NULL THEN 1 ELSE 0 END) AS active,
-          SUM(CASE WHEN acknowledged_at IS NOT NULL AND bookmarked_at IS NOT NULL THEN 1 ELSE 0 END) AS saved
+          SUM(CASE WHEN acknowledged_at IS NOT NULL AND bookmarked_at IS NOT NULL THEN 1 ELSE 0 END) AS saved,
+          SUM(CASE WHEN acknowledged_at IS NOT NULL AND bookmarked_at IS NULL THEN 1 ELSE 0 END) AS history
          FROM human_inbox_messages WHERE thread_id = ?`,
-      ).get(threadId) as { active: number | null; saved: number | null };
+      ).get(threadId) as { active: number | null; saved: number | null; history: number | null };
       const response = () => ({
         messages,
         cursor: rows.length > messages.length && messages.length ? cursorFor(messages.at(-1)!) : null,
         activeCount: counts.active ?? 0,
         savedCount: counts.saved ?? 0,
+        historyCount: counts.history ?? 0,
       });
       for (const row of rows.slice(0, limit)) {
         messages.push(messageFrom(row));

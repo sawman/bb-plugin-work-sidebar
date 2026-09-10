@@ -101,6 +101,7 @@ describe("Inbox server service", () => {
       expect(Buffer.byteLength(JSON.stringify(page), "utf8")).toBeLessThanOrEqual(256 * 1024);
       expect(page.activeCount).toBe(extraRow ? 9 : 8);
       expect(page.savedCount).toBe(0);
+      expect(page.historyCount).toBe(0);
       expect(page.messages.length).toBeGreaterThan(0);
       seen.push(...page.messages.map(({ id }) => id));
       cursor = page.cursor ?? undefined;
@@ -170,20 +171,20 @@ describe("Inbox server service", () => {
     expect(inbox.list({ threadId, limit: 100, cursor: page.cursor! }).messages).not.toHaveLength(0);
   });
 
-  it("keeps active and saved messages visible above newer acknowledged history while search includes history", async () => {
+  it("returns acknowledged history in the default projection with exact partition counts", async () => {
     const { create, inbox } = fixture();
     const active = await create("active message");
     const saved = await create("saved message");
     const acknowledged = inbox.acknowledge(threadId, saved.id, saved.revision);
     inbox.bookmark(threadId, saved.id, true, acknowledged.revision);
-    for (let index = 0; index < 51; index += 1) {
-      const history = await create(`history ${index}`);
-      inbox.acknowledge(threadId, history.id, history.revision);
-    }
-    expect(inbox.list({ threadId, limit: 50 }).messages.map(({ id }) => id)).toEqual(
-      expect.arrayContaining([active.id, saved.id]),
+    const historical = await create("historical message");
+    inbox.acknowledge(threadId, historical.id, historical.revision);
+    const page = inbox.list({ threadId, limit: 50 });
+
+    expect(page.messages.map(({ id }) => id)).toEqual(
+      expect.arrayContaining([active.id, saved.id, historical.id]),
     );
-    expect(inbox.list({ threadId, query: "history", limit: 100 }).messages).toHaveLength(51);
+    expect(page).toMatchObject({ activeCount: 1, savedCount: 1, historyCount: 1 });
   });
 
   it.each([

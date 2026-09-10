@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitInboxMarkdown } from "../model";
+import { messageIsHistory, messageIsInbox, messageIsSaved, splitInboxMarkdown } from "../model";
 
 describe("Inbox Markdown segmentation", () => {
   it("only extracts complete fenced mermaid blocks with the exact info string", () => {
@@ -12,6 +12,17 @@ describe("Inbox Markdown segmentation", () => {
       { kind: "markdown", content: "```mermaid dark\nA-->B\n```\n```js\nalert(1)\n```" },
     ]);
   });
+});
+
+it("partitions Inbox, Saved, and History without duplicate rows", () => {
+  const state = (acknowledgedAt: string | null, bookmarkedAt: string | null) => ({ acknowledgedAt, bookmarkedAt });
+  const classification = (message: ReturnType<typeof state>) => [
+    messageIsInbox(message), messageIsSaved(message), messageIsHistory(message),
+  ];
+  expect(classification(state(null, null))).toEqual([true, false, false]);
+  expect(classification(state("2026-09-10T00:00:00.000Z", "2026-09-10T00:00:01.000Z")))
+    .toEqual([false, true, false]);
+  expect(classification(state("2026-09-10T00:00:00.000Z", null))).toEqual([false, false, true]);
 });
 
 it.each(["````markdown", "~~~~markdown", "   `````text"])("keeps literal Mermaid inside %s untouched", (opener) => {

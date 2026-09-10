@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { configureAxe } from "vitest-axe";
 import { formatMessageAge, InboxCard, InboxMessageContent } from "../views";
+import type { HumanMessage } from "../schemas";
 
 const axe = configureAxe({
   runOnly: { type: "tag", values: ["cat.aria", "cat.name-role-value"] },
@@ -36,7 +37,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   Markdown: markdown,
 }));
 
-const active = {
+const active: HumanMessage = {
   id: "msg_active",
   threadId: "thr_one",
   projectId: "proj_one",
@@ -56,15 +57,16 @@ const history = { ...active, id: "msg_history", subject: "Old handoff", body: "h
 
 function renderCard(
   messages = [active, saved],
-  options: { query?: string; activeCount?: number; savedCount?: number } = {},
+  options: { query?: string; activeCount?: number; savedCount?: number; historyCount?: number } = {},
 ) {
   rpcClient.call.mockImplementation(async (method: string, input: { query?: string }) => {
-    if (method === "listHumanMessages" && input.query) return { messages: [history], cursor: null, activeCount: 1, savedCount: 1 };
+    if (method === "listHumanMessages" && input.query) return { messages: [history], cursor: null, activeCount: 1, savedCount: 1, historyCount: 1 };
     return {
       messages,
       cursor: null,
       activeCount: options.activeCount ?? 4,
       savedCount: options.savedCount ?? 7,
+      historyCount: options.historyCount ?? 3,
     };
   });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -104,18 +106,24 @@ describe("Inbox Work card", () => {
     expect(within(boundary).getByRole("img", { name: "Attached diagram" })).toBeTruthy();
   });
 
-  it("renders shared collapsible Inbox/Saved groups, Markdown, and no delete action", async () => {
-    const view = renderCard();
+  it("renders shared Messages/Saved/History groups with History collapsed", async () => {
+    const view = renderCard([active, saved, history], { historyCount: 1 });
     expect(await view.findByRole("heading", { name: "Inbox" })).toBeTruthy();
     await findMessageRow(view, "msg_active");
     expect(view.getByRole("button", { name: /^Messages:/ })).toBeTruthy();
     expect(view.getByRole("button", { name: /^Saved:/ })).toBeTruthy();
+    const historyGroup = view.getByRole("button", { name: /^History:/ });
     expect(view.getByRole("button", { name: /^Messages:/ }).textContent).toContain("4");
     expect(view.getByRole("button", { name: /^Saved:/ }).textContent).toContain("7");
+    expect(historyGroup.textContent).toContain("1");
+    expect(historyGroup.getAttribute("aria-expanded")).toBe("false");
     expect(view.queryByRole("searchbox", { name: "Search Inbox messages" })).toBeNull();
     expect(view.getByRole("button", { name: "Search Inbox" }).getAttribute("aria-expanded")).toBe("false");
     expect(view.container.querySelector('[data-message-id="msg_active"]')).toBeTruthy();
     expect(view.container.querySelector('[data-message-id="msg_saved"]')).toBeTruthy();
+    expect(view.container.querySelector('[data-message-id="msg_history"]')).toBeNull();
+    fireEvent.click(historyGroup);
+    expect(view.container.querySelector('[data-message-id="msg_history"]')).toBeTruthy();
     expect(view.getAllByText("**Markdown** and 😀")).toHaveLength(2);
     expect(view.queryByRole("button", { name: /delete/i })).toBeNull();
     view.unmount();
@@ -175,12 +183,14 @@ describe("Inbox Work card", () => {
   });
 
   it("uses the zero group counts as the complete empty state", async () => {
-    const view = renderCard([], { activeCount: 0, savedCount: 0 });
+    const view = renderCard([], { activeCount: 0, savedCount: 0, historyCount: 0 });
     const messages = await view.findByRole("button", { name: "Messages: 0 messages" });
     const saved = view.getByRole("button", { name: "Saved: 0 messages" });
+    const historyGroup = view.getByRole("button", { name: "History: 0 messages" });
 
     expect(messages.textContent).toContain("0");
     expect(saved.textContent).toContain("0");
+    expect(historyGroup.textContent).toContain("0");
     expect(view.queryByText("No unread messages")).toBeNull();
     expect(view.queryByText("No saved messages")).toBeNull();
     view.unmount();
@@ -225,7 +235,7 @@ describe("Inbox Work card", () => {
   });
 
   it.each([false, true])("disables Load more throughout a background fetch (search=%s)", async (search) => {
-    const loaded = { messages: [active], cursor: "next", activeCount: 1, savedCount: 0 };
+    const loaded = { messages: [active], cursor: "next", activeCount: 1, savedCount: 0, historyCount: 0 };
     rpcClient.call.mockResolvedValue(loaded);
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
@@ -248,10 +258,10 @@ describe("Inbox Work card", () => {
   });
 
   it("keeps loaded rows and disclosure state mounted while loading a later cursor", async () => {
-    let resolveLaterPage!: (value: { messages: (typeof active)[]; cursor: null; activeCount: number; savedCount: number }) => void;
+    let resolveLaterPage!: (value: { messages: HumanMessage[]; cursor: null; activeCount: number; savedCount: number; historyCount: number }) => void;
     rpcClient.call.mockImplementation((method: string, input: { cursor?: string }) => {
       if (method !== "listHumanMessages") return Promise.resolve(active);
-      if (!input.cursor) return Promise.resolve({ messages: [active, saved], cursor: "later", activeCount: 1, savedCount: 1 });
+      if (!input.cursor) return Promise.resolve({ messages: [active, saved], cursor: "later", activeCount: 1, savedCount: 1, historyCount: 0 });
       return new Promise((resolve) => { resolveLaterPage = resolve; });
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -263,7 +273,7 @@ describe("Inbox Work card", () => {
     fireEvent.click(view.getByRole("button", { name: "Load more messages" }));
     expect(view.container.querySelector('[data-message-id="msg_active"]')).toBeTruthy();
     expect(savedDisclosure.getAttribute("aria-expanded")).toBe("false");
-    resolveLaterPage({ messages: [{ ...active, id: "msg_later" }], cursor: null, activeCount: 2, savedCount: 1 });
+    resolveLaterPage({ messages: [{ ...active, id: "msg_later" }], cursor: null, activeCount: 2, savedCount: 1, historyCount: 0 });
     expect(await findMessageRow(view, "msg_later")).toBeTruthy();
     expect(savedDisclosure.getAttribute("aria-expanded")).toBe("false");
     view.unmount();
@@ -274,11 +284,11 @@ describe("Inbox Work card", () => {
     let laterAttempts = 0;
     rpcClient.call.mockImplementation((method: string, input: { cursor?: string }) => {
       if (method !== "listHumanMessages") return Promise.resolve(active);
-      if (!input.cursor) return Promise.resolve({ messages: [active, saved], cursor: "later", activeCount: 1, savedCount: 1 });
+      if (!input.cursor) return Promise.resolve({ messages: [active, saved], cursor: "later", activeCount: 1, savedCount: 1, historyCount: 0 });
       laterAttempts += 1;
       return laterAttempts === 1
         ? Promise.reject(new Error("later page unavailable"))
-        : Promise.resolve({ messages: [{ ...active, id: "msg_retried" }], cursor: null, activeCount: 2, savedCount: 1 });
+        : Promise.resolve({ messages: [{ ...active, id: "msg_retried" }], cursor: null, activeCount: 2, savedCount: 1, historyCount: 0 });
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
@@ -296,7 +306,7 @@ describe("Inbox Work card", () => {
     let mutationAttempts = 0;
     let resolveRetry!: (value: Omit<typeof active, "bookmarkedAt" | "revision"> & { bookmarkedAt: string; revision: number }) => void;
     rpcClient.call.mockImplementation((method: string) => {
-      if (method === "listHumanMessages") return Promise.resolve({ messages: [active], cursor: null, activeCount: 1, savedCount: 0 });
+      if (method === "listHumanMessages") return Promise.resolve({ messages: [active], cursor: null, activeCount: 1, savedCount: 0, historyCount: 0 });
       mutationAttempts += 1;
       return mutationAttempts === 1
         ? Promise.reject(new Error("Action unavailable"))
@@ -323,7 +333,7 @@ describe("Inbox Work card", () => {
   it("lets the latest cross-action success clear an earlier failure", async () => {
     let resolveBookmark!: (value: Omit<typeof active, "bookmarkedAt" | "revision"> & { bookmarkedAt: string; revision: number }) => void;
     rpcClient.call.mockImplementation((method: string) => {
-      if (method === "listHumanMessages") return Promise.resolve({ messages: [active], cursor: null, activeCount: 1, savedCount: 0 });
+      if (method === "listHumanMessages") return Promise.resolve({ messages: [active], cursor: null, activeCount: 1, savedCount: 0, historyCount: 0 });
       return method === "acknowledgeHumanMessage"
         ? Promise.reject(new Error("Acknowledgement unavailable"))
         : new Promise((resolve) => { resolveBookmark = resolve; });
@@ -347,10 +357,10 @@ describe("Inbox Work card", () => {
       if (method !== "listHumanMessages") return Promise.resolve(active);
       refreshAttempts += 1;
       return refreshAttempts === 1
-        ? Promise.resolve({ messages: [active], cursor: null, activeCount: 1, savedCount: 0 })
+        ? Promise.resolve({ messages: [active], cursor: null, activeCount: 1, savedCount: 0, historyCount: 0 })
         : refreshAttempts === 2
           ? Promise.reject(new Error("Refresh unavailable"))
-          : Promise.resolve({ messages: [active], cursor: null, activeCount: 1, savedCount: 0 });
+          : Promise.resolve({ messages: [active], cursor: null, activeCount: 1, savedCount: 0, historyCount: 0 });
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
@@ -368,7 +378,7 @@ describe("Inbox Work card", () => {
   it("scopes busy and mutation errors to the row whose action was invoked", async () => {
     let rejectAcknowledgement!: (error: Error) => void;
     rpcClient.call.mockImplementation((method: string) => method === "listHumanMessages"
-      ? Promise.resolve({ messages: [active, saved], cursor: null, activeCount: 1, savedCount: 1 })
+      ? Promise.resolve({ messages: [active, saved], cursor: null, activeCount: 1, savedCount: 1, historyCount: 0 })
       : new Promise((_resolve, reject) => { rejectAcknowledgement = reject; }));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
@@ -387,7 +397,7 @@ describe("Inbox Work card", () => {
   it("keeps rapid different-row actions and errors local to their originating rows", async () => {
     const rejecters: ((error: Error) => void)[] = [];
     rpcClient.call.mockImplementation((method: string) => method === "listHumanMessages"
-      ? Promise.resolve({ messages: [active, saved], cursor: null, activeCount: 1, savedCount: 1 })
+      ? Promise.resolve({ messages: [active, saved], cursor: null, activeCount: 1, savedCount: 1, historyCount: 0 })
       : new Promise((_resolve, reject) => { rejecters.push(reject); }));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);

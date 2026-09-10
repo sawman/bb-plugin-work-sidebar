@@ -44,6 +44,7 @@ const page: InboxPage = {
   cursor: null,
   activeCount: 1,
   savedCount: 0,
+  historyCount: 0,
 };
 
 function wrapper(client: QueryClient) {
@@ -367,11 +368,45 @@ describe("Inbox query lifecycle", () => {
     await act(async () => {
       const mutation = view.result.current.mutations.acknowledge.mutateAsync({ messageId: message.id, revision: message.revision });
       const rejection = mutation.then(() => null, (error: unknown) => error);
-      await waitFor(() => expect(cachedPages(client, "thr_one")[0]?.activeCount).toBe(0));
+      await waitFor(() => expect(cachedPages(client, "thr_one")[0]).toMatchObject({ activeCount: 0, historyCount: 1 }));
       rejectMutation(new Error("Message changed; refresh and retry."));
       await expect(rejection).resolves.toMatchObject({ message: "Message changed; refresh and retry." });
     });
     expect(cachedPages(client, "thr_one")).toEqual([page]);
+    view.unmount();
+    client.clear();
+  });
+
+  it.each([
+    [true, { savedCount: 1, historyCount: 0 }],
+    [false, { savedCount: 0, historyCount: 1 }],
+  ] as const)("moves acknowledged messages between Saved and History when bookmarked=%s", async (bookmarked, counts) => {
+    const acknowledged = {
+      ...message,
+      acknowledgedAt: message.createdAt,
+      bookmarkedAt: bookmarked ? null : message.createdAt,
+    };
+    const initial: InboxPage = {
+      messages: [acknowledged], cursor: null, activeCount: 0,
+      savedCount: bookmarked ? 0 : 1, historyCount: bookmarked ? 1 : 0,
+    };
+    let rejectMutation!: (error: Error) => void;
+    rpcClient.call.mockImplementation((method: string) => method === "listHumanMessages"
+      ? Promise.resolve(initial)
+      : new Promise((_resolve, reject) => { rejectMutation = reject; }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = renderHook(
+      () => ({ query: useInboxMessages("thr_one", ""), mutations: useInboxMutations("thr_one") }),
+      { wrapper: wrapper(client) },
+    );
+    await waitFor(() => expect(view.result.current.query.data).toEqual(initial));
+    const pending = view.result.current.mutations.bookmark.mutateAsync({
+      messageId: message.id, bookmarked, revision: message.revision,
+    }).catch(() => undefined);
+    await waitFor(() => expect(cachedPages(client, "thr_one")[0]).toMatchObject(counts));
+    rejectMutation(new Error("conflict"));
+    await pending;
+    expect(cachedPages(client, "thr_one")).toEqual([initial]);
     view.unmount();
     client.clear();
   });
@@ -467,7 +502,8 @@ describe("Inbox query lifecycle", () => {
     await waitFor(() => expect(view.result.current.query.data?.messages).toHaveLength(2));
     const mutation = view.result.current.mutations.acknowledge.mutateAsync({ messageId: message.id, revision: message.revision });
     await waitFor(() => {
-      expect(cachedPages(client, "thr_one").map((cached) => cached.activeCount)).toEqual([0, 0]);
+      expect(cachedPages(client, "thr_one").map((cached) => [cached.activeCount, cached.historyCount]))
+        .toEqual([[0, 1], [0, 1]]);
     });
     resolveMutation(message);
     await mutation;
@@ -486,8 +522,8 @@ describe("Inbox query lifecycle", () => {
     const keys = [queryKeys.inbox.scope("thr_one", ""), queryKeys.inbox.scope("thr_one", "history")];
     for (const key of keys) client.setQueryData(key, {
       pages: [
-        { messages: [firstRecord], cursor: "next", activeCount, savedCount: 0 },
-        { messages: [second], cursor: null, activeCount, savedCount: 0 },
+        { messages: [firstRecord], cursor: "next", activeCount, savedCount: 0, historyCount: 1 },
+        { messages: [second], cursor: null, activeCount, savedCount: 0, historyCount: 1 },
       ], pageParams: [null, "next"],
     });
     let rejectFirst!: (error: Error) => void;
@@ -627,7 +663,7 @@ function messageRange(first: number, last: number) {
 }
 
 function makePage(messages: readonly HumanMessage[], cursor: string | null): InboxPage {
-  return { messages, cursor, activeCount: messages.length, savedCount: 0 };
+  return { messages, cursor, activeCount: messages.length, savedCount: 0, historyCount: 0 };
 }
 
 function uniqueIds(messages: readonly HumanMessage[]) {
