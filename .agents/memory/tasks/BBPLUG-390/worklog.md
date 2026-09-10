@@ -7,6 +7,7 @@
 - Removed the redundant source-thread title entirely.
 - Removed the visible message ID and absolute `Created`/`Edited` metadata rows.
 - Reduced body copy to the shared metadata text scale after live feedback showed subtext was still too large.
+- Forced the host Markdown root to inherit that scale; the host wrapper otherwise overrode the Inbox container typography.
 - Added an icon-only copy-ID button with clipboard success/error feedback.
 - Kept the absolute created timestamp as the accessible label for the compact `<time>` element.
 - Hoisted the absolute timestamp formatter so a long Inbox does not allocate one formatter per row.

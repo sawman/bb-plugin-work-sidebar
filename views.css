@@ -4467,6 +4467,8 @@ button.ws-provider-health:focus-visible {
 }
 
 .ws-inbox-message-content > * {
+  font: inherit;
+  line-height: inherit;
   margin-block: 0.35rem;
 }
 
