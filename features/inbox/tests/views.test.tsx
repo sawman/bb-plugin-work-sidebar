@@ -11,7 +11,17 @@ const axe = configureAxe({
 
 const { rpcClient, markdown, writeText } = vi.hoisted(() => ({
   rpcClient: { call: vi.fn() },
-  markdown: vi.fn(({ content }: { content: string }) => <div data-testid="markdown">{content}</div>),
+  markdown: vi.fn(({ content }: { content: string }) => content.startsWith("# Rich Inbox fixture") ? (
+    <div data-testid="markdown">
+      <h2>Compact heading</h2>
+      <p>Paragraph with <strong>emphasis</strong> and <code>inlineCode()</code>.</p>
+      <ul><li>List item</li></ul>
+      <blockquote>Quoted detail</blockquote>
+      <table><tbody><tr><th>Key</th><td>Value</td></tr></tbody></table>
+      <pre><code>longLine()</code></pre>
+      <img alt="Attached diagram" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" />
+    </div>
+  ) : <div data-testid="markdown">{content}</div>),
   writeText: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -75,6 +85,17 @@ afterEach(() => {
 });
 
 describe("Inbox Work card", () => {
+  it("keeps rich Markdown descendants inside the compact message boundary", () => {
+    const view = render(<InboxMessageContent content="# Rich Inbox fixture\n\n- List item" />);
+    const boundary = view.container.querySelector<HTMLElement>(".ws-inbox-message-content")!;
+
+    expect(within(boundary).getByRole("heading", { name: "Compact heading" })).toBeTruthy();
+    expect(within(boundary).getByRole("list")).toBeTruthy();
+    expect(within(boundary).getByRole("blockquote")).toBeTruthy();
+    expect(within(boundary).getByRole("table")).toBeTruthy();
+    expect(within(boundary).getByRole("img", { name: "Attached diagram" })).toBeTruthy();
+  });
+
   it("renders shared collapsible Inbox/Saved groups, Markdown, and no delete action", async () => {
     const view = renderCard();
     expect(await view.findByRole("heading", { name: "Inbox" })).toBeTruthy();

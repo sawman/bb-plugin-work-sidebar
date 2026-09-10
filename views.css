@@ -3989,6 +3989,8 @@ button.ws-provider-health:focus-visible {
     normal var(--ws-text-font-family);
   --ws-text-metadata: var(--ws-text-metadata-weight)
     var(--ws-text-metadata-size) / normal var(--ws-text-font-family);
+  --ws-text-metadata-emphasis: var(--ws-text-title-weight)
+    var(--ws-text-metadata-size) / normal var(--ws-text-font-family);
   --ws-text-label: var(--ws-text-label-weight) var(--ws-text-label-size) /
     normal var(--ws-text-font-family);
   --ws-text-code: var(--ws-text-code-weight) var(--ws-text-code-size) / normal
@@ -4469,12 +4471,104 @@ button.ws-provider-health:focus-visible {
 .ws-inbox-message-content > * {
   font: inherit;
   line-height: inherit;
-  margin-block: 0.35rem;
+  margin: 0;
+  min-width: 0;
 }
 
 .ws-inbox-message-content :is(code, pre) {
   font: inherit;
   font-family: var(--ws-text-font-family-code);
+}
+
+.ws-inbox-message-content :is(
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  li,
+  blockquote,
+  table,
+  th,
+  td
+) {
+  font: inherit;
+  line-height: inherit;
+}
+
+.ws-inbox-message-content :is(h1, h2, h3, h4, h5, h6, th) {
+  font: var(--ws-text-metadata-emphasis);
+  line-height: inherit;
+}
+
+.ws-inbox-message-content :is(
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  ul,
+  ol,
+  blockquote,
+  pre,
+  table,
+  hr
+) {
+  margin-block: 0.35rem;
+}
+
+.ws-inbox-message-content > * > :first-child {
+  margin-block-start: 0;
+}
+
+.ws-inbox-message-content > * > :last-child {
+  margin-block-end: 0;
+}
+
+.ws-inbox-message-content :is(ul, ol) {
+  padding-inline-start: 1.15rem;
+}
+
+.ws-inbox-message-content blockquote {
+  border-inline-start: 2px solid var(--border);
+  color: var(--muted-foreground);
+  margin-inline: 0;
+  padding-inline-start: 0.5rem;
+}
+
+.ws-inbox-message-content pre {
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.ws-inbox-message-content table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  overflow-x: auto;
+}
+
+.ws-inbox-message-content :is(th, td) {
+  border-bottom: 1px solid var(--border);
+  padding: 0.2rem 0.3rem;
+  text-align: start;
+}
+
+.ws-inbox-message-content :is(img, video) {
+  display: block;
+  height: auto;
+  max-width: 100%;
+}
+
+.ws-inbox-message-content hr {
+  border: 0;
+  border-top: 1px solid var(--border);
 }
 
 .ws-inbox-state,

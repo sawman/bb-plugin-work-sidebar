@@ -45,6 +45,29 @@ describe("Inbox architecture boundaries", () => {
     expect(styles).toMatch(
       /\.ws-inbox-message-content :is\(code, pre\)\s*\{[\s\S]*?font: inherit;[\s\S]*?font-family: var\(--ws-text-font-family-code\)/,
     );
+    expect(styles).toMatch(
+      /\.ws-inbox-message-content :is\([\s\S]*?h1,[\s\S]*?p,[\s\S]*?blockquote,[\s\S]*?th,[\s\S]*?td[\s\S]*?\)\s*\{[\s\S]*?font: inherit;[\s\S]*?line-height: inherit/,
+    );
+    expect(styles).toMatch(
+      /\.ws-inbox-message-content :is\(h1, h2, h3, h4, h5, h6, th\)\s*\{[\s\S]*?font: var\(--ws-text-metadata-emphasis\)/,
+    );
+    expect(styles).toMatch(
+      /\.ws-inbox-message-content :is\(ul, ol\)\s*\{[\s\S]*?padding-inline-start:/,
+    );
+    expect(styles).toMatch(
+      /\.ws-inbox-message-content blockquote\s*\{[\s\S]*?border-inline-start: 2px solid var\(--border\);[\s\S]*?padding-inline-start:/,
+    );
+    expect(styles).toMatch(
+      /\.ws-inbox-message-content pre\s*\{[\s\S]*?max-width: 100%;[\s\S]*?overflow-x: auto/,
+    );
+    expect(styles).toMatch(
+      /\.ws-inbox-message-content table\s*\{[\s\S]*?display: block;[\s\S]*?overflow-x: auto/,
+    );
+    expect(styles).toMatch(
+      /\.ws-inbox-message-content :is\(img, video\)\s*\{[\s\S]*?height: auto;[\s\S]*?max-width: 100%/,
+    );
+    expect(styles).toContain(":first-child");
+    expect(styles).toContain(":last-child");
     expect(styles).not.toContain("--bb-");
     expect(styles.slice(styles.lastIndexOf(".ws-inbox-card"))).not.toMatch(/font-size\s*:/);
   });
