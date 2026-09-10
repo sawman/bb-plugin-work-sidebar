@@ -3,16 +3,22 @@ import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-libra
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { configureAxe } from "vitest-axe";
-import { InboxCard, InboxMessageContent } from "../views";
+import { formatMessageAge, InboxCard, InboxMessageContent } from "../views";
 
 const axe = configureAxe({
   runOnly: { type: "tag", values: ["cat.aria", "cat.name-role-value"] },
 });
 
-const { rpcClient, markdown } = vi.hoisted(() => ({
+const { rpcClient, markdown, writeText } = vi.hoisted(() => ({
   rpcClient: { call: vi.fn() },
   markdown: vi.fn(({ content }: { content: string }) => <div data-testid="markdown">{content}</div>),
+  writeText: vi.fn().mockResolvedValue(undefined),
 }));
+
+Object.defineProperty(navigator, "clipboard", {
+  configurable: true,
+  value: { writeText },
+});
 
 vi.mock("@get-bb/plugin-sdk/app", () => ({
   useRpc: () => rpcClient,
@@ -52,34 +58,68 @@ function renderCard(messages = [active, saved], options: { query?: string } = {}
   return { ...view, client };
 }
 
+async function findMessageRow(view: { container: HTMLElement }, messageId: string) {
+  let row: HTMLElement | null = null;
+  await waitFor(() => {
+    row = view.container.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
+    expect(row).toBeTruthy();
+  });
+  return row!;
+}
+
 afterEach(() => {
   cleanup();
   rpcClient.call.mockReset();
+  writeText.mockClear();
   vi.clearAllMocks();
 });
 
 describe("Inbox Work card", () => {
-  it("renders shared collapsible Inbox/Saved groups, Markdown, IDs, and no delete action", async () => {
+  it("renders shared collapsible Inbox/Saved groups, Markdown, and no delete action", async () => {
     const view = renderCard();
     expect(await view.findByRole("heading", { name: "Inbox" })).toBeTruthy();
-    await view.findByText("msg_active");
+    await findMessageRow(view, "msg_active");
     expect(view.getByRole("button", { name: /^Messages:/ })).toBeTruthy();
     expect(view.getByRole("button", { name: /^Saved:/ })).toBeTruthy();
     expect(view.getByRole("button", { name: /^Messages:/ }).textContent).toContain("4");
     expect(view.getByRole("button", { name: /^Saved:/ }).textContent).toContain("7");
     expect(view.queryByRole("searchbox", { name: "Search Inbox messages" })).toBeNull();
     expect(view.getByRole("button", { name: "Search Inbox" }).getAttribute("aria-expanded")).toBe("false");
-    expect(view.getByText("msg_active")).toBeTruthy();
-    expect(view.getByText("msg_saved")).toBeTruthy();
+    expect(view.container.querySelector('[data-message-id="msg_active"]')).toBeTruthy();
+    expect(view.container.querySelector('[data-message-id="msg_saved"]')).toBeTruthy();
     expect(view.getAllByText("**Markdown** and 😀")).toHaveLength(2);
     expect(view.queryByRole("button", { name: /delete/i })).toBeNull();
     view.unmount();
     view.client.clear();
   });
 
+  it("compacts message metadata into a thread, relative time, and icon actions row", async () => {
+    const view = renderCard([active]);
+    const row = (await view.findByText("Active answer")).closest("li")!;
+    const meta = row.querySelector(".ws-inbox-message-meta")!;
+    const copy = within(row).getByRole("button", { name: "Copy message ID msg_active" });
+    const bookmark = within(row).getByRole("button", { name: "Bookmark message msg_active" });
+    const time = within(row).getByText(/^(?:now|[0-9]+[mhd])$/);
+
+    expect(meta.textContent).toContain("Codex");
+    expect(meta.contains(time)).toBe(true);
+    expect(meta.contains(copy)).toBe(true);
+    expect(row.textContent).not.toContain("Created");
+    expect(row.textContent).not.toContain("msg_active");
+    expect(copy.querySelector('[data-icon="Copy"]')).toBeTruthy();
+    expect(bookmark.querySelector('[data-icon="Bookmark"] path')).toBeTruthy();
+    expect(bookmark.querySelector('[data-icon="Bookmark"] circle')).toBeNull();
+    expect(formatMessageAge("2026-09-10T00:00:00.000Z", Date.parse("2026-09-10T05:00:00.000Z"))).toBe("5h");
+    fireEvent.click(copy);
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("msg_active"));
+
+    view.unmount();
+    view.client.clear();
+  });
+
   it("uses a compact icon action to expand and collapse each message body", async () => {
     const view = renderCard([active]);
-    const row = (await view.findByText("msg_active")).closest("li")!;
+    const row = await findMessageRow(view, "msg_active");
     const collapse = within(row).getByRole("button", { name: "Collapse message body" });
     const bodyId = collapse.getAttribute("aria-controls");
 
@@ -115,18 +155,18 @@ describe("Inbox Work card", () => {
 
   it("searches acknowledged history and performs acknowledge/bookmark/copy actions", async () => {
     const view = renderCard();
-    await view.findByText("msg_active");
+    await findMessageRow(view, "msg_active");
     expect(document.body.querySelector('.ws-search-shell-content[data-portalled="true"]')).toBeNull();
     expect(view.queryByRole("listbox")).toBeNull();
-    const row = view.getByText("msg_active").closest("li")!;
+    const row = await findMessageRow(view, "msg_active");
     fireEvent.click(within(row).getByRole("button", { name: /Acknowledge/ }));
-    fireEvent.click(within(view.getByText("msg_saved").closest("li")!).getByRole("button", { name: /bookmark/i }));
+    fireEvent.click(within(await findMessageRow(view, "msg_saved")).getByRole("button", { name: /bookmark/i }));
     expect(within(row).getByRole("button", { name: /Copy message ID msg_active/ })).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Search Inbox" }));
     const search = view.getByRole("searchbox", { name: "Search Inbox messages" });
     expect(view.getByRole("button", { name: "Search Inbox" }).getAttribute("aria-expanded")).toBe("true");
     fireEvent.change(search, { target: { value: "handoff" } });
-    expect(await view.findByText("msg_history")).toBeTruthy();
+    expect(await findMessageRow(view, "msg_history")).toBeTruthy();
     expect(view.getByText("Old handoff")).toBeTruthy();
     fireEvent.keyDown(search, { key: "Escape" });
     await waitFor(() => expect(view.queryByRole("searchbox", { name: "Search Inbox messages" })).toBeNull());
@@ -155,7 +195,7 @@ describe("Inbox Work card", () => {
     rpcClient.call.mockResolvedValue(loaded);
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
-    await view.findByText("msg_active");
+    await findMessageRow(view, "msg_active");
     if (search) {
       fireEvent.click(view.getByRole("button", { name: "Search Inbox" }));
       fireEvent.change(view.getByRole("searchbox"), { target: { value: "history" } });
@@ -182,15 +222,15 @@ describe("Inbox Work card", () => {
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
-    await view.findByText("msg_active");
+    await findMessageRow(view, "msg_active");
     const savedDisclosure = view.getByRole("button", { name: /^Saved:/ });
     fireEvent.click(savedDisclosure);
     expect(savedDisclosure.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(view.getByRole("button", { name: "Load more messages" }));
-    expect(view.getByText("msg_active")).toBeTruthy();
+    expect(view.container.querySelector('[data-message-id="msg_active"]')).toBeTruthy();
     expect(savedDisclosure.getAttribute("aria-expanded")).toBe("false");
     resolveLaterPage({ messages: [{ ...active, id: "msg_later" }], cursor: null, activeCount: 2, savedCount: 1 });
-    expect(await view.findByText("msg_later")).toBeTruthy();
+    expect(await findMessageRow(view, "msg_later")).toBeTruthy();
     expect(savedDisclosure.getAttribute("aria-expanded")).toBe("false");
     view.unmount();
     client.clear();
@@ -208,12 +248,12 @@ describe("Inbox Work card", () => {
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
-    await view.findByText("msg_active");
+    await findMessageRow(view, "msg_active");
     fireEvent.click(view.getByRole("button", { name: "Load more messages" }));
     expect((await view.findByRole("alert")).textContent).toContain("later page unavailable");
-    expect(view.getByText("msg_active")).toBeTruthy();
+    expect(view.container.querySelector('[data-message-id="msg_active"]')).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Retry loading messages" }));
-    expect(await view.findByText("msg_retried")).toBeTruthy();
+    expect(await findMessageRow(view, "msg_retried")).toBeTruthy();
     view.unmount();
     client.clear();
   });
@@ -230,13 +270,18 @@ describe("Inbox Work card", () => {
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
-    const row = (await view.findByText("msg_active")).closest("li")!;
+    const row = await findMessageRow(view, "msg_active");
     fireEvent.click(within(row).getByRole("button", { name: /Bookmark message/ }));
     expect((await within(row).findByRole("alert")).textContent).toContain("Action unavailable");
     fireEvent.click(within(row).getByRole("button", { name: /Bookmark message/ }));
     await waitFor(() => expect(row.getAttribute("data-busy")).toBe("true"));
     resolveRetry({ ...active, bookmarkedAt: "2026-09-06T00:02:00.000Z", revision: 2 });
     await waitFor(() => expect(within(row).queryByRole("alert")).toBeNull());
+    expect(
+      within(row)
+        .getByRole("button", { name: /Remove bookmark from message/ })
+        .querySelector('[data-icon="BookmarkX"] path'),
+    ).toBeTruthy();
     view.unmount();
     client.clear();
   });
@@ -251,7 +296,7 @@ describe("Inbox Work card", () => {
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
-    const row = (await view.findByText("msg_active")).closest("li")!;
+    const row = await findMessageRow(view, "msg_active");
     fireEvent.click(within(row).getByRole("button", { name: /Acknowledge message/ }));
     expect((await within(row).findByRole("alert")).textContent).toContain("Acknowledgement unavailable");
     fireEvent.click(within(row).getByRole("button", { name: /Bookmark message/ }));
@@ -275,10 +320,10 @@ describe("Inbox Work card", () => {
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
-    await view.findByText("msg_active");
+    await findMessageRow(view, "msg_active");
     await act(async () => { await client.refetchQueries(); });
     expect((await view.findByRole("alert")).textContent).toContain("Could not refresh Inbox: Refresh unavailable");
-    expect(view.getByText("msg_active")).toBeTruthy();
+    expect(view.container.querySelector('[data-message-id="msg_active"]')).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Retry Inbox" }));
     await waitFor(() => expect(refreshAttempts).toBe(3));
     await waitFor(() => expect(view.queryByText(/Could not refresh Inbox/)).toBeNull());
@@ -293,8 +338,8 @@ describe("Inbox Work card", () => {
       : new Promise((_resolve, reject) => { rejectAcknowledgement = reject; }));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
-    const activeRow = (await view.findByText("msg_active")).closest("li")!;
-    const savedRow = view.getByText("msg_saved").closest("li")!;
+    const activeRow = await findMessageRow(view, "msg_active");
+    const savedRow = await findMessageRow(view, "msg_saved");
     fireEvent.click(within(activeRow).getByRole("button", { name: /Bookmark message/ }));
     await waitFor(() => expect(activeRow.getAttribute("data-busy")).toBe("true"));
     expect((within(savedRow).getByRole("button", { name: /Remove bookmark/ }) as HTMLButtonElement).disabled).toBe(false);
@@ -312,8 +357,8 @@ describe("Inbox Work card", () => {
       : new Promise((_resolve, reject) => { rejecters.push(reject); }));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><InboxCard threadId="thr_one" /></QueryClientProvider>);
-    const activeRow = (await view.findByText("msg_active")).closest("li")!;
-    const savedRow = view.getByText("msg_saved").closest("li")!;
+    const activeRow = await findMessageRow(view, "msg_active");
+    const savedRow = await findMessageRow(view, "msg_saved");
     fireEvent.click(within(activeRow).getByRole("button", { name: /Bookmark message/ }));
     fireEvent.click(within(savedRow).getByRole("button", { name: /Remove bookmark/ }));
     await waitFor(() => {
@@ -331,16 +376,16 @@ describe("Inbox Work card", () => {
   it("unmounts closed group bodies and restores them on reopen", async () => {
     const diagramMessage = { ...active, body: "```mermaid\nflowchart TD\n A-->B\n```" };
     const view = renderCard([diagramMessage]);
-    await view.findByText("msg_active");
+    await findMessageRow(view, "msg_active");
     const inbox = view.getByRole("button", { name: /^Messages:/ });
     const panelId = inbox.getAttribute("aria-controls");
     expect(panelId).toBeTruthy();
     fireEvent.click(inbox);
-    expect(view.queryByText("msg_active")).toBeNull();
+    expect(view.container.querySelector('[data-message-id="msg_active"]')).toBeNull();
     expect(view.queryByLabelText("Mermaid diagram source")).toBeNull();
     expect(view.container.querySelector(`[id="${panelId}"]`)).toBeNull();
     fireEvent.click(inbox);
-    expect(await view.findByText("msg_active")).toBeTruthy();
+    expect(await findMessageRow(view, "msg_active")).toBeTruthy();
     expect(await view.findByLabelText("Mermaid diagram source")).toBeTruthy();
     view.unmount();
     view.client.clear();
@@ -353,7 +398,7 @@ describe("Inbox Work card", () => {
     expect(view.getByLabelText("Mermaid diagram source").textContent).toContain("flowchart TD");
     expect(view.getByText("Mermaid rendering is disabled in this bundle; showing source.")).toBeTruthy();
     const card = renderCard();
-    await card.findByText("msg_active");
+    await findMessageRow(card, "msg_active");
     fireEvent.click(card.getByRole("button", { name: "Search Inbox" }));
     const search = card.getByRole("searchbox", { name: "Search Inbox messages" });
     search.focus();

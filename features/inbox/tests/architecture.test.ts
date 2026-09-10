@@ -30,6 +30,7 @@ describe("Inbox architecture boundaries", () => {
     expect(views).not.toContain("ws-inbox-group");
     expect(views).toContain('icon={expanded ? "ChevronUp" : "ChevronDown"}');
     expect(views).not.toContain("ws-inbox-message-toggle");
+    expect(views).not.toContain("<CopyBadge");
     expect(styles).toMatch(
       /\.ws-inbox-message\s*\{[\s\S]*?font: var\(--ws-text-subtext\)/,
     );

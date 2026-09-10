@@ -24,4 +24,14 @@ describe("status icon geometry", () => {
 
     expect(wrench).toContain('transform="translate(0 -2)"');
   });
+
+  it("renders bookmark actions as bookmark glyphs instead of the fallback circle", () => {
+    const bookmark = renderToStaticMarkup(<Icon name="Bookmark" />);
+    const removeBookmark = renderToStaticMarkup(<Icon name="BookmarkX" />);
+
+    expect(bookmark).toContain('data-icon="Bookmark"');
+    expect(bookmark).toContain('d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"');
+    expect(removeBookmark).toContain('data-icon="BookmarkX"');
+    expect(removeBookmark).toContain('d="m16 3 5 5M21 3l-5 5"');
+  });
 });

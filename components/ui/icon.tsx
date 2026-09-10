@@ -15,6 +15,15 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M12 3v4M8 12h.01M16 12h.01M8 16h8" />
     </>
   ),
+  Bookmark: (
+    <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+  ),
+  BookmarkX: (
+    <>
+      <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h6" />
+      <path d="m16 3 5 5M21 3l-5 5" />
+    </>
+  ),
   Check: <path d="m5 12 4 4L19 6" />,
   ChevronDown: <path d="m6 9 6 6 6-6" />,
   ChevronRight: <path d="m9 18 6-6-6-6" />,
@@ -36,6 +45,12 @@ const paths: Record<string, React.ReactNode> = {
     <>
       <rect x="3" y="4" width="18" height="16" rx="2" />
       <path d="M12 4v16" />
+    </>
+  ),
+  Copy: (
+    <>
+      <rect x="8" y="8" width="13" height="13" rx="2" />
+      <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
     </>
   ),
   Eye: (

@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import { Markdown } from "@get-bb/plugin-sdk/app";
+import { toast } from "sonner";
 import { ActionTooltip } from "../../components/ui/action-tooltip";
-import { CopyBadge } from "../../components/ui/copy-badge";
 import { Icon, type IconName } from "../../components/ui/icon";
 import { SearchCombobox } from "../../components/ui/combobox";
 import { SurfaceCard, SurfaceCardHeading } from "../../components/ui/surface-card";
@@ -13,6 +13,11 @@ import {
   useInboxMutations,
 } from "./queries";
 import type { HumanMessage } from "./schemas";
+
+const messageTimestampFormatter = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
 
 export function InboxCard({ threadId }: { threadId: string }) {
   const [searchDraft, setSearchDraft] = useState("");
@@ -272,11 +277,36 @@ function InboxMessageRow({
   const { busy, error } = useInboxMessageMutationState(message.threadId, message.id);
   const acknowledge = () => mutations.acknowledge.mutate({ messageId: message.id, revision: message.revision });
   const bookmark = () => mutations.bookmark.mutate({ messageId: message.id, bookmarked: !message.bookmarkedAt, revision: message.revision });
+  const copyId = () => {
+    void (async () => {
+      try {
+        await navigator.clipboard.writeText(message.id);
+        toast.success("Copied message ID");
+      } catch {
+        toast.error("Could not copy message ID");
+      }
+    })();
+  };
   return (
     <li className="ws-inbox-message" data-message-id={message.id} data-busy={busy ? "true" : undefined}>
       <div className="ws-inbox-message-heading">
         <strong>{messageLabel(message)}</strong>
+      </div>
+      <div className="ws-inbox-message-meta">
+        {message.agentLabel ? <span className="ws-inbox-message-agent">{message.agentLabel}</span> : null}
+        <time
+          dateTime={message.createdAt}
+          aria-label={`Created ${formatTimestamp(message.createdAt)}`}
+        >
+          {formatMessageAge(message.createdAt)}
+        </time>
         <div className="ws-inbox-message-actions">
+          <InboxMessageAction
+            tooltip="Copy ID"
+            ariaLabel={`Copy message ID ${message.id}`}
+            icon="Copy"
+            onClick={copyId}
+          />
           <InboxMessageAction
             tooltip={message.acknowledgedAt ? "Acknowledged" : "Acknowledge"}
             ariaLabel={`Acknowledge message ${message.id}`}
@@ -301,14 +331,6 @@ function InboxMessageRow({
           />
         </div>
       </div>
-      <div className="ws-inbox-message-meta">
-        {message.agentLabel ? <span>{message.agentLabel}</span> : null}
-        <time dateTime={message.createdAt}>Created {formatTimestamp(message.createdAt)}</time>
-        {message.updatedAt !== message.createdAt ? <time dateTime={message.updatedAt}>Edited {formatTimestamp(message.updatedAt)}</time> : null}
-      </div>
-      <CopyBadge value={message.id} label="message ID" title={`Copy ${message.id}`}>
-        <code>{message.id}</code>
-      </CopyBadge>
       {expanded ? <InboxMessageContent id={bodyId} content={message.body} /> : null}
       {error ? <p className="ws-inbox-mutation-error" role="alert">{error.message} Refresh and retry.</p> : null}
     </li>
@@ -316,7 +338,18 @@ function InboxMessageRow({
 }
 
 function formatTimestamp(value: string) {
-  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return messageTimestampFormatter.format(new Date(value));
+}
+
+export function formatMessageAge(value: string, now = Date.now()) {
+  const createdAt = new Date(value).getTime();
+  if (!Number.isFinite(createdAt)) return "now";
+  const minutes = Math.max(0, Math.floor((now - createdAt) / 60_000));
+  if (minutes < 1) return "now";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
 }
 
 export function InboxMessageContent({ content, id }: { content: string; id?: string }) {
