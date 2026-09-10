@@ -1,8 +1,9 @@
-import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
+import { createFakePluginHost, makePluginAgentConfigurationContext } from "@get-bb/plugin-sdk/testing";
 import { describe, expect, it, vi } from "vitest";
 import plugin, { createServerLifecycle, rpcContract } from "../../../server.js";
 import { pluginStorageDatabase } from "../../../shared/server-storage.js";
 import * as inboxService from "../server.js";
+import { INBOX_AGENT_INSTRUCTIONS } from "../server.js";
 import { createInboxLifecycleSubscription } from "../server-registration.js";
 
 const thread = {
@@ -26,6 +27,19 @@ function toolText(output: unknown) {
 }
 
 describe("Inbox registration", () => {
+  it("instructs agents to answer through Inbox and continue remaining work", async () => {
+    const expected = "When the user asks a question and requested work still remains, leave the answer in Inbox and continue the work instead of stopping after the answer.";
+    expect(INBOX_AGENT_INSTRUCTIONS).toContain(expected);
+
+    const host = createFakePluginHost();
+    await plugin(host.bb);
+    const configuration = host.harness.inspection.registrations.agentConfigurationProvider?.(
+      makePluginAgentConfigurationContext(),
+    );
+    expect(configuration?.instructions).toContain(expected);
+    await host.harness.lifecycle.dispose();
+  });
+
   it("registers strict RPCs and provider-derived tools with one targeted signal", async () => {
     const host = createFakePluginHost({ sdk: { threads: { get: vi.fn(async () => thread) } } });
     await plugin(host.bb);

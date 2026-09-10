@@ -20,6 +20,8 @@ export const INBOX_AGENT_INSTRUCTIONS = [
   "or handoff information the user may need later. Do not mirror routine progress",
   "or every chat response. Ask interactive questions through the question tool;",
   "when the question or its answer is important, also leave a concise Inbox record.",
+  "When the user asks a question and requested work still remains, leave the answer",
+  "in Inbox and continue the work instead of stopping after the answer.",
 ].join(" ");
 
 function normalizeSubject(subject: string | null | undefined): string | null {

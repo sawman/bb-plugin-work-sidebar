@@ -131,7 +131,9 @@ agent instruction contribution says:
 > or handoff information the user may need later. Do not mirror routine
 > progress or every chat response. Ask interactive questions through the
 > question tool; when the question or its answer is important, also leave a
-> concise Inbox record.
+> concise Inbox record. When the user asks a question and requested work still
+> remains, leave the answer in Inbox and continue the work instead of stopping
+> after the answer.
 
 The instruction is deliberately short and provider-neutral. Creating an Inbox
 message never pauses or wakes the agent and never writes into the chat
