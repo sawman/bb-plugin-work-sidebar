@@ -42,6 +42,9 @@ describe("Inbox architecture boundaries", () => {
     expect(styles).toMatch(
       /\.ws-inbox-message-content > \*\s*\{[\s\S]*?font: inherit/,
     );
+    expect(styles).toMatch(
+      /\.ws-inbox-message-content :is\(code, pre\)\s*\{[\s\S]*?font: inherit;[\s\S]*?font-family: var\(--ws-text-font-family-code\)/,
+    );
     expect(styles).not.toContain("--bb-");
     expect(styles.slice(styles.lastIndexOf(".ws-inbox-card"))).not.toMatch(/font-size\s*:/);
   });

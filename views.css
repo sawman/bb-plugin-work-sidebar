@@ -4472,6 +4472,11 @@ button.ws-provider-health:focus-visible {
   margin-block: 0.35rem;
 }
 
+.ws-inbox-message-content :is(code, pre) {
+  font: inherit;
+  font-family: var(--ws-text-font-family-code);
+}
+
 .ws-inbox-state,
 .ws-inbox-empty,
 .ws-inbox-mutation-error {
