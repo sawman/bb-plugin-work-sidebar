@@ -124,7 +124,7 @@ describe("Inbox Work card", () => {
     expect(view.container.querySelector('[data-message-id="msg_history"]')).toBeNull();
     fireEvent.click(historyGroup);
     expect(view.container.querySelector('[data-message-id="msg_history"]')).toBeTruthy();
-    expect(view.getAllByText("**Markdown** and 😀")).toHaveLength(2);
+    expect(view.queryByText("**Markdown** and 😀")).toBeNull();
     expect(view.queryByRole("button", { name: /delete/i })).toBeNull();
     view.unmount();
     view.client.clear();
@@ -155,29 +155,27 @@ describe("Inbox Work card", () => {
     view.client.clear();
   });
 
-  it("uses a compact icon action to expand and collapse each message body", async () => {
+  it("starts each message body collapsed and toggles it with the compact icon action", async () => {
     const view = renderCard([active]);
     const row = await findMessageRow(view, "msg_active");
-    const collapse = within(row).getByRole("button", { name: "Collapse message body" });
-    const bodyId = collapse.getAttribute("aria-controls");
-
-    expect(collapse.closest(".ws-inbox-message-actions")).toBeTruthy();
-    expect(collapse.querySelector('[data-icon="ChevronUp"]')).toBeTruthy();
-    expect(collapse.textContent).toBe("");
-    expect(bodyId).toBeTruthy();
-    expect(row.querySelector(`[id="${bodyId}"]`)).toBeTruthy();
-    expect(view.queryByText("Collapse message body")).toBeNull();
-
-    fireEvent.click(collapse);
     const expand = within(row).getByRole("button", { name: "Expand message body" });
+    const bodyId = expand.getAttribute("aria-controls");
+
+    expect(expand.closest(".ws-inbox-message-actions")).toBeTruthy();
     expect(expand.getAttribute("aria-expanded")).toBe("false");
     expect(expand.querySelector('[data-icon="ChevronDown"]')).toBeTruthy();
+    expect(expand.textContent).toBe("");
+    expect(bodyId).toBeTruthy();
     expect(row.querySelector(`[id="${bodyId}"]`)).toBeNull();
-    expect(document.body.querySelector('[data-tooltip-label="Expand"]')).toBeTruthy();
 
     fireEvent.click(expand);
-    expect(within(row).getByRole("button", { name: "Collapse message body" })).toBeTruthy();
+    const collapse = within(row).getByRole("button", { name: "Collapse message body" });
+    expect(collapse.querySelector('[data-icon="ChevronUp"]')).toBeTruthy();
     expect(row.querySelector(`[id="${bodyId}"]`)).toBeTruthy();
+
+    fireEvent.click(collapse);
+    expect(within(row).getByRole("button", { name: "Expand message body" })).toBeTruthy();
+    expect(row.querySelector(`[id="${bodyId}"]`)).toBeNull();
     view.unmount();
     view.client.clear();
   });
@@ -417,10 +415,12 @@ describe("Inbox Work card", () => {
     client.clear();
   });
 
-  it("unmounts closed group bodies and restores them on reopen", async () => {
+  it("unmounts closed group rows and restores their message bodies collapsed", async () => {
     const diagramMessage = { ...active, body: "```mermaid\nflowchart TD\n A-->B\n```" };
     const view = renderCard([diagramMessage]);
-    await findMessageRow(view, "msg_active");
+    const row = await findMessageRow(view, "msg_active");
+    fireEvent.click(within(row).getByRole("button", { name: "Expand message body" }));
+    expect(await view.findByLabelText("Mermaid diagram source")).toBeTruthy();
     const inbox = view.getByRole("button", { name: /^Messages:/ });
     const panelId = inbox.getAttribute("aria-controls");
     expect(panelId).toBeTruthy();
@@ -429,7 +429,10 @@ describe("Inbox Work card", () => {
     expect(view.queryByLabelText("Mermaid diagram source")).toBeNull();
     expect(view.container.querySelector(`[id="${panelId}"]`)).toBeNull();
     fireEvent.click(inbox);
-    expect(await findMessageRow(view, "msg_active")).toBeTruthy();
+    const restored = await findMessageRow(view, "msg_active");
+    expect(within(restored).getByRole("button", { name: "Expand message body" })).toBeTruthy();
+    expect(view.queryByLabelText("Mermaid diagram source")).toBeNull();
+    fireEvent.click(within(restored).getByRole("button", { name: "Expand message body" }));
     expect(await view.findByLabelText("Mermaid diagram source")).toBeTruthy();
     view.unmount();
     view.client.clear();

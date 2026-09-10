@@ -71,8 +71,9 @@ Each message presents:
 - an acknowledge control;
 - a bookmark toggle;
 
-The body can be expanded without changing acknowledgement state. Links follow
-BB's normal browser preference through the host Markdown renderer.
+Message bodies start collapsed in every group and search result, and can be
+expanded without changing acknowledgement state. Links follow BB's normal
+browser preference through the host Markdown renderer.
 
 ### Acknowledge, save, and edit semantics
 

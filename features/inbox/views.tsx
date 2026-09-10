@@ -287,7 +287,7 @@ function InboxMessageRow({
   message: HumanMessage;
   mutations: ReturnType<typeof useInboxMutations>;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const bodyId = useId();
   const { busy, error } = useInboxMessageMutationState(message.threadId, message.id);
   const acknowledge = () => mutations.acknowledge.mutate({ messageId: message.id, revision: message.revision });
