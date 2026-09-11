@@ -24,9 +24,9 @@ the UI specifically needs a per-thread task list.
 
 ## Current deployment
 
-- Target: `builtin:tasks` inside BB `0.42.0`, SDK `0.4.47`.
-- Verified source baseline: `desktop-v0.42.0` at
-  `960255b98ce3dccdcb5754eb67a7f989236602a1`.
+- Target: `builtin:tasks` inside BB `0.42.1`, SDK `0.4.47`.
+- Verified source baseline: `desktop-v0.42.1` at
+  `a4aa07f9ee3fdeb5716a26a368246ea1ef9e0b78`.
 - Source patch: [thread-workflow.patch](thread-workflow.patch).
 - Coverage includes database filtering and link scoping, typed RPC validation
   and label hydration, direct delegation, and CLI parent forwarding.
@@ -37,9 +37,9 @@ the UI specifically needs a per-thread task list.
   `a4aa07f9ee3fdeb5716a26a368246ea1ef9e0b78`.
 - BB 0.42.1 does not change the Tasks plugin or SDK 0.4.47. The patch still
   applies unchanged and remains necessary.
-- The full 0.42.1 preflight passed 368 plugin tests, typecheck, and build, and
-  staged BB 0.42.1 / SDK 0.4.47 artifacts. The desktop bundle is downloaded but
-  is not the running host yet; deploy only after the update is activated.
+- The full 0.42.1 preflight and deployment pass each passed 368 plugin tests,
+  typecheck, and build. The resulting BB 0.42.1 / SDK 0.4.47 artifacts were
+  deployed with a version-matched local backup and exact checksum parity.
 
 ## Update procedure
 

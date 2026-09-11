@@ -9,7 +9,7 @@ removing any item below. Re-run the linked searches against the current open
 issues and pull requests, then confirm the shipped API through a typed plugin
 test—not just a changelog entry.
 
-Last checked: 2026-09-09 against BB 0.42.1 / SDK 0.4.47.
+Last checked: 2026-09-11 against BB 0.42.1 / SDK 0.4.47.
 
 ## BB 0.42.1 audit
 
@@ -21,10 +21,13 @@ Issues #1978, #2200, and #2836 remain open, and current repository searches
 found no open issue or pull request for `listTasksForThread` or the ACP answer
 continuation.
 
-The desktop updater has downloaded 0.42.1, but the running app, server, and CLI
-still report 0.42.0. The 0.42.1 catalog entry is therefore prepared for the
-post-restart sync; the existing 0.42.0 patched artifacts remain live until the
-update is activated.
+The running CLI and host now report 0.42.1. The cataloged preflight and deploy
+were rerun against the immutable release source; AskUserQuestion, Automations,
+and Tasks artifacts were installed with a version-matched backup and exact
+staged/installed checksum parity. SDK 0.4.47 remains aligned with this plugin.
+Issues #1978, #2200, and #2836 remain open as of 2026-09-11, and refreshed
+repository searches still find no open issue or pull request for
+`listTasksForThread` or the ACP answer continuation.
 
 ## BB 0.42.0 audit
 
@@ -54,7 +57,7 @@ audit intentionally did not create speculative work.
   immediately after showing the question, then delivers the submitted answer
   through `threads.send({ mode: "auto" })`; this prevents ACP
   clients from timing out and leaves no manual Resume step. It is deployed into
-  BB 0.42.0 as of 2026-09-05 and cataloged with an exact source ref, patch,
+  BB 0.42.1 as of 2026-09-11 and cataloged with an exact source ref, patch,
   regression suite, and rollback artifacts in
   [`bb-plugins/ask-user-question/`](bb-plugins/ask-user-question/). On every
   BB release, run `npm run bb-plugins:sync`: remove this patch only when ACP

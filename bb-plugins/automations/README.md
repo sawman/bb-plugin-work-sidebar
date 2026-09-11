@@ -15,11 +15,11 @@ missing, deleted, or unreadable projects. The source patch is
 
 ## Current deployment
 
-- Target: `builtin:automations` inside BB `0.42.0`, SDK `0.4.47`.
-- Verified source baseline: `desktop-v0.42.0` at
-  `960255b98ce3dccdcb5754eb67a7f989236602a1`.
+- Target: `builtin:automations` inside BB `0.42.1`, SDK `0.4.47`.
+- Verified source baseline: `desktop-v0.42.1` at
+  `a4aa07f9ee3fdeb5716a26a368246ea1ef9e0b78`.
 - Validation: 81 focused tests, typecheck, and plugin build.
-- Rebased and deployed through the cataloged 0.42.0 sync pass.
+- Rebased and deployed through the cataloged 0.42.1 sync pass.
 
 ## BB 0.42.1 upgrade
 
@@ -27,10 +27,9 @@ missing, deleted, or unreadable projects. The source patch is
   `a4aa07f9ee3fdeb5716a26a368246ea1ef9e0b78`.
 - BB 0.42.1 does not change the Automations plugin or SDK 0.4.47. The patch
   still applies unchanged.
-- The full 0.42.1 preflight passed 81 plugin tests, typecheck, and build, and
-  staged BB 0.42.1 / SDK 0.4.47 artifacts. The desktop bundle is downloaded but
-  is not the running host yet, so the current live deployment remains the
-  0.42.0 build above.
+- The full 0.42.1 preflight and deployment pass each passed 81 plugin tests,
+  typecheck, and build. The resulting BB 0.42.1 / SDK 0.4.47 artifacts were
+  deployed with a version-matched local backup and exact checksum parity.
 
 ## Update procedure
 
