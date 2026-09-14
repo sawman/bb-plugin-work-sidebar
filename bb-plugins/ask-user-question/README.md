@@ -31,21 +31,33 @@ The versioned release criteria and live smoke matrix are in
 
 ## Current deployment
 
-- Target: `builtin:ask-user-question` inside BB `0.42.1`, SDK `0.4.47`.
-- Verified source baseline: `desktop-v0.42.1` at
-  `a4aa07f9ee3fdeb5716a26a368246ea1ef9e0b78`.
+- Target: `builtin:ask-user-question` inside BB `0.43.1`, SDK `0.4.87`.
+- Verified source baseline: `desktop-v0.43.1` at
+  `267938526dfcbc0edb228ce827b5bec202c1af97`.
 - Installed files replaced: all six built-in plugin `dist/*` artifacts plus
   `server/dist/start-server.js` and its source map. BB's server was restarted
-  after the 0.42.1 deployment and the installed artifacts were inspected for
+  after the 0.43.1 deployment and the installed artifacts were inspected for
   the patched continuation markers.
 - Historical 0.41.0 rollback payload:
   [`rollback/bb-0.41.0/`](rollback/bb-0.41.0/), verified by its
   [`manifest.json`](rollback/bb-0.41.0/manifest.json). The exact current
-  0.42.1 pre-deploy payload is retained locally under `~/.bb/patch-backups/`;
+    0.43.1 pre-deploy payload is retained locally under `~/.bb/patch-backups/`;
   never apply the historical payload to a different BB version.
-- Validation: 87 focused plugin tests, 101 focused core tests, plugin and core
+- Validation: 87 focused plugin tests, 108 focused core tests, plugin and core
   typechecks, builds, and exact staged/installed artifact checks. The previous
   release's live ACP Reply matrix remains the behavioral baseline.
+
+## BB 0.43.1 upgrade
+
+- Verified source baseline: `desktop-v0.43.1` at
+  `267938526dfcbc0edb228ce827b5bec202c1af97`.
+- Upstream moved ordinary question rendering and form state into shared UI,
+  and moved request validation into SDK host policy. The continuation remains
+  absent, so the patch was rebased to preserve the queue-aware form and extend
+  the new normalized request path with the non-blocking flag.
+- The preflight and deployment pass each passed 87 plugin tests and 108 core
+  tests, both typechecks, and both builds. Installed core and plugin artifacts
+  match the staged SHA-256 hashes exactly.
 
 ## BB 0.42.1 upgrade
 

@@ -1,5 +1,15 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Patch <patch@local>
+Date: Mon, 14 Sep 2026 11:44:13 +0800
+Subject: [PATCH] patch automations personal projects
+
+---
+ plugins/automations/src/automations.test.ts | 70 +++++++++++++++++----
+ plugins/automations/src/service.ts          | 19 +++++-
+ 2 files changed, 76 insertions(+), 13 deletions(-)
+
 diff --git a/plugins/automations/src/automations.test.ts b/plugins/automations/src/automations.test.ts
-index ec34800..5103174 100644
+index 864df7b..1b887ae 100644
 --- a/plugins/automations/src/automations.test.ts
 +++ b/plugins/automations/src/automations.test.ts
 @@ -159,20 +159,39 @@ function legacyAutomationRow(
@@ -53,7 +63,7 @@ index ec34800..5103174 100644
        },
        providers: {
          list: async () =>
-@@ -980,6 +999,35 @@ describe("automation data access", () => {
+@@ -979,6 +998,35 @@ describe("automation data access", () => {
  });
  
  describe("automation service", () => {
@@ -90,10 +100,10 @@ index ec34800..5103174 100644
      const db = createTestDb();
      const bb = {
 diff --git a/plugins/automations/src/service.ts b/plugins/automations/src/service.ts
-index fa30f1c..b3df64d 100644
+index 304dd9d..98a3e84 100644
 --- a/plugins/automations/src/service.ts
 +++ b/plugins/automations/src/service.ts
-@@ -452,10 +452,25 @@ async function requireProjectAvailable(
+@@ -445,9 +445,24 @@ async function requireProjectAvailable(
  ): Promise<void> {
    try {
      projectAvailableSchema.parse(await bb.sdk.projects.get({ projectId }));
@@ -115,10 +125,8 @@ index fa30f1c..b3df64d 100644
 +      // Preserve the more specific get() failure below.
 +    }
      throw new Error(
-       `Project ${projectId} is not available: ${
--        error instanceof Error ? error.message : String(error)
-+        getError instanceof Error ? getError.message : String(getError)
-       }`,
+-      `Project ${projectId} is not available: ${errorMessage(error)}`,
++      `Project ${projectId} is not available: ${errorMessage(getError)}`,
      );
    }
  }

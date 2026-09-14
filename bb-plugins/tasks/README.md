@@ -24,12 +24,20 @@ the UI specifically needs a per-thread task list.
 
 ## Current deployment
 
-- Target: `builtin:tasks` inside BB `0.42.1`, SDK `0.4.47`.
-- Verified source baseline: `desktop-v0.42.1` at
-  `a4aa07f9ee3fdeb5716a26a368246ea1ef9e0b78`.
+- Target: `builtin:tasks` inside BB `0.43.1`, SDK `0.4.87`.
+- Verified source baseline: `desktop-v0.43.1` at
+  `267938526dfcbc0edb228ce827b5bec202c1af97`.
 - Source patch: [thread-workflow.patch](thread-workflow.patch).
 - Coverage includes database filtering and link scoping, typed RPC validation
   and label hydration, direct delegation, and CLI parent forwarding.
+
+## BB 0.43.1 upgrade
+
+- Upstream expanded project-list pagination but still exposes neither the
+  indexed `listTasksForThread` RPC nor CLI caller-thread forwarding.
+- The patch was rebased without changing its behavior. The preflight and
+  deployment pass each passed 391 serial tests, typecheck, and build; installed
+  artifacts match the staged SHA-256 hashes.
 
 ## BB 0.42.1 upgrade
 

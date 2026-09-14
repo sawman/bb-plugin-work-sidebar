@@ -237,6 +237,7 @@ describe("agent-facing Tasks workflow tools", () => {
       "update_human_message",
     ]);
     expect(host.harness.inspection.registrations.agentConfigurationProvider?.({
+      pluginMetadata: {},
       thread: { id: THREAD_ID, title: "Task tools", parentThreadId: null, sourceThreadId: null },
       project: { id: "proj_root", kind: "standard", name: "bbplug", gitRemoteUrl: null },
       environment: { id: "env_test", name: null, path: null, workspaceProvisionType: "managed-worktree", branchName: null },

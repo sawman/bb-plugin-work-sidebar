@@ -9,7 +9,26 @@ removing any item below. Re-run the linked searches against the current open
 issues and pull requests, then confirm the shipped API through a typed plugin
 test—not just a changelog entry.
 
-Last checked: 2026-09-11 against BB 0.42.1 / SDK 0.4.47.
+Last checked: 2026-09-14 against BB 0.43.1 / SDK 0.4.87.
+
+## BB 0.43.1 audit
+
+Audited immutable `desktop-v0.43.1` source at
+`267938526dfcbc0edb228ce827b5bec202c1af97` and the SDK 0.4.87 declarations.
+None of the six watchlist items is fulfilled. AskUserQuestion moved ordinary
+form rendering into shared UI but still lacks durable non-blocking ACP answer
+continuation; Automations still rejects a personal project during creation;
+Tasks still lacks the indexed thread read and CLI parent forwarding. The SDK
+still explicitly excludes per-thread draft state from the array-wide sidebar
+view and still exposes only preference-following HTTP URL navigation.
+
+All three patches were rebased, preflighted, deployed with a version-matched
+backup, and activated by restarting only BB's server child. Tests passed for
+AskUserQuestion (87 plugin and 108 core), Automations (81), and Tasks (391),
+with typecheck/build gates and exact staged/installed SHA-256 parity. Work
+Sidebar is pinned to SDK 0.4.87. Issues #1978, #2200, and #2836 remain open;
+repository searches found no issue or pull request for `listTasksForThread` or
+the ACP continuation.
 
 ## BB 0.42.1 audit
 
@@ -57,7 +76,7 @@ audit intentionally did not create speculative work.
   immediately after showing the question, then delivers the submitted answer
   through `threads.send({ mode: "auto" })`; this prevents ACP
   clients from timing out and leaves no manual Resume step. It is deployed into
-  BB 0.42.1 as of 2026-09-11 and cataloged with an exact source ref, patch,
+  BB 0.43.1 as of 2026-09-14 and cataloged with an exact source ref, patch,
   regression suite, and rollback artifacts in
   [`bb-plugins/ask-user-question/`](bb-plugins/ask-user-question/). On every
   BB release, run `npm run bb-plugins:sync`: remove this patch only when ACP

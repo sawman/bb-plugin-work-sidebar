@@ -1,8 +1,27 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Patch <patch@local>
+Date: Mon, 14 Sep 2026 11:44:33 +0800
+Subject: [PATCH] patch tasks thread workflow
+
+---
+ plugins/tasks/api/api.test.ts           | 52 +++++++++++++++++++++
+ plugins/tasks/api/index.ts              |  4 ++
+ plugins/tasks/cli/cli.test.ts           | 47 +++++++++++++++++++
+ plugins/tasks/cli/index.ts              |  4 +-
+ plugins/tasks/db.test.ts                | 62 +++++++++++++++++++++++++
+ plugins/tasks/db/store.ts               | 58 +++++++++++++++++++++++
+ plugins/tasks/db/types.ts               | 12 +++++
+ plugins/tasks/delegate/contract.ts      |  1 +
+ plugins/tasks/delegate/delegate.test.ts | 37 +++++++++++++++
+ plugins/tasks/delegate/index.ts         |  3 ++
+ plugins/tasks/shared/contract.ts        | 21 +++++++++
+ 11 files changed, 300 insertions(+), 1 deletion(-)
+
 diff --git a/plugins/tasks/api/api.test.ts b/plugins/tasks/api/api.test.ts
-index 59ff51a..5b478e5 100644
+index b0dbc0b..e4b05a9 100644
 --- a/plugins/tasks/api/api.test.ts
 +++ b/plugins/tasks/api/api.test.ts
-@@ -10,6 +10,58 @@ import { tasksRpcContract } from "../shared/contract";
+@@ -11,6 +11,58 @@ import { tasksRpcContract } from "../shared/contract";
  import { createComment, createStore, registerTasksApi } from ".";
  
  describe("Tasks RPC domain API", () => {
@@ -62,10 +81,10 @@ index 59ff51a..5b478e5 100644
      const { bb, harness } = createFakePluginHost({ pluginId: "tasks" });
      const store = createStore(bb);
 diff --git a/plugins/tasks/api/index.ts b/plugins/tasks/api/index.ts
-index 9e00744..ba58a94 100644
+index 3716a19..b4915d5 100644
 --- a/plugins/tasks/api/index.ts
 +++ b/plugins/tasks/api/index.ts
-@@ -922,6 +922,10 @@ export function registerHandlers(
+@@ -906,6 +906,10 @@ export function registerHandlers(
      listTaskThreads(input) {
        return { taskThreads: store.tasks.listTaskThreads(input.taskId) };
      },
@@ -77,7 +96,7 @@ index 9e00744..ba58a94 100644
        return listTaskPullRequests(bb, store, input.taskId);
      },
 diff --git a/plugins/tasks/cli/cli.test.ts b/plugins/tasks/cli/cli.test.ts
-index 60ae986..76896b1 100644
+index 3f818ab..1836830 100644
 --- a/plugins/tasks/cli/cli.test.ts
 +++ b/plugins/tasks/cli/cli.test.ts
 @@ -82,6 +82,53 @@ function stdout(result: {
@@ -135,10 +154,10 @@ index 60ae986..76896b1 100644
      const { bb, harness } = createFakePluginHost({ pluginId: "tasks" });
      await plugin(bb);
 diff --git a/plugins/tasks/cli/index.ts b/plugins/tasks/cli/index.ts
-index 347a778..f4ab53b 100644
+index 1ad7c78..d50cc9a 100644
 --- a/plugins/tasks/cli/index.ts
 +++ b/plugins/tasks/cli/index.ts
-@@ -1806,6 +1806,7 @@ async function runDispatch(
+@@ -1799,6 +1799,7 @@ async function runDispatch(
    bb: BbPluginApi,
    store: TasksApiStore,
    domain: TasksDomain,
@@ -146,7 +165,7 @@ index 347a778..f4ab53b 100644
    argv: string[],
  ): Promise<string> {
    const args = parseArgs(argv);
-@@ -1823,6 +1824,7 @@ async function runDispatch(
+@@ -1816,6 +1817,7 @@ async function runDispatch(
          taskId: task.id,
          presetId: preset.id,
          extraInstructions: option(args, "instructions"),
@@ -154,7 +173,7 @@ index 347a778..f4ab53b 100644
        }),
      ),
    );
-@@ -2093,7 +2095,7 @@ export function registerTasksCli(
+@@ -2079,7 +2081,7 @@ export function registerTasksCli(
              break;
            case "dispatch":
            case "delegate":
@@ -237,10 +256,10 @@ index c0ce2d1..19e70e6 100644
      const { db, harness, store } = setup();
      try {
 diff --git a/plugins/tasks/db/store.ts b/plugins/tasks/db/store.ts
-index 6c11a21..9f30a83 100644
+index e1a208d..de9d7f6 100644
 --- a/plugins/tasks/db/store.ts
 +++ b/plugins/tasks/db/store.ts
-@@ -25,6 +25,8 @@ import type {
+@@ -28,6 +28,8 @@ import type {
    DeleteFolderResult,
    Folder,
    Label,
@@ -249,7 +268,7 @@ index 6c11a21..9f30a83 100644
    ListTasksFilters,
    ListTasksPage,
    Preset,
-@@ -1064,6 +1066,61 @@ export function createTasksStore(db: PluginDatabase) {
+@@ -1063,6 +1065,61 @@ export function createTasksStore(db: PluginDatabase) {
      return tasks;
    }
  
@@ -311,16 +330,16 @@ index 6c11a21..9f30a83 100644
    function listSubtasks(parentTaskId: string): Task[] {
      requireTask(parentTaskId);
      return db
-@@ -1827,6 +1884,7 @@ export function createTasksStore(db: PluginDatabase) {
+@@ -1817,6 +1874,7 @@ export function createTasksStore(db: PluginDatabase) {
      getTaskByKey,
      listTasksPage,
      listTasks,
 +    listTasksForThread,
      listSubtasks,
-     getSubtaskDoneCounts,
      updateTask,
+     updatePosition,
 diff --git a/plugins/tasks/db/types.ts b/plugins/tasks/db/types.ts
-index c498f4e..ae58bad 100644
+index f99b481..bc9585c 100644
 --- a/plugins/tasks/db/types.ts
 +++ b/plugins/tasks/db/types.ts
 @@ -186,6 +186,18 @@ export interface ListTasksPage {
@@ -343,10 +362,10 @@ index c498f4e..ae58bad 100644
    status: TaskStatus;
    beforeTaskId?: string | null;
 diff --git a/plugins/tasks/delegate/contract.ts b/plugins/tasks/delegate/contract.ts
-index c2e2180..6d89168 100644
+index 2451bb3..720366b 100644
 --- a/plugins/tasks/delegate/contract.ts
 +++ b/plugins/tasks/delegate/contract.ts
-@@ -13,6 +13,7 @@ export const delegationRpcContract = defineRpcContract({
+@@ -11,6 +11,7 @@ export const delegationRpcContract = defineRpcContract({
          taskId: idSchema,
          presetId: idSchema,
          extraInstructions: z.string().optional(),
@@ -403,10 +422,10 @@ index 7277ee6..ae569c4 100644
      const { bb, harness } = createFakePluginHost({
        pluginId: "tasks",
 diff --git a/plugins/tasks/delegate/index.ts b/plugins/tasks/delegate/index.ts
-index 1549610..f610f3a 100644
+index f68a656..3e80a11 100644
 --- a/plugins/tasks/delegate/index.ts
 +++ b/plugins/tasks/delegate/index.ts
-@@ -345,6 +345,9 @@ export function handlers(
+@@ -339,6 +339,9 @@ export function handlers(
              ? {}
              : { serviceTier: execution.serviceTier }),
            permissionMode: execution.permissionMode,
@@ -417,10 +436,10 @@ index 1549610..f610f3a 100644
            prompt,
          })
 diff --git a/plugins/tasks/shared/contract.ts b/plugins/tasks/shared/contract.ts
-index 35bb964..863cb85 100644
+index addb8da..0d7df7c 100644
 --- a/plugins/tasks/shared/contract.ts
 +++ b/plugins/tasks/shared/contract.ts
-@@ -520,6 +520,27 @@ export const tasksRpcContract = defineRpcContract({
+@@ -529,6 +529,27 @@ export const tasksRpcContract = defineRpcContract({
        })
        .strict(),
    },

@@ -1556,6 +1556,7 @@ describe("R18 registered left sidebar parity", () => {
         id: "env_child",
         name: "Child stack workspace",
         branchName: "feature/child",
+        providerId: null,
         workspaceDisplayKind: "managed-worktree" as const,
       },
     };

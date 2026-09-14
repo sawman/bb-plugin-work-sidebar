@@ -15,11 +15,19 @@ missing, deleted, or unreadable projects. The source patch is
 
 ## Current deployment
 
-- Target: `builtin:automations` inside BB `0.42.1`, SDK `0.4.47`.
-- Verified source baseline: `desktop-v0.42.1` at
-  `a4aa07f9ee3fdeb5716a26a368246ea1ef9e0b78`.
+- Target: `builtin:automations` inside BB `0.43.1`, SDK `0.4.87`.
+- Verified source baseline: `desktop-v0.43.1` at
+  `267938526dfcbc0edb228ce827b5bec202c1af97`.
 - Validation: 81 focused tests, typecheck, and plugin build.
-- Rebased and deployed through the cataloged 0.42.1 sync pass.
+- Rebased and deployed through the cataloged 0.43.1 sync pass.
+
+## BB 0.43.1 upgrade
+
+- The personal-inclusive overview read remains upstream, but creation still
+  relies solely on `projects.get` and rejects the personal project.
+- The patch was rebased over the new error-normalization code. The preflight
+  and deployment pass each passed 81 tests, typecheck, and build; installed
+  artifacts match the staged SHA-256 hashes.
 
 ## BB 0.42.1 upgrade
 

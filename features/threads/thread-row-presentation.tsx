@@ -99,7 +99,7 @@ export function ThreadMetadata({
       <ThreadWorkspaceBadge
         branchName={thread.environment?.branchName ?? null}
         environmentName={thread.environment?.name}
-        workspaceDisplayKind={thread.environment?.workspaceDisplayKind}
+        workspaceDisplayKind={thread.environment?.workspaceDisplayKind ?? undefined}
         project={project}
         projectLabel={projectLabel}
         divergence={branchDivergence}

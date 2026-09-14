@@ -1,3 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Patch <patch@local>
+Date: Mon, 14 Sep 2026 11:51:07 +0800
+Subject: [PATCH] patch ask user question continuation
+
+---
+ apps/server/src/internal/tool-calls.ts        |   1 +
+ .../interactions/pending-interactions.ts      |  24 +-
+ .../server/src/services/plugins/plugin-api.ts |   1 +
+ .../internal-events-tool-calls.test.ts        |   8 +-
+ .../services/pending-interactions.test.ts     |  33 +
+ .../plugins/plugin-agent-tools.test.ts        |   2 +
+ .../test/threads/thread-send-dispatch.test.ts | 159 +++++
+ packages/domain/src/pending-interactions.ts   |   1 +
+ packages/plugin-sdk/src/backend-contract.ts   |   8 +
+ .../plugin-sdk/src/internal/host-policy.ts    |   2 +
+ .../src/testing/fake-plugin-host.ts           |   1 +
+ plugins/ask-user-question/app.test.tsx        | 189 +++++-
+ plugins/ask-user-question/app.tsx             | 598 +++++++++++++++++-
+ plugins/ask-user-question/src/form-state.ts   | 111 ++++
+ .../src/server-harness.test.ts                | 431 ++++++++++++-
+ plugins/ask-user-question/src/server.ts       | 296 ++++++++-
+ .../ask-user-question/src/tool-definition.ts  |   2 +
+ 17 files changed, 1819 insertions(+), 48 deletions(-)
+ create mode 100644 plugins/ask-user-question/src/form-state.ts
+
 diff --git a/apps/server/src/internal/tool-calls.ts b/apps/server/src/internal/tool-calls.ts
 index 64a9f5e..1e012e2 100644
 --- a/apps/server/src/internal/tool-calls.ts
@@ -11,7 +37,7 @@ index 64a9f5e..1e012e2 100644
              },
            }),
 diff --git a/apps/server/src/services/interactions/pending-interactions.ts b/apps/server/src/services/interactions/pending-interactions.ts
-index db329b5..056a0ee 100644
+index 907f0b9..acb4d22 100644
 --- a/apps/server/src/services/interactions/pending-interactions.ts
 +++ b/apps/server/src/services/interactions/pending-interactions.ts
 @@ -112,6 +112,7 @@ interface RequestPluginInteractionArgs {
@@ -38,7 +64,7 @@ index db329b5..056a0ee 100644
  export class PendingInteractionLifecycle {
    private readonly deps: CreateLifecycleDeps;
    private readonly pluginWaiters = new Map<string, PluginInteractionWaiter>();
-@@ -349,9 +359,14 @@ export class PendingInteractionLifecycle {
+@@ -343,9 +353,14 @@ export class PendingInteractionLifecycle {
    }
  
    hasPendingThreadInteraction(threadId: string): boolean {
@@ -56,7 +82,7 @@ index db329b5..056a0ee 100644
    }
  
    registerPendingInteraction(
-@@ -490,6 +505,7 @@ export class PendingInteractionLifecycle {
+@@ -484,6 +499,7 @@ export class PendingInteractionLifecycle {
          payload: JSON.stringify({
            kind: "plugin",
            title: args.title,
@@ -64,7 +90,7 @@ index db329b5..056a0ee 100644
            data: args.payload,
          }),
        });
-@@ -529,7 +545,7 @@ export class PendingInteractionLifecycle {
+@@ -523,7 +539,7 @@ export class PendingInteractionLifecycle {
        appendPendingInteractionTimelineEvent(this.deps, interaction);
        notifyInteractionChanged({
          deps: this.deps,
@@ -72,12 +98,12 @@ index db329b5..056a0ee 100644
 +        hasPendingInteraction: !isNonBlockingPluginInteraction(interaction),
          threadId: interaction.threadId,
        });
-     } catch (error) {
+       emitPluginInteractionPending(thread, interaction);
 diff --git a/apps/server/src/services/plugins/plugin-api.ts b/apps/server/src/services/plugins/plugin-api.ts
-index 79db557..df26b97 100644
+index 1be0f20..f9df7aa 100644
 --- a/apps/server/src/services/plugins/plugin-api.ts
 +++ b/apps/server/src/services/plugins/plugin-api.ts
-@@ -441,6 +441,7 @@ export function createPluginApi(options: {
+@@ -477,6 +477,7 @@ export function createPluginApi(options: {
      rendererId: string;
      title: string;
      payload: JsonValue;
@@ -85,16 +111,8 @@ index 79db557..df26b97 100644
      timeoutMs: number;
      signal?: AbortSignal;
    }) => Promise<PluginInteractionResult>;
-@@ -619,6 +620,7 @@ export function createPluginApi(options: {
-       rendererId: request.rendererId,
-       title: request.title.trim(),
-       payload,
-+      nonBlocking: request.nonBlocking === true,
-       timeoutMs,
-       signal: requestOptions?.signal,
-     });
 diff --git a/apps/server/test/internal/internal-events-tool-calls.test.ts b/apps/server/test/internal/internal-events-tool-calls.test.ts
-index adbfc67..70f3c64 100644
+index d6f401b..24d6ec6 100644
 --- a/apps/server/test/internal/internal-events-tool-calls.test.ts
 +++ b/apps/server/test/internal/internal-events-tool-calls.test.ts
 @@ -92,13 +92,17 @@ describe("internal event and tool-call routes", () => {
@@ -133,10 +151,10 @@ index adbfc67..70f3c64 100644
            await expect(readJson(response)).resolves.toEqual({
              success: true,
 diff --git a/apps/server/test/services/pending-interactions.test.ts b/apps/server/test/services/pending-interactions.test.ts
-index 0f1d954..ecbc3fc 100644
+index d6472f1..624d7ae 100644
 --- a/apps/server/test/services/pending-interactions.test.ts
 +++ b/apps/server/test/services/pending-interactions.test.ts
-@@ -65,6 +65,7 @@ function requestPluginInteraction(
+@@ -67,6 +67,7 @@ function requestPluginInteraction(
    args: {
      threadId: string;
      name?: string;
@@ -144,7 +162,7 @@ index 0f1d954..ecbc3fc 100644
      signal?: AbortSignal;
    },
  ) {
-@@ -75,11 +76,43 @@ function requestPluginInteraction(
+@@ -77,11 +78,43 @@ function requestPluginInteraction(
      title: "Add secrets",
      payload: { fields: [{ name: args.name ?? "API_KEY" }] },
      timeoutMs: 10_000,
@@ -185,11 +203,11 @@ index 0f1d954..ecbc3fc 100644
 +    });
 +  });
 +
-   it("returns a plugin response only through memory and persists metadata only", async () => {
+   it("announces each committed plugin prompt once without read duplicates", async () => {
      await withTestHarness(async (harness) => {
-       const thread = seedPluginInteractionThread(harness.deps, "memory-only");
+       const thread = seedPluginInteractionThread(harness.deps, "pending-event");
 diff --git a/apps/server/test/services/plugins/plugin-agent-tools.test.ts b/apps/server/test/services/plugins/plugin-agent-tools.test.ts
-index 1f352a4..a4714fb 100644
+index 6829a06..3e9761f 100644
 --- a/apps/server/test/services/plugins/plugin-agent-tools.test.ts
 +++ b/apps/server/test/services/plugins/plugin-agent-tools.test.ts
 @@ -176,6 +176,7 @@ describe("bb.agents.registerTool", () => {
@@ -209,10 +227,10 @@ index 1f352a4..a4714fb 100644
      };
      const found = service.findAgentTool("search_issues")!;
 diff --git a/apps/server/test/threads/thread-send-dispatch.test.ts b/apps/server/test/threads/thread-send-dispatch.test.ts
-index b568fde..af3c3dc 100644
+index 7ac498c..96a70d4 100644
 --- a/apps/server/test/threads/thread-send-dispatch.test.ts
 +++ b/apps/server/test/threads/thread-send-dispatch.test.ts
-@@ -16,7 +16,12 @@ import {
+@@ -17,7 +17,12 @@ import {
    type ThreadChangedMessage,
  } from "@bb/domain";
  import { groupHostDaemonEvents } from "@bb/host-daemon-contract";
@@ -225,7 +243,7 @@ index b568fde..af3c3dc 100644
  import type { TelemetryService } from "../../src/services/system/telemetry.js";
  import * as threadEvents from "../../src/services/threads/thread-events.js";
  import { runQueuedMessageDispatch } from "../../src/services/threads/queued-message-dispatch.js";
-@@ -137,6 +142,160 @@ function parseThreadMessages(
+@@ -142,6 +147,160 @@ function parseThreadMessages(
    });
  }
  
@@ -387,10 +405,10 @@ index b568fde..af3c3dc 100644
    it("rolls back and sends no host command when the idle thread was archived between claim and dispatch", async () => {
      await withTestHarness(async (harness) => {
 diff --git a/packages/domain/src/pending-interactions.ts b/packages/domain/src/pending-interactions.ts
-index 06e87b8..d4378f4 100644
+index 20d1463..57ac86e 100644
 --- a/packages/domain/src/pending-interactions.ts
 +++ b/packages/domain/src/pending-interactions.ts
-@@ -339,6 +339,7 @@ export type UserQuestionPendingInteractionPayload = z.infer<
+@@ -336,6 +336,7 @@ export type UserQuestionPendingInteractionPayload = z.infer<
  const pluginPendingInteractionPayloadSchema = z.object({
    kind: z.literal("plugin"),
    title: z.string().trim().min(1).max(PLUGIN_INTERACTION_MAX_TITLE_LENGTH),
@@ -399,10 +417,10 @@ index 06e87b8..d4378f4 100644
  });
  type PluginPendingInteractionPayload = z.infer<
 diff --git a/packages/plugin-sdk/src/backend-contract.ts b/packages/plugin-sdk/src/backend-contract.ts
-index aa1fc9e..4832d94 100644
+index 12322bf..1e64e38 100644
 --- a/packages/plugin-sdk/src/backend-contract.ts
 +++ b/packages/plugin-sdk/src/backend-contract.ts
-@@ -695,6 +695,12 @@ export interface PluginInteractionRequest {
+@@ -903,6 +903,12 @@ export interface PluginInteractionRequest {
    rendererId: string;
    title: string;
    payload: JsonValue;
@@ -415,7 +433,7 @@ index aa1fc9e..4832d94 100644
    /** Defaults to ten minutes; capped at one hour. */
    timeoutMs?: number;
  }
-@@ -770,6 +776,8 @@ export type PluginAgentToolResult =
+@@ -978,6 +984,8 @@ export type PluginAgentToolResult =
  export interface PluginAgentToolContext {
    threadId: string;
    projectId: string;
@@ -424,11 +442,31 @@ index aa1fc9e..4832d94 100644
    /** The tool-call request's abort signal (aborts if the daemon round-trip
     * is torn down mid-call). */
    signal: AbortSignal;
+diff --git a/packages/plugin-sdk/src/internal/host-policy.ts b/packages/plugin-sdk/src/internal/host-policy.ts
+index 34bbf47..ed3ed9d 100644
+--- a/packages/plugin-sdk/src/internal/host-policy.ts
++++ b/packages/plugin-sdk/src/internal/host-policy.ts
+@@ -3172,6 +3172,7 @@ export function normalizeInteractionRequest(
+   rendererId: string;
+   title: string;
+   payload: JsonValue;
++  nonBlocking?: boolean;
+   timeoutMs: number;
+ } {
+   if (!request || typeof request !== "object") {
+@@ -3226,6 +3227,7 @@ export function normalizeInteractionRequest(
+     rendererId: request.rendererId,
+     title: request.title.trim(),
+     payload,
++    ...(request.nonBlocking === true ? { nonBlocking: true } : {}),
+     timeoutMs,
+   };
+ }
 diff --git a/packages/plugin-sdk/src/testing/fake-plugin-host.ts b/packages/plugin-sdk/src/testing/fake-plugin-host.ts
-index dc006d8..df01463 100644
+index c3aed2f..1d0c79d 100644
 --- a/packages/plugin-sdk/src/testing/fake-plugin-host.ts
 +++ b/packages/plugin-sdk/src/testing/fake-plugin-host.ts
-@@ -2621,6 +2621,7 @@ function createFakePluginHostInternal(
+@@ -2029,6 +2029,7 @@ function createFakePluginHostInternal(
        return record.execute(parsed.value, {
          threadId: ctx?.threadId ?? "thread-test",
          projectId: ctx?.projectId ?? "project-test",
@@ -437,7 +475,7 @@ index dc006d8..df01463 100644
        });
      },
 diff --git a/plugins/ask-user-question/app.test.tsx b/plugins/ask-user-question/app.test.tsx
-index ad02532..62f8195 100644
+index eba285d..62f8195 100644
 --- a/plugins/ask-user-question/app.test.tsx
 +++ b/plugins/ask-user-question/app.test.tsx
 @@ -54,20 +54,25 @@ function render(
@@ -477,7 +515,138 @@ index ad02532..62f8195 100644
  }
  
  function getButtonByText(
-@@ -216,6 +221,47 @@ describe("multi-select and multi-question flows", () => {
+@@ -81,7 +86,7 @@ function getButtonByText(
+   return button;
+ }
+ 
+-describe("question interaction adapter", () => {
++describe("answering a single-select question", () => {
+   it("submits the selected option value", () => {
+     const submit = vi.fn(async () => undefined);
+     const slot = render(singleSelect, { submit });
+@@ -95,13 +100,171 @@ describe("question interaction adapter", () => {
+       answers: { q0: { selected: ["q0o1"] } },
+     } satisfies InteractionResponse);
+   });
++
++  it("blocks submission until something is chosen", () => {
++    const slot = render(singleSelect);
++    const submitButton = getButtonByText(slot, "Submit answer");
++
++    expect(submitButton.disabled).toBe(true);
++    fireEvent.click(getButtonByText(slot, "Postgres"));
++    expect(submitButton.disabled).toBe(false);
++  });
++
++  it("reveals an option preview only while that option is selected", () => {
++    const slot = render(singleSelect);
++    const preview = "CREATE TABLE users (id uuid primary key);";
++
++    expect(slot.queryByText(preview)).toBeNull();
++    fireEvent.click(getButtonByText(slot, "Postgres"));
++    expect(slot.getByText(preview)).toBeTruthy();
++
++    fireEvent.click(getButtonByText(slot, "SQLite"));
++    expect(slot.queryByText(preview)).toBeNull();
++  });
++
++  it("makes 'Other' and a real option mutually exclusive", () => {
++    const submit = vi.fn(async () => undefined);
++    const slot = render(singleSelect, { submit });
++
++    fireEvent.click(getButtonByText(slot, "Postgres"));
++    fireEvent.click(getButtonByText(slot, "Other…"));
++    const textarea = slot.getByLabelText("Database answer");
++    fireEvent.change(textarea, { target: { value: "DuckDB" } });
++    fireEvent.click(getButtonByText(slot, "Submit answer"));
++
++    expect(submit).toHaveBeenCalledTimes(1);
++    expect(submit.mock.calls[0]?.[0]).toEqual({
++      answers: { q0: { selected: [], freeText: "DuckDB" } },
++    } satisfies InteractionResponse);
++  });
++
++  it("selects an option with its number-key shortcut", () => {
++    const submit = vi.fn(async () => undefined);
++    const slot = render(singleSelect, { submit });
++
++    fireEvent.keyDown(window, { key: "2" });
++    fireEvent.click(getButtonByText(slot, "Submit answer"));
++
++    expect(submit).toHaveBeenCalledTimes(1);
++    expect(submit.mock.calls[0]?.[0]).toEqual({
++      answers: { q0: { selected: ["q0o1"] } },
++    } satisfies InteractionResponse);
++  });
++
++  it("ignores number keys typed into the free-text box", () => {
++    const slot = render(singleSelect);
++    fireEvent.click(getButtonByText(slot, "Other…"));
++    const textarea = slot.getByLabelText("Database answer");
++
++    fireEvent.keyDown(textarea, { key: "1" });
++
++    expect(getButtonByText(slot, "Postgres").getAttribute("aria-pressed")).toBe(
++      "false",
++    );
++  });
++});
++
++describe("multi-select and multi-question flows", () => {
++  const multi: InteractionPayload = {
++    questions: [
++      {
++        id: "q0",
++        prompt: "Which extras?",
++        shortLabel: "Extras",
++        multiSelect: true,
++        allowFreeText: true,
++        options: [
++          { value: "q0o0", label: "Metrics", description: "Prometheus." },
++          { value: "q0o1", label: "Tracing", description: "OTel." },
++        ],
++      },
++      {
++        id: "q1",
++        prompt: "Which database?",
++        shortLabel: "Database",
++        multiSelect: false,
++        allowFreeText: true,
++        options: [
++          { value: "q1o0", label: "Postgres", description: "Server." },
++          { value: "q1o1", label: "SQLite", description: "Embedded." },
++        ],
++      },
++    ],
++  };
++
++  it("keeps several options selected and walks both questions before submitting", () => {
++    const submit = vi.fn(async () => undefined);
++    const slot = render(multi, { submit });
++
++    expect(slot.getByText("1 of 2")).toBeTruthy();
++    fireEvent.click(getButtonByText(slot, "Metrics"));
++    fireEvent.click(getButtonByText(slot, "Tracing"));
++    fireEvent.click(getButtonByText(slot, "Next"));
++
++    expect(slot.getByText("2 of 2")).toBeTruthy();
++    fireEvent.click(getButtonByText(slot, "Postgres"));
++    fireEvent.click(getButtonByText(slot, "Submit answer"));
++
++    expect(submit).toHaveBeenCalledTimes(1);
++    expect(submit.mock.calls[0]?.[0]).toEqual({
++      answers: {
++        q0: { selected: ["q0o0", "q0o1"] },
++        q1: { selected: ["q1o0"] },
++      },
++    } satisfies InteractionResponse);
++  });
++
+   it("cancels the request instead of submitting", () => {
+     const cancel = vi.fn(async () => undefined);
+-    const slot = render(singleSelect, { cancel });
++    const slot = render(multi, { cancel });
+ 
      fireEvent.click(getButtonByText(slot, "Cancel"));
      expect(cancel).toHaveBeenCalledTimes(1);
    });
@@ -522,15 +691,28 @@ index ad02532..62f8195 100644
 +
 +    await vi.waitFor(() => expect(cancel).toHaveBeenCalledTimes(1));
 +  });
- });
- 
- describe("a payload the form cannot read", () => {
++});
++
++describe("a payload the form cannot read", () => {
+   it("offers a cancel escape rather than blocking the composer", () => {
+     const cancel = vi.fn(async () => undefined);
+     const slot = renderSlot(app.pendingInteractions[0]!, {
 diff --git a/plugins/ask-user-question/app.tsx b/plugins/ask-user-question/app.tsx
-index 4e03f6a..c06b4ed 100644
+index 2202d16..9f3c816 100644
 --- a/plugins/ask-user-question/app.tsx
 +++ b/plugins/ask-user-question/app.tsx
-@@ -10,8 +10,11 @@ import {
- } from "react";
+@@ -1,28 +1,524 @@
+-import { useMemo, useState } from "react";
++import {
++  useCallback,
++  useEffect,
++  useLayoutEffect,
++  useMemo,
++  useRef,
++  useState,
++  type KeyboardEvent,
++  type RefObject,
++} from "react";
  import {
    definePluginApp,
 +  useRealtime,
@@ -539,9 +721,297 @@ index 4e03f6a..c06b4ed 100644
  } from "@get-bb/plugin-sdk/app";
 +import type { questionQueueRpcContract } from "./src/server.js";
  import { Button } from "@bb/shared-ui/button";
- import { Icon } from "@bb/shared-ui/icon";
- import { usePointerCoarse } from "@bb/shared-ui/hooks/use-pointer-coarse";
-@@ -307,11 +310,36 @@ function AskUserQuestionInteraction({
+-import { QuestionForm } from "@bb/shared-ui/question-form";
++import { Icon } from "@bb/shared-ui/icon";
++import { usePointerCoarse } from "@bb/shared-ui/hooks/use-pointer-coarse";
++import { cn } from "@bb/shared-ui/lib/utils";
+ import {
+   ASK_USER_QUESTION_RENDERER_ID,
+   interactionPayloadSchema,
++  type InteractionQuestion,
+ } from "./src/contracts.js";
++import {
++  answerStateFor,
++  buildInteractionResponse,
++  createInitialFormState,
++  isQuestionAnswered,
++  resolveQuestionShortcutChoice,
++  type QuestionAnswerState,
++  type QuestionFormState,
++} from "./src/form-state.js";
++
++const OTHER_OPTION_LABEL = "Other…";
++const FREE_TEXT_MIN_HEIGHT = 84;
++const FREE_TEXT_MAX_HEIGHT = 158;
++const PREVIEW_MAX_HEIGHT = 220;
++const MAX_SHORTCUT_ROWS = 9;
++
++interface QuestionOptionRowProps {
++  checked: boolean;
++  label: string;
++  description?: string;
++  multiSelect: boolean;
++  onSelect: () => void;
++  shortcut?: string;
++}
++
++function useAutoGrow(
++  ref: RefObject<HTMLTextAreaElement | null>,
++  { minHeight, maxHeight }: { minHeight: number; maxHeight: number },
++) {
++  return useCallback(
++    (textarea?: HTMLTextAreaElement | null) => {
++      const element = textarea ?? ref.current;
++      if (!element) return;
++      element.style.height = "auto";
++      element.style.height = `${Math.min(
++        Math.max(element.scrollHeight, minHeight),
++        maxHeight,
++      )}px`;
++    },
++    [maxHeight, minHeight, ref],
++  );
++}
++
++function QuestionOptionRow({
++  checked,
++  label,
++  description,
++  multiSelect,
++  onSelect,
++  shortcut,
++}: QuestionOptionRowProps) {
++  return (
++    <button
++      type="button"
++      aria-pressed={checked}
++      aria-keyshortcuts={shortcut}
++      onClick={onSelect}
++      className={cn(
++        "flex w-full items-start gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors",
++        checked ? "bg-surface-selected" : "hover:bg-state-hover",
++      )}
++    >
++      <span
++        className={cn(
++          "mt-0.5 flex size-4 shrink-0 items-center justify-center border",
++          multiSelect ? "rounded" : "rounded-full",
++          checked
++            ? "border-primary bg-primary text-primary-foreground"
++            : "border-input",
++        )}
++      >
++        {checked ? <Icon name="Check" className="size-3" aria-hidden /> : null}
++      </span>
++      <span className="min-w-0 flex-1">
++        <span className="block text-sm font-medium text-foreground">
++          {label}
++        </span>
++        {description ? (
++          <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
++            {description}
++          </span>
++        ) : null}
++      </span>
++      {shortcut ? (
++        <kbd
++          aria-hidden="true"
++          className="mt-0.5 shrink-0 text-xs font-normal text-subtle-foreground"
++        >
++          {shortcut}
++        </kbd>
++      ) : null}
++    </button>
++  );
++}
++
++function QuestionOptionPreview({ preview }: { preview: string }) {
++  return (
++    <pre
++      className="mx-2.5 mb-1 mt-1 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-surface-raised px-2.5 py-2 font-mono text-xs leading-relaxed text-foreground"
++      style={{ maxHeight: `${PREVIEW_MAX_HEIGHT}px` }}
++    >
++      {preview}
++    </pre>
++  );
++}
++
++interface QuestionTabsProps {
++  currentIndex: number;
++  formState: QuestionFormState;
++  onSelect: (index: number) => void;
++  questions: readonly InteractionQuestion[];
++}
++
++function QuestionTabs({
++  currentIndex,
++  formState,
++  onSelect,
++  questions,
++}: QuestionTabsProps) {
++  return (
++    <div className="mb-2 flex shrink-0 items-center gap-2">
++      {}
++      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
++        {questions.map((question, index) => {
++          const answered = isQuestionAnswered(
++            question,
++            answerStateFor(formState, question),
++          );
++          const isActive = index === currentIndex;
++          return (
++            <div
++              key={question.id}
++              className={cn(
++                "relative inline-flex h-7 shrink-0 items-center rounded-md",
++                isActive
++                  ? "bg-muted text-foreground"
++                  : "text-muted-foreground hover:bg-state-hover",
++              )}
++            >
++              <button
++                type="button"
++                onClick={() => onSelect(index)}
++                aria-pressed={isActive}
++                title={question.prompt}
++                className="flex h-full min-w-0 items-center rounded-md px-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
++              >
++                <span
++                  className={cn(
++                    "truncate text-xs",
++                    answered ? "line-through" : undefined,
++                  )}
++                  style={{ maxWidth: "180px" }}
++                >
++                  {question.shortLabel}
++                </span>
++              </button>
++            </div>
++          );
++        })}
++      </div>
++      <span className="shrink-0 text-xs text-muted-foreground">
++        {currentIndex + 1} of {questions.length}
++      </span>
++    </div>
++  );
++}
++
++interface QuestionInputBlockProps {
++  disabled: boolean;
++  question: InteractionQuestion;
++  state: QuestionAnswerState;
++  onToggleOption: (optionValue: string) => void;
++  onSelectOther: () => void;
++  onFreeTextChange: (value: string) => void;
++  onShortcutSubmit: () => void;
++}
++
++function QuestionInputBlock({
++  disabled,
++  question,
++  state,
++  onToggleOption,
++  onSelectOther,
++  onFreeTextChange,
++  onShortcutSubmit,
++}: QuestionInputBlockProps) {
++  const freeTextRef = useRef<HTMLTextAreaElement>(null);
++  const isPointerCoarse = usePointerCoarse();
++  const resizeFreeTextArea = useAutoGrow(freeTextRef, {
++    minHeight: FREE_TEXT_MIN_HEIGHT,
++    maxHeight: FREE_TEXT_MAX_HEIGHT,
++  });
++  const options = question.options;
++  const freeTextLabel = `${question.shortLabel} answer`;
++
++  useLayoutEffect(() => {
++    if (!state.otherSelected) return;
++    resizeFreeTextArea();
++  }, [question.id, resizeFreeTextArea, state.otherSelected, state.otherText]);
++
++  const handleFreeTextKeyDown = (
++    event: KeyboardEvent<HTMLTextAreaElement>,
++  ): void => {
++    if (
++      event.nativeEvent.isComposing ||
++      event.key !== "Enter" ||
++      (!event.metaKey && !event.ctrlKey)
++    ) {
++      return;
++    }
++    event.preventDefault();
++    onShortcutSubmit();
++  };
++
++  return (
++    <fieldset disabled={disabled} className="min-w-0">
++      <legend className="sr-only">{question.prompt}</legend>
++      <div className="text-sm font-semibold text-foreground">
++        {question.prompt}
++      </div>
++      <div className="mt-2 space-y-0.5">
++        {options.map((option: InteractionQuestion["options"][number], index) => {
++          const checked = state.selected.includes(option.value);
++          return (
++            <div key={option.value}>
++              <QuestionOptionRow
++                checked={checked}
++                label={option.label}
++                description={option.description}
++                multiSelect={question.multiSelect}
++                onSelect={() => onToggleOption(option.value)}
++                shortcut={
++                  index < MAX_SHORTCUT_ROWS ? String(index + 1) : undefined
++                }
++              />
++              {checked && option.preview ? (
++                <QuestionOptionPreview preview={option.preview} />
++              ) : null}
++            </div>
++          );
++        })}
++        {question.allowFreeText && options.length > 0 ? (
++          <QuestionOptionRow
++            checked={state.otherSelected}
++            label={OTHER_OPTION_LABEL}
++            multiSelect={question.multiSelect}
++            onSelect={onSelectOther}
++            shortcut={
++              options.length < MAX_SHORTCUT_ROWS
++                ? String(options.length + 1)
++                : undefined
++            }
++          />
++        ) : null}
++      </div>
++      {state.otherSelected ? (
++        <textarea
++          ref={freeTextRef}
++          aria-label={freeTextLabel}
++          value={state.otherText}
++          rows={1}
++          autoFocus={!isPointerCoarse}
++          autoComplete="off"
++          onChange={(event) => {
++            onFreeTextChange(event.target.value);
++            resizeFreeTextArea(event.target);
++          }}
++          onKeyDown={handleFreeTextKeyDown}
++          placeholder="Type your own answer…"
++          className="mt-2 w-full resize-none overflow-y-auto rounded-md border border-border bg-surface-raised px-3 py-2 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:border-ring/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
++          style={{
++            minHeight: `${FREE_TEXT_MIN_HEIGHT}px`,
++            maxHeight: `${FREE_TEXT_MAX_HEIGHT}px`,
++          }}
++        />
++      ) : null}
++    </fieldset>
++  );
++}
+ 
+ function AskUserQuestionInteraction({
+   interaction,
    submit,
    cancel,
  }: PluginPendingInteractionProps) {
@@ -550,7 +1020,6 @@ index 4e03f6a..c06b4ed 100644
      () => interactionPayloadSchema.safeParse(interaction.payload),
      [interaction.payload],
    );
--  const questions = parsed.success ? parsed.data.questions : [];
 +  const initialQuestions = parsed.success ? parsed.data.questions : [];
 +  const [queuedQuestions, setQueuedQuestions] = useState<
 +    readonly InteractionQuestion[] | null
@@ -576,34 +1045,96 @@ index 4e03f6a..c06b4ed 100644
 +  useRealtime("question-queue-changed", refreshQueue);
 +  const questions = queuedQuestions ?? initialQuestions;
 +  const queued = queuedQuestions !== null;
-   const [formState, setFormState] = useState<QuestionFormState>(() =>
-     createInitialFormState(questions),
-   );
-@@ -340,6 +368,12 @@ function AskUserQuestionInteraction({
-     [formState, questions, totalQuestions],
-   );
- 
++  const [formState, setFormState] = useState<QuestionFormState>(() =>
++    createInitialFormState(questions),
++  );
++  const [currentIndex, setCurrentIndex] = useState(0);
+   const [busy, setBusy] = useState(false);
+-  const handleCancel = () => {
+-    void cancel().catch(() => {});
++  const [activeInteractionId, setActiveInteractionId] = useState(
++    interaction.id,
++  );
++
++  if (activeInteractionId !== interaction.id) {
++    setActiveInteractionId(interaction.id);
++    setFormState(createInitialFormState(questions));
++    setCurrentIndex(0);
++  }
++
++  const totalQuestions = questions.length;
++  const currentQuestion = questions[currentIndex] ?? null;
++  const isFirst = currentIndex === 0;
++  const isLast = currentIndex === totalQuestions - 1;
++  const allAnswered = useMemo(
++    () =>
++      totalQuestions > 0 &&
++      questions.every((question) =>
++        isQuestionAnswered(question, answerStateFor(formState, question)),
++      ),
++    [formState, questions, totalQuestions],
++  );
++
 +  useEffect(() => {
 +    setCurrentIndex((index) =>
 +      Math.min(index, Math.max(totalQuestions - 1, 0)),
 +    );
 +  }, [totalQuestions]);
 +
-   const updateQuestionState = (
-     question: InteractionQuestion,
-     update: (state: QuestionAnswerState) => QuestionAnswerState,
-@@ -383,6 +417,7 @@ function AskUserQuestionInteraction({
-   const submitAnswer = (): void => {
-     if (busy || !allAnswered) return;
-     setBusy(true);
++  const updateQuestionState = (
++    question: InteractionQuestion,
++    update: (state: QuestionAnswerState) => QuestionAnswerState,
++  ): void => {
++    setFormState((current) => ({
++      ...current,
++      [question.id]: update(answerStateFor(current, question)),
++    }));
++  };
++
++  const handleToggleOption = (
++    question: InteractionQuestion,
++    optionValue: string,
++  ): void => {
++    updateQuestionState(question, (state) => {
++      if (question.multiSelect) {
++        const selected = state.selected.includes(optionValue)
++          ? state.selected.filter((value) => value !== optionValue)
++          : [...state.selected, optionValue];
++        return { ...state, selected };
++      }
++      return { ...state, selected: [optionValue], otherSelected: false };
++    });
++  };
++
++  const handleSelectOther = (question: InteractionQuestion): void => {
++    updateQuestionState(question, (state) =>
++      question.multiSelect
++        ? { ...state, otherSelected: !state.otherSelected }
++        : { ...state, selected: [], otherSelected: true },
++    );
++  };
++
++  const handleFreeTextChange = (
++    question: InteractionQuestion,
++    value: string,
++  ): void => {
++    updateQuestionState(question, (state) => ({ ...state, otherText: value }));
++  };
++
++  const submitAnswer = (): void => {
++    if (busy || !allAnswered) return;
++    setBusy(true);
 +    setSendError(null);
-     void (async () => {
-       try {
-         await submit(buildInteractionResponse(questions, formState));
-@@ -393,7 +428,50 @@ function AskUserQuestionInteraction({
-     })();
++    void (async () => {
++      try {
++        await submit(buildInteractionResponse(questions, formState));
++      } catch {
++      } finally {
++        setBusy(false);
++      }
++    })();
    };
- 
++
 +  const sendCurrentAnswer = (): void => {
 +    if (busy || currentQuestion === null) return;
 +    if (
@@ -643,19 +1174,67 @@ index 4e03f6a..c06b4ed 100644
 +      .finally(() => setBusy(false));
 +  };
 +
-   const handleAdvance = (): void => {
++  const handleAdvance = (): void => {
 +    if (queued) {
 +      sendCurrentAnswer();
 +      return;
 +    }
-     if (isLast) {
-       submitAnswer();
-       return;
-@@ -455,7 +533,16 @@ function AskUserQuestionInteraction({
++    if (isLast) {
++      submitAnswer();
++      return;
++    }
++    setCurrentIndex((index) => Math.min(index + 1, totalQuestions - 1));
++  };
++
++  const handleCancel = (): void => {
++    void (async () => {
++      try {
++        await cancel();
++      } catch {}
++    })();
++  };
++
++  useEffect(() => {
++    if (busy || currentQuestion === null) return;
++    const onKeyDown = (event: globalThis.KeyboardEvent): void => {
++      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
++        return;
++      }
++      const target = event.target;
++      if (
++        target instanceof HTMLElement &&
++        (target.isContentEditable ||
++          target instanceof HTMLInputElement ||
++          target instanceof HTMLTextAreaElement)
++      ) {
++        return;
++      }
++      const digit = Number.parseInt(event.key, 10);
++      if (!Number.isInteger(digit) || digit < 1 || digit > MAX_SHORTCUT_ROWS) {
++        return;
++      }
++      const choice = resolveQuestionShortcutChoice(currentQuestion, digit - 1);
++      if (choice === null) return;
++      event.preventDefault();
++      if (choice.kind === "option") {
++        handleToggleOption(currentQuestion, choice.value);
++        return;
++      }
++      handleSelectOther(currentQuestion);
++    };
++    window.addEventListener("keydown", onKeyDown);
++    return () => window.removeEventListener("keydown", onKeyDown);
++    // oxlint-disable-next-line react/exhaustive-deps
++  }, [busy, currentQuestion]);
++
+   if (!parsed.success) {
+     return (
+       <div className="space-y-3">
+@@ -35,20 +531,88 @@ function AskUserQuestionInteraction({
+       </div>
      );
    }
- 
--  if (!currentQuestion) return null;
++
 +  if (!currentQuestion) {
 +    return queued ? (
 +      <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
@@ -666,47 +1245,228 @@ index 4e03f6a..c06b4ed 100644
 +      </div>
 +    ) : null;
 +  }
- 
-   const currentState = answerStateFor(formState, currentQuestion);
- 
-@@ -509,16 +596,23 @@ function AskUserQuestionInteraction({
-           <Button
-             type="button"
-             size="sm"
--            disabled={busy || (isLast && !allAnswered)}
++
++  const currentState = answerStateFor(formState, currentQuestion);
++
+   return (
+-    <QuestionForm
+-      key={interaction.id}
+-      questions={parsed.data.questions}
+-      disabled={busy}
+-      cancelDisabled={busy}
+-      onSubmit={(answers) => {
+-        setBusy(true);
+-        void submit({ answers })
+-          .catch(() => {})
+-          .finally(() => setBusy(false));
+-      }}
+-      onCancel={handleCancel}
+-    />
++    <div className="flex max-h-[calc(100dvh-6rem)] min-h-0 flex-col text-xs text-muted-foreground">
++      {totalQuestions > 1 ? (
++        <QuestionTabs
++          currentIndex={currentIndex}
++          formState={formState}
++          onSelect={setCurrentIndex}
++          questions={questions}
++        />
++      ) : null}
++      <div className="min-h-0 touch-pan-y overflow-y-auto overscroll-contain">
++        <QuestionInputBlock
++          disabled={busy}
++          question={currentQuestion}
++          state={currentState}
++          onToggleOption={(optionValue) =>
++            handleToggleOption(currentQuestion, optionValue)
++          }
++          onSelectOther={() => handleSelectOther(currentQuestion)}
++          onFreeTextChange={(value) =>
++            handleFreeTextChange(currentQuestion, value)
++          }
++          onShortcutSubmit={handleAdvance}
++        />
++      </div>
++      <div className="mt-3 flex shrink-0 items-center justify-between gap-2">
++        <Button
++          type="button"
++          size="sm"
++          variant="ghost"
++          disabled={busy}
++          onClick={handleCancel}
++        >
++          Cancel
++        </Button>
++        <div className="flex items-center gap-2">
++          {!isFirst ? (
++            <Button
++              type="button"
++              size="sm"
++              variant="outline"
++              disabled={busy}
++              onClick={() => setCurrentIndex((index) => Math.max(index - 1, 0))}
++            >
++              Back
++            </Button>
++          ) : null}
++          <Button
++            type="button"
++            size="sm"
 +            disabled={
 +              busy ||
 +              (queued
 +                ? !isQuestionAnswered(currentQuestion, currentState)
 +                : isLast && !allAnswered)
 +            }
-             onClick={handleAdvance}
-           >
-             {busy ? (
-               <Icon name="Spinner" className="size-3 animate-spin" />
-             ) : null}
--            {isLast ? "Submit answer" : "Next"}
++            onClick={handleAdvance}
++          >
++            {busy ? (
++              <Icon name="Spinner" className="size-3 animate-spin" />
++            ) : null}
 +            {queued ? "Send answer" : isLast ? "Submit answer" : "Next"}
-           </Button>
-         </div>
-       </div>
++          </Button>
++        </div>
++      </div>
 +      {queueError !== null ? <p role="alert">{queueError}</p> : null}
 +      {sendError !== null ? <p role="alert">{sendError}</p> : null}
-     </div>
++    </div>
    );
  }
+ 
+diff --git a/plugins/ask-user-question/src/form-state.ts b/plugins/ask-user-question/src/form-state.ts
+new file mode 100644
+index 0000000..19d3c1a
+--- /dev/null
++++ b/plugins/ask-user-question/src/form-state.ts
+@@ -0,0 +1,111 @@
++import type {
++  InteractionAnswer,
++  InteractionQuestion,
++  InteractionResponse,
++} from "./contracts.js";
++
++export interface QuestionAnswerState {
++  selected: string[];
++  otherSelected: boolean;
++  otherText: string;
++}
++
++export type QuestionFormState = Record<string, QuestionAnswerState>;
++
++function questionHasOptions(question: InteractionQuestion): boolean {
++  return question.options.length > 0;
++}
++
++export function createInitialFormState(
++  questions: readonly InteractionQuestion[],
++): QuestionFormState {
++  const state: QuestionFormState = {};
++  for (const question of questions) {
++    state[question.id] = {
++      selected: [],
++      otherSelected: !questionHasOptions(question),
++      otherText: "",
++    };
++  }
++  return state;
++}
++
++export function answerStateFor(
++  formState: QuestionFormState,
++  question: InteractionQuestion,
++): QuestionAnswerState {
++  return (
++    formState[question.id] ?? {
++      selected: [],
++      otherSelected: !questionHasOptions(question),
++      otherText: "",
++    }
++  );
++}
++
++function validSelectedValues(
++  question: InteractionQuestion,
++  selectedValues: readonly string[],
++): string[] {
++  const optionValues = new Set(question.options.map((option) => option.value));
++  return selectedValues.filter((value) => optionValues.has(value));
++}
++
++export function isQuestionAnswered(
++  question: InteractionQuestion,
++  state: QuestionAnswerState,
++): boolean {
++  if (validSelectedValues(question, state.selected).length > 0) return true;
++  return state.otherSelected && state.otherText.trim().length > 0;
++}
++
++function buildQuestionAnswer(
++  question: InteractionQuestion,
++  state: QuestionAnswerState,
++): InteractionAnswer {
++  const freeText = state.otherText.trim();
++  const includeFreeText = state.otherSelected && freeText.length > 0;
++  if (question.multiSelect) {
++    const selected = validSelectedValues(question, state.selected);
++    return includeFreeText ? { selected, freeText } : { selected };
++  }
++  if (state.otherSelected) {
++    return includeFreeText ? { selected: [], freeText } : { selected: [] };
++  }
++  return { selected: validSelectedValues(question, state.selected) };
++}
++
++export function buildInteractionResponse(
++  questions: readonly InteractionQuestion[],
++  formState: QuestionFormState,
++): InteractionResponse {
++  const answers: Record<string, InteractionAnswer> = {};
++  for (const question of questions) {
++    answers[question.id] = buildQuestionAnswer(
++      question,
++      answerStateFor(formState, question),
++    );
++  }
++  return { answers };
++}
++
++export type QuestionShortcutChoice =
++  | { kind: "option"; value: string }
++  | { kind: "other" }
++  | null;
++
++export function resolveQuestionShortcutChoice(
++  question: InteractionQuestion,
++  index: number,
++): QuestionShortcutChoice {
++  const option = question.options[index];
++  if (option) return { kind: "option", value: option.value };
++  if (
++    index === question.options.length &&
++    question.options.length > 0 &&
++    question.allowFreeText
++  ) {
++    return { kind: "other" };
++  }
++  return null;
++}
 diff --git a/plugins/ask-user-question/src/server-harness.test.ts b/plugins/ask-user-question/src/server-harness.test.ts
-index 75817df..6cc4bc3 100644
+index 6ecaa15..6cc4bc3 100644
 --- a/plugins/ask-user-question/src/server-harness.test.ts
 +++ b/plugins/ask-user-question/src/server-harness.test.ts
-@@ -4,16 +4,45 @@ import {
+@@ -4,20 +4,45 @@ import {
    type FakePluginHost,
    makePluginAgentConfigurationContext,
  } from "@get-bb/plugin-sdk/testing";
+-import plugin, { TOOL_NAME } from "./server.js";
 +import type { PluginAgentToolContext } from "@get-bb/plugin-sdk";
- import plugin, { RENDERER_ID, TOOL_NAME } from "./server.js";
++import plugin, { RENDERER_ID, TOOL_NAME } from "./server.js";
  import { TOOL_INPUT_JSON_SCHEMA } from "./tool-definition.js";
- import type { InteractionPayload, ToolResult } from "./contracts.js";
+-import {
+-  ASK_USER_QUESTION_RENDERER_ID,
+-  type InteractionPayload,
+-  type ToolResult,
+-} from "./contracts.js";
++import type { InteractionPayload, ToolResult } from "./contracts.js";
  
 -function createHost(): FakePluginHost {
 -  const host = createFakePluginHost({ pluginId: "ask-user-question" });
@@ -747,7 +1507,7 @@ index 75817df..6cc4bc3 100644
  function configurationContext(
    providerId: string,
    supportsNativeUserQuestion = false,
-@@ -42,6 +71,24 @@ const questions = [
+@@ -46,6 +71,24 @@ const questions = [
    },
  ];
  
@@ -772,7 +1532,7 @@ index 75817df..6cc4bc3 100644
  async function resultText(
    result: Awaited<ReturnType<FakePluginHost["harness"]["callAgentTool"]>>,
  ): Promise<string> {
-@@ -63,7 +110,7 @@ describe("provider gating", () => {
+@@ -67,7 +110,7 @@ describe("provider gating", () => {
      },
    );
  
@@ -781,7 +1541,7 @@ index 75817df..6cc4bc3 100644
      "registers the tool for %s with Claude's exact advertised schema",
      async (providerId) => {
        const host = createHost();
-@@ -74,6 +121,14 @@ describe("provider gating", () => {
+@@ -78,6 +121,14 @@ describe("provider gating", () => {
        const [tool] = resolved.tools;
        expect(tool?.name).toBe(TOOL_NAME);
        expect(tool?.inputSchema).toEqual(TOOL_INPUT_JSON_SCHEMA);
@@ -796,7 +1556,7 @@ index 75817df..6cc4bc3 100644
      },
    );
  
-@@ -104,6 +159,366 @@ describe("provider gating", () => {
+@@ -108,6 +159,366 @@ describe("provider gating", () => {
  });
  
  describe("asking a question", () => {
@@ -1163,8 +1923,17 @@ index 75817df..6cc4bc3 100644
    it("opens an interaction and returns the answer in Claude's result shape", async () => {
      const host = createHost();
      const call = host.harness.callAgentTool(TOOL_NAME, { questions });
+@@ -116,7 +527,7 @@ describe("asking a question", () => {
+       expect(host.harness.pendingInteractions).toHaveLength(1),
+     );
+     const pending = host.harness.pendingInteractions[0]!;
+-    expect(pending.rendererId).toBe(ASK_USER_QUESTION_RENDERER_ID);
++    expect(pending.rendererId).toBe(RENDERER_ID);
+     expect(pending.title).toBe("Database");
+     const payload = pending.payload as InteractionPayload;
+     expect(payload.questions[0]).toMatchObject({
 diff --git a/plugins/ask-user-question/src/server.ts b/plugins/ask-user-question/src/server.ts
-index 892065a..3c1037e 100644
+index 003604b..6d87993 100644
 --- a/plugins/ask-user-question/src/server.ts
 +++ b/plugins/ask-user-question/src/server.ts
 @@ -1,8 +1,16 @@
@@ -1185,10 +1954,12 @@ index 892065a..3c1037e 100644
  } from "./contracts.js";
  import {
    TOOL_DESCRIPTION,
-@@ -20,11 +28,238 @@ import {
- export const TOOL_NAME = "AskUserQuestion";
- export const RENDERER_ID = ASK_USER_QUESTION_RENDERER_ID;
+@@ -18,12 +26,240 @@ import {
+ } from "./translate.js";
  
+ export const TOOL_NAME = "AskUserQuestion";
++export const RENDERER_ID = ASK_USER_QUESTION_RENDERER_ID;
++
 +const ACP_PROVIDER_ID_PREFIX = "acp-";
 +const QUESTION_QUEUE_CHANNEL = "question-queue-changed";
 +const MAX_QUEUED_QUESTIONS = 32;
@@ -1234,7 +2005,7 @@ index 892065a..3c1037e 100644
 +      .strict(),
 +  },
 +});
-+
+ 
  function errorResult(message: string): PluginAgentToolResult {
    return { content: [{ type: "text", text: message }], isError: true };
  }
@@ -1424,7 +2195,7 @@ index 892065a..3c1037e 100644
    bb.agents.registerTool({
      name: TOOL_NAME,
      description: TOOL_DESCRIPTION,
-@@ -48,17 +283,67 @@ export default function plugin(bb: BbPluginApi) {
+@@ -47,17 +283,67 @@ export default function plugin(bb: BbPluginApi) {
        }
  
        const askedAt = Date.now();
@@ -1461,7 +2232,7 @@ index 892065a..3c1037e 100644
 +        const request = bb.ui.requestInput(
            {
              threadId: ctx.threadId,
-             rendererId: RENDERER_ID,
+             rendererId: ASK_USER_QUESTION_RENDERER_ID,
              title: buildInteractionTitle(payload),
              payload,
 +            nonBlocking: acp,
@@ -1494,7 +2265,7 @@ index 892065a..3c1037e 100644
        } catch (error) {
          return errorResult(
            `The question could not be shown (${error instanceof Error ? error.message : String(error)}). Only one prompt can await the user at a time — put all of your questions in a single AskUserQuestion call, or continue with your best judgement.`,
-@@ -93,9 +378,13 @@ export default function plugin(bb: BbPluginApi) {
+@@ -92,9 +378,13 @@ export default function plugin(bb: BbPluginApi) {
      if (context.provider.capabilities.supportsNativeUserQuestion) {
        return { tools: [], skills: [] };
      }

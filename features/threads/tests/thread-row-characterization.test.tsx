@@ -63,6 +63,7 @@ const thread = {
     id: "env_one",
     name: "Workspace",
     branchName: "feature/m7",
+    providerId: null,
     workspaceDisplayKind: "managed-worktree",
   },
 } as SidebarThreadWithDraft;
@@ -202,6 +203,7 @@ describe("R21D ThreadRow characterization", () => {
           id: "env_detached",
           name: null,
           branchName: null,
+          providerId: null,
           workspaceDisplayKind: "managed-worktree",
         },
       },

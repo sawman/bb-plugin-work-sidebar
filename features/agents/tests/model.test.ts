@@ -94,6 +94,7 @@ describe("Agents projection model", () => {
         id: "env_1",
         name: "R24 Agents",
         branchName: "bb/r24-agents",
+        providerId: null,
         workspaceDisplayKind: "managed-worktree",
       },
       host: { id: "host_1", name: "Developer Mac" },
@@ -109,6 +110,7 @@ describe("Agents projection model", () => {
         id: "env_2",
         name: "Shared checkout",
         branchName: null,
+        providerId: null,
         workspaceDisplayKind: "other",
       },
     }))).toEqual({
