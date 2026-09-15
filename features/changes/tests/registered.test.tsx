@@ -275,9 +275,9 @@ describe("R13 registered Changes Work slot", () => {
       checks: {
         failedCount: 0,
         passedCount: 2,
-        pendingCount: 0,
-        state: "passing",
-        totalCount: 2,
+        pendingCount: 1,
+        state: "pending",
+        totalCount: 3,
       },
       review: { reviewRequestCount: 0, state: "approved" },
       attention: "none",
@@ -286,7 +286,7 @@ describe("R13 registered Changes Work slot", () => {
         mergeable: "MERGEABLE",
         state: "mergeable",
       },
-      signal: { checks: "passing", review: "approved", reviewCommentCount: 0 },
+      signal: { checks: "pending", review: "approved", reviewCommentCount: 0 },
     };
     const slot = await changesSlot({
       getChanges: () => pending.promise,
@@ -302,6 +302,12 @@ describe("R13 registered Changes Work slot", () => {
       currentPullRequest: sharedPullRequest,
     }));
     await waitFor(() => expect(slot.getByText("Clean")).toBeTruthy());
+    expect(
+      slot
+        .getByRole("button", { name: "Copy PR number #42" })
+        .querySelector('[data-icon="LoaderCircle"]')
+        ?.getAttribute("data-motion"),
+    ).toBe("spin");
     slot.lifecycle.unmount();
   });
   it("renders the non-stack Current PR and discloses stack branch files through the PR row", async () => {

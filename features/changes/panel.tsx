@@ -173,12 +173,17 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
           value={`#${currentPullRequestNumber}`}
           copyValue={`PR #${currentPullRequestNumber}`}
           label="PR number"
-          className="ws-pr-number-badge"
+          className="ws-pr-identifier-badge ws-pr-number-badge"
           title={currentPullRequestStatus?.label ?? "Pull request"}
           tone={currentPullRequestStatus?.tone}
         >
           <Icon
             name={currentPullRequestStatus?.icon ?? "GitPullRequest"}
+            data-motion={
+              currentPullRequestStatus?.icon === "LoaderCircle"
+                ? "spin"
+                : undefined
+            }
             aria-hidden
           />
           <span aria-hidden>#{currentPullRequestNumber}</span>
