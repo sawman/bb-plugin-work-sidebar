@@ -22,7 +22,7 @@ describe("status icon geometry", () => {
   it("optically centers the bottom-heavy wrench glyph", () => {
     const wrench = renderToStaticMarkup(<Icon name="Wrench" />);
 
-    expect(wrench).toContain('transform="translate(0 -2)"');
+    expect(wrench).toContain('transform="translate(0 -3)"');
   });
 
   it("renders bookmark actions as bookmark glyphs instead of the fallback circle", () => {

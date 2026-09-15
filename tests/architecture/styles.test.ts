@@ -125,9 +125,26 @@ describe("stylesheet policy", () => {
     const compactCount = source.match(
       /\.ws-status\[data-size="metadata"\]\s*> b\s*\{([\s\S]*?)\}/,
     )?.[1];
+    const compactIcon = source.match(
+      /\.ws-status\[data-size="metadata"\]\s*> svg:first-child\s*\{([\s\S]*?)\}/,
+    )?.[1];
+    const subtitleSignals = source.match(
+      /\.ws-stack-subtitle-signals\s*\{([\s\S]*?)\}/,
+    )?.[1];
+    const reviewCounts = source.match(
+      /\.ws-status-review-counts\s*\{([\s\S]*?)\}/,
+    )?.[1];
 
     expect(compactStatus).toContain("font: var(--ws-text-metadata)");
+    expect(compactStatus).toContain("line-height: 1");
+    expect(compactStatus).toContain("column-gap: 0.14rem");
     expect(compactCount).toContain("font: inherit");
+    expect(compactIcon).toContain("width: 0.58rem");
+    expect(compactIcon).toContain("height: 0.58rem");
+    expect(subtitleSignals).toContain("vertical-align: middle");
+    expect(subtitleSignals).not.toMatch(/vertical-align:\s*-/);
+    expect(reviewCounts).toContain("gap: 0.14rem");
+    expect(source).not.toMatch(/\.ws-stack-subtitle-signals svg\s*\{/);
   });
 
   test("uses equal metadata columns for every shared change delta pair", () => {
