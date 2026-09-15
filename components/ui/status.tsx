@@ -61,10 +61,12 @@ export function Status({
           {presentation.reviewCommentCounts ? (
             <span className="ws-status-review-counts" aria-hidden>
               <span data-resolution="unresolved">
-                <span>{presentation.reviewCommentCounts.unresolved}</span> open
+                <Icon name="Circle" aria-hidden />
+                <span>{presentation.reviewCommentCounts.unresolved}</span>
               </span>
               <span data-resolution="resolved">
-                <span>{presentation.reviewCommentCounts.resolved}</span> resolved
+                <Icon name="Check" aria-hidden />
+                <span>{presentation.reviewCommentCounts.resolved}</span>
               </span>
             </span>
           ) : null}

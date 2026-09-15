@@ -2990,6 +2990,10 @@ button.ws-provider-health:focus-visible {
 .ws-status-review-counts > span {
   gap: 0.04rem;
 }
+.ws-status-review-counts svg {
+  width: 0.5rem;
+  height: 0.5rem;
+}
 .ws-status-review-counts > [data-resolution="unresolved"] {
   color: var(--warning);
 }

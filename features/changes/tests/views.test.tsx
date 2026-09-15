@@ -230,8 +230,12 @@ describe("R13 Changes error presentation", () => {
       name: "Review: reviewer-a, platform-team, 3 unresolved review comments, 4 resolved review comments",
     });
     expect(review.getAttribute("data-size")).toBe("metadata");
-    expect(review.querySelector('[data-resolution="unresolved"]')?.textContent).toBe("3 open");
-    expect(review.querySelector('[data-resolution="resolved"]')?.textContent).toBe("4 resolved");
+    const unresolved = review.querySelector('[data-resolution="unresolved"]');
+    const resolved = review.querySelector('[data-resolution="resolved"]');
+    expect(unresolved?.textContent).toBe("3");
+    expect(unresolved?.querySelector('[data-icon="Circle"]')).toBeTruthy();
+    expect(resolved?.textContent).toBe("4");
+    expect(resolved?.querySelector('[data-icon="Check"]')).toBeTruthy();
   });
 
   it.each([
