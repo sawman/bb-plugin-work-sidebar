@@ -16,7 +16,15 @@ export type StatusPresentation = {
     | "muted";
   overlayIcon?: IconName;
   count?: number;
+  reviewCommentCounts?: {
+    unresolved: number;
+    resolved: number;
+  };
 };
+
+function reviewCommentCountLabel(count: number, resolution: string): string {
+  return `${count} ${resolution} review comment${count === 1 ? "" : "s"}`;
+}
 
 export function Status({
   presentation,
@@ -30,23 +38,38 @@ export function Status({
   const countLabel = presentation.count
     ? `, ${presentation.count} review comment${presentation.count === 1 ? "" : "s"}`
     : "";
+  const breakdownLabel = presentation.reviewCommentCounts
+    ? `, ${reviewCommentCountLabel(presentation.reviewCommentCounts.unresolved, "unresolved")}, ${reviewCommentCountLabel(presentation.reviewCommentCounts.resolved, "resolved")}`
+    : "";
   return (
     <ActionTooltip label={presentation.label}>
-      {(tooltipId) => <span
-      className={["ws-status", className].filter(Boolean).join(" ")}
-      data-size={size === "metadata" ? size : undefined}
-      data-tone={presentation.tone}
-      data-motion={presentation.icon === "LoaderCircle" ? "spin" : undefined}
-      aria-describedby={tooltipId}
-      role="img"
-      aria-label={`${presentation.label}${countLabel}`}
-    >
-      <Icon name={presentation.icon} aria-hidden />
-      {presentation.overlayIcon && (
-        <Icon name={presentation.overlayIcon} aria-hidden />
+      {(tooltipId) => (
+        <span
+          className={["ws-status", className].filter(Boolean).join(" ")}
+          data-size={size === "metadata" ? size : undefined}
+          data-tone={presentation.tone}
+          data-motion={presentation.icon === "LoaderCircle" ? "spin" : undefined}
+          aria-describedby={tooltipId}
+          role="img"
+          aria-label={`${presentation.label}${breakdownLabel || countLabel}`}
+        >
+          <Icon name={presentation.icon} aria-hidden />
+          {presentation.overlayIcon && (
+            <Icon name={presentation.overlayIcon} aria-hidden />
+          )}
+          {presentation.count ? <b aria-hidden>{presentation.count}</b> : null}
+          {presentation.reviewCommentCounts ? (
+            <span className="ws-status-review-counts" aria-hidden>
+              <span data-resolution="unresolved">
+                <span>{presentation.reviewCommentCounts.unresolved}</span> open
+              </span>
+              <span data-resolution="resolved">
+                <span>{presentation.reviewCommentCounts.resolved}</span> resolved
+              </span>
+            </span>
+          ) : null}
+        </span>
       )}
-      {presentation.count ? <b aria-hidden>{presentation.count}</b> : null}
-      </span>}
     </ActionTooltip>
   );
 }

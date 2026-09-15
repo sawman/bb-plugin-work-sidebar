@@ -206,7 +206,7 @@ describe("R13 Changes error presentation", () => {
     expect(screen.getByRole("img", { name: "Ready to merge" })).toBeTruthy();
   });
 
-  it("keeps review counts at the stack subtitle metadata size", () => {
+  it("splits resolved and unresolved review comments at the stack subtitle metadata size", () => {
     render(
       <ChangesStackBranchRow
         branch={stackBranch()}
@@ -216,7 +216,8 @@ describe("R13 Changes error presentation", () => {
           checks: "passing",
           review: "review_requested",
           requestedReviewers: ["reviewer-a", "platform-team"],
-          reviewCommentCount: 12,
+          reviewCommentCount: 7,
+          reviewCommentCounts: { unresolved: 3, resolved: 4 },
         }}
         expanded={false}
         checkingOut={false}
@@ -226,10 +227,11 @@ describe("R13 Changes error presentation", () => {
     );
 
     const review = screen.getByRole("img", {
-      name: "Review: reviewer-a, platform-team, 12 review comments",
+      name: "Review: reviewer-a, platform-team, 3 unresolved review comments, 4 resolved review comments",
     });
     expect(review.getAttribute("data-size")).toBe("metadata");
-    expect(review.querySelector("b")?.textContent).toBe("12");
+    expect(review.querySelector('[data-resolution="unresolved"]')?.textContent).toBe("3 open");
+    expect(review.querySelector('[data-resolution="resolved"]')?.textContent).toBe("4 resolved");
   });
 
   it.each([

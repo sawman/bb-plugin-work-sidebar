@@ -14,6 +14,7 @@ import {
   readGitHubPullRequestFilePatch,
   readGitHubPullRequestRest,
   readGitHubPullRequestDiff,
+  readGitHubReviewCommentCounts,
   readGitHubSignals,
 } from "./server-stack.js";
 import type {
@@ -293,15 +294,30 @@ export function createThreadStackService(
         );
       }
       const stack = await fetchGitHubStack(match[1], match[2], currentPullRequest.number, (args, buffer) => read(args, buffer), lifecycle);
-      const signal = stack?.pullRequests.find((pullRequest) =>
+      let signal: GitHubSignal | undefined = stack?.pullRequests.find((pullRequest) =>
         pullRequest.number === currentPullRequest.number,
-      ) ?? (await readGitHubSignals(
-        match[1],
-        match[2],
-        [currentPullRequest.number],
-        lifecycle,
-        (args, buffer) => read(args, buffer),
-      )).get(currentPullRequest.number);
+      );
+      if (!signal) {
+        const [signals, commentCounts] = await Promise.all([
+          readGitHubSignals(
+            match[1],
+            match[2],
+            [currentPullRequest.number],
+            lifecycle,
+            (args, buffer) => read(args, buffer),
+          ),
+          readGitHubReviewCommentCounts(
+            match[1],
+            match[2],
+            [currentPullRequest.number],
+            (args, buffer) => read(args, buffer),
+          ),
+        ]);
+        signal = signals.get(currentPullRequest.number);
+        const counts = commentCounts.get(currentPullRequest.number);
+        if (signal && counts)
+          signal = { ...signal, reviewCommentCounts: counts };
+      }
       currentPullRequest = applyGitHubPullRequestSignal(
         currentPullRequest,
         signal,

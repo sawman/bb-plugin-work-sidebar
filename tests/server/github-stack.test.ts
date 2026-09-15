@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   fetchGitHubStack,
+  readGitHubReviewCommentCounts,
   readGitHubPullRequestFilePatch,
   readGitHubSignals,
   readGitHubPullRequestDiff,
@@ -12,6 +13,45 @@ import { createServerLifecycle } from "../../server-lifecycle.js";
 import { reviewLifecycleCorpus } from "../../features/pull-requests/tests/review-lifecycle-fixtures.js";
 
 describe("GitHub Stack enrichment ownership", () => {
+  it("splits complete review-thread comment totals by resolution", async () => {
+    const run = vi.fn(async (_args: readonly string[]) => JSON.stringify({
+      data: {
+        repository: {
+          p0: {
+            reviewThreads: {
+              totalCount: 3,
+              nodes: [
+                { isResolved: false, comments: { totalCount: 2 } },
+                { isResolved: true, comments: { totalCount: 4 } },
+                { isResolved: false, comments: { totalCount: 1 } },
+              ],
+            },
+          },
+          p1: {
+            reviewThreads: {
+              totalCount: 101,
+              nodes: [{ isResolved: true, comments: { totalCount: 1 } }],
+            },
+          },
+        },
+      },
+    }));
+
+    const counts = await readGitHubReviewCommentCounts(
+      "acme",
+      "repo",
+      [12, 13],
+      run,
+    );
+
+    expect(run).toHaveBeenCalledOnce();
+    expect(run.mock.calls[0]?.[0].join(" ")).toContain(
+      "reviewThreads(first: 100)",
+    );
+    expect(counts.get(12)).toEqual({ unresolved: 3, resolved: 4 });
+    expect(counts.has(13)).toBe(false);
+  });
+
   it.each(reviewLifecycleCorpus)("classifies the recorded GitHub corpus: $name", ({ decision, requested, reviewerStates, expected }) => {
     expect(resolveReviewState({
       reviewDecision: decision,
@@ -262,7 +302,16 @@ describe("GitHub Stack enrichment ownership", () => {
         return JSON.stringify([{ user: { login: "reviewer" }, state: "APPROVED" }]);
       if (args.some((value) => value.includes("/check-runs?per_page=100")))
         return JSON.stringify({ check_runs: [{ status: "completed", conclusion: "SUCCESS" }] });
-      if (args[1] === "graphql") throw new Error("GraphQL should not run after REST recovery");
+      if (args[1] === "graphql")
+        return JSON.stringify({ data: { repository: { p0: {
+          reviewThreads: {
+            totalCount: 2,
+            nodes: [
+              { isResolved: false, comments: { totalCount: 1 } },
+              { isResolved: true, comments: { totalCount: 3 } },
+            ],
+          },
+        } } } });
       return JSON.stringify({
         title: "Recovered title",
         html_url: "https://github.com/acme/repo/pull/12",
@@ -287,8 +336,15 @@ describe("GitHub Stack enrichment ownership", () => {
       checks: "passing",
       review: "approved",
       requestedReviewers: ["reviewer"],
+      reviewCommentCounts: { unresolved: 1, resolved: 3 },
     })]);
-    expect(run.mock.calls.some(([args]) => (args as readonly string[])[1] === "graphql")).toBe(false);
+    const graphqlCalls = run.mock.calls.filter(
+      ([args]) => (args as readonly string[])[1] === "graphql",
+    );
+    expect(graphqlCalls).toHaveLength(1);
+    expect((graphqlCalls[0]?.[0] as readonly string[]).join(" ")).toContain(
+      "reviewThreads(first: 100)",
+    );
   });
 
   it("recovers a missing stack-layer diff from the pull request files endpoint", async () => {

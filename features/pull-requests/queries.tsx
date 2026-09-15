@@ -157,6 +157,7 @@ function resolveAuthoredPullRequests<T extends {
   changeRequesters?: string[];
   requestedReviewers?: string[];
   reviewCommentCount: number;
+  reviewCommentCounts?: ReturnType<typeof factFromAuthoredPullRequest>["signal"]["reviewCommentCounts"];
 }>(
   pullRequests: readonly T[] | undefined,
   directory: PullRequestFactDirectory | undefined,
@@ -183,6 +184,7 @@ function resolveAuthoredPullRequests<T extends {
       changeRequesters: fact.signal.changeRequesters,
       requestedReviewers: fact.signal.requestedReviewers,
       reviewCommentCount: fact.signal.reviewCommentCount,
+      reviewCommentCounts: fact.signal.reviewCommentCounts,
       attention: fact.attention,
     } as T;
   });

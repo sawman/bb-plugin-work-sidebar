@@ -2976,6 +2976,26 @@ button.ws-provider-health:focus-visible {
 .ws-status[data-size="metadata"] > b {
   font: inherit;
 }
+.ws-status-review-counts,
+.ws-status-review-counts > span {
+  display: inline-flex;
+  align-items: center;
+}
+.ws-status-review-counts {
+  gap: 0.18rem;
+  font: inherit;
+  line-height: inherit;
+  white-space: nowrap;
+}
+.ws-status-review-counts > span {
+  gap: 0.04rem;
+}
+.ws-status-review-counts > [data-resolution="unresolved"] {
+  color: var(--warning);
+}
+.ws-status-review-counts > [data-resolution="resolved"] {
+  color: var(--diff-added);
+}
 .ws-status[data-tone="open"],
 .ws-status[data-tone="success"] {
   color: var(--diff-added);

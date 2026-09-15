@@ -13,6 +13,13 @@ export const pullRequestSignal = z.object({
   changeRequesters: z.array(z.string()).optional(),
   requestedReviewers: z.array(z.string()).optional(),
   reviewCommentCount: z.number().int().nonnegative(),
+  reviewCommentCounts: z
+    .object({
+      unresolved: z.number().int().nonnegative(),
+      resolved: z.number().int().nonnegative(),
+    })
+    .strict()
+    .optional(),
 });
 
 // Browser-safe typed RPC payloads owned by the pull-request slice. The

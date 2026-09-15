@@ -376,6 +376,10 @@ export interface StackLayer {
   changeRequesters?: string[];
   requestedReviewers?: string[];
   reviewCommentCount: number;
+  reviewCommentCounts?: {
+    unresolved: number;
+    resolved: number;
+  };
 }
 
 /** The compact, host-neutral stack payload used by the PR-sidebar adapter. */
@@ -451,6 +455,10 @@ export interface CurrentPullRequestView {
     changeRequesters?: string[];
     requestedReviewers?: string[];
     reviewCommentCount: number;
+    reviewCommentCounts?: {
+      unresolved: number;
+      resolved: number;
+    };
   };
 }
 

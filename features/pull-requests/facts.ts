@@ -6,7 +6,11 @@ import type {
 } from "./schemas";
 import type { z } from "zod";
 import type { sidebarStackLayer } from "./schemas";
-import { normalizePullRequestSignal, pullRequestAttentionFromSignal } from "./presentation";
+import {
+  normalizePullRequestSignal,
+  pullRequestAttentionFromSignal,
+  type PullRequestSignal,
+} from "./presentation";
 
 /**
  * The stable GitHub identity shared by the authored list, thread directory,
@@ -42,6 +46,7 @@ function factFromSignal(input: {
   changeRequesters?: string[];
   requestedReviewers?: string[];
   reviewCommentCount: number;
+  reviewCommentCounts?: PullRequestSignal["reviewCommentCounts"];
   mergeability?: PullRequestContract["mergeability"] | null;
 }): PullRequestFact {
   const signal = normalizePullRequestSignal(input);
@@ -74,6 +79,7 @@ export function factFromThreadPullRequest(
     changeRequesters: pullRequest.signal.changeRequesters,
     requestedReviewers: pullRequest.signal.requestedReviewers,
     reviewCommentCount: pullRequest.signal.reviewCommentCount,
+    reviewCommentCounts: pullRequest.signal.reviewCommentCounts,
   });
 }
 
@@ -87,6 +93,7 @@ export function factFromPullRequest(
     changeRequesters: pullRequest.signal.changeRequesters,
     requestedReviewers: pullRequest.signal.requestedReviewers,
     reviewCommentCount: pullRequest.signal.reviewCommentCount,
+    reviewCommentCounts: pullRequest.signal.reviewCommentCounts,
   });
 }
 
@@ -142,6 +149,12 @@ export function mergePullRequestFact(
   return {
     ...previous,
     ...incoming,
+    signal: {
+      ...incoming.signal,
+      ...(incoming.signal.reviewCommentCounts
+        ? {}
+        : { reviewCommentCounts: previous.signal.reviewCommentCounts }),
+    },
     attention: incoming.attention ?? previous.attention,
     checks: incoming.checks ?? previous.checks,
     review: incoming.review ?? previous.review,

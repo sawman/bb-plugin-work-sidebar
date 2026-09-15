@@ -339,7 +339,7 @@ relevant gates for each task.
   requested, changes requested, and review re-requested after changes.
 - Review requested uses a sufficiently dark amber eye. Re-requested uses an
   amber eye with a small red work/wrench marker.
-- Review comment count can appear beside the review signal.
+- The aggregate review-comment count can appear beside the review signal.
 - Icons have fast hover labels. Clicking the PR state control toggles
   draft/open and shows a spinner while mutating.
 - Manual refresh bypasses the long display cache. Background refresh remains
@@ -375,8 +375,11 @@ relevant gates for each task.
 - Current checkout highlight is subtle and does not tint the expanded file
   list or add a bracket rail.
 - Show open/draft/closed/merged, checks, review, re-requested review, and review
-  comment count in the subtitle before branch name using the same shared status
-  logic as the left PR list.
+  comments in the subtitle before the branch name using the same shared status
+  logic as the left PR list. When GitHub GraphQL returns a complete review-thread
+  connection, split comments into unresolved and resolved totals; retain the
+  aggregate REST count as the explicit fallback rather than guessing from a
+  truncated connection.
 - Include merged PR layers when they are part of the actual GitHub stack;
   display them purple and visually subdued rather than as closed.
 - Show uncommitted working-tree files in a PR-like current-checkout card with

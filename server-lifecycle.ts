@@ -14,6 +14,10 @@ export type GitHubPullRequestSignal = {
     | "none";
   head?: string;
   base?: string;
+  reviewCommentCounts?: {
+    unresolved: number;
+    resolved: number;
+  };
 };
 export type LegacyWorkContext = {
   state: "none" | "adoptable" | "ambiguous" | "project_mismatch";

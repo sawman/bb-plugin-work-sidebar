@@ -16,6 +16,7 @@ export type StackBranchSignals = Pick<
   | "changeRequesters"
   | "requestedReviewers"
   | "reviewCommentCount"
+  | "reviewCommentCounts"
 >;
 
 /** Merge the stack summary and branch-local signals without weakening RPC types. */
@@ -63,6 +64,7 @@ export function mergeStackBranchSignals(
     checks: branch.checks ?? stackPullRequest?.checks ?? "unknown",
     review: branch.review ?? stackPullRequest?.review ?? "none",
     reviewCommentCount: stackPullRequest?.reviewCommentCount ?? 0,
+    reviewCommentCounts: stackPullRequest?.reviewCommentCounts,
   };
 }
 

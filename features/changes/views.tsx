@@ -359,6 +359,7 @@ export function ChangesCurrentPullRequestRow({
           checks: pullRequest.signal.checks,
           review: pullRequest.signal.review,
           reviewCommentCount: pullRequest.signal.reviewCommentCount,
+          reviewCommentCounts: pullRequest.signal.reviewCommentCounts,
         }}
         expanded={expanded}
         externalOnModifier={externalOnModifier}
@@ -438,9 +439,14 @@ export function ChangesStackBranchRow({
         changeRequesters: signals.changeRequesters,
         requestedReviewers: signals.requestedReviewers,
         reviewCommentCount: signals.reviewCommentCount,
+        reviewCommentCounts: signals.reviewCommentCounts,
       })
     : null;
-  const presented = signal ? pullRequestSignalPresentation(signal) : null;
+  const presented = signal
+    ? pullRequestSignalPresentation(signal, {
+        reviewCommentCountMode: "breakdown",
+      })
+    : null;
   const attention = branch.needsRebase
     ? "blocked"
     : // The signal is the current per-PR GitHub fact. Its aggregate attention

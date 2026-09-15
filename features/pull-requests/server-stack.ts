@@ -1,6 +1,11 @@
 import type { GitHubStackBranch } from "../../contracts.js";
 import type { ServerLifecycle } from "../../server-lifecycle.js";
-import type { GitHubApiRunner, GitHubPullRequest, GitHubSignal } from "./server-types.js";
+import type {
+  GitHubApiRunner,
+  GitHubPullRequest,
+  GitHubSignal,
+  ReviewCommentCounts,
+} from "./server-types.js";
 
 export const GITHUB_STACK_API_VERSION = "2026-03-10";
 export const GITHUB_ACCEPT_HEADER = "application/vnd.github+json";
@@ -370,6 +375,80 @@ function signalFromGraphql(value: unknown): GitHubSignal | null {
   };
 }
 
+function reviewCommentCountsFromGraphql(value: unknown): ReviewCommentCounts | null {
+  if (!isRecord(value) || !isRecord(value.reviewThreads)) return null;
+  const reviewThreads = value.reviewThreads;
+  if (
+    typeof reviewThreads.totalCount !== "number" ||
+    !Number.isInteger(reviewThreads.totalCount) ||
+    !Array.isArray(reviewThreads.nodes) ||
+    reviewThreads.totalCount !== reviewThreads.nodes.length
+  )
+    return null;
+  const counts: ReviewCommentCounts = { unresolved: 0, resolved: 0 };
+  for (const thread of reviewThreads.nodes) {
+    if (
+      !isRecord(thread) ||
+      typeof thread.isResolved !== "boolean" ||
+      !isRecord(thread.comments) ||
+      typeof thread.comments.totalCount !== "number" ||
+      !Number.isInteger(thread.comments.totalCount) ||
+      thread.comments.totalCount < 0
+    )
+      return null;
+    counts[thread.isResolved ? "resolved" : "unresolved"] +=
+      thread.comments.totalCount;
+  }
+  return counts;
+}
+
+/**
+ * Resolution is a review-thread property in GitHub GraphQL. REST exposes only
+ * the aggregate review-comment total, so incomplete GraphQL connections are
+ * omitted and the caller retains that aggregate fallback.
+ */
+export async function readGitHubReviewCommentCounts(
+  owner: string,
+  repo: string,
+  numbers: readonly number[],
+  run: GitHubApiRunner,
+): Promise<Map<number, ReviewCommentCounts>> {
+  const unique = [...new Set(numbers)].filter(
+    (number) => Number.isInteger(number) && number > 0,
+  );
+  if (unique.length === 0) return new Map();
+  const selections = unique
+    .map(
+      (number, index) =>
+        `p${index}: pullRequest(number: ${number}) { reviewThreads(first: 100) { totalCount nodes { isResolved comments { totalCount } } } }`,
+    )
+    .join(" ");
+  try {
+    const stdout = await run(
+      [
+        "api",
+        "graphql",
+        "-f",
+        `query=query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${selections} } }`,
+      ],
+      2_000_000,
+    );
+    const parsed: unknown = JSON.parse(stdout);
+    const repository =
+      isRecord(parsed) && isRecord(parsed.data) && isRecord(parsed.data.repository)
+        ? parsed.data.repository
+        : {};
+    const result = new Map<number, ReviewCommentCounts>();
+    unique.forEach((number, index) => {
+      const counts = reviewCommentCountsFromGraphql(repository[`p${index}`]);
+      if (counts) result.set(number, counts);
+    });
+    return result;
+  } catch {
+    return new Map();
+  }
+}
+
 function signalKey(owner: string, repo: string, number: number) {
   return `${owner}/${repo}#${number}`.toLowerCase();
 }
@@ -577,11 +656,22 @@ export async function fetchGitHubStack(
     lifecycle.cacheGitHubPullRequestSignal(signalKey(owner, repo, item.number), recovered.signal, Date.now() + GITHUB_SIGNAL_CACHE_MS);
     return { ...item, ...recovered.pullRequest };
   }));
-  const signals = await readGitHubSignals(owner, repo, pullRequests.map((item) => item.number), lifecycle, run);
+  const numbers = pullRequests.map((item) => item.number);
+  const [signals, reviewCommentCounts] = await Promise.all([
+    readGitHubSignals(owner, repo, numbers, lifecycle, run),
+    readGitHubReviewCommentCounts(owner, repo, numbers, run),
+  ]);
   return {
     number: raw.number,
     base: raw.base,
     currentPullRequest: pullRequest,
-    pullRequests: pullRequests.map((item) => ({ ...item, ...(signals.get(item.number) ?? { checks: "unknown", review: "none" }) })),
+    pullRequests: pullRequests.map((item) => {
+      const counts = reviewCommentCounts.get(item.number);
+      return {
+        ...item,
+        ...(signals.get(item.number) ?? { checks: "unknown", review: "none" }),
+        ...(counts ? { reviewCommentCounts: counts } : {}),
+      };
+    }),
   };
 }

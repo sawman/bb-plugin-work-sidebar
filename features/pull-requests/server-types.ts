@@ -31,8 +31,14 @@ export interface CurrentPullRequest {
     review: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
     requestedReviewers?: string[];
     reviewCommentCount: number;
+    reviewCommentCounts?: ReviewCommentCounts;
   };
 }
+
+export type ReviewCommentCounts = {
+  unresolved: number;
+  resolved: number;
+};
 
 export type GitHubPullRequest = {
   number: number;
@@ -51,6 +57,7 @@ export type GitHubSignal = {
   changeRequesters?: string[];
   review: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
   requestedReviewers?: string[];
+  reviewCommentCounts?: ReviewCommentCounts;
   head?: string;
   base?: string;
 };
@@ -73,5 +80,6 @@ export type AuthoredPullRequest = {
   changeRequesters?: string[];
   requestedReviewers?: string[];
   reviewCommentCount: number;
+  reviewCommentCounts?: ReviewCommentCounts;
   stack: SidebarStack | null;
 };

@@ -48,6 +48,10 @@ export type AuthoredPullRequest = {
   changeRequesters?: string[];
   requestedReviewers?: string[];
   reviewCommentCount: number;
+  reviewCommentCounts?: {
+    unresolved: number;
+    resolved: number;
+  };
   stack: SidebarStack | null;
 };
 type AuthoredRow = Omit<AuthoredPullRequest, "stack"> & {
@@ -280,6 +284,7 @@ export function AuthoredPullRequestStack({
         review: layer.review ?? "none",
         requestedReviewers: layer.requestedReviewers,
         reviewCommentCount: layer.reviewCommentCount ?? 0,
+        reviewCommentCounts: layer.reviewCommentCounts,
       }}
     />
   );

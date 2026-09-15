@@ -212,6 +212,21 @@ describe("pull-request presentation semantics", () => {
     });
   });
 
+  it("presents resolved and unresolved review comments separately on request", () => {
+    const review = pullRequestSignalPresentation(
+      {
+        checks: "passing",
+        review: "review_requested",
+        reviewCommentCount: 7,
+        reviewCommentCounts: { unresolved: 3, resolved: 4 },
+      },
+      { reviewCommentCountMode: "breakdown" },
+    ).review;
+
+    expect(review.count).toBeUndefined();
+    expect(review.reviewCommentCounts).toEqual({ unresolved: 3, resolved: 4 });
+  });
+
   it("makes both GitHub API budgets visible with a rate-limit warning", () => {
     expect(
       githubHealthPresentation({

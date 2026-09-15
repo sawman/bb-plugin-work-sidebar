@@ -39,6 +39,10 @@ export type PullRequestSignal = {
   changeRequesters?: string[];
   requestedReviewers?: string[];
   reviewCommentCount: number;
+  reviewCommentCounts?: {
+    unresolved: number;
+    resolved: number;
+  };
 };
 
 export type { StatusPresentation } from "../../components/ui/status";
@@ -131,7 +135,10 @@ export function isVisibleAuthoredPullRequest(input: {
   );
 }
 
-export function pullRequestSignalPresentation(signal: PullRequestSignal): {
+export function pullRequestSignalPresentation(
+  signal: PullRequestSignal,
+  options: { reviewCommentCountMode?: "total" | "breakdown" } = {},
+): {
   checks: StatusPresentation;
   review: StatusPresentation;
 } {
@@ -166,12 +173,20 @@ export function pullRequestSignalPresentation(signal: PullRequestSignal): {
     none: { icon: "UserClock", label: "No reviewer requested", tone: "muted" },
   };
   const reviewDetail = pullRequestReviewDetail(signal);
+  const reviewCommentCounts =
+    options.reviewCommentCountMode === "breakdown" &&
+    signal.reviewCommentCounts &&
+    signal.reviewCommentCounts.unresolved + signal.reviewCommentCounts.resolved > 0
+      ? signal.reviewCommentCounts
+      : undefined;
   return {
     checks: checks[signal.checks],
     review: {
       ...review[signal.review],
       ...(reviewDetail ? { label: reviewDetail } : {}),
-      count: signal.reviewCommentCount,
+      ...(reviewCommentCounts
+        ? { reviewCommentCounts }
+        : { count: signal.reviewCommentCount }),
     },
   };
 }
@@ -238,6 +253,10 @@ export function normalizePullRequestSignal(input: {
   changeRequesters?: string[];
   requestedReviewers?: string[];
   reviewCommentCount?: number;
+  reviewCommentCounts?: {
+    unresolved: number;
+    resolved: number;
+  };
 }): PullRequestSignal {
   const checks =
     typeof input.checks === "string"
@@ -266,6 +285,14 @@ export function normalizePullRequestSignal(input: {
       ? { requestedReviewers: input.requestedReviewers }
       : {}),
     reviewCommentCount: Math.max(0, input.reviewCommentCount ?? 0),
+    ...(input.reviewCommentCounts
+      ? {
+          reviewCommentCounts: {
+            unresolved: Math.max(0, input.reviewCommentCounts.unresolved),
+            resolved: Math.max(0, input.reviewCommentCounts.resolved),
+          },
+        }
+      : {}),
   };
 }
 

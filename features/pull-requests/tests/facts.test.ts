@@ -100,6 +100,26 @@ describe("pull-request fact directory", () => {
     });
   });
 
+  it("retains a GraphQL comment breakdown across a detailed signal-only refresh", () => {
+    const withBreakdown = factFromThreadPullRequest({
+      ...thread,
+      signal: {
+        ...thread.signal,
+        reviewCommentCounts: { unresolved: 1, resolved: 3 },
+      },
+    });
+    const withoutBreakdown = factFromThreadPullRequest(thread);
+    const directory = mergePullRequestFacts(
+      mergePullRequestFacts(undefined, [withBreakdown]),
+      [withoutBreakdown],
+    );
+
+    expect(
+      directory.facts["example-org/example-repo#1402"]?.signal
+        .reviewCommentCounts,
+    ).toEqual({ unresolved: 1, resolved: 3 });
+  });
+
   it("bounds the project fact directory and retains refreshed facts", () => {
     const baseline = factFromAuthoredPullRequest(authored);
     const incoming = Array.from({ length: MAX_PULL_REQUEST_FACTS + 1 },
