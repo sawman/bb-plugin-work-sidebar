@@ -233,7 +233,7 @@ describe("R13 Changes error presentation", () => {
     const unresolved = review.querySelector('[data-resolution="unresolved"]');
     const resolved = review.querySelector('[data-resolution="resolved"]');
     expect(unresolved?.textContent).toBe("3");
-    expect(unresolved?.querySelector('[data-icon="Circle"]')).toBeTruthy();
+    expect(unresolved?.querySelector('[data-icon="MessageSquare"]')).toBeTruthy();
     expect(resolved?.textContent).toBe("4");
     expect(resolved?.querySelector('[data-icon="Check"]')).toBeTruthy();
   });
