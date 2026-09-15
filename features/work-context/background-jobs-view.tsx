@@ -1,4 +1,5 @@
-import { Status, type StatusPresentation } from "../../components/ui/status";
+import { Icon } from "../../components/ui/icon";
+import type { StatusPresentation } from "../../components/ui/status";
 import type { BackgroundJobStatus } from "./schemas";
 import { CardState } from "./card-state";
 import { useWorkBackgroundJobs } from "./queries";
@@ -12,21 +13,6 @@ const backgroundStatus: Record<BackgroundJobStatus, StatusPresentation> = {
   running: { icon: "LoaderCircle", label: "Running", tone: "warning" },
   stopped: { icon: "Circle", label: "Stopped", tone: "muted" },
 };
-
-function backgroundJobMetadata(job: {
-  kind: "command" | "workflow";
-  taskType: string;
-  model: string | null;
-  detail: string | null;
-}) {
-  return [
-    job.detail,
-    job.kind === "workflow" ? "Workflow" : job.taskType,
-    job.model,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
 
 export function BackgroundJobsCard({ threadId }: { threadId: string }) {
   const query = useWorkBackgroundJobs(threadId);
@@ -56,12 +42,18 @@ export function BackgroundJobsCard({ threadId }: { threadId: string }) {
             const presentation = backgroundStatus[job.status];
             return (
               <li key={job.id} className="ws-work-card-row">
-                <Status presentation={presentation} />
-                <span className="ws-work-card-copy">
-                  <strong>{job.title}</strong>
-                  <small>{backgroundJobMetadata(job)}</small>
-                </span>
-                <small className="ws-background-job-state" aria-hidden>
+                <Icon
+                  className="ws-background-job-kind"
+                  name={job.kind === "workflow" ? "Layers" : "Terminal"}
+                  aria-label={
+                    job.kind === "workflow" ? "Workflow" : "Local command"
+                  }
+                />
+                <strong className="ws-background-job-title">{job.title}</strong>
+                <small
+                  className="ws-background-job-state"
+                  data-tone={presentation.tone}
+                >
                   {presentation.label}
                 </small>
               </li>

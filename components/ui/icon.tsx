@@ -171,6 +171,12 @@ const paths: Record<string, React.ReactNode> = {
       <path d="m16 16 4 4" />
     </>
   ),
+  Terminal: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="m7 9 3 3-3 3M13 15h4" />
+    </>
+  ),
   Pin: (
     <>
       <path d="m14 4 6 6-3 2-3 5-2-2-5 3-2-2 3-5-2-3z" />

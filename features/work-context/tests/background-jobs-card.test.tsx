@@ -82,7 +82,7 @@ describe("registered provider Background card", () => {
           status: "running",
           startedAt: 100,
           completedAt: null,
-          model: "gpt-5.6-terra",
+          model: "local_bash",
         },
         {
           id: "nightly",
@@ -109,6 +109,15 @@ describe("registered provider Background card", () => {
     expect(slot.getByText("Nightly index")).toBeTruthy();
     expect(slot.getByText("Running")).toBeTruthy();
     expect(slot.getByText("Paused")).toBeTruthy();
+    const commandRow = slot.getByText("Watch tests").closest("li");
+    expect(commandRow?.querySelector('[data-icon="Terminal"]')).toBeTruthy();
+    expect(commandRow?.firstElementChild?.getAttribute("data-icon")).toBe(
+      "Terminal",
+    );
+    expect(commandRow?.lastElementChild?.textContent).toBe("Running");
+    expect(commandRow?.querySelector(".ws-work-card-copy")).toBeNull();
+    expect(slot.queryByText("local_bash")).toBeNull();
+    expect(slot.queryByText("vitest --watch")).toBeNull();
     expect(getWorkBackgroundJobs).toHaveBeenCalledExactlyOnceWith({
       threadId: "thr_jobs",
     });

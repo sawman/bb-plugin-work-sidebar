@@ -3419,6 +3419,18 @@ button.ws-provider-health:focus-visible {
   padding: 0;
   list-style: none;
 }
+.ws-background-job-kind {
+  width: 0.72rem;
+  height: 0.72rem;
+  color: var(--muted-foreground);
+}
+.ws-background-job-title {
+  min-width: 0;
+  overflow: hidden;
+  font: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .ws-background-job-state {
   color: var(--muted-foreground);
   font: var(--ws-text-subtext);
