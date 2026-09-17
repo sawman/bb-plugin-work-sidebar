@@ -82,7 +82,7 @@ export function ThreadAssignmentPicker({
               className="ws-task-thread-unavailable"
               aria-label={`Owner thread unavailable: ${primaryThread.title}`}
             >
-              <Icon name="CircleAlert" aria-hidden />
+              <Icon name="AlertCircle" aria-hidden />
               <span>{primaryThread.title}</span>
               <span>Owner thread unavailable</span>
             </span>

@@ -1,6 +1,6 @@
 import type { SVGProps } from "react";
 
-const paths: Record<string, React.ReactNode> = {
+const paths = {
   AlertCircle: (
     <>
       <circle cx="12" cy="12" r="9" />
@@ -9,6 +9,8 @@ const paths: Record<string, React.ReactNode> = {
   ),
   ArrowLeft: <path d="M19 12H5m5-5-5 5 5 5" />,
   ArrowRight: <path d="M5 12h14m-5-5 5 5-5 5" />,
+  ArrowUp: <path d="M12 19V5m-5 5 5-5 5 5" />,
+  ArrowDown: <path d="M12 5v14m-5-5 5 5 5-5" />,
   Bot: (
     <>
       <rect x="4" y="7" width="16" height="12" rx="3" />
@@ -219,7 +221,7 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M17 14h3l-3 3h3" />
     </>
   ),
-};
+} satisfies Record<string, React.ReactNode>;
 
 export type IconName = keyof typeof paths;
 type IconProps = SVGProps<SVGSVGElement> & { name: IconName };

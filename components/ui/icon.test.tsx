@@ -19,6 +19,18 @@ describe("Git icon geometry", () => {
 });
 
 describe("status icon geometry", () => {
+  it("renders the Current and Queue actions as arrows instead of fallback circles", () => {
+    const current = renderToStaticMarkup(<Icon name="ArrowUp" />);
+    const queue = renderToStaticMarkup(<Icon name="ArrowDown" />);
+
+    expect(current).toContain('data-icon="ArrowUp"');
+    expect(current).toContain('d="M12 19V5m-5 5 5-5 5 5"');
+    expect(current).not.toContain('<circle');
+    expect(queue).toContain('data-icon="ArrowDown"');
+    expect(queue).toContain('d="M12 5v14m-5-5 5 5 5-5"');
+    expect(queue).not.toContain('<circle');
+  });
+
   it("optically centers the bottom-heavy wrench glyph", () => {
     const wrench = renderToStaticMarkup(<Icon name="Wrench" />);
 
