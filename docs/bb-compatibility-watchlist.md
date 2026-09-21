@@ -9,7 +9,27 @@ removing any item below. Re-run the linked searches against the current open
 issues and pull requests, then confirm the shipped API through a typed plugin
 test—not just a changelog entry.
 
-Last checked: 2026-09-14 against BB 0.43.1 / SDK 0.4.87.
+Last checked: 2026-09-21 against BB 0.43.3 / SDK 0.4.104.
+
+## BB 0.43.3 audit
+
+Audited immutable `desktop-v0.43.3` source at
+`e865697f56bea89f3413dd4cc7fae964850d20a0` and SDK 0.4.104. The host now
+detaches ordinary `requestInput` calls and delivers eventual answers to the
+agent, so the AskUserQuestion patch no longer modifies or deploys core server
+artifacts. Its ACP multi-call queue remains a plugin-local capability and is
+therefore retained. Automations still needs the personal-project lookup
+fallback. Tasks still lacks both the bounded indexed thread-task RPC and
+caller-thread forwarding from `bb tasks dispatch`; its patch was reimplemented
+against the new declarative CLI surface.
+
+Preflight passed the cataloged serial suites—AskUserQuestion 45, Automations
+105, Tasks 393—plus each plugin's typecheck, build, and target-CLI artifact
+metadata check. All three artifacts were deployed and reloaded on 2026-09-21;
+the version-matched rollback is
+`~/.bb/patch-backups/bb-0.43.3-2026-09-21T09-05-13-046Z`. No watchlist item
+was fulfilled. The SDK pin is updated to 0.4.104; Work Sidebar's own type
+check is clean.
 
 ## BB 0.43.1 audit
 
@@ -70,18 +90,17 @@ audit intentionally did not create speculative work.
 
 ## Check later
 
-- [ ] **ACP AskUserQuestion continuation (BBPLUG-334).** BB's local
-  `ask-user-question` plugin now avoids holding an interactive MCP tool call
-  open for every ACP provider (`providerId.startsWith("acp-")`). It returns
-  immediately after showing the question, then delivers the submitted answer
-  through `threads.send({ mode: "auto" })`; this prevents ACP
-  clients from timing out and leaves no manual Resume step. It is deployed into
-  BB 0.43.1 as of 2026-09-14 and cataloged with an exact source ref, patch,
+- [ ] **ACP AskUserQuestion queue (BBPLUG-334).** BB now guarantees detached
+  ordinary question continuations, but does not provide the ACP-specific
+  multi-call queue that keeps unanswered questions visible while each submitted
+  answer immediately reaches the agent. The local plugin-only patch supplies
+  that queue (maximum 32 questions) and `threads.send({ mode: "auto" })`
+  follow-up. It is cataloged against BB 0.43.3 with an exact source ref,
   regression suite, and rollback artifacts in
   [`bb-plugins/ask-user-question/`](bb-plugins/ask-user-question/). On every
   BB release, run `npm run bb-plugins:sync`: remove this patch only when ACP
-  guarantees a durable answer continuation, otherwise rebase it and retain its
-  cross-provider test matrix.
+  provides equivalent queueing and auto-follow-up behavior, otherwise rebase
+  it and retain its cross-provider test matrix.
 
 - [ ] **Thread-filtered Tasks read (BBPLUG-252).** Upstream BB Tasks still
   lacks a thread-scoped indexed read. The deployed local Tasks patch supplies

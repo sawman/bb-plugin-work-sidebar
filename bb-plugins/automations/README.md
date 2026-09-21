@@ -13,13 +13,16 @@ list for the same active ID. It preserves the original direct-lookup error for
 missing, deleted, or unreadable projects. The source patch is
 [personal-projects.patch](personal-projects.patch).
 
-## Current deployment
+## BB 0.43.3 upgrade
 
-- Target: `builtin:automations` inside BB `0.43.1`, SDK `0.4.87`.
-- Verified source baseline: `desktop-v0.43.1` at
-  `267938526dfcbc0edb228ce827b5bec202c1af97`.
-- Validation: 81 focused tests, typecheck, and plugin build.
-- Rebased and deployed through the cataloged 0.43.1 sync pass.
+- Target: `builtin:automations` inside BB `0.43.3`, SDK `0.4.104`.
+- Verified source baseline: `desktop-v0.43.3` at
+  `e865697f56bea89f3413dd4cc7fae964850d20a0`.
+- Direct project lookup still omits personal projects; the bounded fallback
+  remains necessary. Preflight passed 105 serial tests, typecheck, both
+  plugin builds, and target-CLI artifact metadata validation.
+- Deployed on 2026-09-21 with the version-matched rollback recorded in the
+  patch catalog.
 
 ## BB 0.43.1 upgrade
 

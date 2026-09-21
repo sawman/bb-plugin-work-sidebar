@@ -164,6 +164,33 @@
           "turboFilter": "bb-plugin-tasks"
         }
       ]
+    },
+    "0.43.3": {
+      "sourceRef": "desktop-v0.43.3",
+      "sourceCommit": "e865697f56bea89f3413dd4cc7fae964850d20a0",
+      "patches": [
+        {
+          "id": "ask-user-question-acp-continuation",
+          "pluginId": "ask-user-question",
+          "pluginPath": "plugins/ask-user-question",
+          "sourcePatch": "bb-plugins/ask-user-question/acp-continuation.patch",
+          "turboFilter": "bb-plugin-ask-user-question"
+        },
+        {
+          "id": "automations-personal-projects",
+          "pluginId": "automations",
+          "pluginPath": "plugins/automations",
+          "sourcePatch": "bb-plugins/automations/personal-projects.patch",
+          "turboFilter": "bb-plugin-automations"
+        },
+        {
+          "id": "tasks-thread-workflow",
+          "pluginId": "tasks",
+          "pluginPath": "plugins/tasks",
+          "sourcePatch": "bb-plugins/tasks/thread-workflow.patch",
+          "turboFilter": "bb-plugin-tasks"
+        }
+      ]
     }
   }
 }

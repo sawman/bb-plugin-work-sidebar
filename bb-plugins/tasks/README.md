@@ -22,14 +22,19 @@ This adds the capability without changing Work Sidebar's project-wide Tasks
 pane. A future, separately reviewed migration can use the indexed RPC wherever
 the UI specifically needs a per-thread task list.
 
-## Current deployment
+## BB 0.43.3 upgrade
 
-- Target: `builtin:tasks` inside BB `0.43.1`, SDK `0.4.87`.
-- Verified source baseline: `desktop-v0.43.1` at
-  `267938526dfcbc0edb228ce827b5bec202c1af97`.
+- Target: `builtin:tasks` inside BB `0.43.3`, SDK `0.4.104`.
+- Verified source baseline: `desktop-v0.43.3` at
+  `e865697f56bea89f3413dd4cc7fae964850d20a0`.
 - Source patch: [thread-workflow.patch](thread-workflow.patch).
 - Coverage includes database filtering and link scoping, typed RPC validation
   and label hydration, direct delegation, and CLI parent forwarding.
+- BB 0.43.3 rewrote the CLI command surface; the patch was reimplemented as
+  the same narrow RPC and parent-forwarding additions. Preflight passed 393
+  serial tests, typecheck, both plugin builds, and target-CLI metadata checks.
+- Deployed on 2026-09-21 with the version-matched rollback recorded in the
+  patch catalog.
 
 ## BB 0.43.1 upgrade
 

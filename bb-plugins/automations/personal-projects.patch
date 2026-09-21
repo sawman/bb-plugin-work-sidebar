@@ -1,18 +1,8 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: Patch <patch@local>
-Date: Mon, 14 Sep 2026 11:44:13 +0800
-Subject: [PATCH] patch automations personal projects
-
----
- plugins/automations/src/automations.test.ts | 70 +++++++++++++++++----
- plugins/automations/src/service.ts          | 19 +++++-
- 2 files changed, 76 insertions(+), 13 deletions(-)
-
 diff --git a/plugins/automations/src/automations.test.ts b/plugins/automations/src/automations.test.ts
-index 864df7b..1b887ae 100644
+index d5f2fa018..7b1e1d44d 100644
 --- a/plugins/automations/src/automations.test.ts
 +++ b/plugins/automations/src/automations.test.ts
-@@ -159,20 +159,39 @@ function legacyAutomationRow(
+@@ -162,7 +162,8 @@ function legacyAutomationRow(
    };
  }
  
@@ -21,31 +11,22 @@ index 864df7b..1b887ae 100644
 +  const { personalProjectId } = options;
    return {
      sdk: {
+       system: {
+@@ -172,6 +173,9 @@ function createAutomationServiceBb() {
+       },
        projects: {
--        get: async ({ projectId }: { projectId: string }) => ({
--          id: projectId,
--          kind: "standard" as const,
--          name: "Test Project",
--          gitRemoteUrl: null,
--          createdAt: 1,
--          updatedAt: 1,
--          sources: [],
--        }),
--        list: async () => [],
-+        get: async ({ projectId }: { projectId: string }) => {
+         get: async ({ projectId }: { projectId: string }) => {
 +          if (projectId === personalProjectId) {
 +            throw new Error("Project not found");
 +          }
-+          return {
-+            id: projectId,
-+            kind: "standard" as const,
-+            name: "Test Project",
-+            gitRemoteUrl: null,
-+            createdAt: 1,
-+            updatedAt: 1,
-+            sources: [],
-+          };
-+        },
+           const personal = projectId === "proj_personal";
+           const remoteOnly = projectId === "proj_remote";
+           const sources = personal
+@@ -198,7 +202,20 @@ function createAutomationServiceBb() {
+             sources,
+           };
+         },
+-        list: async () => [],
 +        list: async ({ includePersonal }: { includePersonal?: boolean } = {}) =>
 +          includePersonal && personalProjectId !== undefined
 +            ? [
@@ -63,11 +44,11 @@ index 864df7b..1b887ae 100644
        },
        providers: {
          list: async () =>
-@@ -979,6 +998,35 @@ describe("automation data access", () => {
- });
+@@ -1348,6 +1365,35 @@ describe("automation service", () => {
+     expect(listAutomationsForProject(db, "proj_missing")).toHaveLength(0);
+   });
  
- describe("automation service", () => {
-+  it("creates automations for the personal project listed by the SDK", async () => {
++  it("accepts a listed personal project when direct lookup is unavailable", async () => {
 +    const db = createTestDb();
 +    const service = createAutomationService({
 +      bb: createAutomationServiceBb({ personalProjectId: "proj_personal" }),
@@ -96,19 +77,18 @@ index 864df7b..1b887ae 100644
 +    expect(automation.projectId).toBe("proj_personal");
 +  });
 +
-   it("validates project availability before creating an automation", async () => {
+   it("removes a stored script directory after switching to agent execution", async () => {
      const db = createTestDb();
-     const bb = {
+     const pluginDataDir = await mkdtemp(join(tmpdir(), "bb-auto-service-"));
 diff --git a/plugins/automations/src/service.ts b/plugins/automations/src/service.ts
-index 304dd9d..98a3e84 100644
+index 534e43e83..48726bd32 100644
 --- a/plugins/automations/src/service.ts
 +++ b/plugins/automations/src/service.ts
-@@ -445,9 +445,24 @@ async function requireProjectAvailable(
- ): Promise<void> {
-   try {
-     projectAvailableSchema.parse(await bb.sdk.projects.get({ projectId }));
+@@ -535,9 +535,27 @@ async function requireProjectAvailable(
+     return projectAvailableSchema.parse(
+       await bb.sdk.projects.get({ projectId }),
+     );
 -  } catch (error) {
-+    return;
 +  } catch (getError) {
 +    try {
 +      const projects = projectSummaryListSchema.parse(
@@ -119,7 +99,11 @@ index 304dd9d..98a3e84 100644
 +        project !== undefined &&
 +        (project.deletedAt === undefined || project.deletedAt === null)
 +      ) {
-+        return;
++        return projectAvailableSchema.parse({
++          ...project,
++          kind: "personal",
++          sources: [],
++        });
 +      }
 +    } catch {
 +      // Preserve the more specific get() failure below.
