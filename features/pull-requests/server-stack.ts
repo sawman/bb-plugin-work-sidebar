@@ -9,7 +9,11 @@ import type {
 
 export const GITHUB_STACK_API_VERSION = "2026-03-10";
 export const GITHUB_ACCEPT_HEADER = "application/vnd.github+json";
-const GITHUB_SIGNAL_CACHE_MS = 2 * 60_000;
+// Changes polls an active PR as frequently as every 30 seconds. Keep this
+// small server-side dedupe window below that cadence: otherwise a changed
+// GitHub review decision can survive a successful Changes refresh and render
+// as the previous state (for example, "Review pending" after approval).
+export const GITHUB_SIGNAL_CACHE_MS = 20_000;
 const GITHUB_GRAPHQL_BACKOFF_MS = 60 * 60_000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {

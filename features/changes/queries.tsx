@@ -33,6 +33,11 @@ export function useChanges(
     queryKey: changesKeys.projection(threadId),
     queryFn: () => rpc.call("getChanges", { threadId }),
     ...changesPolicies.projection,
+    // A working-tree fingerprint only changes for repository mutations. PR
+    // review/check updates do not necessarily alter it, so poll the complete
+    // projection as well to keep Changes aligned with the shared PR facts.
+    refetchInterval: visible ? polling.visiblePollMs : polling.backgroundPollMs,
+    refetchIntervalInBackground: true,
   });
   const url = projection.data?.currentPullRequest?.url;
   const previous = useRef<{ identity: string; fingerprint: string | null }>({

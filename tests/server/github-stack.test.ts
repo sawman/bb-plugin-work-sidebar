@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   fetchGitHubStack,
+  GITHUB_SIGNAL_CACHE_MS,
   readGitHubReviewCommentCounts,
   readGitHubPullRequestFilePatch,
   readGitHubSignals,
@@ -72,6 +73,43 @@ describe("GitHub Stack enrichment ownership", () => {
     expect(lifecycle.githubPullRequestSignalCache.has("repo#0")).toBe(false);
     expect(lifecycle.githubPullRequestSignalCache.has("repo#1")).toBe(true);
     expect(lifecycle.githubPullRequestSignalCache.has("repo#300")).toBe(true);
+  });
+
+  it("refreshes a cached pending review before the next active Changes poll", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-22T00:00:00Z"));
+    const lifecycle = createServerLifecycle();
+    let decision = "REVIEW_REQUIRED";
+    const run = vi.fn(async () =>
+      JSON.stringify({
+        data: {
+          repository: {
+            p0: {
+              reviewDecision: decision,
+              reviewRequests: { totalCount: 0, nodes: [] },
+              reviews: { totalCount: 0, nodes: [] },
+              commits: { nodes: [] },
+            },
+          },
+        },
+      }),
+    );
+
+    await expect(readGitHubSignals("acme", "repo", [42], lifecycle, run)).resolves.toMatchObject(
+      new Map([[42, { review: "review_required" }]]),
+    );
+    decision = "APPROVED";
+    await expect(readGitHubSignals("acme", "repo", [42], lifecycle, run)).resolves.toMatchObject(
+      new Map([[42, { review: "review_required" }]]),
+    );
+    expect(run).toHaveBeenCalledOnce();
+
+    await vi.advanceTimersByTimeAsync(GITHUB_SIGNAL_CACHE_MS);
+
+    await expect(readGitHubSignals("acme", "repo", [42], lifecycle, run)).resolves.toMatchObject(
+      new Map([[42, { review: "approved" }]]),
+    );
+    expect(run).toHaveBeenCalledTimes(2);
   });
 
   it("keeps the entrypoint export pointed at the PR-owned Stack service", () => {

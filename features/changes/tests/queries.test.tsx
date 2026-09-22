@@ -308,4 +308,86 @@ describe("R13 Changes queries", () => {
       Object.defineProperty(document, "visibilityState", previousVisibility);
     else delete (document as { visibilityState?: string }).visibilityState;
   });
+
+  it("refreshes the PR projection on the configured active and background cadence", async () => {
+    vi.useFakeTimers();
+    const previousVisibility = Object.getOwnPropertyDescriptor(document, "visibilityState");
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
+    const rpc = {
+      call: vi.fn(async (method: string) => {
+        if (method === "getChanges")
+          return {
+            currentPullRequest: null,
+            stack: null,
+            stackUnavailableReason: null,
+            githubStack: null,
+            repository: {
+              outcome: "available",
+              message: null,
+              branch: "main",
+              base: "main",
+              ahead: 0,
+              behind: 0,
+              worktreeState: "clean",
+              hasUncommittedChanges: false,
+              changedFileCount: 0,
+              changedInsertions: 0,
+              changedDeletions: 0,
+              changedFiles: [],
+            },
+          };
+        return { fingerprint: null };
+      }),
+    };
+    const client = new QueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const view = renderHook(
+      () => useChanges(rpc as never, "thr_polling_projection", {
+        visiblePollMs: 1_000,
+        backgroundPollMs: 9_000,
+      }),
+      { wrapper },
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(
+      rpc.call.mock.calls.filter(([method]) => method === "getChanges"),
+    ).toHaveLength(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(
+      rpc.call.mock.calls.filter(([method]) => method === "getChanges"),
+    ).toHaveLength(2);
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "hidden",
+    });
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(8_999);
+    });
+    expect(
+      rpc.call.mock.calls.filter(([method]) => method === "getChanges"),
+    ).toHaveLength(2);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(
+      rpc.call.mock.calls.filter(([method]) => method === "getChanges"),
+    ).toHaveLength(3);
+
+    view.unmount();
+    if (previousVisibility)
+      Object.defineProperty(document, "visibilityState", previousVisibility);
+    else delete (document as { visibilityState?: string }).visibilityState;
+  });
 });
