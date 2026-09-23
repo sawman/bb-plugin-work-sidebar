@@ -5,8 +5,9 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getPluginQueryClient } from "../../../query-runtime";
 import { dispatchHrefClickWithoutJsdomNavigation } from "../../../tests/utils/dispatch-href-click";
+import { sidebarThreadFixture } from "../../../tests/utils/sidebar-thread";
 
-const project = { id: "project", name: "Project", isPersonal: false };
+const project = { id: "project", name: "Project", isPersonal: false, href: "/projects/project", settingsHref: "/projects/project/settings" };
 
 function thread(
   id: string,
@@ -15,9 +16,11 @@ function thread(
   providerId = "codex",
 ): PluginSidebarThread {
   return {
+    ...sidebarThreadFixture(),
     id,
     projectId: project.id,
     title,
+    displayTitle: title,
     titleFallback: null,
     parentThreadId,
     sectionId: null,
@@ -157,8 +160,6 @@ async function leftSlot({
       isCompactViewport: false,
       onNavigate: vi.fn(),
       searchQuery: "",
-      Original: () => <div>Native BB list</div>,
-      experimental_Original: () => <div>Deprecated native BB list</div>,
     },
     {
       sidebarThreads: { status: "ready", projects: [project], threads },
@@ -1553,6 +1554,8 @@ describe("R18 registered left sidebar parity", () => {
     const linkedThread = {
       ...thread("thr_child", "Child stack worker", null, "claude-code"),
       environment: {
+        path: "/worktrees/thread",
+        isWorktree: true,
         id: "env_child",
         name: "Child stack workspace",
         branchName: "feature/child",

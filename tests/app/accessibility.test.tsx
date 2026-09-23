@@ -285,7 +285,6 @@ describe("R19D registered slot accessibility", () => {
         isCompactViewport: false,
         onNavigate: () => undefined,
         searchQuery: "",
-        Original: () => null,
       },
       { rpc: fixture() },
     );

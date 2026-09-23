@@ -48,10 +48,8 @@ const SIDEBAR_TABS: readonly { id: SidebarView; label: string }[] = (
 ).map((id) => ({ id, label: sidebarViewLabel(id) }));
 const EMPTY_TASK_OWNER_THREADS: ReadonlyMap<string, { title: string; providerId: string; provider?: ThreadProvider }> = new Map();
 const EMPTY_PULL_REQUEST_THREADS: readonly PullRequestThreadReference[] = [];
-function EmptyOriginal() { return null; }
 
 export function ThreadsSidebarController(props: PluginThreadListProps) {
-  const Original = props.Original ?? props.experimental_Original ?? EmptyOriginal;
   const { status, threads, projects } = experimental_useSidebarThreads();
   const providerDirectory = experimental_useProviders();
   const pluginSettings = useSettings();
@@ -216,7 +214,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     },
     [actions, props],
   );
-  if (status !== "ready") return <Original />;
+  if (status !== "ready") return <div className="ws-empty" role={status === "loading" ? "status" : "alert"}>{status === "loading" ? "Loading threads…" : "Threads unavailable"}</div>;
   const taskLinks = taskLinksData?.links ?? {};
   const textScale = threadPreferences.appearance.data?.textScale ?? DEFAULT_TEXT_SCALE;
   const workingProviderAnimation = threadPreferences.appearance.data?.workingProviderAnimation ?? DEFAULT_WORKING_PROVIDER_ANIMATION;

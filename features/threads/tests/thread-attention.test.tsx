@@ -2,6 +2,7 @@
 import { act, cleanup, render } from "@testing-library/react";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { sidebarThreadFixture } from "../../../tests/utils/sidebar-thread";
 
 import {
   DEFAULT_STALE_WORKING_MINUTES,
@@ -32,6 +33,7 @@ function thread(
   overrides: Partial<PluginSidebarThread> = {},
 ): PluginSidebarThread {
   return {
+    ...sidebarThreadFixture(),
     id: "thr_attention",
     projectId: "project",
     title: "Attention",
@@ -61,6 +63,7 @@ function thread(
     lastReadAt: NOW,
     latestAttentionAt: NOW,
     ...overrides,
+    displayTitle: overrides.displayTitle ?? overrides.title ?? "Attention",
   };
 }
 

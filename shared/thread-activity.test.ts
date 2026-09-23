@@ -1,5 +1,6 @@
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { describe, expect, it } from "vitest";
+import { sidebarThreadFixture } from "../tests/utils/sidebar-thread";
 
 import {
   THREAD_ACTIVITY_PRESENTATION,
@@ -14,6 +15,7 @@ function thread(
   overrides: Partial<PluginSidebarThread> = {},
 ): PluginSidebarThread {
   return {
+    ...sidebarThreadFixture(),
     id,
     projectId: "project",
     title: id,
@@ -43,6 +45,7 @@ function thread(
     lastReadAt: null,
     latestAttentionAt: 1,
     ...overrides,
+    displayTitle: overrides.displayTitle ?? overrides.title ?? id,
   };
 }
 

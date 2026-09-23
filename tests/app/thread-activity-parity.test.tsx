@@ -15,6 +15,7 @@ import {
   type ThreadActivityState,
 } from "../../shared/thread-activity";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
+import { sidebarThreadFixture } from "../utils/sidebar-thread";
 
 const NOW = Date.UTC(2026, 8, 3, 12);
 
@@ -22,6 +23,7 @@ function thread(
   overrides: Partial<PluginSidebarThread> = {},
 ): PluginSidebarThread {
   return {
+    ...sidebarThreadFixture(),
     id: "thr_parity",
     projectId: "project",
     title: "Parity",
@@ -51,6 +53,7 @@ function thread(
     lastReadAt: null,
     latestAttentionAt: 1,
     ...overrides,
+    displayTitle: overrides.displayTitle ?? overrides.title ?? "Parity",
   };
 }
 

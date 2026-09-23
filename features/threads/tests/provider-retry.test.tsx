@@ -9,6 +9,7 @@ import {
   queuedMessageReason,
 } from "../queued-messages";
 import type { QueuedMessage } from "../schemas";
+import { sidebarThreadFixture } from "../../../tests/utils/sidebar-thread";
 
 const NOW = 1_800_000_000_000;
 const queuedMessage: QueuedMessage = {
@@ -20,6 +21,7 @@ const queuedMessage: QueuedMessage = {
 };
 
 const thread = {
+  ...sidebarThreadFixture(),
   id: "thr_retry",
   projectId: "project",
   title: "Retry me",

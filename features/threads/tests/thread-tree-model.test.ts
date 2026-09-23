@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
+import { sidebarThreadFixture } from "../../../tests/utils/sidebar-thread";
 
 import { threadAgentRollups } from "../thread-agent-rollup";
 
@@ -9,6 +10,7 @@ function thread(
   indicator: PluginSidebarThread["indicator"] = "none",
 ): PluginSidebarThread {
   return {
+    ...sidebarThreadFixture(),
     id,
     parentThreadId,
     projectId: "project",

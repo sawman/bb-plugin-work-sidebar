@@ -16,9 +16,9 @@ matching BB version.
 
 | Built-in plugin | Patch | Status |
 | --- | --- | --- |
-| `ask-user-question` | [ACP answer continuation](ask-user-question/README.md) | verified and deployed for BB 0.43.3 |
-| `automations` | [Personal-project availability](automations/README.md) | verified and deployed for BB 0.43.3 |
-| `tasks` | [Thread workflow](tasks/README.md) | verified and deployed for BB 0.43.3 |
+| `ask-user-question` | [ACP answer continuation](ask-user-question/README.md) | verified and deployed for BB 0.43.4 |
+| `automations` | [Personal-project availability](automations/README.md) | verified and deployed for BB 0.43.4 |
+| `tasks` | [Thread workflow](tasks/README.md) | verified and deployed for BB 0.43.4 |
 
 Run `npm run bb-plugins:sync` for the non-mutating local CI pass. It stages
 only verified artifacts. `npm run bb-plugins:sync -- --deploy` reruns that

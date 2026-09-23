@@ -92,7 +92,6 @@ describe("R2 app registration and Query lifecycle", () => {
       isCompactViewport: false,
       onNavigate: () => undefined,
       searchQuery: "",
-      Original: () => null,
     }, {
       rpc: {
         getSidebarAppearance: () => ({
@@ -319,7 +318,6 @@ describe("R2 app registration and Query lifecycle", () => {
         isCompactViewport: false,
         onNavigate: () => undefined,
         searchQuery: "",
-        Original: () => null,
       });
       const right = renderSlot(app.threadPanelActions[0]!, {
         threadId: `thr_generation_${generation}`,
@@ -362,7 +360,6 @@ describe("R2 app registration and Query lifecycle", () => {
         isCompactViewport: false,
         onNavigate: () => undefined,
         searchQuery: "",
-        Original: () => null,
       },
       { rpc },
     );
@@ -525,7 +522,6 @@ describe("R6 mounted Tasks reads", () => {
         isCompactViewport: false,
         onNavigate: () => undefined,
         searchQuery: "",
-        Original: () => null,
       },
       { rpc },
     );
@@ -586,7 +582,6 @@ describe("R6 mounted Tasks reads", () => {
         isCompactViewport: false,
         onNavigate: () => undefined,
         searchQuery: "",
-        Original: () => null,
       },
       {
         rpc: {

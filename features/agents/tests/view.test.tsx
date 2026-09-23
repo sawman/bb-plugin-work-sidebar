@@ -4,6 +4,7 @@ import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { getPluginQueryClient } from "../../../query-runtime";
+import { sidebarThreadFixture } from "../../../tests/utils/sidebar-thread";
 
 const clipboardWrite = vi.fn(() => Promise.resolve());
 
@@ -32,6 +33,7 @@ function thread(
   overrides: Partial<PluginSidebarThread> = {},
 ): PluginSidebarThread {
   return {
+    ...sidebarThreadFixture(),
     id,
     projectId: "project",
     title: id,
@@ -61,6 +63,7 @@ function thread(
     lastReadAt: null,
     latestAttentionAt: 0,
     ...overrides,
+    displayTitle: overrides.displayTitle ?? overrides.title ?? id,
   };
 }
 
@@ -232,6 +235,8 @@ describe("R15 registered Agents Work slot", () => {
           thread("thr_child", "thr_root", {
             indicator: "runtime",
             environment: {
+              path: "/worktrees/agent",
+              isWorktree: true,
               id: "env_agents",
               name: "Agents worktree",
               branchName: "bb/agents-details",
@@ -307,6 +312,8 @@ describe("R15 registered Agents Work slot", () => {
           thread("thr_root", null),
           thread("thr_child", "thr_root", {
             environment: {
+              path: "/worktrees/agent",
+              isWorktree: true,
               id: "env_long",
               name: longWorktree,
               branchName: "bb/very-long-agent-branch-name",
@@ -466,6 +473,8 @@ describe("R15 registered Agents Work slot", () => {
         thread("thr_child", "thr_root", {
           createdAt: Date.now() - 65_000,
           environment: {
+            path: "/worktrees/agent",
+            isWorktree: true,
             id: "env_child",
             name: "Agent checkout",
             branchName: "bb/agent-child",

@@ -9,7 +9,25 @@ removing any item below. Re-run the linked searches against the current open
 issues and pull requests, then confirm the shipped API through a typed plugin
 test—not just a changelog entry.
 
-Last checked: 2026-09-21 against BB 0.43.3 / SDK 0.4.104.
+Last checked: 2026-09-23 against BB 0.43.4 / SDK 0.5.9.
+
+## BB 0.43.4 audit
+
+Audited immutable `desktop-v0.43.4` source at
+`9b8c1d3457b00359af206e3fd423fe50520182c2` and SDK 0.5.9. The three
+cataloged built-in patches still apply and passed their exact-version plugin
+tests, typechecks, builds, and artifact checks. They were deployed and reloaded
+with rollback backup
+`~/.bb/patch-backups/bb-0.43.4-2026-09-23T09-34-46-940Z`.
+
+The SDK removed `PluginThreadListProps.Original` and added required sidebar
+thread/project fields. Work Sidebar has been migrated, rebuilt, and reloaded;
+its 773 tests, typecheck, and SDK check pass. SDK 0.5.9 also adds
+`useSidebarThreadDraft(threadId)` and `useSidebarThreadDraftIds()`, satisfying
+the missing host API for per-client unsent drafts even on unselected rows.
+Adopting those hooks in our draft indicator is tracked as BBPLUG-406. The
+remaining navigation and Tasks API gaps were not shown to be fulfilled, so
+their workarounds remain.
 
 ## BB 0.43.3 audit
 
@@ -95,7 +113,7 @@ audit intentionally did not create speculative work.
   multi-call queue that keeps unanswered questions visible while each submitted
   answer immediately reaches the agent. The local plugin-only patch supplies
   that queue (maximum 32 questions) and `threads.send({ mode: "auto" })`
-  follow-up. It is cataloged against BB 0.43.3 with an exact source ref,
+  follow-up. It is cataloged against BB 0.43.4 with an exact source ref,
   regression suite, and rollback artifacts in
   [`bb-plugins/ask-user-question/`](bb-plugins/ask-user-question/). On every
   BB release, run `npm run bb-plugins:sync`: remove this patch only when ACP
@@ -121,17 +139,6 @@ audit intentionally did not create speculative work.
   Related upstream issue:
   [#2836](https://github.com/get-bb/bb/issues/2836) covers spawn/handoff
   parenting, but it does not yet cover the Tasks dispatcher.
-- [ ] **Durable per-thread composer draft.** The BB SDK/host does not provide
-  durable composer-draft state for unselected thread rows, so the plugin cannot
-  derive a draft indicator purely from host state across refresh. Current
-  workaround in `features/threads/thread-attention.ts` uses `hasComposerDraft`
-  when supplied, otherwise only legacy `draft`/`working-draft` row indicators;
-  it never infers state from the mounted, selection-dependent composer. Remove
-  this item when the SDK exposes durable per-thread draft metadata or an event.
-  Related open issues [#1978](https://github.com/get-bb/bb/issues/1978) and
-  [#2200](https://github.com/get-bb/bb/issues/2200) improve composer input and
-  draft creation, respectively, but neither currently exposes row-level durable
-  draft state to plugins.
 - [ ] **Explicit inverse HTTP navigation.** Ordinary plugin `UrlLink`s and
   `openUrl` only honor BB's browser preference; the SDK neither exposes that
   preference nor a documented “open in BB browser” HTTP destination. The

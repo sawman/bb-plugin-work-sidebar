@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { waitFor } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { getPluginQueryClient } from "../../../query-runtime";
+import { sidebarThreadFixture } from "../../../tests/utils/sidebar-thread";
 
 const queuedMessage = {
   threadId: "thr_retry",
@@ -13,6 +14,7 @@ const queuedMessage = {
 };
 
 const thread = {
+  ...sidebarThreadFixture(),
   id: queuedMessage.threadId,
   projectId: "project",
   title: "Retry me",
@@ -46,9 +48,9 @@ describe("queued message sidebar lifecycle", () => {
       .mockResolvedValueOnce({ messages: [] });
     const slot = renderSlot(
       app.threadLists[0]!,
-      { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: vi.fn(), searchQuery: "", Original: () => null },
+      { activeThreadId: null, activeProjectId: null, isCompactViewport: false, onNavigate: vi.fn(), searchQuery: "" },
       {
-        sidebarThreads: { status: "ready", projects: [{ id: "project", name: "Project", isPersonal: false }], threads: [thread] },
+        sidebarThreads: { status: "ready", projects: [{ id: "project", name: "Project", isPersonal: false, href: "/projects/project", settingsHref: "/projects/project/settings" }], threads: [thread] },
         rpc: {
           getSidebarAppearance: () => ({ rowHeight: 40, textScale: 1, workingProviderAnimation: "slow-spin" }),
           getSidebarOrder: () => ({ threadIds: [] }),

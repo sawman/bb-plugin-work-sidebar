@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { waitFor } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { getPluginQueryClient } from "../../query-runtime";
+import { sidebarThreadFixture } from "../utils/sidebar-thread";
 
 const host = vi.hoisted(() => ({
   sidebarThreads: { status: "loading", threads: [], projects: [] } as unknown,
@@ -19,7 +20,7 @@ vi.mock("@get-bb/plugin-sdk/app", async (importOriginal) => {
 });
 
 describe("R19A registered left-slot transitions", () => {
-  it("keeps one mounted registered slot hook-safe through loading → ready → loading", async () => {
+  it("keeps one mounted registered slot hook-safe through loading → ready → error", async () => {
     const app = await loadPluginApp(() => import("../../app"));
     const props = {
       activeThreadId: null,
@@ -27,19 +28,20 @@ describe("R19A registered left-slot transitions", () => {
       isCompactViewport: false,
       onNavigate: () => undefined,
       searchQuery: "",
-      Original: () => <div>Native loading list</div>,
     };
     const slot = renderSlot(app.threadLists[0]!, props);
-    expect(slot.getByText("Native loading list")).toBeTruthy();
+    expect(slot.getByRole("status").textContent).toBe("Loading threads…");
 
     host.sidebarThreads = {
       status: "ready",
-      projects: [{ id: "project", name: "Project", isPersonal: false }],
+      projects: [{ id: "project", name: "Project", isPersonal: false, href: "/projects/project", settingsHref: "/projects/project/settings" }],
       threads: [
         {
+          ...sidebarThreadFixture(),
           id: "thr_ready",
           projectId: "project",
           title: "Ready",
+          displayTitle: "Ready",
           titleFallback: null,
           parentThreadId: null,
           sectionId: null,
@@ -75,11 +77,11 @@ describe("R19A registered left-slot transitions", () => {
       expect(slot.getByRole("link", { name: /Ready/ })).toBeTruthy(),
     );
 
-    host.sidebarThreads = { status: "loading", threads: [], projects: [] };
+    host.sidebarThreads = { status: "error", threads: [], projects: [] };
     slot.lifecycle.rerender(
       createElement(app.threadLists[0]!.component, props),
     );
-    expect(slot.getByText("Native loading list")).toBeTruthy();
+    expect(slot.getByRole("alert").textContent).toBe("Threads unavailable");
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();
   });

@@ -1,5 +1,6 @@
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { describe, expect, it } from "vitest";
+import { sidebarThreadFixture } from "../../../tests/utils/sidebar-thread";
 import {
   agentDurationLabel,
   agentRuntimePresentation,
@@ -13,6 +14,7 @@ function thread(
   overrides: Partial<PluginSidebarThread> = {},
 ): PluginSidebarThread {
   return {
+    ...sidebarThreadFixture(),
     id,
     projectId: "project",
     title: id,
@@ -42,6 +44,7 @@ function thread(
     lastReadAt: null,
     latestAttentionAt: 0,
     ...overrides,
+    displayTitle: overrides.displayTitle ?? overrides.title ?? id,
   };
 }
 
@@ -94,6 +97,8 @@ describe("Agents projection model", () => {
         id: "env_1",
         name: "R24 Agents",
         branchName: "bb/r24-agents",
+        path: "/worktrees/r24-agents",
+        isWorktree: true,
         providerId: null,
         workspaceDisplayKind: "managed-worktree",
       },
@@ -110,6 +115,8 @@ describe("Agents projection model", () => {
         id: "env_2",
         name: "Shared checkout",
         branchName: null,
+        path: null,
+        isWorktree: false,
         providerId: null,
         workspaceDisplayKind: "other",
       },

@@ -49,7 +49,7 @@ const tasks = (items = [task]): TasksResult => ({
   projects: [{ id: "project_1", name: "Work" }],
   error: null,
 });
-const sidebarProject = { id: "project_1", name: "Work", isPersonal: false };
+const sidebarProject = { id: "project_1", name: "Work", isPersonal: false, href: "/projects/project_1", settingsHref: "/projects/project_1/settings" };
 function sidebarThread(id: string, title: string): PluginSidebarThread {
   return {
     id,
@@ -213,7 +213,6 @@ function leftProps(searchQuery = "") {
     isCompactViewport: false,
     onNavigate: () => undefined,
     searchQuery,
-    Original: () => null,
   };
 }
 async function leftSlot(

@@ -200,6 +200,8 @@ describe("R21D ThreadRow characterization", () => {
     const view = renderRow({
       threadOverrides: {
         environment: {
+          path: "/worktrees/thread",
+          isWorktree: true,
           id: "env_detached",
           name: null,
           branchName: null,

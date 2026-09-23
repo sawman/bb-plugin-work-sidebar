@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, waitFor } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { toast } from "sonner";
+import { sidebarThreadFixture } from "../../../tests/utils/sidebar-thread";
 
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn() },
@@ -31,17 +32,18 @@ describe("R9 production ThreadRow host behavior", () => {
         isCompactViewport: false,
         onNavigate: vi.fn(),
         searchQuery: "",
-        Original: () => null,
       },
       {
         sidebarThreads: {
           status: "ready",
-          projects: [{ id: "project", name: "Project", isPersonal: false }],
+          projects: [{ id: "project", name: "Project", isPersonal: false, href: "/projects/project", settingsHref: "/projects/project/settings" }],
           threads: [
             {
+              ...sidebarThreadFixture(),
               id: "thr_parent",
               projectId: "project",
               title: "Parent",
+              displayTitle: "Parent",
               titleFallback: null,
               parentThreadId: null,
               sectionId: null,
@@ -69,9 +71,11 @@ describe("R9 production ThreadRow host behavior", () => {
               latestAttentionAt: 0,
             },
             {
+              ...sidebarThreadFixture(),
               id: "thr_child",
               projectId: "project",
               title: "Child",
+              displayTitle: "Child",
               titleFallback: null,
               parentThreadId: "thr_parent",
               sectionId: null,
@@ -99,9 +103,11 @@ describe("R9 production ThreadRow host behavior", () => {
               latestAttentionAt: 0,
             },
             {
+              ...sidebarThreadFixture(),
               id: "thr_other",
               projectId: "project",
               title: "Other",
+              displayTitle: "Other",
               titleFallback: null,
               parentThreadId: null,
               sectionId: null,
