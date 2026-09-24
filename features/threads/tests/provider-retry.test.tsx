@@ -53,12 +53,27 @@ const thread = {
 } as const;
 
 describe("queued message presentation and read contract", () => {
-  it("shows count and a compact hour/minute countdown while keeping the reason in its tooltip", () => {
-    expect(queuedMessageCountdown(queuedMessage, NOW)).toBe("1h5m");
-    expect(queuedMessageDisplay(queuedMessage, NOW)).toBe("2 · 1h5m");
+  it.each([
+    { minutes: 1, label: "1m" },
+    { minutes: 59, label: "59m" },
+    { minutes: 60, label: "1h" },
+    { minutes: 65, label: "2h" },
+    { minutes: 23 * 60, label: "23h" },
+    { minutes: 23 * 60 + 1, label: "24h" },
+    { minutes: 24 * 60, label: "1d" },
+    { minutes: 24 * 60 + 1, label: "2d" },
+    { minutes: 48 * 60, label: "2d" },
+  ])("rounds $minutes minutes to the largest unit ($label)", ({ minutes, label }) => {
+    const message = { ...queuedMessage, nextSendAt: NOW + minutes * 60_000 };
+    expect(queuedMessageCountdown(message, NOW)).toBe(label);
+  });
+
+  it("shows count and a rounded hour countdown while keeping the reason in its tooltip", () => {
+    expect(queuedMessageCountdown(queuedMessage, NOW)).toBe("2h");
+    expect(queuedMessageDisplay(queuedMessage, NOW)).toBe("2 · 2h");
     expect(queuedMessageReason(queuedMessage)).toBe("Rate limited");
     expect(queuedMessageLabel(queuedMessage, NOW)).toBe(
-      "2 queued messages · next sends in 1h5m · Rate limited",
+      "2 queued messages · next sends in 2h · Rate limited",
     );
     const view = render(
       <ThreadStatus
@@ -69,9 +84,9 @@ describe("queued message presentation and read contract", () => {
       />,
     );
     const status = view.getByRole("status", {
-      name: "2 queued messages · next sends in 1h5m · Rate limited",
+      name: "2 queued messages · next sends in 2h · Rate limited",
     });
-    expect(status.textContent).toBe("2 · 1h5m");
+    expect(status.textContent).toBe("2 · 2h");
     expect(status.querySelector('[data-icon="Clock"]')).toBeTruthy();
     expect(status.querySelector("[data-message-bubble]")).toBeNull();
     expect(status.getAttribute("aria-describedby")).toBeTruthy();
