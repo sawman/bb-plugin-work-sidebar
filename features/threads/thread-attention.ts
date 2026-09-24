@@ -13,6 +13,7 @@ import {
 export const DEFAULT_STALE_WORKING_MINUTES = 30;
 export const STALE_WORKING_MS = DEFAULT_STALE_WORKING_MINUTES * 60 * 1_000;
 export type { ThreadGroupActivity } from "./group-activity-priority";
+const NO_DRAFT_THREADS: ReadonlySet<string> = new Set();
 
 export function threadGroupActivity(
   thread: PluginSidebarThread,
@@ -38,8 +39,9 @@ export function threadNeedsAttention(thread: PluginSidebarThread): boolean {
 export function threadTreeNeedsAttention(
   roots: readonly PluginSidebarThread[],
   childrenByThread: ReadonlyMap<string, readonly PluginSidebarThread[]>,
+  draftThreadIds: ReadonlySet<string> = NO_DRAFT_THREADS,
 ): boolean {
-  const activity = threadTreeGroupActivity(roots, childrenByThread);
+  const activity = threadTreeGroupActivity(roots, childrenByThread, undefined, draftThreadIds);
   return activity === "error" || activity === "attention" || activity === "completed";
 }
 
@@ -51,6 +53,7 @@ export function threadTreeGroupActivity(
   roots: readonly PluginSidebarThread[],
   childrenByThread: ReadonlyMap<string, readonly PluginSidebarThread[]>,
   priority: GroupActivityPriority = DEFAULT_GROUP_ACTIVITY_PRIORITY,
+  draftThreadIds: ReadonlySet<string> = NO_DRAFT_THREADS,
 ): ThreadGroupActivity | null {
   const pending = [...roots];
   const visited = new Set<string>();
@@ -61,6 +64,8 @@ export function threadTreeGroupActivity(
     visited.add(thread.id);
     const candidate = threadGroupActivity(thread);
     activity = prioritizeGroupActivity(activity, candidate, priority);
+    if (draftThreadIds.has(thread.id))
+      activity = prioritizeGroupActivity(activity, "attention", priority);
     pending.push(...(childrenByThread.get(thread.id) ?? []));
   }
   return activity;
@@ -68,19 +73,6 @@ export function threadTreeGroupActivity(
 
 export function threadIsWorking(thread: PluginSidebarThread): boolean {
   return adaptSidebarThreadActivity(thread).ownWorking;
-}
-
-export function threadReportsComposerDraft(
-  thread: PluginSidebarThread,
-): boolean {
-  // SDK 0.4.28+ supplies the durable signal. Older hosts retain only their
-  // historical row indicator values; never infer a row from the mounted
-  // composer, which is selection-dependent client state.
-  if ("hasComposerDraft" in thread) {
-    return thread.hasComposerDraft === true;
-  }
-  const indicator = normalizeIndicator(String(thread.indicator));
-  return indicator === "draft" || indicator === "working-draft";
 }
 
 function lastThreadUpdateAt(thread: PluginSidebarThread): number {

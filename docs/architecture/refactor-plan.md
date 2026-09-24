@@ -967,6 +967,22 @@ executable work queue.
   probe, and diff check pass. Commit and push only after the integrated
   checkout is clean.
 
+#### Loop R39 — BB-owned sidebar draft signals
+
+- **Red:** registered sidebar and row tests fail for an unsent draft in an
+  unselected thread and a collapsed custom group; a legacy indicator without
+  a host draft must not paint a pencil. Remount the list with the same host
+  draft set to check the refresh path.
+- **Green:** use `useSidebarThreadDraft(threadId)` in each mounted row and one
+  `useSidebarThreadDraftIds()` subscription for group rollups. Keep drafts in
+  BB host state, never Query or Zustand.
+- **Refactor/removal:** delete the legacy row-indicator draft heuristic and its
+  test; retain the existing status glyph and configurable group precedence.
+- **Validation/evidence:** focused and full tests, typecheck, SDK check, build,
+  verified-source reload, and diff check pass before closing BBPLUG-406. Inspect
+  the live sidebar when the desktop is available; if it is locked, record that
+  limitation explicitly rather than claiming visual verification.
+
 ### BB child execution protocol
 
 G0 is complete. Each new code-editing loop receives one direct BB execution

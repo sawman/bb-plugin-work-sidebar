@@ -86,6 +86,7 @@ async function leftSlot({
   groups = [{ id: "group_later", name: "Later", threadIds: [] as string[] }],
   activeProjectId = null,
   sidebarPullRequests = {},
+  sidebarDraftThreadIds = [],
   providers = [],
   settings,
   rpc = {},
@@ -103,6 +104,7 @@ async function leftSlot({
       attention: "none";
     }
   >;
+  sidebarDraftThreadIds?: readonly string[];
   providers?: unknown[];
   settings?: Record<string, string | boolean>;
   rpc?: Record<string, unknown>;
@@ -166,6 +168,7 @@ async function leftSlot({
       providers: { status: "ready", providers: providers as never },
       settings,
       sidebarPullRequests,
+      sidebarDraftThreadIds,
       rpc: defaults as never,
     },
   );
@@ -189,6 +192,38 @@ function mockElementAt(element: Element | null) {
 }
 
 describe("R18 registered left sidebar parity", () => {
+  it("shows host-owned drafts on unselected rows and collapsed groups without legacy indicator guesses", async () => {
+    const drafted = thread("thr_drafted", "Drafted");
+    const legacy = { ...thread("thr_legacy", "Legacy"), indicator: "draft" as never };
+    const slot = await leftSlot({
+      threads: [drafted, legacy],
+      groups: [{ id: "group_later", name: "Later", threadIds: [drafted.id] }],
+      sidebarDraftThreadIds: [drafted.id],
+      rpc: {
+        getThreadGroups: () => ({
+          groups: [{ id: "group_later", name: "Later", threadIds: [drafted.id] }],
+          disclosures: { active: true, group_later: false },
+        }),
+      },
+    });
+
+    const later = (await slot.findByText("Later")).closest("details");
+    expect(later?.open).toBe(false);
+    expect(later?.querySelector('[aria-label="Group needs attention"]')).toBeTruthy();
+    fireEvent.click(later!.querySelector("summary")!);
+    await waitFor(() => expect(slot.getByRole("img", { name: "Unsent draft" })).toBeTruthy());
+    const legacyRow = slot.getByRole("link", { name: /Legacy/ });
+    expect(legacyRow.querySelector('[aria-label="Unsent draft"]')).toBeNull();
+    slot.unmount();
+
+    const refreshed = await leftSlot({
+      threads: [drafted],
+      sidebarDraftThreadIds: [drafted.id],
+    });
+    expect(refreshed.getByRole("img", { name: "Unsent draft" })).toBeTruthy();
+    refreshed.unmount();
+  });
+
   it("applies the plugin-configured stale timeout to active goals", async () => {
     vi.useFakeTimers();
     const now = Date.UTC(2026, 7, 29, 3);

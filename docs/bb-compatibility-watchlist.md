@@ -25,7 +25,8 @@ thread/project fields. Work Sidebar has been migrated, rebuilt, and reloaded;
 its 773 tests, typecheck, and SDK check pass. SDK 0.5.9 also adds
 `useSidebarThreadDraft(threadId)` and `useSidebarThreadDraftIds()`, satisfying
 the missing host API for per-client unsent drafts even on unselected rows.
-Adopting those hooks in our draft indicator is tracked as BBPLUG-406. The
+Work Sidebar now consumes those hooks for row pencils and collapsed-group
+attention rollups, with remount and unselected-thread coverage in BBPLUG-406. The
 remaining navigation and Tasks API gaps were not shown to be fulfilled, so
 their workarounds remain.
 

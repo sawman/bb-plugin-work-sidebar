@@ -28,6 +28,7 @@ type Project = { id: string; name: string; isPersonal: boolean };
 export function RecycleBinView({
   entries,
   groupActivityPriority,
+  draftThreadIds,
   threads,
   projectsById,
   providersById,
@@ -38,6 +39,7 @@ export function RecycleBinView({
 }: {
   entries: readonly RecycleBinEntry[];
   groupActivityPriority: GroupActivityPriority;
+  draftThreadIds: ReadonlySet<string>;
   threads: readonly PluginSidebarThread[];
   projectsById: ReadonlyMap<string, Project>;
   providersById: ThreadProviderDirectory;
@@ -83,6 +85,7 @@ export function RecycleBinView({
     }),
     new Map(),
     groupActivityPriority,
+    draftThreadIds,
   );
   return (
     <details

@@ -17,6 +17,7 @@ const host = vi.hoisted(() => ({
   pullRequestLoading: false,
   stackNumber: null as number | null,
   rpcCall: vi.fn(),
+  draftThreadIds: new Set<string>(),
 }));
 
 const clipboardWrite = vi.fn(() => Promise.resolve());
@@ -37,16 +38,15 @@ vi.mock("@get-bb/plugin-sdk/app", async () => {
       pullRequest: host.pullRequest,
       isLoading: host.pullRequestLoading,
     }),
+    useSidebarThreadDraft: (threadId: string) => ({
+      hasUnsubmittedDraft: host.draftThreadIds.has(threadId),
+    }),
     useRpc: () => ({ call: host.rpcCall }),
   };
 });
 
 import { ThreadRow } from "../thread-row";
 import type { ThreadRowProps } from "../thread-row-types";
-
-type SidebarThreadWithDraft = PluginSidebarThread & {
-  hasComposerDraft?: boolean;
-};
 
 const thread = {
   id: "thr_one",
@@ -66,7 +66,7 @@ const thread = {
     providerId: null,
     workspaceDisplayKind: "managed-worktree",
   },
-} as SidebarThreadWithDraft;
+} as PluginSidebarThread;
 
 function renderRow({
   onSelect = () => false,
@@ -79,7 +79,7 @@ function renderRow({
   onSelect?: ThreadRowProps["onSelect"];
   groupId?: string | null;
   groups?: { id: string; name: string; threadIds: string[] }[];
-  threadOverrides?: Partial<SidebarThreadWithDraft>;
+  threadOverrides?: Partial<PluginSidebarThread>;
   children?: number;
   activeChildren?: number;
 } = {}) {
@@ -140,6 +140,7 @@ afterEach(() => {
   host.pullRequestLoading = false;
   host.stackNumber = null;
   host.rpcCall.mockReset();
+  host.draftThreadIds.clear();
   clipboardWrite.mockClear();
 });
 
@@ -270,7 +271,8 @@ describe("R21D ThreadRow characterization", () => {
       attention: "review_requested",
     };
     host.stackNumber = 17;
-    const view = renderRow({ threadOverrides: { hasComposerDraft: true } });
+    host.draftThreadIds.add(thread.id);
+    const view = renderRow();
 
     expect(view.getByText("feature/m7")).toBeTruthy();
     expect(view.queryByText("WORK-1")).toBeNull();
@@ -319,7 +321,8 @@ describe("R21D ThreadRow characterization", () => {
   });
 
   it("shows a durable host draft without selecting or visiting the thread", () => {
-    const view = renderRow({ threadOverrides: { hasComposerDraft: true } });
+    host.draftThreadIds.add(thread.id);
+    const view = renderRow();
 
     expect(view.getByRole("img", { name: "Unsent draft" })).toBeTruthy();
   });

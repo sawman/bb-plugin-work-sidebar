@@ -28,6 +28,7 @@ vi.mock("@get-bb/plugin-sdk/app", async () => {
       pullRequest: null,
       isLoading: false,
     }),
+    useSidebarThreadDraft: () => ({ hasUnsubmittedDraft: false }),
   };
 });
 

@@ -11,7 +11,6 @@ import {
   threadNeedsAttention,
   threadTreeGroupActivity,
   threadTreeNeedsAttention,
-  threadReportsComposerDraft,
   useStaleWorking,
 } from "../thread-attention";
 import {
@@ -73,24 +72,6 @@ afterEach(() => {
 });
 
 describe("thread attention presentation", () => {
-  it("prefers durable host draft state over legacy indicator inference", () => {
-    expect(
-      threadReportsComposerDraft(
-        Object.assign(thread(), { hasComposerDraft: true }),
-      ),
-    ).toBe(true);
-    expect(
-      threadReportsComposerDraft(
-        Object.assign(thread({ indicator: "draft" }), {
-          hasComposerDraft: false,
-        }),
-      ),
-    ).toBe(false);
-    expect(threadReportsComposerDraft(thread({ indicator: "draft" }))).toBe(
-      true,
-    );
-  });
-
   it("ignores generic unread updates and attends only to input, errors, and completion", () => {
     expect(threadNeedsAttention(thread({ isUnread: true }))).toBe(false);
     expect(
@@ -108,6 +89,15 @@ describe("thread attention presentation", () => {
     expect(threadNeedsAttention(thread({ indicator: "unread-success" }))).toBe(
       true,
     );
+  });
+
+  it("rolls up a draft in a collapsed child without hiding a higher-priority error", () => {
+    const root = thread({ id: "root", indicator: "none" });
+    const child = thread({ id: "child", parentThreadId: root.id, indicator: "none" });
+    const children = new Map([[root.id, [child]]]);
+    const drafts = new Set([child.id]);
+    expect(threadTreeGroupActivity([root], children, undefined, drafts)).toBe("attention");
+    expect(threadTreeGroupActivity([thread({ id: "error", indicator: "unread-error" })], children, undefined, drafts)).toBe("error");
   });
 
   it("promotes actionable descendants to their group header", () => {

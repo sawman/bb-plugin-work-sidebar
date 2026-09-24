@@ -1,5 +1,6 @@
 import type { DragEvent } from "react";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
+import { useSidebarThreadDraftIds } from "@get-bb/plugin-sdk/app";
 import { ArchivedThreads } from "./archived-threads";
 import type { SidebarThreadOrganization } from "./sidebar-organization";
 import type { ThreadProviderDirectory } from "@/components/threads/thread-provider-logo";
@@ -53,6 +54,7 @@ export function SidebarThreadGroups({
   pullRequestsByThread, pullRequestsLoading,
   branchDivergences,
 }: SidebarGroupTreeProps) {
+  const draftThreadIds = useSidebarThreadDraftIds();
   const sharedTreeProps = {
     organization, activeThreadId, providersById, onNavigate, subtextRefreshKey,
     staleWorkingMinutes, queuedMessagesByThread, queuedMessageNow,
@@ -123,6 +125,7 @@ export function SidebarThreadGroups({
                     organization.activeRoots,
                     organization.activeChildren,
                     groupActivityPriority,
+                    draftThreadIds,
                   )}
                 />
                 <SidebarThreadTree
@@ -160,6 +163,7 @@ export function SidebarThreadGroups({
                   roots,
                   tree?.children ?? new Map(),
                   groupActivityPriority,
+                  draftThreadIds,
                 )}
               />
               {roots.length > 0 ? (
@@ -182,6 +186,7 @@ export function SidebarThreadGroups({
         <RecycleBinView
           entries={recycleBinEntries}
           groupActivityPriority={groupActivityPriority}
+          draftThreadIds={draftThreadIds}
           threads={allThreads}
           projectsById={organization.projectsById}
           providersById={providersById}

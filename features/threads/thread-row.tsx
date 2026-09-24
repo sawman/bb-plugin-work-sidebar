@@ -1,10 +1,10 @@
 import { useRef } from "react";
+import { useSidebarThreadDraft } from "@get-bb/plugin-sdk/app";
 import { Input } from "@/components/ui/input";
 import { ThreadRowContent } from "@/components/threads/thread-row-content";
 import { threadTitle } from "@/work-model";
 import {
   threadNeedsAttention,
-  threadReportsComposerDraft,
   useStaleWorking,
 } from "./thread-attention";
 import { ThreadRowMenu } from "./thread-row-menu";
@@ -89,7 +89,7 @@ export function ThreadRow({
   const { startNativeDrag, finishNativeDrag } = createThreadRowNativeDragHandlers({ threadId: thread.id, onDragThreadChange, onDropTargetChange });
   const projectLabel = project?.isPersonal ? "Personal" : (project?.name ?? "Project");
   const title = threadTitle(thread);
-  const hasComposerDraft = threadReportsComposerDraft(thread);
+  const { hasUnsubmittedDraft: hasComposerDraft } = useSidebarThreadDraft(thread.id);
   const staleWorking = useStaleWorking(thread, staleWorkingMinutes);
   return (
     <div
