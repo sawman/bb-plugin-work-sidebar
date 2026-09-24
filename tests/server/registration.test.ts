@@ -218,8 +218,6 @@ describe("R2 server registration and disposal", () => {
       "sidebarQueuedMessages",
       "getSidebarOrder",
       "saveSiblingOrder",
-      "getLaterThreads",
-      "saveLaterThreads",
       "getThreadGroups",
       "saveThreadGroups",
       "getSidebarAppearance",

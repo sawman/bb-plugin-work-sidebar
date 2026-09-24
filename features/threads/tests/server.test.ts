@@ -6,6 +6,20 @@ import {
 } from "../server";
 
 describe("R9 Threads server preferences", () => {
+  it("recovers legacy Later membership through the generic groups read", async () => {
+    const service = createThreadPreferencesService({
+      get: async (key) => key === THREAD_PREFERENCE_KEYS.later ? ["thr_a", "thr_a", "invalid"] : undefined,
+      set: async () => {},
+      publish: () => {},
+    });
+
+    await expect(service.groups()).resolves.toEqual({
+      groups: [{ id: "group_later", name: "Later", threadIds: ["thr_a"] }],
+      activeGroupPosition: 0,
+      disclosures: {},
+    });
+  });
+
   it("normalizes recovered groups, persists sibling order and group preferences, and exposes no archive subprocess", async () => {
     const saved = new Map<string, unknown>([
       [

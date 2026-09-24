@@ -39,8 +39,6 @@ export default function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle = cre
     getPullRequestFileDiff: changes.getPullRequestFileDiff,
     getSidebarOrder: threads.getSidebarOrder,
     saveSiblingOrder: threads.saveSiblingOrder,
-    getLaterThreads: threads.getLaterThreads,
-    saveLaterThreads: threads.saveLaterThreads,
     getThreadGroups: threads.getThreadGroups,
     saveThreadGroups: threads.saveThreadGroups,
     getSidebarAppearance: threads.getSidebarAppearance,

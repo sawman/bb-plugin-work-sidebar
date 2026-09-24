@@ -111,20 +111,6 @@ export const threadPreferenceSchemas = {
     input: z.object({ threadIds: z.array(z.string()) }).strict(),
     output: z.object({ threadIds: z.array(z.string()) }).strict(),
   },
-  getLaterThreads: {
-    input: z.null(),
-    output: z
-      .object({ threadIds: z.array(z.string().startsWith("thr_")) })
-      .strict(),
-  },
-  saveLaterThreads: {
-    input: z
-      .object({ threadIds: z.array(z.string().startsWith("thr_")).max(2_000) })
-      .strict(),
-    output: z
-      .object({ threadIds: z.array(z.string().startsWith("thr_")) })
-      .strict(),
-  },
   getThreadGroups: {
     input: z.null(),
     output: z

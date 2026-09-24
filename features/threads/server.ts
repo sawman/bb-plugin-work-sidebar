@@ -190,17 +190,6 @@ export function createThreadPreferencesService(
       adapter.publish(THREAD_PREFERENCE_CHANNEL, { threadIds: value });
       return value;
     },
-    async later() {
-      return sanitizeThreadOrder(
-        await adapter.get(THREAD_PREFERENCE_KEYS.later),
-      );
-    },
-    async saveLater(threadIds: unknown) {
-      const value = sanitizeThreadOrder(threadIds);
-      await adapter.set(THREAD_PREFERENCE_KEYS.later, value);
-      adapter.publish(THREAD_PREFERENCE_CHANNEL, { threadIds: value });
-      return value;
-    },
     async groups(): Promise<SidebarThreadGroupPreferences> {
       const stored = await adapter.get(THREAD_PREFERENCE_KEYS.groups);
       const groups = normalizeThreadGroups(

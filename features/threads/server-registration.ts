@@ -8,7 +8,7 @@ import { createQueuedMessageRegistration } from "./queued-messages-server.js";
 import { createBranchDivergenceReader } from "./branch-divergence-server.js";
 type ThreadHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
-  "sidebarBranchDivergence" | "sidebarQueuedMessages" | "getSidebarOrder" | "saveSiblingOrder" | "getLaterThreads" | "saveLaterThreads"
+  "sidebarBranchDivergence" | "sidebarQueuedMessages" | "getSidebarOrder" | "saveSiblingOrder"
     | "getThreadGroups" | "saveThreadGroups" | "getSidebarAppearance" | "saveSidebarAppearance" | "moveSidebarThread"
     | "getRecycleBin" | "binSidebarThread" | "restoreBinnedSidebarThread" | "expireRecycleBinThreads" | "sidebarArchivedThreads" | "unarchiveSidebarThread"
 >;
@@ -29,12 +29,6 @@ export function createThreadRegistration(bb: BbPluginApi, work: WorkBindingReade
     },
     async saveSiblingOrder({ threadIds }) {
       return { threadIds: await preferences.saveOrder(threadIds) };
-    },
-    async getLaterThreads() {
-      return { threadIds: await preferences.later() };
-    },
-    async saveLaterThreads({ threadIds }) {
-      return { threadIds: await preferences.saveLater(threadIds) };
     },
     async getThreadGroups() {
       return preferences.groups();
