@@ -588,12 +588,6 @@
 .ws-thread[data-drop-placement="after"]::after {
   bottom: -1px;
 }
-.ws-thread-selected {
-  background: color-mix(in srgb, var(--accent) 82%, var(--primary) 18%);
-}
-.ws-thread-selected:hover {
-  background: color-mix(in srgb, var(--accent) 72%, var(--primary) 28%);
-}
 .ws-thread-anchor:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 1px;
@@ -1200,12 +1194,28 @@
   /* R17 important: host toolbar hover styling hides the archive affordance. */
   background: var(--accent) !important;
 }
-/* Modifier-selected task rows stay visible without changing their normal layout. */
-.ws-task-row-selected {
-  background: color-mix(in srgb, var(--accent) 82%, var(--primary) 18%);
+/* Selection stays distinct from the ordinary hover/current-row accent in both themes. */
+.ws-list {
+  --ws-selection-strength: 24%;
 }
+.dark .ws-list {
+  --ws-selection-strength: 30%;
+}
+.ws-thread-selected,
+.ws-thread-selected:hover,
+.ws-task-row-selected,
 .ws-task-row-selected:hover {
-  background: color-mix(in srgb, var(--accent) 72%, var(--primary) 28%);
+  background: color-mix(in srgb, var(--primary) var(--ws-selection-strength), var(--background));
+}
+.ws-thread-selected::before,
+.ws-task-row-selected::before {
+  position: absolute;
+  inset-block: 0.16rem;
+  inset-inline-start: 0;
+  width: 3px;
+  background: var(--primary);
+  content: "";
+  pointer-events: none;
 }
 
 /* Stack hierarchy lives entirely in the fixed control gutter.  The content
@@ -2715,11 +2725,6 @@ button.ws-provider-health:focus-visible {
   max-width: 5.5rem;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.ws-thread-selected,
-.ws-thread-selected:hover,
-.ws-thread-agent-control-expanded {
-  background: var(--accent);
 }
 .ws-thread-dragging > .ws-thread-anchor {
   background: var(--accent);
