@@ -4386,12 +4386,14 @@ button.ws-provider-health:focus-visible {
 }
 
 .ws-inbox-message-action:focus-visible,
+.ws-inbox-state button:focus-visible,
 .ws-inbox-load-more:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
 .ws-inbox-results h3 {
-  font: inherit;
+  color: var(--muted-foreground);
+  font: var(--ws-text-label);
   line-height: inherit;
   margin: 0;
 }
@@ -4641,8 +4643,21 @@ button.ws-provider-health:focus-visible {
   border-radius: 0.3rem;
   color: var(--foreground);
   cursor: pointer;
+  font: var(--ws-text-subtext);
   justify-self: start;
+  line-height: 1.3;
   padding: 0.3rem 0.5rem;
+}
+
+.ws-inbox-state button:hover:not(:disabled),
+.ws-inbox-load-more:hover:not(:disabled) {
+  background: var(--accent);
+}
+
+.ws-inbox-state button:disabled,
+.ws-inbox-load-more:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .ws-inbox-results {
