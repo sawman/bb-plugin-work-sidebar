@@ -33,12 +33,10 @@ export type ThreadRowProps = {
   groupId: string | null;
   groups: readonly SidebarThreadGroup[];
   onToggleChildren(): void;
-  onSelect(
-    thread: PluginSidebarThread,
-    event: ReactMouseEvent<HTMLAnchorElement>,
-  ): boolean;
+  onSelect(thread: PluginSidebarThread, event: ReactMouseEvent<HTMLAnchorElement>): boolean;
   onMoveToGroup(threadId: string, groupId: string | null): void | Promise<void>;
   onMoveToRecycleBin?(threadId: string): void;
+  onDropToRecycleBin?(threadId: string): void;
   project?: ThreadProject;
   provider?: ThreadProvider;
   pullRequest?: ThreadPullRequest | null;

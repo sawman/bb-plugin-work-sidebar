@@ -17,6 +17,7 @@ export function WorkThreadTree({
   onSelect,
   onMoveToGroup,
   onMoveToRecycleBin,
+  onDropToRecycleBin,
   orderedSiblings,
   reorderDisabled,
   dragThreadId,
@@ -63,6 +64,7 @@ export function WorkThreadTree({
         onSelect={onSelect}
         onMoveToGroup={onMoveToGroup}
         onMoveToRecycleBin={onMoveToRecycleBin}
+        onDropToRecycleBin={onDropToRecycleBin}
         project={projectsById.get(thread.projectId)}
         provider={providersById.get(thread.providerId)}
         pullRequest={pullRequestsByThread?.[thread.id] ?? null}
@@ -99,6 +101,7 @@ export function WorkThreadTree({
               onSelect={onSelect}
               onMoveToGroup={onMoveToGroup}
               onMoveToRecycleBin={onMoveToRecycleBin}
+              onDropToRecycleBin={onDropToRecycleBin}
               orderedSiblings={children}
               reorderDisabled={reorderDisabled}
               dragThreadId={dragThreadId}

@@ -36,6 +36,7 @@ export function ThreadRow({
   onSelect,
   onMoveToGroup,
   onMoveToRecycleBin,
+  onDropToRecycleBin,
   project,
   provider,
   pullRequest = null,
@@ -68,7 +69,7 @@ export function ThreadRow({
     onDropTargetChange,
     onMoveToGroup,
     onDropThread,
-    onArchive: () => void (onMoveToRecycleBin ?? rowActions.archiveTree)(thread.id),
+    onArchive: () => void (onDropToRecycleBin ?? onMoveToRecycleBin ?? rowActions.archiveTree)(thread.id),
     onReparentThread: (sourceId, parentThreadId) => {
       void hierarchy
         .move(sourceId, parentThreadId)

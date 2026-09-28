@@ -1178,22 +1178,6 @@
   line-height: inherit;
   white-space: nowrap;
 }
-.ws-selection-archive {
-  /* R17 important: host toolbar controls inject padding that breaks the compact action. */
-  padding: 0.15rem 0.3rem !important;
-  /* R17 important: host toolbar controls inject a border that breaks the compact action. */
-  border: 1px solid var(--border) !important;
-  /* R17 important: host toolbar controls inject a radius that breaks the compact action. */
-  border-radius: calc(var(--radius) - 3px) !important;
-  /* R17 important: host toolbar controls inject a font size that breaks the compact action. */
-  font: var(--ws-text-subtext);
-  line-height: inherit;
-  white-space: nowrap;
-}
-.ws-selection-archive:hover {
-  /* R17 important: host toolbar hover styling hides the archive affordance. */
-  background: var(--accent) !important;
-}
 /* Selection stays distinct from the ordinary hover/current-row accent in both themes. */
 .ws-list {
   --ws-selection-strength: 24%;

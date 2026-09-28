@@ -75,13 +75,13 @@ export type SidebarThreadOrganization = {
   setDropTarget(target: ThreadDropTarget): void;
   moveToGroup(threadId: string, destination: string | null): void | Promise<void>;
   moveToRecycleBin(threadId: string): Promise<void>;
+  dropToRecycleBin(threadId: string): Promise<void>;
   restoreFromRecycleBin(threadId: string): void;
   reorder(
     sourceId: string,
     targetId: string,
     placement: "before" | "after",
   ): void;
-  binSelected(): Promise<void>;
   saveGroups(groups: SidebarThreadGroup[]): void | Promise<void>;
   addGroup(name: string): boolean;
   moveGroup(groupId: string, direction: -1 | 1): void;
@@ -289,24 +289,55 @@ export function useSidebarThreadOrganization({
     },
     [allChildren, groups, saveGroups, threads],
   );
-  const moveToRecycleBin = useCallback(
-    async (threadId: string) => {
-      const thread = threads.find((candidate) => candidate.id === threadId);
-      if (!thread) return;
-      const subtree = visibleThreadTreeIds([thread], allChildren);
+  const binThreadTrees = useCallback(
+    async (threadIds: readonly string[]) => {
+      const byId = new Map(threads.map((thread) => [thread.id, thread]));
+      if (!threadIds.some((id) => byId.has(id))) return false;
       try {
-        for (const id of subtree)
-          await (bin?.(id, groupIds.get(id) ?? null) ?? Promise.resolve());
+        for (const threadId of threadIds) {
+          const thread = byId.get(threadId);
+          if (!thread) continue;
+          for (const id of visibleThreadTreeIds([thread], allChildren))
+            await (bin?.(id, groupIds.get(id) ?? null) ?? Promise.resolve());
+        }
         toast.success("Moved to Recycle Bin");
+        return true;
       } catch (error) {
         toast.error(
           error instanceof Error
             ? error.message
             : "Could not move thread to Recycle Bin",
         );
+        return false;
       }
     },
     [allChildren, bin, groupIds, threads],
+  );
+  const moveToRecycleBin = useCallback(
+    async (threadId: string) => { await binThreadTrees([threadId]); },
+    [binThreadTrees],
+  );
+  const dropToRecycleBin = useCallback(
+    async (threadId: string) => {
+      if (!selectedThreadIds.has(threadId) || selectedThreadIds.size < 2) {
+        await binThreadTrees([threadId]);
+        return;
+      }
+      const byId = new Map(threads.map((thread) => [thread.id, thread]));
+      const roots = [...selectedThreadIds].filter((id) => {
+        if (!byId.has(id)) return false;
+        for (
+          let parent = byId.get(id)?.parentThreadId;
+          parent;
+          parent = byId.get(parent)?.parentThreadId
+        )
+          if (selectedThreadIds.has(parent)) return false;
+        return true;
+      });
+      if (await binThreadTrees(roots))
+        threadInteractionStore.getState().setSelected(null, []);
+    },
+    [binThreadTrees, selectedThreadIds, threads],
   );
   const restoreFromRecycleBin = useCallback(
     (threadId: string) => {
@@ -370,20 +401,6 @@ export function useSidebarThreadOrganization({
     },
     [effectiveOrder, reorderDisabled, saveOrder, threads],
   );
-  const binSelected = useCallback(async () => {
-    const byId = new Map(threads.map((thread) => [thread.id, thread]));
-    const roots = [...selectedThreadIds].filter((id) => {
-      for (
-        let parent = byId.get(id)?.parentThreadId;
-        parent;
-        parent = byId.get(parent)?.parentThreadId
-      )
-        if (selectedThreadIds.has(parent)) return false;
-      return byId.has(id);
-    });
-    for (const id of roots) await moveToRecycleBin(id);
-    threadInteractionStore.getState().setSelected(null, []);
-  }, [moveToRecycleBin, selectedThreadIds, threads]);
   const addGroup = useCallback(
     (input: string) => {
       if (groups.length >= 12) {
@@ -492,9 +509,9 @@ export function useSidebarThreadOrganization({
     setDropTarget,
     moveToGroup,
     moveToRecycleBin,
+    dropToRecycleBin,
     restoreFromRecycleBin,
     reorder,
-    binSelected,
     saveGroups,
     addGroup,
     moveGroup,

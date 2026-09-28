@@ -250,11 +250,9 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   const toolbar = (
     <SidebarThreadToolbar
       threadCountLabel={threadCount.label}
-      selectedCount={organization.selectedThreadIds.size}
       reorderDisabled={organization.reorderDisabled}
       settings={settings}
       activeProjectId={props.activeProjectId}
-      onBinSelected={() => void organization.binSelected()}
       onRefresh={refreshThreadDetails}
       searchQuery={threadSearchQuery}
       onSearchQueryChange={setThreadSearchQuery}

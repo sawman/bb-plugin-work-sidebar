@@ -66,6 +66,7 @@ export function SidebarThreadTree({
             onSelect={organization.selectThread}
             onMoveToGroup={organization.moveToGroup}
             onMoveToRecycleBin={organization.moveToRecycleBin}
+            onDropToRecycleBin={organization.dropToRecycleBin}
             orderedSiblings={roots}
             reorderDisabled={organization.reorderDisabled}
             dragThreadId={organization.dragThreadId}

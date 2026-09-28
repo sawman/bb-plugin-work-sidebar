@@ -1711,6 +1711,32 @@ describe("R18 registered left sidebar parity", () => {
     slot.lifecycle.unmount();
   });
 
+  it("keeps multi-selection without the count or batch-bin toolbar action", async () => {
+    const binSidebarThread = vi.fn(() => ({ entries: [] }));
+    const slot = await leftSlot({ rpc: { binSidebarThread } });
+    const first = slot.getByRole("link", { name: /One/ });
+    const second = slot.getByRole("link", { name: /Two/ });
+    fireEvent.click(first, { metaKey: true });
+    fireEvent.click(second, { metaKey: true });
+    await waitFor(() => {
+      expect(first.hasAttribute("data-selected")).toBe(true);
+      expect(second.hasAttribute("data-selected")).toBe(true);
+    });
+    expect(slot.queryByText("2 selected")).toBeNull();
+    expect(slot.queryByRole("button", { name: "Move to Recycle Bin" })).toBeNull();
+    const bin = slot.container.querySelector<HTMLElement>('[data-ws-thread-drop-zone="recycle-bin"]')!;
+    mockElementAt(bin);
+    const source = slot.container.querySelector<HTMLElement>('[data-ws-thread-id="thr_one"]')!;
+    fireEvent.pointerDown(source, { button: 0, pointerId: 11, clientX: 0, clientY: 0 });
+    fireEvent.pointerMove(window, { pointerId: 11, clientX: 10, clientY: 20 });
+    fireEvent.pointerUp(window, { pointerId: 11, clientX: 10, clientY: 20 });
+    await waitFor(() => {
+      expect(binSidebarThread).toHaveBeenCalledWith({ threadId: "thr_one", originGroupId: null });
+      expect(binSidebarThread).toHaveBeenCalledWith({ threadId: "thr_two", originGroupId: null });
+    });
+    slot.lifecycle.unmount();
+  });
+
   it("persists unified pointer ordering, moves across groups, hands archive drops to BB, and ignores rename inputs", async () => {
     const saveBefore = vi.fn(({ threadIds }: { threadIds: string[] }) => ({
       threadIds,

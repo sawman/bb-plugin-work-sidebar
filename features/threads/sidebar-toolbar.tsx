@@ -8,11 +8,9 @@ import { RefreshButton } from "@/components/ui/refresh-button";
 import { SidebarSearch } from "@/components/ui/sidebar-search";
 type SidebarToolbarProps = {
   threadCountLabel: string;
-  selectedCount: number;
   reorderDisabled: boolean;
   settings: ReactNode;
   activeProjectId: string | null;
-  onBinSelected(): void;
   onRefresh(): void | Promise<unknown>;
   onNewThread(projectId: string): void;
   searchQuery: string;
@@ -21,11 +19,9 @@ type SidebarToolbarProps = {
 
 export function SidebarThreadToolbar({
   threadCountLabel,
-  selectedCount,
   reorderDisabled,
   settings,
   activeProjectId,
-  onBinSelected,
   onRefresh,
   onNewThread,
   searchQuery,
@@ -36,26 +32,11 @@ export function SidebarThreadToolbar({
       <span>{threadCountLabel}</span>
       <SidebarListActions
         context={
-          <>
-            {selectedCount > 1 && (
-              <>
-                <span className="ws-selection-count" role="status">
-                  {selectedCount} selected
-                </span>
-                <button
-                  className="ws-selection-archive"
-                  onClick={onBinSelected}
-                >
-                  Move to Recycle Bin
-                </button>
-              </>
-            )}
-            {reorderDisabled && (
-              <span className="ws-reorder-disabled" role="status">
-                Clear search to reorder
-              </span>
-            )}
-          </>
+          reorderDisabled ? (
+            <span className="ws-reorder-disabled" role="status">
+              Clear search to reorder
+            </span>
+          ) : undefined
         }
         search={
           <SidebarSearch
