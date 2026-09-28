@@ -1207,16 +1207,6 @@
 .ws-task-row-selected:hover {
   background: color-mix(in srgb, var(--primary) var(--ws-selection-strength), var(--background));
 }
-.ws-thread-selected::before,
-.ws-task-row-selected::before {
-  position: absolute;
-  inset-block: 0.16rem;
-  inset-inline-start: 0;
-  width: 3px;
-  background: var(--primary);
-  content: "";
-  pointer-events: none;
-}
 
 /* Stack hierarchy lives entirely in the fixed control gutter.  The content
    column must never shift: ordinary PRs, stack roots, and stack layers all
