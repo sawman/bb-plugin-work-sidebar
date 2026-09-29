@@ -123,6 +123,14 @@ try {
     run("git", ["apply", sourcePatch(entry)], { cwd: sourceRoot });
   }
   run("pnpm", ["install", "--frozen-lockfile"], { cwd: sourceRoot });
+  // Plugin tests import the SDK testing runtime. In newer BB releases pnpm
+  // links its workspace package before that runtime's dist is built.
+  run(join(sourceRoot, "node_modules/.bin/turbo"), [
+    "run",
+    "build",
+    "--filter=@get-bb/plugin-sdk",
+    "--force",
+  ], { cwd: sourceRoot });
   if (coreArtifacts.length > 0) {
     run(join(sourceRoot, "node_modules/.bin/turbo"), [
       "run",

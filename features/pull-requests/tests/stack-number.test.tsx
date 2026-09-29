@@ -2,7 +2,6 @@
 import {
   cleanup,
   fireEvent,
-  render,
   screen,
   waitFor,
 } from "@testing-library/react";
@@ -20,6 +19,7 @@ import { StackNumberBadge } from "../stack-number";
 import { linkedThreadForStack, uniqueThreadsByBranch } from "../thread-link";
 import type { SidebarStack } from "../../../work-model";
 import { dispatchHrefClickWithoutJsdomNavigation } from "../../../tests/utils/dispatch-href-click";
+import { renderPluginComponent as render } from "../../../tests/utils/render-plugin-component";
 
 const stack = {
   id: "github-stack:acme/repo:17",

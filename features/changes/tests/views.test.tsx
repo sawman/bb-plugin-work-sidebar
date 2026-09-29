@@ -3,7 +3,6 @@ import { createElement } from "react";
 import {
   cleanup,
   fireEvent,
-  render,
   screen,
   within,
 } from "@testing-library/react";
@@ -12,6 +11,7 @@ import type { GitHubStackBranch } from "../../../contracts";
 import { changesHeaderLabel } from "../model";
 import { ChangesError, ChangesStackBranchRow } from "../views";
 import { dispatchHrefClickWithoutJsdomNavigation } from "../../../tests/utils/dispatch-href-click";
+import { renderPluginComponent as render } from "../../../tests/utils/render-plugin-component";
 
 afterEach(cleanup);
 

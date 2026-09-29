@@ -3,7 +3,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   cleanup,
   fireEvent,
-  render,
   screen,
   waitFor,
 } from "@testing-library/react";
@@ -13,6 +12,7 @@ import { configureAxe } from "vitest-axe";
 import { PullRequestReviewerPicker } from "../reviewer-picker";
 import type { PullRequestRpc } from "../queries";
 import { AuthoredPullRequestRow } from "../authored-pull-requests";
+import { renderPluginComponent as render } from "../../../tests/utils/render-plugin-component";
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));

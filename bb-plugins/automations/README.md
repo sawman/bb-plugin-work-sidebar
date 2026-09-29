@@ -13,6 +13,16 @@ list for the same active ID. It preserves the original direct-lookup error for
 missing, deleted, or unreadable projects. The source patch is
 [personal-projects.patch](personal-projects.patch).
 
+## BB 0.44.0 upgrade
+
+- Target: `builtin:automations` in BB `0.44.0`, SDK `0.5.29`, from
+  `desktop-v0.44.0` at `0baa605b32a00619c1d7e3f32be6553ebcf8244a`.
+- The personal-project fallback still applies unchanged. Exact-version
+  preflight and deployment passed plugin tests, typecheck, build, and artifact
+  metadata checks. Deployed 2026-09-29 with rollback backup
+  `~/.bb/patch-backups/bb-0.44.0-2026-09-29T03-04-21-503Z`.
+- The installed server artifact matches the staged SHA-256.
+
 ## BB 0.43.4 upgrade
 
 - Target: `builtin:automations` in BB `0.43.4`, SDK `0.5.9`, from

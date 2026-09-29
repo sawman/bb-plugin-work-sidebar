@@ -1,0 +1,1348 @@
+diff --git a/plugins/ask-user-question/app.test.tsx b/plugins/ask-user-question/app.test.tsx
+index eba285df0..62f81951b 100644
+--- a/plugins/ask-user-question/app.test.tsx
++++ b/plugins/ask-user-question/app.test.tsx
+@@ -54,20 +54,25 @@ function render(
+   handlers: {
+     submit?: (value: unknown) => Promise<void>;
+     cancel?: () => Promise<void>;
++    rpc?: Record<string, (input: unknown) => unknown>;
+   } = {},
+ ) {
+-  return renderSlot(app.pendingInteractions[0]!, {
+-    interaction: {
+-      id: "pint_test",
+-      threadId: "thr_test",
+-      title: "Database",
+-      payload: payload as never,
+-      createdAt: 0,
+-      expiresAt: null,
++  return renderSlot(
++    app.pendingInteractions[0]!,
++    {
++      interaction: {
++        id: "pint_test",
++        threadId: "thr_test",
++        title: "Database",
++        payload: payload as never,
++        createdAt: 0,
++        expiresAt: null,
++      },
++      submit: handlers.submit ?? (async () => undefined),
++      cancel: handlers.cancel ?? (async () => undefined),
+     },
+-    submit: handlers.submit ?? (async () => undefined),
+-    cancel: handlers.cancel ?? (async () => undefined),
+-  });
++    { rpc: handlers.rpc },
++  );
+ }
+ 
+ function getButtonByText(
+@@ -81,7 +86,7 @@ function getButtonByText(
+   return button;
+ }
+ 
+-describe("question interaction adapter", () => {
++describe("answering a single-select question", () => {
+   it("submits the selected option value", () => {
+     const submit = vi.fn(async (_value: unknown) => undefined);
+     const slot = render(singleSelect, { submit });
+@@ -95,13 +100,171 @@ describe("question interaction adapter", () => {
+       answers: { q0: { selected: ["q0o1"] } },
+     } satisfies InteractionResponse);
+   });
++
++  it("blocks submission until something is chosen", () => {
++    const slot = render(singleSelect);
++    const submitButton = getButtonByText(slot, "Submit answer");
++
++    expect(submitButton.disabled).toBe(true);
++    fireEvent.click(getButtonByText(slot, "Postgres"));
++    expect(submitButton.disabled).toBe(false);
++  });
++
++  it("reveals an option preview only while that option is selected", () => {
++    const slot = render(singleSelect);
++    const preview = "CREATE TABLE users (id uuid primary key);";
++
++    expect(slot.queryByText(preview)).toBeNull();
++    fireEvent.click(getButtonByText(slot, "Postgres"));
++    expect(slot.getByText(preview)).toBeTruthy();
++
++    fireEvent.click(getButtonByText(slot, "SQLite"));
++    expect(slot.queryByText(preview)).toBeNull();
++  });
++
++  it("makes 'Other' and a real option mutually exclusive", () => {
++    const submit = vi.fn(async (_value: unknown) => undefined);
++    const slot = render(singleSelect, { submit });
++
++    fireEvent.click(getButtonByText(slot, "Postgres"));
++    fireEvent.click(getButtonByText(slot, "Other…"));
++    const textarea = slot.getByLabelText("Database answer");
++    fireEvent.change(textarea, { target: { value: "DuckDB" } });
++    fireEvent.click(getButtonByText(slot, "Submit answer"));
++
++    expect(submit).toHaveBeenCalledTimes(1);
++    expect(submit.mock.calls[0]?.[0]).toEqual({
++      answers: { q0: { selected: [], freeText: "DuckDB" } },
++    } satisfies InteractionResponse);
++  });
++
++  it("selects an option with its number-key shortcut", () => {
++    const submit = vi.fn(async (_value: unknown) => undefined);
++    const slot = render(singleSelect, { submit });
++
++    fireEvent.keyDown(window, { key: "2" });
++    fireEvent.click(getButtonByText(slot, "Submit answer"));
++
++    expect(submit).toHaveBeenCalledTimes(1);
++    expect(submit.mock.calls[0]?.[0]).toEqual({
++      answers: { q0: { selected: ["q0o1"] } },
++    } satisfies InteractionResponse);
++  });
++
++  it("ignores number keys typed into the free-text box", () => {
++    const slot = render(singleSelect);
++    fireEvent.click(getButtonByText(slot, "Other…"));
++    const textarea = slot.getByLabelText("Database answer");
++
++    fireEvent.keyDown(textarea, { key: "1" });
++
++    expect(getButtonByText(slot, "Postgres").getAttribute("aria-pressed")).toBe(
++      "false",
++    );
++  });
++});
++
++describe("multi-select and multi-question flows", () => {
++  const multi: InteractionPayload = {
++    questions: [
++      {
++        id: "q0",
++        prompt: "Which extras?",
++        shortLabel: "Extras",
++        multiSelect: true,
++        allowFreeText: true,
++        options: [
++          { value: "q0o0", label: "Metrics", description: "Prometheus." },
++          { value: "q0o1", label: "Tracing", description: "OTel." },
++        ],
++      },
++      {
++        id: "q1",
++        prompt: "Which database?",
++        shortLabel: "Database",
++        multiSelect: false,
++        allowFreeText: true,
++        options: [
++          { value: "q1o0", label: "Postgres", description: "Server." },
++          { value: "q1o1", label: "SQLite", description: "Embedded." },
++        ],
++      },
++    ],
++  };
++
++  it("keeps several options selected and walks both questions before submitting", () => {
++    const submit = vi.fn(async (_value: unknown) => undefined);
++    const slot = render(multi, { submit });
++
++    expect(slot.getByText("1 of 2")).toBeTruthy();
++    fireEvent.click(getButtonByText(slot, "Metrics"));
++    fireEvent.click(getButtonByText(slot, "Tracing"));
++    fireEvent.click(getButtonByText(slot, "Next"));
++
++    expect(slot.getByText("2 of 2")).toBeTruthy();
++    fireEvent.click(getButtonByText(slot, "Postgres"));
++    fireEvent.click(getButtonByText(slot, "Submit answer"));
++
++    expect(submit).toHaveBeenCalledTimes(1);
++    expect(submit.mock.calls[0]?.[0]).toEqual({
++      answers: {
++        q0: { selected: ["q0o0", "q0o1"] },
++        q1: { selected: ["q1o0"] },
++      },
++    } satisfies InteractionResponse);
++  });
++
+   it("cancels the request instead of submitting", () => {
+     const cancel = vi.fn(async () => undefined);
+-    const slot = render(singleSelect, { cancel });
++    const slot = render(multi, { cancel });
+ 
+     fireEvent.click(getButtonByText(slot, "Cancel"));
+     expect(cancel).toHaveBeenCalledTimes(1);
+   });
++
++  it("sends one queued ACP answer without closing the remaining inbox", async () => {
++    const send = vi.fn(async () => ({ remaining: 1, version: 2 }));
++    const slot = render(singleSelect, {
++      submit: vi.fn(async () => undefined),
++      rpc: {
++        getQuestionQueue: () => ({ payload: multi, version: 1 }),
++        answerQueuedQuestion: send,
++      },
++    });
++
++    await slot.findByText("1 of 2");
++    fireEvent.click(getButtonByText(slot, "Metrics"));
++    fireEvent.click(getButtonByText(slot, "Send answer"));
++
++    await vi.waitFor(() =>
++      expect(send).toHaveBeenCalledWith({
++        threadId: "thr_test",
++        questionId: "q0",
++        answer: { selected: ["q0o0"] },
++      }),
++    );
++  });
++
++  it("closes the display-only interaction after the final queued answer", async () => {
++    const cancel = vi.fn(async () => undefined);
++    const send = vi.fn(async () => ({ remaining: 0, version: 2 }));
++    const slot = render(singleSelect, {
++      cancel,
++      rpc: {
++        getQuestionQueue: () => ({ payload: multi, version: 1 }),
++        answerQueuedQuestion: send,
++      },
++    });
++
++    await slot.findByText("1 of 2");
++    fireEvent.click(getButtonByText(slot, "Metrics"));
++    fireEvent.click(getButtonByText(slot, "Send answer"));
++
++    await vi.waitFor(() => expect(cancel).toHaveBeenCalledTimes(1));
++  });
++});
++
++describe("a payload the form cannot read", () => {
+   it("offers a cancel escape rather than blocking the composer", () => {
+     const cancel = vi.fn(async () => undefined);
+     const slot = renderSlot(app.pendingInteractions[0]!, {
+diff --git a/plugins/ask-user-question/app.tsx b/plugins/ask-user-question/app.tsx
+index 2202d16d0..9f3c816bb 100644
+--- a/plugins/ask-user-question/app.tsx
++++ b/plugins/ask-user-question/app.tsx
+@@ -1,28 +1,524 @@
+-import { useMemo, useState } from "react";
++import {
++  useCallback,
++  useEffect,
++  useLayoutEffect,
++  useMemo,
++  useRef,
++  useState,
++  type KeyboardEvent,
++  type RefObject,
++} from "react";
+ import {
+   definePluginApp,
++  useRealtime,
++  useRpc,
+   type PluginPendingInteractionProps,
+ } from "@get-bb/plugin-sdk/app";
++import type { questionQueueRpcContract } from "./src/server.js";
+ import { Button } from "@/components/ui/button";
+-import { QuestionForm } from "@/components/ui/question-form";
++import { Icon } from "@/components/ui/icon";
++import { usePointerCoarse } from "@/components/ui/hooks/use-pointer-coarse";
++import { cn } from "@/lib/utils";
+ import {
+   ASK_USER_QUESTION_RENDERER_ID,
+   interactionPayloadSchema,
++  type InteractionQuestion,
+ } from "./src/contracts.js";
++import {
++  answerStateFor,
++  buildInteractionResponse,
++  createInitialFormState,
++  isQuestionAnswered,
++  resolveQuestionShortcutChoice,
++  type QuestionAnswerState,
++  type QuestionFormState,
++} from "./src/form-state.js";
++
++const OTHER_OPTION_LABEL = "Other…";
++const FREE_TEXT_MIN_HEIGHT = 84;
++const FREE_TEXT_MAX_HEIGHT = 158;
++const PREVIEW_MAX_HEIGHT = 220;
++const MAX_SHORTCUT_ROWS = 9;
++
++interface QuestionOptionRowProps {
++  checked: boolean;
++  label: string;
++  description?: string;
++  multiSelect: boolean;
++  onSelect: () => void;
++  shortcut?: string;
++}
++
++function useAutoGrow(
++  ref: RefObject<HTMLTextAreaElement | null>,
++  { minHeight, maxHeight }: { minHeight: number; maxHeight: number },
++) {
++  return useCallback(
++    (textarea?: HTMLTextAreaElement | null) => {
++      const element = textarea ?? ref.current;
++      if (!element) return;
++      element.style.height = "auto";
++      element.style.height = `${Math.min(
++        Math.max(element.scrollHeight, minHeight),
++        maxHeight,
++      )}px`;
++    },
++    [maxHeight, minHeight, ref],
++  );
++}
++
++function QuestionOptionRow({
++  checked,
++  label,
++  description,
++  multiSelect,
++  onSelect,
++  shortcut,
++}: QuestionOptionRowProps) {
++  return (
++    <button
++      type="button"
++      aria-pressed={checked}
++      aria-keyshortcuts={shortcut}
++      onClick={onSelect}
++      className={cn(
++        "flex w-full items-start gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors",
++        checked ? "bg-surface-selected" : "hover:bg-state-hover",
++      )}
++    >
++      <span
++        className={cn(
++          "mt-0.5 flex size-4 shrink-0 items-center justify-center border",
++          multiSelect ? "rounded" : "rounded-full",
++          checked
++            ? "border-primary bg-primary text-primary-foreground"
++            : "border-input",
++        )}
++      >
++        {checked ? <Icon name="Check" className="size-3" aria-hidden /> : null}
++      </span>
++      <span className="min-w-0 flex-1">
++        <span className="block text-sm font-medium text-foreground">
++          {label}
++        </span>
++        {description ? (
++          <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
++            {description}
++          </span>
++        ) : null}
++      </span>
++      {shortcut ? (
++        <kbd
++          aria-hidden="true"
++          className="mt-0.5 shrink-0 text-xs font-normal text-subtle-foreground"
++        >
++          {shortcut}
++        </kbd>
++      ) : null}
++    </button>
++  );
++}
++
++function QuestionOptionPreview({ preview }: { preview: string }) {
++  return (
++    <pre
++      className="mx-2.5 mb-1 mt-1 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-surface-raised px-2.5 py-2 font-mono text-xs leading-relaxed text-foreground"
++      style={{ maxHeight: `${PREVIEW_MAX_HEIGHT}px` }}
++    >
++      {preview}
++    </pre>
++  );
++}
++
++interface QuestionTabsProps {
++  currentIndex: number;
++  formState: QuestionFormState;
++  onSelect: (index: number) => void;
++  questions: readonly InteractionQuestion[];
++}
++
++function QuestionTabs({
++  currentIndex,
++  formState,
++  onSelect,
++  questions,
++}: QuestionTabsProps) {
++  return (
++    <div className="mb-2 flex shrink-0 items-center gap-2">
++      {}
++      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
++        {questions.map((question, index) => {
++          const answered = isQuestionAnswered(
++            question,
++            answerStateFor(formState, question),
++          );
++          const isActive = index === currentIndex;
++          return (
++            <div
++              key={question.id}
++              className={cn(
++                "relative inline-flex h-7 shrink-0 items-center rounded-md",
++                isActive
++                  ? "bg-muted text-foreground"
++                  : "text-muted-foreground hover:bg-state-hover",
++              )}
++            >
++              <button
++                type="button"
++                onClick={() => onSelect(index)}
++                aria-pressed={isActive}
++                title={question.prompt}
++                className="flex h-full min-w-0 items-center rounded-md px-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
++              >
++                <span
++                  className={cn(
++                    "truncate text-xs",
++                    answered ? "line-through" : undefined,
++                  )}
++                  style={{ maxWidth: "180px" }}
++                >
++                  {question.shortLabel}
++                </span>
++              </button>
++            </div>
++          );
++        })}
++      </div>
++      <span className="shrink-0 text-xs text-muted-foreground">
++        {currentIndex + 1} of {questions.length}
++      </span>
++    </div>
++  );
++}
++
++interface QuestionInputBlockProps {
++  disabled: boolean;
++  question: InteractionQuestion;
++  state: QuestionAnswerState;
++  onToggleOption: (optionValue: string) => void;
++  onSelectOther: () => void;
++  onFreeTextChange: (value: string) => void;
++  onShortcutSubmit: () => void;
++}
++
++function QuestionInputBlock({
++  disabled,
++  question,
++  state,
++  onToggleOption,
++  onSelectOther,
++  onFreeTextChange,
++  onShortcutSubmit,
++}: QuestionInputBlockProps) {
++  const freeTextRef = useRef<HTMLTextAreaElement>(null);
++  const isPointerCoarse = usePointerCoarse();
++  const resizeFreeTextArea = useAutoGrow(freeTextRef, {
++    minHeight: FREE_TEXT_MIN_HEIGHT,
++    maxHeight: FREE_TEXT_MAX_HEIGHT,
++  });
++  const options = question.options;
++  const freeTextLabel = `${question.shortLabel} answer`;
++
++  useLayoutEffect(() => {
++    if (!state.otherSelected) return;
++    resizeFreeTextArea();
++  }, [question.id, resizeFreeTextArea, state.otherSelected, state.otherText]);
++
++  const handleFreeTextKeyDown = (
++    event: KeyboardEvent<HTMLTextAreaElement>,
++  ): void => {
++    if (
++      event.nativeEvent.isComposing ||
++      event.key !== "Enter" ||
++      (!event.metaKey && !event.ctrlKey)
++    ) {
++      return;
++    }
++    event.preventDefault();
++    onShortcutSubmit();
++  };
++
++  return (
++    <fieldset disabled={disabled} className="min-w-0">
++      <legend className="sr-only">{question.prompt}</legend>
++      <div className="text-sm font-semibold text-foreground">
++        {question.prompt}
++      </div>
++      <div className="mt-2 space-y-0.5">
++        {options.map((option: InteractionQuestion["options"][number], index) => {
++          const checked = state.selected.includes(option.value);
++          return (
++            <div key={option.value}>
++              <QuestionOptionRow
++                checked={checked}
++                label={option.label}
++                description={option.description}
++                multiSelect={question.multiSelect}
++                onSelect={() => onToggleOption(option.value)}
++                shortcut={
++                  index < MAX_SHORTCUT_ROWS ? String(index + 1) : undefined
++                }
++              />
++              {checked && option.preview ? (
++                <QuestionOptionPreview preview={option.preview} />
++              ) : null}
++            </div>
++          );
++        })}
++        {question.allowFreeText && options.length > 0 ? (
++          <QuestionOptionRow
++            checked={state.otherSelected}
++            label={OTHER_OPTION_LABEL}
++            multiSelect={question.multiSelect}
++            onSelect={onSelectOther}
++            shortcut={
++              options.length < MAX_SHORTCUT_ROWS
++                ? String(options.length + 1)
++                : undefined
++            }
++          />
++        ) : null}
++      </div>
++      {state.otherSelected ? (
++        <textarea
++          ref={freeTextRef}
++          aria-label={freeTextLabel}
++          value={state.otherText}
++          rows={1}
++          autoFocus={!isPointerCoarse}
++          autoComplete="off"
++          onChange={(event) => {
++            onFreeTextChange(event.target.value);
++            resizeFreeTextArea(event.target);
++          }}
++          onKeyDown={handleFreeTextKeyDown}
++          placeholder="Type your own answer…"
++          className="mt-2 w-full resize-none overflow-y-auto rounded-md border border-border bg-surface-raised px-3 py-2 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:border-ring/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/40"
++          style={{
++            minHeight: `${FREE_TEXT_MIN_HEIGHT}px`,
++            maxHeight: `${FREE_TEXT_MAX_HEIGHT}px`,
++          }}
++        />
++      ) : null}
++    </fieldset>
++  );
++}
+ 
+ function AskUserQuestionInteraction({
+   interaction,
+   submit,
+   cancel,
+ }: PluginPendingInteractionProps) {
++  const rpc = useRpc<typeof questionQueueRpcContract>();
+   const parsed = useMemo(
+     () => interactionPayloadSchema.safeParse(interaction.payload),
+     [interaction.payload],
+   );
++  const initialQuestions = parsed.success ? parsed.data.questions : [];
++  const [queuedQuestions, setQueuedQuestions] = useState<
++    readonly InteractionQuestion[] | null
++  >(null);
++  const [queueError, setQueueError] = useState<string | null>(null);
++  const [sendError, setSendError] = useState<string | null>(null);
++  const refreshQueue = useCallback(() => {
++    void rpc
++      .call("getQuestionQueue", { threadId: interaction.threadId })
++      .then((result) => {
++        setQueuedQuestions(result.payload?.questions ?? null);
++        setQueueError(null);
++      })
++      .catch((error: unknown) => {
++        setQueueError(
++          `Could not load this question: ${
++            error instanceof Error ? error.message : String(error)
++          }`,
++        );
++      });
++  }, [interaction.threadId, rpc]);
++  useEffect(refreshQueue, [refreshQueue]);
++  useRealtime("question-queue-changed", refreshQueue);
++  const questions = queuedQuestions ?? initialQuestions;
++  const queued = queuedQuestions !== null;
++  const [formState, setFormState] = useState<QuestionFormState>(() =>
++    createInitialFormState(questions),
++  );
++  const [currentIndex, setCurrentIndex] = useState(0);
+   const [busy, setBusy] = useState(false);
+-  const handleCancel = () => {
+-    void cancel().catch(() => {});
++  const [activeInteractionId, setActiveInteractionId] = useState(
++    interaction.id,
++  );
++
++  if (activeInteractionId !== interaction.id) {
++    setActiveInteractionId(interaction.id);
++    setFormState(createInitialFormState(questions));
++    setCurrentIndex(0);
++  }
++
++  const totalQuestions = questions.length;
++  const currentQuestion = questions[currentIndex] ?? null;
++  const isFirst = currentIndex === 0;
++  const isLast = currentIndex === totalQuestions - 1;
++  const allAnswered = useMemo(
++    () =>
++      totalQuestions > 0 &&
++      questions.every((question) =>
++        isQuestionAnswered(question, answerStateFor(formState, question)),
++      ),
++    [formState, questions, totalQuestions],
++  );
++
++  useEffect(() => {
++    setCurrentIndex((index) =>
++      Math.min(index, Math.max(totalQuestions - 1, 0)),
++    );
++  }, [totalQuestions]);
++
++  const updateQuestionState = (
++    question: InteractionQuestion,
++    update: (state: QuestionAnswerState) => QuestionAnswerState,
++  ): void => {
++    setFormState((current) => ({
++      ...current,
++      [question.id]: update(answerStateFor(current, question)),
++    }));
++  };
++
++  const handleToggleOption = (
++    question: InteractionQuestion,
++    optionValue: string,
++  ): void => {
++    updateQuestionState(question, (state) => {
++      if (question.multiSelect) {
++        const selected = state.selected.includes(optionValue)
++          ? state.selected.filter((value) => value !== optionValue)
++          : [...state.selected, optionValue];
++        return { ...state, selected };
++      }
++      return { ...state, selected: [optionValue], otherSelected: false };
++    });
++  };
++
++  const handleSelectOther = (question: InteractionQuestion): void => {
++    updateQuestionState(question, (state) =>
++      question.multiSelect
++        ? { ...state, otherSelected: !state.otherSelected }
++        : { ...state, selected: [], otherSelected: true },
++    );
++  };
++
++  const handleFreeTextChange = (
++    question: InteractionQuestion,
++    value: string,
++  ): void => {
++    updateQuestionState(question, (state) => ({ ...state, otherText: value }));
++  };
++
++  const submitAnswer = (): void => {
++    if (busy || !allAnswered) return;
++    setBusy(true);
++    setSendError(null);
++    void (async () => {
++      try {
++        await submit(buildInteractionResponse(questions, formState));
++      } catch {
++      } finally {
++        setBusy(false);
++      }
++    })();
+   };
++
++  const sendCurrentAnswer = (): void => {
++    if (busy || currentQuestion === null) return;
++    if (
++      !isQuestionAnswered(
++        currentQuestion,
++        answerStateFor(formState, currentQuestion),
++      )
++    ) {
++      return;
++    }
++    const answer = buildInteractionResponse([currentQuestion], formState)
++      .answers[currentQuestion.id];
++    if (answer === undefined) return;
++    setBusy(true);
++    void rpc
++      .call("answerQueuedQuestion", {
++        threadId: interaction.threadId,
++        questionId: currentQuestion.id,
++        answer,
++      })
++      .then((result) => {
++        if (result.remaining === 0) {
++          // The answer is already on its way to the agent. Settle the
++          // display-only interaction so its card and server row do not linger.
++          void cancel();
++          return;
++        }
++        refreshQueue();
++      })
++      .catch((error: unknown) =>
++        setSendError(
++          `Could not send answer: ${
++            error instanceof Error ? error.message : String(error)
++          }`,
++        ),
++      )
++      .finally(() => setBusy(false));
++  };
++
++  const handleAdvance = (): void => {
++    if (queued) {
++      sendCurrentAnswer();
++      return;
++    }
++    if (isLast) {
++      submitAnswer();
++      return;
++    }
++    setCurrentIndex((index) => Math.min(index + 1, totalQuestions - 1));
++  };
++
++  const handleCancel = (): void => {
++    void (async () => {
++      try {
++        await cancel();
++      } catch {}
++    })();
++  };
++
++  useEffect(() => {
++    if (busy || currentQuestion === null) return;
++    const onKeyDown = (event: globalThis.KeyboardEvent): void => {
++      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
++        return;
++      }
++      const target = event.target;
++      if (
++        target instanceof HTMLElement &&
++        (target.isContentEditable ||
++          target instanceof HTMLInputElement ||
++          target instanceof HTMLTextAreaElement)
++      ) {
++        return;
++      }
++      const digit = Number.parseInt(event.key, 10);
++      if (!Number.isInteger(digit) || digit < 1 || digit > MAX_SHORTCUT_ROWS) {
++        return;
++      }
++      const choice = resolveQuestionShortcutChoice(currentQuestion, digit - 1);
++      if (choice === null) return;
++      event.preventDefault();
++      if (choice.kind === "option") {
++        handleToggleOption(currentQuestion, choice.value);
++        return;
++      }
++      handleSelectOther(currentQuestion);
++    };
++    window.addEventListener("keydown", onKeyDown);
++    return () => window.removeEventListener("keydown", onKeyDown);
++    // oxlint-disable-next-line react/exhaustive-deps
++  }, [busy, currentQuestion]);
++
+   if (!parsed.success) {
+     return (
+       <div className="space-y-3">
+@@ -35,20 +531,88 @@ function AskUserQuestionInteraction({
+       </div>
+     );
+   }
++
++  if (!currentQuestion) {
++    return queued ? (
++      <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
++        <span>No questions waiting.</span>
++        <Button type="button" size="sm" variant="ghost" onClick={handleCancel}>
++          Close
++        </Button>
++      </div>
++    ) : null;
++  }
++
++  const currentState = answerStateFor(formState, currentQuestion);
++
+   return (
+-    <QuestionForm
+-      key={interaction.id}
+-      questions={parsed.data.questions}
+-      disabled={busy}
+-      cancelDisabled={busy}
+-      onSubmit={(answers) => {
+-        setBusy(true);
+-        void submit({ answers })
+-          .catch(() => {})
+-          .finally(() => setBusy(false));
+-      }}
+-      onCancel={handleCancel}
+-    />
++    <div className="flex max-h-[calc(100dvh-6rem)] min-h-0 flex-col text-xs text-muted-foreground">
++      {totalQuestions > 1 ? (
++        <QuestionTabs
++          currentIndex={currentIndex}
++          formState={formState}
++          onSelect={setCurrentIndex}
++          questions={questions}
++        />
++      ) : null}
++      <div className="min-h-0 touch-pan-y overflow-y-auto overscroll-contain">
++        <QuestionInputBlock
++          disabled={busy}
++          question={currentQuestion}
++          state={currentState}
++          onToggleOption={(optionValue) =>
++            handleToggleOption(currentQuestion, optionValue)
++          }
++          onSelectOther={() => handleSelectOther(currentQuestion)}
++          onFreeTextChange={(value) =>
++            handleFreeTextChange(currentQuestion, value)
++          }
++          onShortcutSubmit={handleAdvance}
++        />
++      </div>
++      <div className="mt-3 flex shrink-0 items-center justify-between gap-2">
++        <Button
++          type="button"
++          size="sm"
++          variant="ghost"
++          disabled={busy}
++          onClick={handleCancel}
++        >
++          Cancel
++        </Button>
++        <div className="flex items-center gap-2">
++          {!isFirst ? (
++            <Button
++              type="button"
++              size="sm"
++              variant="outline"
++              disabled={busy}
++              onClick={() => setCurrentIndex((index) => Math.max(index - 1, 0))}
++            >
++              Back
++            </Button>
++          ) : null}
++          <Button
++            type="button"
++            size="sm"
++            disabled={
++              busy ||
++              (queued
++                ? !isQuestionAnswered(currentQuestion, currentState)
++                : isLast && !allAnswered)
++            }
++            onClick={handleAdvance}
++          >
++            {busy ? (
++              <Icon name="Spinner" className="size-3 animate-spin" />
++            ) : null}
++            {queued ? "Send answer" : isLast ? "Submit answer" : "Next"}
++          </Button>
++        </div>
++      </div>
++      {queueError !== null ? <p role="alert">{queueError}</p> : null}
++      {sendError !== null ? <p role="alert">{sendError}</p> : null}
++    </div>
+   );
+ }
+ 
+diff --git a/plugins/ask-user-question/src/form-state.ts b/plugins/ask-user-question/src/form-state.ts
+new file mode 100644
+index 000000000..19d3c1a1a
+--- /dev/null
++++ b/plugins/ask-user-question/src/form-state.ts
+@@ -0,0 +1,111 @@
++import type {
++  InteractionAnswer,
++  InteractionQuestion,
++  InteractionResponse,
++} from "./contracts.js";
++
++export interface QuestionAnswerState {
++  selected: string[];
++  otherSelected: boolean;
++  otherText: string;
++}
++
++export type QuestionFormState = Record<string, QuestionAnswerState>;
++
++function questionHasOptions(question: InteractionQuestion): boolean {
++  return question.options.length > 0;
++}
++
++export function createInitialFormState(
++  questions: readonly InteractionQuestion[],
++): QuestionFormState {
++  const state: QuestionFormState = {};
++  for (const question of questions) {
++    state[question.id] = {
++      selected: [],
++      otherSelected: !questionHasOptions(question),
++      otherText: "",
++    };
++  }
++  return state;
++}
++
++export function answerStateFor(
++  formState: QuestionFormState,
++  question: InteractionQuestion,
++): QuestionAnswerState {
++  return (
++    formState[question.id] ?? {
++      selected: [],
++      otherSelected: !questionHasOptions(question),
++      otherText: "",
++    }
++  );
++}
++
++function validSelectedValues(
++  question: InteractionQuestion,
++  selectedValues: readonly string[],
++): string[] {
++  const optionValues = new Set(question.options.map((option) => option.value));
++  return selectedValues.filter((value) => optionValues.has(value));
++}
++
++export function isQuestionAnswered(
++  question: InteractionQuestion,
++  state: QuestionAnswerState,
++): boolean {
++  if (validSelectedValues(question, state.selected).length > 0) return true;
++  return state.otherSelected && state.otherText.trim().length > 0;
++}
++
++function buildQuestionAnswer(
++  question: InteractionQuestion,
++  state: QuestionAnswerState,
++): InteractionAnswer {
++  const freeText = state.otherText.trim();
++  const includeFreeText = state.otherSelected && freeText.length > 0;
++  if (question.multiSelect) {
++    const selected = validSelectedValues(question, state.selected);
++    return includeFreeText ? { selected, freeText } : { selected };
++  }
++  if (state.otherSelected) {
++    return includeFreeText ? { selected: [], freeText } : { selected: [] };
++  }
++  return { selected: validSelectedValues(question, state.selected) };
++}
++
++export function buildInteractionResponse(
++  questions: readonly InteractionQuestion[],
++  formState: QuestionFormState,
++): InteractionResponse {
++  const answers: Record<string, InteractionAnswer> = {};
++  for (const question of questions) {
++    answers[question.id] = buildQuestionAnswer(
++      question,
++      answerStateFor(formState, question),
++    );
++  }
++  return { answers };
++}
++
++export type QuestionShortcutChoice =
++  | { kind: "option"; value: string }
++  | { kind: "other" }
++  | null;
++
++export function resolveQuestionShortcutChoice(
++  question: InteractionQuestion,
++  index: number,
++): QuestionShortcutChoice {
++  const option = question.options[index];
++  if (option) return { kind: "option", value: option.value };
++  if (
++    index === question.options.length &&
++    question.options.length > 0 &&
++    question.allowFreeText
++  ) {
++    return { kind: "other" };
++  }
++  return null;
++}
+diff --git a/plugins/ask-user-question/src/server.ts b/plugins/ask-user-question/src/server.ts
+index 2bd2071d2..4a870c73d 100644
+--- a/plugins/ask-user-question/src/server.ts
++++ b/plugins/ask-user-question/src/server.ts
+@@ -1,10 +1,21 @@
+-import type { BbPluginApi, PluginAgentToolResult } from "@get-bb/plugin-sdk";
++import {
++  defineRpcContract,
++  type BbPluginApi,
++  type PluginAgentToolResult,
++} from "@get-bb/plugin-sdk";
++import { z } from "zod";
+ import {
+   ASK_USER_QUESTION_RENDERER_ID,
++  interactionPayloadSchema,
+   interactionResponseSchema,
+   toolInputSchema,
++  type InteractionPayload,
++  type InteractionQuestion,
+ } from "./contracts.js";
+-import { TOOL_DESCRIPTION, buildTimeoutMessage } from "./tool-definition.js";
++import {
++  TOOL_DESCRIPTION,
++  buildTimeoutMessage,
++} from "./tool-definition.js";
+ import {
+   assertInteractionPayloadFits,
+   buildInteractionPayload,
+@@ -15,14 +26,240 @@ import {
+ } from "./translate.js";
+ 
+ export const TOOL_NAME = "AskUserQuestion";
++export const RENDERER_ID = ASK_USER_QUESTION_RENDERER_ID;
++
++const ACP_PROVIDER_ID_PREFIX = "acp-";
++const QUESTION_QUEUE_CHANNEL = "question-queue-changed";
++const MAX_QUEUED_QUESTIONS = 32;
++const ACP_PENDING_RESULT =
++  "Question added. You may continue independent work; each user answer arrives as a follow-up message.";
++
++interface QuestionQueue {
++  questions: InteractionQuestion[];
++  nextQuestionId: number;
++  version: number;
++}
++
++const queuedInteractionPayloadSchema = z.object({
++  questions: z
++    .array(interactionPayloadSchema.shape.questions.element)
++    .min(1)
++    .max(MAX_QUEUED_QUESTIONS),
++});
+ 
+-const QUESTION_TIMEOUT_MS = 30 * 60 * 1000;
++export const questionQueueRpcContract = defineRpcContract({
++  getQuestionQueue: {
++    input: z.object({ threadId: z.string().min(1) }).strict(),
++    output: z
++      .object({
++        payload: queuedInteractionPayloadSchema.nullable(),
++        version: z.number().int().nonnegative(),
++      })
++      .strict(),
++  },
++  answerQueuedQuestion: {
++    input: z
++      .object({
++        threadId: z.string().min(1),
++        questionId: z.string().min(1),
++        answer: z.unknown(),
++      })
++      .strict(),
++    output: z
++      .object({
++        remaining: z.number().int().nonnegative(),
++        version: z.number().int().nonnegative(),
++      })
++      .strict(),
++  },
++});
+ 
+ function errorResult(message: string): PluginAgentToolResult {
+   return { content: [{ type: "text", text: message }], isError: true };
+ }
+ 
++function isAcpProviderId(providerId: unknown): boolean {
++  return (
++    typeof providerId === "string" &&
++    providerId.startsWith(ACP_PROVIDER_ID_PREFIX)
++  );
++}
++
++async function resolveProviderId(
++  bb: BbPluginApi,
++  ctx: { threadId: string; providerId?: unknown },
++): Promise<string | null> {
++  if (typeof ctx.providerId === "string") return ctx.providerId;
++  try {
++    const thread = await bb.sdk.threads.get({ threadId: ctx.threadId });
++    const providerId = (thread as { providerId?: unknown }).providerId;
++    return typeof providerId === "string" ? providerId : null;
++  } catch (error) {
++    bb.log.warn(
++      `AskUserQuestion could not resolve the thread provider: ${
++        error instanceof Error ? error.message : String(error)
++      }`,
++    );
++    return null;
++  }
++}
++
++function newQuestionCount(
++  queue: QuestionQueue,
++  payload: InteractionPayload,
++): number {
++  const seenPrompts = new Set(
++    queue.questions.map((question) => question.prompt),
++  );
++  let count = 0;
++  for (const source of payload.questions) {
++    if (seenPrompts.has(source.prompt)) continue;
++    seenPrompts.add(source.prompt);
++    count += 1;
++  }
++  return count;
++}
++
++function appendQuestions(
++  queue: QuestionQueue,
++  payload: InteractionPayload,
++): void {
++  const seenPrompts = new Set(
++    queue.questions.map((question) => question.prompt),
++  );
++  for (const source of payload.questions) {
++    if (seenPrompts.has(source.prompt)) continue;
++    const id = `q${queue.nextQuestionId++}`;
++    queue.questions.push({
++      ...source,
++      id,
++      options: source.options.map((option, index) => ({
++        ...option,
++        value: `${id}o${index}`,
++      })),
++    });
++    seenPrompts.add(source.prompt);
++  }
++  queue.version += 1;
++}
++
++async function deliverAcpAnswer(args: {
++  bb: BbPluginApi;
++  threadId: string;
++  payload: ReturnType<typeof buildInteractionPayload>;
++  result: Awaited<ReturnType<BbPluginApi["ui"]["requestInput"]>>;
++}): Promise<void> {
++  const { bb, threadId, payload, result } = args;
++  if (result.outcome !== "submitted") return;
++
++  const parsed = interactionResponseSchema.safeParse(result.value);
++  if (!parsed.success) {
++    bb.log.warn("AskUserQuestion could not read an ACP answer");
++    return;
++  }
++  const toolResult = buildToolResult(payload, parsed.data);
++  if (Object.keys(toolResult.answers).length === 0) {
++    bb.log.info("AskUserQuestion ACP answer was empty");
++    return;
++  }
++
++  try {
++    await bb.sdk.threads.send({
++      threadId,
++      mode: "auto",
++      input: [
++        {
++          type: "text",
++          text: `AskUserQuestion answer:\n${JSON.stringify(toolResult)}`,
++          mentions: [],
++          visibility: "agent-only",
++        },
++      ],
++    });
++  } catch (error) {
++    bb.log.warn(
++      `Could not deliver AskUserQuestion answer to ACP: ${
++        error instanceof Error ? error.message : String(error)
++      }`,
++    );
++  }
++}
++
+ export default function plugin(bb: BbPluginApi) {
++  const queues = new Map<string, QuestionQueue>();
++  const sendingQuestionIds = new Set<string>();
++  const publishQueue = (
++    threadId: string,
++    queue: QuestionQueue | undefined,
++  ): void => {
++    bb.realtime.publish(QUESTION_QUEUE_CHANNEL, {
++      threadId,
++      version: queue?.version ?? 0,
++    });
++  };
++
++  bb.rpc.register(questionQueueRpcContract, {
++    getQuestionQueue({ threadId }) {
++      const queue = queues.get(threadId);
++      return {
++        payload:
++          queue === undefined || queue.questions.length === 0
++            ? null
++            : { questions: queue.questions },
++        version: queue?.version ?? 0,
++      };
++    },
++    async answerQueuedQuestion({ threadId, questionId, answer }) {
++      const queue = queues.get(threadId);
++      const question = queue?.questions.find(
++        (candidate) => candidate.id === questionId,
++      );
++      const parsed = interactionResponseSchema.safeParse({
++        answers: { [questionId]: answer },
++      });
++      if (queue === undefined || question === undefined || !parsed.success)
++        throw new Error("Question answer is no longer pending.");
++      const toolResult = buildToolResult(
++        { questions: [question] },
++        parsed.data,
++      );
++      if (Object.keys(toolResult.answers).length === 0)
++        throw new Error("Choose an answer before sending it.");
++      const sendingKey = `${threadId}:${questionId}`;
++      if (sendingQuestionIds.has(sendingKey)) {
++        throw new Error("That answer is already being delivered.");
++      }
++      sendingQuestionIds.add(sendingKey);
++      try {
++        await bb.sdk.threads.send({
++          threadId,
++          mode: "auto",
++          input: [
++            {
++              type: "text",
++              text: `AskUserQuestion answer:\n${JSON.stringify(toolResult)}`,
++              mentions: [],
++              visibility: "agent-only",
++            },
++          ],
++        });
++        queue.questions = queue.questions.filter(
++          (candidate) => candidate.id !== questionId,
++        );
++        queue.version += 1;
++        if (queue.questions.length === 0) {
++          queues.delete(threadId);
++          publishQueue(threadId, undefined);
++        } else {
++          publishQueue(threadId, queue);
++        }
++      } finally {
++        sendingQuestionIds.delete(sendingKey);
++      }
++      return { remaining: queue.questions.length, version: queue.version };
++    },
++  });
++
+   bb.agents.registerTool({
+     name: TOOL_NAME,
+     description: TOOL_DESCRIPTION,
+@@ -46,15 +283,41 @@ export default function plugin(bb: BbPluginApi) {
+       }
+ 
+       const askedAt = Date.now();
++      const acp = isAcpProviderId(await resolveProviderId(bb, ctx));
+       let result;
+       try {
+-        result = await bb.ui.requestInput(
++        const existing = acp ? queues.get(ctx.threadId) : undefined;
++        if (existing !== undefined) {
++          if (
++            newQuestionCount(existing, payload) >
++            MAX_QUEUED_QUESTIONS - existing.questions.length
++          ) {
++            return errorResult(
++              `The ACP question inbox is full (${MAX_QUEUED_QUESTIONS}). Answer or dismiss a question before adding more.`,
++            );
++          }
++          appendQuestions(existing, payload);
++          publishQueue(ctx.threadId, existing);
++          return ACP_PENDING_RESULT;
++        }
++        const queue = acp
++          ? { questions: [], nextQuestionId: 0, version: 0 }
++          : undefined;
++        if (queue !== undefined) {
++          if (newQuestionCount(queue, payload) > MAX_QUEUED_QUESTIONS) {
++            return errorResult(
++              `The ACP question inbox is full (${MAX_QUEUED_QUESTIONS}). Answer or dismiss a question before adding more.`,
++            );
++          }
++          appendQuestions(queue, payload);
++          queues.set(ctx.threadId, queue);
++        }
++        const request = bb.ui.requestInput(
+           {
+             threadId: ctx.threadId,
+             rendererId: ASK_USER_QUESTION_RENDERER_ID,
+             title: buildInteractionTitle(payload),
+             payload,
+-            timeoutMs: QUESTION_TIMEOUT_MS,
+             presentation: {
+               label: { pending: "Asking a question", completed: "Asked" },
+               icon: { glyph: "MessageQuestion" },
+@@ -68,8 +331,30 @@ export default function plugin(bb: BbPluginApi) {
+               );
+             },
+           },
+-          { signal: ctx.signal },
++          acp ? undefined : { signal: ctx.signal },
+         );
++        if (acp) {
++          void request.then(
++            (resolved) => (
++              queues.delete(ctx.threadId),
++              publishQueue(ctx.threadId, undefined),
++              deliverAcpAnswer({
++                bb,
++                threadId: ctx.threadId,
++                payload,
++                result: resolved,
++              })
++            ),
++            (error) =>
++              bb.log.warn(
++                `AskUserQuestion could not wait for an ACP answer: ${
++                  error instanceof Error ? error.message : String(error)
++                }`,
++              ),
++          );
++          return ACP_PENDING_RESULT;
++        }
++        result = await request;
+       } catch (error) {
+         return errorResult(
+           `The question could not be shown (${error instanceof Error ? error.message : String(error)}). Only one prompt can await the user at a time — put all of your questions in a single AskUserQuestion call, or continue with your best judgement.`,
+@@ -104,9 +389,13 @@ export default function plugin(bb: BbPluginApi) {
+     if (context.provider.capabilities.supportsNativeUserQuestion) {
+       return { tools: [], skills: [] };
+     }
++    const instructions = isAcpProviderId(context.provider.id)
++      ? "On ACP, AskUserQuestion adds each call to the visible question inbox and returns immediately. Continue independent work; each submitted answer arrives as a follow-up message."
++      : undefined;
+     return {
+       tools: [TOOL_NAME],
+       skills: [],
++      ...(instructions === undefined ? {} : { instructions }),
+     };
+   });
+ }
+diff --git a/plugins/ask-user-question/src/tool-definition.ts b/plugins/ask-user-question/src/tool-definition.ts
+index 16723aa40..a58fbe340 100644
+--- a/plugins/ask-user-question/src/tool-definition.ts
++++ b/plugins/ask-user-question/src/tool-definition.ts
+@@ -2,6 +2,8 @@ export const TOOL_DESCRIPTION = `Use this tool only when you are blocked on a de
+ 
+ Usage notes:
+ - Users will always be able to select "Other" to provide custom text input
++- Batch 1-4 independent questions in a single call: the user sees one form and the response includes every answer
++- On ACP, later AskUserQuestion calls join the open question inbox; each answer is delivered separately while unanswered questions remain visible
+ - Use multiSelect: true to allow multiple answers to be selected for a question
+ - If you recommend a specific option, make that the first option in the list and add "(Recommended)" at the end of the label
+ 

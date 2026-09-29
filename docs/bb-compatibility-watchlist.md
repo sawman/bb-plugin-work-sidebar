@@ -9,7 +9,34 @@ removing any item below. Re-run the linked searches against the current open
 issues and pull requests, then confirm the shipped API through a typed plugin
 test—not just a changelog entry.
 
-Last checked: 2026-09-23 against BB 0.43.4 / SDK 0.5.9.
+Last checked: 2026-09-29 against BB 0.44.0 / SDK 0.5.29.
+
+## BB 0.44.0 audit
+
+Audited immutable `desktop-v0.44.0` source at
+`0baa605b32a00619c1d7e3f32be6553ebcf8244a` and SDK 0.5.29. The ACP
+question queue is still absent upstream, as are the indexed thread-task read,
+parented Tasks CLI dispatch, explicit inverse HTTP navigation, and a
+browser-capable URL host for the left thread-list slot. The three local
+built-in patches remain necessary. The AskUserQuestion patch was rebased for
+BB's shared UI import changes; Automations and Tasks applied unchanged.
+
+The exact-version preflight and deployment each passed plugin tests,
+typechecks, builds, and artifact metadata checks; the staged and installed
+server artifacts match SHA-256. The BB 0.44.0 backup is
+`~/.bb/patch-backups/bb-0.44.0-2026-09-29T03-04-21-503Z`.
+Work Sidebar is pinned to SDK 0.5.29 and passed 785 tests, typecheck, build,
+and reload. Its direct-component tests now use the SDK's slot context for
+host-rendered links.
+
+BB 0.44.0 also adds `threads.restoreEnvironment` for eligible destroyed
+provider-managed workspaces. This may improve the existing archived-thread
+"Resume in new worktree" flow; the scoped follow-up is BBPLUG-414. It does not
+change the current behavior as part of this compatibility patch. Issues
+[#1978](https://github.com/get-bb/bb/issues/1978),
+[#2200](https://github.com/get-bb/bb/issues/2200), and
+[#2836](https://github.com/get-bb/bb/issues/2836) remain open; no upstream
+`listTasksForThread` pull request was found on 2026-09-29.
 
 ## BB 0.43.4 audit
 
@@ -114,7 +141,7 @@ audit intentionally did not create speculative work.
   multi-call queue that keeps unanswered questions visible while each submitted
   answer immediately reaches the agent. The local plugin-only patch supplies
   that queue (maximum 32 questions) and `threads.send({ mode: "auto" })`
-  follow-up. It is cataloged against BB 0.43.4 with an exact source ref,
+  follow-up. It is cataloged against BB 0.44.0 with an exact source ref,
   regression suite, and rollback artifacts in
   [`bb-plugins/ask-user-question/`](bb-plugins/ask-user-question/). On every
   BB release, run `npm run bb-plugins:sync`: remove this patch only when ACP

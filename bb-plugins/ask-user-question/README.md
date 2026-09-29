@@ -27,6 +27,21 @@ coverage for Cursor, OpenCode, and a custom ACP provider, plus dismissal.
 The versioned release criteria and live smoke matrix are in
 [TEST-PLAN.md](TEST-PLAN.md).
 
+## BB 0.44.0 upgrade
+
+- Target: `builtin:ask-user-question` in BB `0.44.0`, SDK `0.5.29`, from
+  `desktop-v0.44.0` at `0baa605b32a00619c1d7e3f32be6553ebcf8244a`.
+- BB changed shared UI import paths; the version-specific
+  [0.44 patch](acp-continuation-v0.44.patch) retains the ACP queue and fixes
+  the patched tests for the newer TypeScript compiler. No core artifact is
+  patched.
+- Exact-version preflight and deployment each passed 47 plugin tests,
+  typecheck, build, and artifact metadata checks. Deployed 2026-09-29 with
+  rollback backup
+  `~/.bb/patch-backups/bb-0.44.0-2026-09-29T03-04-21-503Z`.
+- The installed server artifact matches the staged SHA-256. A live ACP Reply
+  smoke test was not run during this upgrade.
+
 ## BB 0.43.4 upgrade
 
 - Target: `builtin:ask-user-question` in BB `0.43.4`, SDK `0.5.9`, from

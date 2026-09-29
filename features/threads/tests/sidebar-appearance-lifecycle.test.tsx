@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SidebarTextScaleEditor } from "../sidebar-appearance-settings";
 import { ThreadListSettings } from "../sidebar-group-settings";
+import { renderPluginComponent as render } from "../../../tests/utils/render-plugin-component";
 
 afterEach(() => {
   cleanup();
