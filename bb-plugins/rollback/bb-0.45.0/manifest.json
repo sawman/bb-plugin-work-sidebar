@@ -1,0 +1,25 @@
+{
+  "bbVersion": "0.45.0",
+  "pluginSdkVersion": "0.6.15",
+  "sourceRef": "desktop-v0.45.0",
+  "sourceCommit": "129f621771a3e275773992db648316966ac207cf",
+  "capturedAt": "2026-10-09T04:31:44.573Z",
+  "kind": "pre-deployment-bundled-artifacts",
+  "archives": [
+    {
+      "pluginId": "ask-user-question",
+      "file": "ask-user-question.tar.gz",
+      "sha256": "bc46db5d6e74ab5ceaf35752f19d76135d0d413b13473836ee7b3f3a72abefa2"
+    },
+    {
+      "pluginId": "automations",
+      "file": "automations.tar.gz",
+      "sha256": "0dba2eb801011d9f15852856ae4a2ce1ab77cbfc1e0ef4de17770dc6e37dfb5f"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "tasks.tar.gz",
+      "sha256": "978feb444e29600ae16d30e018ad5cb55fe6cd3a0420d2f52050bad217a6e196"
+    }
+  ]
+}

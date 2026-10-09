@@ -13,6 +13,16 @@ Last checked: 2026-10-09 against BB 0.45.0 / SDK 0.6.15.
 
 ## BB 0.45.0 audit
 
+Root deployment completed 2026-10-09 after the implementation/preflight evidence
+below. Work Sidebar rebuilt and reloaded successfully with SDK 0.6.15. The
+built-in deployment pass repeated 43/136/412 tests, typechecks and builds; all
+three installed artifact sets match the final stage byte-for-byte. The
+version-matched rollback archives and checksums are tracked under
+[`bb-plugins/rollback/bb-0.45.0`](../bb-plugins/rollback/bb-0.45.0/README.md).
+Desktop visual interaction remains unverified: a freshly started driver
+reported a locked desktop. This is distinct from the passing build/runtime
+checks; the read-only theme probe confirmed the renderer is alive.
+
 Checked immutable `desktop-v0.45.0` at
 `129f621771a3e275773992db648316966ac207cf` and SDK 0.6.15 on 2026-10-09.
 No remaining watchlist workaround is fulfilled. Exact shipped source evidence:

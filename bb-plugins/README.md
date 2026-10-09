@@ -12,13 +12,21 @@ before relying on the new app.
 `~/.bb/patch-backups/` is a convenient local backup made immediately before a
 deployment. The canonical rollback payload and its checksums live here in Git,
 so an emergency rollback is reproducible on another machine with the exact
-matching BB version.
+matching BB version. Tracked rollback coverage is explicit: historical 0.41
+payloads for Questions/Automations and [0.45 packages for all three plugins](rollback/bb-0.45.0/README.md).
+Other historical deployments have local backups only; never use a different
+BB version's rollback payload.
 
 | Built-in plugin | Patch | Status |
 | --- | --- | --- |
-| `ask-user-question` | [ACP answer continuation](ask-user-question/README.md) | staged and verified for BB 0.45.0; last cataloged deployment BB 0.44.0 |
-| `automations` | [Personal-project availability](automations/README.md) | staged and verified for BB 0.45.0; last cataloged deployment BB 0.44.0 |
-| `tasks` | [Thread workflow](tasks/README.md) | staged and verified for BB 0.45.0; last cataloged deployment BB 0.44.0 |
+| `ask-user-question` | [ACP answer continuation](ask-user-question/README.md) | verified and deployed for BB 0.45.0 |
+| `automations` | [Personal-project availability](automations/README.md) | verified and deployed for BB 0.45.0 |
+| `tasks` | [Thread workflow](tasks/README.md) | verified and deployed for BB 0.45.0 |
+
+Deployment on 2026-10-09 reran the exact-source preflight (43 Questions, 136
+Automations, 412 Tasks tests, plus typechecks/builds). All installed artifacts
+match the verified stage byte-for-byte. Backup packages above record the
+version-matched pre-deployment artifacts and SHA-256 checksums.
 
 Run `npm run bb-plugins:sync` for the non-mutating local CI pass. It stages
 only verified artifacts. `npm run bb-plugins:sync -- --deploy` reruns that
