@@ -2,7 +2,6 @@ import {
   definePluginApp,
   useBbNavigate,
   useComposer,
-  useComposerView,
   useRpc,
 } from "@get-bb/plugin-sdk/app";
 import type { PluginThreadHeaderActionProps } from "@get-bb/plugin-sdk/app";
@@ -53,23 +52,29 @@ function OptionalIntegrationsSettings() {
 function TrackWorkAction() {
   const rpc = useRpc<typeof rpcContract>();
   const composer = useComposer();
-  const view = useComposerView();
-  if (view.scope.kind !== "thread") return null;
-  const threadId = view.scope.threadId;
+  if (composer.scope.kind !== "thread") return null;
+  const threadId = composer.scope.threadId;
   const track = async () => {
     const title =
-      view.draft.text.trim().split("\n")[0]?.slice(0, 100) || "New work";
+      composer.draft.text.trim().split("\n")[0]?.slice(0, 100) || "New work";
     try {
       const result = await rpc.call("createWorkTask", {
         threadId,
         title,
-        description: view.draft.text,
+        description: composer.draft.text,
         parentTaskId: null,
       });
-      composer.updateText(
-        (current) =>
-          `Work through ${result.task.key}: ${result.task.title}.\n\n${current}`,
-      );
+      composer.replace((current) => {
+        const prefix = `Work through ${result.task.key}: ${result.task.title}.\n\n`;
+        return {
+          text: prefix + current.text,
+          mentions: current.mentions.map((mention) => ({
+            ...mention,
+            from: mention.from + prefix.length,
+            to: mention.to + prefix.length,
+          })),
+        };
+      });
       toast.success(`${result.task.key} created and attached`);
     } catch (error) {
       toast.error(

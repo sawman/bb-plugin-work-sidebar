@@ -13,6 +13,19 @@ list for the same active ID. It preserves the original direct-lookup error for
 missing, deleted, or unreadable projects. The source patch is
 [personal-projects.patch](personal-projects.patch).
 
+## BB 0.45.0 compatibility preflight
+
+- Target: `builtin:automations` in BB `0.45.0`, SDK `0.6.15`, from
+  `desktop-v0.45.0` at `129f621771a3e275773992db648316966ac207cf`.
+- The personal-project fallback applies unchanged; upstream creation still uses only the direct project lookup.
+- Non-deploy preflight on 2026-10-09 passed 136 serial plugin tests,
+  typecheck, dependency and standalone builds, and target-CLI artifact metadata
+  checks. All three plugin artifacts are staged at
+  `/Users/matthewsaw/.bb/patch-staging/bb-0.45.0-2026-10-09T04-20-14-758Z`.
+- This worker did not install, reload, or deploy. Previous deployment and
+  rollback evidence below remains historical; these artifacts require root
+  integration and deployment before being treated as active.
+
 ## BB 0.44.0 upgrade
 
 - Target: `builtin:automations` in BB `0.44.0`, SDK `0.5.29`, from

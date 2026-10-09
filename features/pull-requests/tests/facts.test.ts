@@ -1,3 +1,5 @@
+import { pullRequest, pullRequestFact, threadPullRequest } from "../schemas";
+import { pullRequestSummaryPresentation } from "../presentation";
 import { describe, expect, it } from "vitest";
 import {
   factFromAuthoredPullRequest,
@@ -149,4 +151,15 @@ describe("pull-request fact directory", () => {
     expect(reconciled.facts[fact.key]).toEqual(fact);
     expect(reconciled.threadFactKeys).toEqual({});
   });
+});
+
+
+it("carries host merge-queue attention through RPC schemas and normalized facts", () => {
+  const queued = { ...thread, attention: "queued" as const };
+  expect(pullRequest.parse(queued).attention).toBe("queued");
+  expect(threadPullRequest.parse(queued).attention).toBe("queued");
+  const fact = pullRequestFact.parse(factFromThreadPullRequest(queued));
+  expect(fact.attention).toBe("queued");
+  expect(pullRequestSummaryPresentation(fact).label).toBe("Queued to merge");
+  expect(() => pullRequestFact.parse({ ...fact, attention: "future-state" })).toThrow();
 });

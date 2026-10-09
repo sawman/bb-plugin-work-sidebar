@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
-import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
+import type { PluginSidebarPullRequest, PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getPluginQueryClient } from "../../../query-runtime";
 import { dispatchHrefClickWithoutJsdomNavigation } from "../../../tests/utils/dispatch-href-click";
@@ -94,16 +94,7 @@ async function leftSlot({
   threads?: ReturnType<typeof thread>[];
   groups?: { id: string; name: string; threadIds: string[] }[];
   activeProjectId?: string | null;
-  sidebarPullRequests?: Record<
-    string,
-    {
-      number: number;
-      title: string;
-      url: string;
-      state: "closed" | "draft" | "merged" | "open";
-      attention: "none";
-    }
-  >;
+  sidebarPullRequests?: Record<string, PluginSidebarPullRequest>;
   sidebarDraftThreadIds?: readonly string[];
   providers?: unknown[];
   settings?: Record<string, string | boolean>;

@@ -9,7 +9,67 @@ removing any item below. Re-run the linked searches against the current open
 issues and pull requests, then confirm the shipped API through a typed plugin
 test—not just a changelog entry.
 
-Last checked: 2026-09-29 against BB 0.44.0 / SDK 0.5.29.
+Last checked: 2026-10-09 against BB 0.45.0 / SDK 0.6.15.
+
+## BB 0.45.0 audit
+
+Checked immutable `desktop-v0.45.0` at
+`129f621771a3e275773992db648316966ac207cf` and SDK 0.6.15 on 2026-10-09.
+No remaining watchlist workaround is fulfilled. Exact shipped source evidence:
+
+| Item | Release disposition and primary evidence |
+| --- | --- |
+| ACP question queue | Retain unchanged 0.44 plugin patch. Upstream [question server](https://github.com/get-bb/bb/blob/129f621771a3e275773992db648316966ac207cf/plugins/ask-user-question/src/server.ts) uses one `requestInput` call, with no ACP queue or auto-send path. |
+| Thread-filtered Tasks read | Retain local indexed read. Upstream [Tasks contract](https://github.com/get-bb/bb/blob/129f621771a3e275773992db648316966ac207cf/plugins/tasks/shared/contract.ts) has no `listTasksForThread`; refreshed open issue and PR searches returned no matches. |
+| Parented Tasks dispatch | Retain caller forwarding. Upstream [CLI](https://github.com/get-bb/bb/blob/129f621771a3e275773992db648316966ac207cf/plugins/tasks/cli/index.ts) passes task/preset/instructions, and [delegate](https://github.com/get-bb/bb/blob/129f621771a3e275773992db648316966ac207cf/plugins/tasks/delegate/index.ts) spawns without the invoking thread. [#2836](https://github.com/get-bb/bb/issues/2836) remains open. |
+| Automations personal project | Retain fallback. Upstream [service](https://github.com/get-bb/bb/blob/129f621771a3e275773992db648316966ac207cf/plugins/automations/src/service.ts) still checks creation through `projects.get` only. |
+| Explicit inverse HTTP navigation | Still absent in [SDK app contract](https://github.com/get-bb/bb/blob/129f621771a3e275773992db648316966ac207cf/packages/plugin-sdk/src/app-contract.ts): `openUrl(url)` has no explicit in-app HTTP intent or effective browser-preference getter. |
+| Browser-capable left URL host | Still absent: [App](https://github.com/get-bb/bb/blob/129f621771a3e275773992db648316966ac207cf/apps/app/src/App.tsx) uses the app-wide host; [routing](https://github.com/get-bb/bb/blob/129f621771a3e275773992db648316966ac207cf/apps/app/src/lib/url-open-routing.tsx) defaults the browser callback to null. The [right panel](https://github.com/get-bb/bb/blob/129f621771a3e275773992db648316966ac207cf/apps/app/src/components/plugin/PluginPanelRightPanelHost.tsx) supplies `openBrowser`. |
+
+The new reactive `useComposer` draft and atomic `replace` API remove the need
+for `useComposerView`/`updateText`. Task-first prefixing now rebases mention
+ranges in UTF-16 offsets against the latest draft after the RPC and preserves
+uploaded attachments. [#1978](https://github.com/get-bb/bb/issues/1978) is now
+closed; complete structured composer input is exposed in the SDK. This is
+compatibility work, with no additional composer product feature.
+[#2200](https://github.com/get-bb/bb/issues/2200) remains open. The existing
+workspace-restore follow-up stays BBPLUG-414; no speculative task was created.
+
+The host PR contract adds merge-queue attention and required experimental PR
+metadata. Strict PR schemas/types now accept `queued`, and synthetic stack
+projections use only their actual summary fields. Shared presentation retains
+merged/closed/draft lifecycle precedence; branch conflicts, fresh CI failures,
+and requested changes outrank queue membership, while pending checks do not
+erase it. [Host attention matrix](https://github.com/get-bb/bb/blob/129f621771a3e275773992db648316966ac207cf/apps/server/src/services/environments/pull-request.ts)
+is the release authority for the new queue boundary. Regression tests cover
+RPC parsing, normalized facts, server signal refresh, badge rendering, and
+composer edits/mentions/attachments.
+
+Work Sidebar passed its full serial suite once (109 files, 806 tests),
+typecheck, SDK pin check, production build, bundle-boundary tests, and
+`git diff --check`. The build emitted only the existing Node DEP0205
+deprecation warning. Live reload/visual checks are deferred to root because
+this worker was explicitly instructed not to install or reload.
+
+All three patches passed exact-version non-deploy preflight: AskUserQuestion
+43 tests, Automations 136, Tasks 412, plus typechecks, builds and artifact
+metadata checks. AskUserQuestion and Automations applied unchanged; Tasks
+required shorter hunk context around new move-task imports/exports. The shared
+Tasks patch also applies to exact 0.44.0 source. Artifacts are staged at
+`/Users/matthewsaw/.bb/patch-staging/bb-0.45.0-2026-10-09T04-20-14-758Z`; no installation, reload, deployment, or push occurred in this worker.
+
+`npm audit` reports existing development-only findings: Hono 4.13.5
+([JSX boundary escaping](https://github.com/advisories/GHSA-hxh3-vqpv-xpqv),
+moderate), source-map-js 1.2.1
+([indexed source-map DoS](https://github.com/advisories/GHSA-68fv-2mgg-jv7q),
+high), and Undici 8.10.0 (high; including
+[TLS option loss](https://github.com/advisories/GHSA-w293-vg96-wgc3) and
+[WebSocket DoS](https://github.com/advisories/GHSA-rfgv-xxqx-mfg5)). Their
+lockfile entries are byte-for-byte unchanged from canonical main. Undici comes
+through jsdom, source-map-js through jsdom/Vite, and Hono is a development/SDK
+peer. Production dependency audit is clean. The upgrade changes only SDK
+0.5.29 to 0.6.15 and Zod 4.4.3 to 4.6.5, so it introduces no new vulnerable
+package/version in this audit. No automatic audit fixes were applied.
 
 ## BB 0.44.0 audit
 
@@ -141,7 +201,7 @@ audit intentionally did not create speculative work.
   multi-call queue that keeps unanswered questions visible while each submitted
   answer immediately reaches the agent. The local plugin-only patch supplies
   that queue (maximum 32 questions) and `threads.send({ mode: "auto" })`
-  follow-up. It is cataloged against BB 0.44.0 with an exact source ref,
+  follow-up. It is cataloged against BB 0.45.0 with an exact source ref,
   regression suite, and rollback artifacts in
   [`bb-plugins/ask-user-question/`](bb-plugins/ask-user-question/). On every
   BB release, run `npm run bb-plugins:sync`: remove this patch only when ACP

@@ -20,6 +20,7 @@ export type PullRequestAttention =
   | "draft"
   | "merged"
   | "none"
+  | "queued"
   | "ready_to_merge"
   | "review_requested";
 export type StatusTone =
@@ -63,6 +64,8 @@ export function pullRequestPresentation(input: {
     return { icon: "X", label: "Closed", tone: "closed" };
   if (input.draft || input.state === "draft" || input.attention === "draft")
     return { icon: "GitPullRequest", label: "Draft", tone: "draft" };
+  if (input.attention === "queued")
+    return { icon: "GitMerge", label: "Queued to merge", tone: "warning" };
   if (input.attention === "ready_to_merge")
     return { icon: "Check", label: "Ready to merge", tone: "success" };
   if (input.attention === "conflicts")
@@ -82,7 +85,7 @@ export function pullRequestPresentation(input: {
 
 /**
  * The one status matrix shared by PR, Thread, and Changes views. Signals own
- * review/check state; the aggregate preserves only branch-only conflicts.
+ * review/check state; the aggregate preserves branch-only conflicts and merge-queue membership.
  */
 export function pullRequestSummaryPresentation(input: {
   state: PullRequestState;
@@ -96,11 +99,12 @@ export function pullRequestSummaryPresentation(input: {
     : null;
   const aggregateAttention =
     input.attention && input.attention !== "none" ? input.attention : null;
-  // A current signal supersedes an aggregate review/check summary. This also
-  // prevents an older "none" aggregate from hiding an Approved review.
-  const attention =
-    aggregateAttention === "conflicts"
-      ? aggregateAttention
+  // Review/check refreshes cannot infer merge-queue membership. Preserve it,
+  // while allowing fresh CI failure or requested changes to take precedence.
+  const attention = aggregateAttention === "conflicts"
+    ? aggregateAttention
+    : aggregateAttention === "queued"
+      ? pullRequestQueuedAttention(input.signal)
       : (signalAttention ?? aggregateAttention);
   return pullRequestPresentation({
     state: input.state,
@@ -108,6 +112,15 @@ export function pullRequestSummaryPresentation(input: {
     attention,
     mergedLayer: input.mergedLayer,
   });
+}
+
+/** Host queue membership survives signal refreshes unless a blocking fact wins. */
+export function pullRequestQueuedAttention(
+  signal?: Pick<PullRequestSignal, "checks" | "review"> | null,
+): PullRequestAttention {
+  if (signal?.checks === "failed") return "checks_failed";
+  if (signal?.review === "changes_requested") return "changes_requested";
+  return "queued";
 }
 
 export function pullRequestAttentionFromSignal(

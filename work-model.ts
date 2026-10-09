@@ -276,13 +276,18 @@ export function projectTaskQueue(tasks: readonly SidebarTask[]): TaskQueueNode[]
   ];
 }
 
-export function pullRequestKey(pullRequest: PluginSidebarPullRequest): string {
+type SidebarPullRequestSummary = Pick<
+  PluginSidebarPullRequest,
+  "number" | "title" | "url" | "state" | "attention"
+>;
+
+export function pullRequestKey(pullRequest: SidebarPullRequestSummary): string {
   return pullRequest.url.trim().toLocaleLowerCase() || `#${pullRequest.number}`;
 }
 
 export function uniquePullRequestThreadIds(
   threadIds: readonly string[],
-  pullRequests: Readonly<Record<string, PluginSidebarPullRequest | null | undefined>>,
+  pullRequests: Readonly<Record<string, SidebarPullRequestSummary | null | undefined>>,
 ): string[] {
   const seen = new Set<string>();
   return threadIds.filter((threadId) => {
@@ -298,7 +303,7 @@ export function uniquePullRequestThreadIds(
 export function matchesPullRequestSearch(
   thread: PluginSidebarThread,
   projectName: string,
-  pullRequest: PluginSidebarPullRequest,
+  pullRequest: SidebarPullRequestSummary,
   query: string,
 ): boolean {
   const needle = query.trim().toLocaleLowerCase();
@@ -393,13 +398,13 @@ export interface SidebarStack {
 
 export interface PullRequestProjectionRecord {
   thread: PluginSidebarThread;
-  pullRequest: PluginSidebarPullRequest;
+  pullRequest: SidebarPullRequestSummary;
   stack: SidebarStack | null;
 }
 
 export interface PullRequestLayerProjection {
   key: string;
-  pullRequest: PluginSidebarPullRequest;
+  pullRequest: SidebarPullRequestSummary;
   thread: PluginSidebarThread | null;
   handlingThreadIds: string[];
   layer: StackLayer;
@@ -408,7 +413,7 @@ export interface PullRequestLayerProjection {
 export interface PullRequestRowProjection {
   kind: "pull-request";
   key: string;
-  pullRequest: PluginSidebarPullRequest;
+  pullRequest: SidebarPullRequestSummary;
   thread: PluginSidebarThread;
   handlingThreadIds: string[];
 }
@@ -442,7 +447,7 @@ export interface CurrentPullRequestView {
     reviewRequestCount: number;
     state: "approved" | "changes_requested" | "none" | "review_requested" | "review_required";
   };
-  attention: "approved" | "blocked" | "changes_requested" | "checks_failed" | "checks_pending" | "closed" | "conflicts" | "draft" | "merged" | "none" | "ready_to_merge" | "review_requested";
+  attention: "approved" | "blocked" | "changes_requested" | "checks_failed" | "checks_pending" | "closed" | "conflicts" | "draft" | "merged" | "none" | "queued" | "ready_to_merge" | "review_requested";
   mergeability: {
     mergeStateStatus: "BEHIND" | "BLOCKED" | "CLEAN" | "DRAFT" | "HAS_HOOKS" | "DIRTY" | "UNKNOWN" | "UNSTABLE" | null;
     mergeable: "CONFLICTING" | "MERGEABLE" | "UNKNOWN" | null;
@@ -515,7 +520,7 @@ function stackProjectionKey(stack: SidebarStack): string {
   return stack.id.trim() || [stack.base, ...stack.pullRequests.map(stackLayerKey)].join("|");
 }
 
-function pullRequestFromStackLayer(layer: StackLayer): PluginSidebarPullRequest {
+function pullRequestFromStackLayer(layer: StackLayer): SidebarPullRequestSummary {
   const state = layer.draft ? "draft" : ["open", "draft", "merged", "closed"].includes(layer.state.toLocaleLowerCase())
     ? layer.state.toLocaleLowerCase()
     : "open";

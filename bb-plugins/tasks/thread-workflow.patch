@@ -40,15 +40,13 @@ diff --git a/plugins/tasks/db/store.ts b/plugins/tasks/db/store.ts
 index c5b247e89..48c83d8ea 100644
 --- a/plugins/tasks/db/store.ts
 +++ b/plugins/tasks/db/store.ts
-@@ -29,6 +29,8 @@ import type {
+@@ -28,4 +28,6 @@ import type {
    Folder,
    Label,
    ListTasksFilters,
 +  ListTasksForThreadFilters,
 +  ListTasksForThreadResult,
    ListTasksPage,
-   Preset,
-   PresetEnvironmentKind,
 @@ -1071,6 +1073,57 @@ export function createTasksStore(db: PluginDatabase) {
      return tasks;
    }
@@ -107,14 +105,12 @@ index c5b247e89..48c83d8ea 100644
    function listSubtasks(parentTaskId: string): Task[] {
      requireTask(parentTaskId);
      return db
-@@ -1825,6 +1878,7 @@ export function createTasksStore(db: PluginDatabase) {
+@@ -1825,4 +1878,5 @@ export function createTasksStore(db: PluginDatabase) {
      getTaskByKey,
      listTasksPage,
      listTasks,
 +    listTasksForThread,
      listSubtasks,
-     updateTask,
-     updatePosition,
 diff --git a/plugins/tasks/db/types.ts b/plugins/tasks/db/types.ts
 index f99b48138..bc9585c26 100644
 --- a/plugins/tasks/db/types.ts

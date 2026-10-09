@@ -7,6 +7,7 @@ import type { PluginRpcInput } from "../../shared/server-plugin-rpc.js";
 import {
   normalizePullRequestSignal,
   pullRequestAttentionFromSignal,
+  pullRequestQueuedAttention,
 } from "./presentation.js";
 import {
   fetchGitHubStack,
@@ -153,7 +154,9 @@ function applyGitHubPullRequestSignal(
     },
     attention: current.attention === "conflicts"
       ? current.attention
-      : pullRequestAttentionFromSignal(signal),
+      : current.attention === "queued"
+        ? pullRequestQueuedAttention(signal)
+        : pullRequestAttentionFromSignal(signal),
     signal: {
       ...signal,
       reviewCommentCount: current.signal.reviewCommentCount,

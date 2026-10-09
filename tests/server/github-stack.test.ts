@@ -595,7 +595,14 @@ describe("GitHub Stack enrichment ownership", () => {
     });
   });
 
-  it("overlays a current PR with its fresh re-requested reviewer signal", async () => {
+  it.each([
+    ["changes_requested", "SUCCESS", "review_requested"],
+    ["queued", "SUCCESS", "queued"],
+    ["queued", "CHANGES", "changes_requested"],
+    ["queued", "PENDING", "queued"],
+    ["queued", "FAILURE", "checks_failed"],
+    ["conflicts", "FAILURE", "conflicts"],
+  ] as const)("overlays %s with %s checks as %s", async (attention, checkState, expectedAttention) => {
     const bb = {
       sdk: {
         threads: { get: vi.fn(async () => ({ environmentId: "env_current" })) },
@@ -611,7 +618,7 @@ describe("GitHub Stack enrichment ownership", () => {
               baseRefName: "main",
               checks: { failedCount: 0, passedCount: 1, pendingCount: 0, state: "passing", totalCount: 1 },
               review: { reviewRequestCount: 0, state: "changes_requested" },
-              attention: "changes_requested",
+              attention,
               mergeability: { mergeStateStatus: "CLEAN", mergeable: "MERGEABLE", state: "mergeable" },
             },
           })),
@@ -629,10 +636,10 @@ describe("GitHub Stack enrichment ownership", () => {
       if (args[1] === "graphql") {
         return JSON.stringify({ data: { repository: { p0: {
           headRefName: "feature/current", baseRefName: "main",
-          reviewDecision: "CHANGES_REQUESTED",
-          reviewRequests: { totalCount: 1, nodes: [{ requestedReviewer: { login: "octocat" } }] },
-          reviews: { nodes: [{ author: { login: "octocat" }, state: "CHANGES_REQUESTED", submittedAt: "2026-09-04T00:00:00Z" }] },
-          commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
+          reviewDecision: attention === "queued" && checkState !== "CHANGES" ? "APPROVED" : "CHANGES_REQUESTED",
+          reviewRequests: { totalCount: attention === "queued" ? 0 : 1, nodes: attention === "queued" ? [] : [{ requestedReviewer: { login: "octocat" } }] },
+          reviews: { nodes: [{ author: { login: "octocat" }, state: attention === "queued" && checkState !== "CHANGES" ? "APPROVED" : "CHANGES_REQUESTED", submittedAt: "2026-09-04T00:00:00Z" }] },
+          commits: { nodes: [{ commit: { statusCheckRollup: { state: checkState === "CHANGES" ? "SUCCESS" : checkState } } }] },
         } } } });
       }
       throw new Error(`Unexpected GitHub request: ${args.join(" ")}`);
@@ -642,13 +649,13 @@ describe("GitHub Stack enrichment ownership", () => {
     const result = await service.sidebarThreadPullRequests({ threadIds: ["thr_current"] });
 
     expect(result.pullRequests.thr_current).toMatchObject({
-      review: { reviewRequestCount: 1, state: "review_required" },
-      attention: "review_requested",
+      review: { reviewRequestCount: attention === "queued" ? 0 : 1, state: attention === "queued" ? checkState === "CHANGES" ? "changes_requested" : "approved" : "review_required" },
+      attention: expectedAttention,
       signal: {
-        checks: "passing",
-        review: "review_required",
-        changeRequesters: ["octocat"],
-        requestedReviewers: ["octocat"],
+        checks: checkState === "FAILURE" ? "failed" : checkState === "PENDING" ? "pending" : "passing",
+        review: attention === "queued" ? checkState === "CHANGES" ? "changes_requested" : "approved" : "review_required",
+        ...(attention === "queued" && checkState !== "CHANGES" ? { approvers: ["octocat"] } : { changeRequesters: ["octocat"] }),
+        ...(attention === "queued" ? {} : { requestedReviewers: ["octocat"] }),
       },
     });
   });

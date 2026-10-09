@@ -38,7 +38,7 @@ const hostShims = {
 describe("R1 package and compile boundary", () => {
   it("pins the SDK and keeps host shims out of the plugin bundle", () => {
     expect(packageJson.engines?.bbPluginSdk).toBe(">=0.4.21");
-    expect(packageJson.devDependencies?.["@get-bb/plugin-sdk"]).toBe("0.5.29");
+    expect(packageJson.devDependencies?.["@get-bb/plugin-sdk"]).toBe("0.6.15");
     expect(packageJson.dependencies?.["@get-bb/plugin-sdk"]).toBeUndefined();
 
     for (const [name, version] of Object.entries(hostShims)) {

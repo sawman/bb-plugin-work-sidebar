@@ -533,6 +533,7 @@ describe("pull-request stack number presentation", () => {
     ["CI failure", "destructive", "X", { draft: false, attention: "checks_failed", checks: "failed", review: "none" }],
     ["Changes requested", "closed", "Wrench", { draft: false, attention: "changes_requested", checks: "passing", review: "changes_requested" }],
     ["Conflicts", "destructive", "X", { draft: false, attention: "conflicts", checks: "passing", review: "approved" }],
+    ["Queued to merge", "warning", "GitMerge", { draft: false, attention: "queued", checks: "pending", review: "approved" }],
     ["Ready to merge", "success", "Check", { draft: false, attention: "ready_to_merge", checks: "passing", review: "approved" }],
   ] as const)(
     "exposes the %s status label, tone, and icon from the PR badge",

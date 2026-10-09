@@ -60,6 +60,7 @@ export const pullRequest = z.object({
     "draft",
     "merged",
     "none",
+    "queued",
     "ready_to_merge",
     "review_requested",
   ]),
@@ -109,6 +110,7 @@ export const pullRequestFact = z
         "draft",
         "merged",
         "none",
+        "queued",
         "ready_to_merge",
         "review_requested",
       ])

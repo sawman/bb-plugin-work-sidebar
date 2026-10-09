@@ -27,6 +27,19 @@ coverage for Cursor, OpenCode, and a custom ACP provider, plus dismissal.
 The versioned release criteria and live smoke matrix are in
 [TEST-PLAN.md](TEST-PLAN.md).
 
+## BB 0.45.0 compatibility preflight
+
+- Target: `builtin:ask-user-question` in BB `0.45.0`, SDK `0.6.15`, from
+  `desktop-v0.45.0` at `129f621771a3e275773992db648316966ac207cf`.
+- The 0.44 ACP queue patch applies unchanged; ordinary detached questions still do not supply the ACP multi-call queue.
+- Non-deploy preflight on 2026-10-09 passed 43 serial plugin tests,
+  typecheck, dependency and standalone builds, and target-CLI artifact metadata
+  checks. All three plugin artifacts are staged at
+  `/Users/matthewsaw/.bb/patch-staging/bb-0.45.0-2026-10-09T04-20-14-758Z`.
+- This worker did not install, reload, or deploy. Previous deployment and
+  rollback evidence below remains historical; these artifacts require root
+  integration and deployment before being treated as active.
+
 ## BB 0.44.0 upgrade
 
 - Target: `builtin:ask-user-question` in BB `0.44.0`, SDK `0.5.29`, from

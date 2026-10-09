@@ -253,6 +253,7 @@ describe("pull-request presentation semantics", () => {
       "ready_to_merge",
       { icon: "Check", label: "Ready to merge", tone: "success" },
     ],
+    ["queued", { icon: "GitMerge", label: "Queued to merge", tone: "warning" }],
     ["checks_failed", { icon: "X", label: "CI failure", tone: "destructive" }],
     ["conflicts", { icon: "X", label: "Conflicts", tone: "destructive" }],
     [
@@ -363,4 +364,41 @@ describe("pull-request presentation semantics", () => {
     expect(markup).toContain('data-tone="warning"');
     expect(markup).toContain('aria-label="Review requested, 1 review comment"');
   });
+});
+
+
+describe("merge queue lifecycle precedence", () => {
+  it.each([
+    ["open", false, false, "Queued to merge"],
+    ["draft", false, false, "Draft"],
+    ["open", true, false, "Draft"],
+    ["closed", false, false, "Closed"],
+    ["merged", false, false, "Merged"],
+    ["open", false, true, "Merged"],
+  ] as const)("preserves %s lifecycle over queue attention", (state, draft, mergedLayer, label) => {
+    expect(pullRequestSummaryPresentation({
+      state, draft, mergedLayer, attention: "queued",
+      signal: { checks: "pending", review: "approved" },
+    }).label).toBe(label);
+  });
+});
+
+
+it("shows fresher CI failure and conflicts ahead of merge queue membership", () => {
+  expect(pullRequestSummaryPresentation({
+    state: "open", draft: false, attention: "queued",
+    signal: { checks: "failed", review: "approved" },
+  }).label).toBe("CI failure");
+  expect(pullRequestSummaryPresentation({
+    state: "open", draft: false, attention: "conflicts",
+    signal: { checks: "pending", review: "approved" },
+  }).label).toBe("Conflicts");
+});
+
+
+it.each(["passing", "pending", "failed"] as const)("keeps blocking %s checks or requested changes ahead of the queue", (checks) => {
+  expect(pullRequestSummaryPresentation({
+    state: "open", draft: false, attention: "queued",
+    signal: { checks, review: "changes_requested" },
+  }).label).toBe(checks === "failed" ? "CI failure" : "Changes requested");
 });
