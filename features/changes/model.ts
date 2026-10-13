@@ -22,7 +22,7 @@ export type StackBranchSignals = Pick<
 /** Merge the stack summary and branch-local signals without weakening RPC types. */
 export function mergeStackBranchSignals(
   branch: GitHubStackBranch,
-  changes: Changes,
+  changes: Omit<Changes, "repository">,
   currentPullRequest = changes.currentPullRequest,
   facts?: PullRequestFactDirectory,
 ): StackBranchSignals | undefined {
@@ -69,6 +69,10 @@ export function mergeStackBranchSignals(
 }
 
 export const changesKeys = {
+  repository: (threadId: string) =>
+    ["work-sidebar", "changes", threadId, "repository"] as const,
+  summary: (threadId: string) =>
+    ["work-sidebar", "changes", threadId, "summary"] as const,
   projection: (threadId: string) =>
     ["work-sidebar", "changes", threadId, "projection"] as const,
   fingerprint: (threadId: string, url: string) =>

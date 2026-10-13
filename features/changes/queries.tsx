@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PluginRpcClient } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
 import { changesKeys, changesPolicies } from "./model";
 import type { Changes } from "./schemas";
+import { hydratePullRequestFacts, pullRequestKeys } from "../pull-requests/queries";
+import { factFromPullRequest, factFromSidebarStackLayer, type PullRequestFactDirectory } from "../pull-requests/facts";
 
 type ChangesRpc = PluginRpcClient<typeof rpcContract>;
 export type ChangesPolling = {
@@ -29,17 +31,48 @@ export function useChanges(
 ) {
   const client = useQueryClient();
   const visible = useDocumentVisibility();
-  const projection = useQuery({
-    queryKey: changesKeys.projection(threadId),
-    queryFn: () => rpc.call("getChanges", { threadId }),
+  const stagePolling = {
     ...changesPolicies.projection,
-    // A working-tree fingerprint only changes for repository mutations. PR
-    // review/check updates do not necessarily alter it, so poll the complete
-    // projection as well to keep Changes aligned with the shared PR facts.
     refetchInterval: visible ? polling.visiblePollMs : polling.backgroundPollMs,
     refetchIntervalInBackground: true,
+  };
+  const repository = useQuery({
+    queryKey: changesKeys.repository(threadId),
+    queryFn: () => rpc.call("getChangesRepository", { threadId }),
+    ...stagePolling,
   });
-  const url = projection.data?.currentPullRequest?.url;
+  const summary = useQuery({
+    queryKey: changesKeys.summary(threadId),
+    queryFn: async ({ signal }) => {
+      const before = client.getQueryData<PullRequestFactDirectory>(pullRequestKeys.factDirectory());
+      const summaryState = client.getQueryState(changesKeys.summary(threadId));
+      const directoryUpdatedAt = client.getQueryState(pullRequestKeys.factDirectory())?.dataUpdatedAt ?? 0;
+      const preserveFreshDirectory = summaryState?.data === undefined && !summaryState?.isInvalidated
+        && Date.now() - directoryUpdatedAt < changesPolicies.projection.staleTime;
+      const result = await rpc.call("getChangesPullRequests", { threadId });
+      if (!signal.aborted) {
+        const current = client.getQueryData<PullRequestFactDirectory>(pullRequestKeys.factDirectory());
+        const facts = [
+          ...(result.currentPullRequest ? [factFromPullRequest(result.currentPullRequest)] : []),
+          ...(result.stack?.pullRequests.map(factFromSidebarStackLayer) ?? []),
+        ];
+        // A newer directory/manual read can settle while this RPC is pending.
+        // Only publish facts whose canonical record has not changed meanwhile.
+        hydratePullRequestFacts(client, facts.filter((fact) =>
+          current?.facts[fact.key] === before?.facts[fact.key]
+            && !(preserveFreshDirectory && before?.facts[fact.key]),
+        ));
+      }
+      return result;
+    },
+    ...stagePolling,
+  });
+  const projection = useQuery({
+    queryKey: changesKeys.projection(threadId),
+    queryFn: () => rpc.call("getChangesProjection", { threadId }),
+    ...stagePolling,
+  });
+  const url = summary.data?.currentPullRequest?.url;
   const previous = useRef<{ identity: string; fingerprint: string | null }>({
     identity: "",
     fingerprint: null,
@@ -58,9 +91,7 @@ export function useChanges(
         previous.current.fingerprint &&
         result.fingerprint !== previous.current.fingerprint
       )
-        void client.invalidateQueries({
-          queryKey: changesKeys.projection(threadId),
-        });
+        void invalidateChanges(client, threadId);
       previous.current = { identity, fingerprint: result.fingerprint };
       return result;
     },
@@ -68,7 +99,22 @@ export function useChanges(
     ...changesPolicies.fingerprint,
     refetchInterval: visible ? polling.visiblePollMs : polling.backgroundPollMs,
   });
-  return { ...projection, fingerprint };
+  const data = useMemo(() => {
+    if (!summary.data) return undefined;
+    const enriched = projection.data;
+    const sameIdentity = enriched?.currentPullRequest?.url === summary.data.currentPullRequest?.url
+      && enriched?.stack?.number === summary.data.stack?.number;
+    return { ...summary.data, githubStack: sameIdentity ? enriched?.githubStack ?? null : null };
+  }, [summary.data, projection.data]);
+  return {
+    ...summary,
+    // Enrichment never publishes PR facts. Its potentially late response may
+    // only fill branch/file metadata; summary owns PR identity and signals.
+    data,
+    repository,
+    enrichment: projection,
+    fingerprint,
+  };
 }
 export function invalidateChanges(
   client: {
@@ -78,9 +124,11 @@ export function invalidateChanges(
   },
   threadId: string,
 ) {
-  return client.invalidateQueries({
-    queryKey: changesKeys.projection(threadId),
-  });
+  return Promise.all([
+    client.invalidateQueries({ queryKey: changesKeys.repository(threadId) }),
+    client.invalidateQueries({ queryKey: changesKeys.summary(threadId) }),
+    client.invalidateQueries({ queryKey: changesKeys.projection(threadId) }),
+  ]);
 }
 
 export function useWorkingTreeFileDiff(
@@ -123,16 +171,18 @@ export function usePullRequestFileDiff(
 export function useCheckoutStackBranch(rpc: ChangesRpc, threadId: string) {
   const client = useQueryClient();
   const queryKey = changesKeys.projection(threadId);
+  const repositoryKey = changesKeys.repository(threadId);
   return useMutation({
     mutationFn: (branch: string) => rpc.call("checkoutStackBranch", { threadId, branch }),
     onMutate: async (branch) => {
-      await client.cancelQueries({ queryKey });
-      const previous = client.getQueryData<Changes>(queryKey);
-      client.setQueryData<Changes>(queryKey, (current) => {
+      await Promise.all([client.cancelQueries({ queryKey }), client.cancelQueries({ queryKey: repositoryKey })]);
+      const previousRepository = client.getQueryData<Changes["repository"]>(repositoryKey);
+      client.setQueryData<Changes["repository"]>(repositoryKey, (current) => current ? { ...current, branch } : current);
+      const previous = client.getQueryData<Omit<Changes, "repository">>(queryKey);
+      client.setQueryData<Omit<Changes, "repository">>(queryKey, (current) => {
         if (!current?.githubStack?.stack) return current;
         return {
           ...current,
-          repository: { ...current.repository, branch },
           githubStack: {
             ...current.githubStack,
             stack: {
@@ -146,14 +196,18 @@ export function useCheckoutStackBranch(rpc: ChangesRpc, threadId: string) {
           },
         };
       });
-      return { previous };
+      return { previous, previousRepository };
     },
     onError: (_error, _branch, context) => {
       if (context?.previous) client.setQueryData(queryKey, context.previous);
+      if (context?.previousRepository) client.setQueryData(repositoryKey, context.previousRepository);
+      void invalidateChanges(client, threadId);
     },
     onSuccess: async (result, _branch, context) => {
-      if (!result.ok && context?.previous)
-        client.setQueryData(queryKey, context.previous);
+      if (!result.ok) {
+        if (context?.previous) client.setQueryData(queryKey, context.previous);
+        if (context?.previousRepository) client.setQueryData(repositoryKey, context.previousRepository);
+      }
       await invalidateChanges(client, threadId);
     },
   });

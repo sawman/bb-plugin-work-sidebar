@@ -95,6 +95,8 @@ export const changesSchema = z.object({
     .nullable(),
   repository: repositorySchema,
 });
+export const changesProjectionSchema = changesSchema.omit({ repository: true });
+export const changesPullRequestsSchema = changesProjectionSchema.omit({ githubStack: true });
 const threadInput = z
   .object({ threadId: z.string().startsWith("thr_") })
   .strict();
@@ -142,6 +144,9 @@ export const workingTreeFileDiffSchema = z.discriminatedUnion("kind", [
 ]);
 export const changesRpcSchemas = {
   getChanges: { input: threadInput, output: changesSchema },
+  getChangesRepository: { input: threadInput, output: repositorySchema },
+  getChangesPullRequests: { input: threadInput, output: changesPullRequestsSchema },
+  getChangesProjection: { input: threadInput, output: changesProjectionSchema },
   getChangesFingerprint: {
     input: z
       .object({

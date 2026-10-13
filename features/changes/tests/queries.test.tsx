@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { changesKeys, changesPolicies } from "../model";
 import type { Changes } from "../schemas";
+import { currentPr } from "./latency-fixtures";
 import {
   invalidateChanges,
   useChanges,
@@ -45,10 +46,10 @@ describe("R13 Changes queries", () => {
     };
     const rpc = { call: vi.fn(() => refreshed) };
     const client = new QueryClient();
-    client.setQueryData<Changes>(changesKeys.projection(threadId), cached);
-    await client.invalidateQueries({
-      queryKey: changesKeys.projection(threadId),
-    });
+    client.setQueryData(changesKeys.summary(threadId), cached);
+    client.setQueryData(changesKeys.repository(threadId), cached.repository);
+    client.setQueryData(changesKeys.projection(threadId), cached);
+    await invalidateChanges(client, threadId);
     const wrapper = ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
     );
@@ -61,7 +62,8 @@ describe("R13 Changes queries", () => {
       { wrapper },
     );
 
-    expect(view.result.current.data).toBe(cached);
+    expect(view.result.current.data).toMatchObject({ currentPullRequest: null });
+    expect(view.result.current.repository.data).toBe(cached.repository);
     expect(view.result.current.isPending).toBe(false);
     await waitFor(() => expect(view.result.current.isFetching).toBe(true));
 
@@ -128,7 +130,7 @@ describe("R13 Changes queries", () => {
       }),
     };
     const client = new QueryClient();
-    client.setQueryData(changesKeys.projection(threadId), {
+    client.setQueryData(changesKeys.summary(threadId), {
       currentPullRequest: { url },
     });
     client.setQueryData(changesKeys.fingerprint(threadId, url), {
@@ -197,11 +199,9 @@ describe("R13 Changes queries", () => {
     let fingerprint = "one";
     const rpc = {
       call: vi.fn(async (method: string, input: { threadId: string }) =>
-        method === "getChanges"
+        method === "getChangesPullRequests"
           ? {
-              currentPullRequest: {
-                url: `https://github.com/acme/repo/pull/${input.threadId === "thr_a" ? 1 : 2}`,
-              },
+              currentPullRequest: currentPr(input.threadId === "thr_a" ? 1 : 2),
               stack: null,
               stackUnavailableReason: null,
               githubStack: null,
@@ -318,7 +318,7 @@ describe("R13 Changes queries", () => {
     });
     const rpc = {
       call: vi.fn(async (method: string) => {
-        if (method === "getChanges")
+        if (method === "getChangesPullRequests")
           return {
             currentPullRequest: null,
             stack: null,
@@ -357,14 +357,14 @@ describe("R13 Changes queries", () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(
-      rpc.call.mock.calls.filter(([method]) => method === "getChanges"),
+      rpc.call.mock.calls.filter(([method]) => method === "getChangesPullRequests"),
     ).toHaveLength(1);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1_000);
     });
     expect(
-      rpc.call.mock.calls.filter(([method]) => method === "getChanges"),
+      rpc.call.mock.calls.filter(([method]) => method === "getChangesPullRequests"),
     ).toHaveLength(2);
 
     Object.defineProperty(document, "visibilityState", {
@@ -376,13 +376,13 @@ describe("R13 Changes queries", () => {
       await vi.advanceTimersByTimeAsync(8_999);
     });
     expect(
-      rpc.call.mock.calls.filter(([method]) => method === "getChanges"),
+      rpc.call.mock.calls.filter(([method]) => method === "getChangesPullRequests"),
     ).toHaveLength(2);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1);
     });
     expect(
-      rpc.call.mock.calls.filter(([method]) => method === "getChanges"),
+      rpc.call.mock.calls.filter(([method]) => method === "getChangesPullRequests"),
     ).toHaveLength(3);
 
     view.unmount();

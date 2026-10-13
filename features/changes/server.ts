@@ -54,9 +54,11 @@ export function createWorkingTreeFileDiffReader(dependencies: WorkingTreeFileDif
   };
 }
 
-/** Thread-specific adapter: repository state and PR stack are one Changes projection. */
+/** Independent stage readers; the aggregate remains a thin RPC compatibility adapter. */
 export function createChangesService(dependencies: ChangesServiceDependencies) {
   return {
+    repository: dependencies.repository,
+    projection: dependencies.projection,
     async get(threadId: string): Promise<Changes> {
       const [repository, projection] = await Promise.all([dependencies.repository(threadId), dependencies.projection(threadId)]);
       return { ...projection, repository };

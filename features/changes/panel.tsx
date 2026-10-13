@@ -1,20 +1,15 @@
 import { useSettings, useRpc } from "@get-bb/plugin-sdk/app";
-import { useQueryClient } from "@tanstack/react-query";
 import { useStore } from "zustand";
 import { toast } from "sonner";
-import { useEffect } from "react";
 import type { rpcContract } from "../../contracts";
 import { CopyBadge } from "../../components/ui/copy-badge";
 import { Icon } from "../../components/ui/icon";
 import { ActionTooltip } from "../../components/ui/action-tooltip";
 import {
   useGitHubApiHealth,
-  hydratePullRequestFacts,
   useSharedPullRequestFactDirectory,
 } from "../pull-requests/queries";
 import {
-  factFromPullRequest,
-  factFromSidebarStackLayer,
   pullRequestFactForThread,
   pullRequestFromFact,
   resolvePullRequestFact,
@@ -44,7 +39,6 @@ import {
 
 export function ChangesPanel({ threadId }: { threadId: string }) {
   const rpc = useRpc<typeof rpcContract>();
-  const queryClient = useQueryClient();
   const { values: pluginSettings } = useSettings();
   const changesQuery = useChanges(rpc, threadId, {
     visiblePollMs:
@@ -105,23 +99,9 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
       ? githubStack
       : null;
   const projectedPullRequest = changesQuery.data?.currentPullRequest ?? null;
-  useEffect(() => {
-    const changes = changesQuery.data;
-    if (!changes) return;
-    const facts = [
-      ...(changes.currentPullRequest
-        ? [factFromPullRequest(changes.currentPullRequest)]
-        : []),
-      ...(changes.stack?.pullRequests.map(factFromSidebarStackLayer) ?? []),
-    ];
-    hydratePullRequestFacts(
-      queryClient,
-      facts,
-    );
-  }, [changesQuery.data, queryClient]);
   const currentPullRequest = projectedPullRequest
     ? resolvePullRequestFact(projectedPullRequest, pullRequestFacts.data)
-    : (() => {
+    : changesQuery.data ? null : (() => {
         const fact = pullRequestFactForThread(pullRequestFacts.data, threadId);
         return fact ? pullRequestFromFact(fact) : null;
       })();
@@ -197,9 +177,9 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
   return (
     <div className="ws-changes-content">
       <ChangesRepositoryCard
-        repository={changesQuery.data?.repository}
-        loading={changesQuery.isPending}
-        refreshing={changesQuery.isFetching && !changesQuery.isPending}
+        repository={changesQuery.repository.data}
+        loading={changesQuery.repository.isPending}
+        refreshing={changesQuery.repository.isFetching && !changesQuery.repository.isPending}
         expanded={presentation?.repositoryExpanded ?? false}
         contextMeta={contextMeta}
         onToggle={() =>
@@ -210,14 +190,13 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
           selectedPullRequestNumber === null ? selectedDiffPreview : null
         }
       />
-      {changesQuery.isError && (
+      {(changesQuery.isError || changesQuery.repository.isError || changesQuery.enrichment.isError) && (
         <ChangesError
-          error={changesQuery.error}
-          onRetry={() => void changesQuery.refetch()}
+          error={changesQuery.error ?? changesQuery.repository.error ?? changesQuery.enrichment.error ?? new Error("Changes are unavailable.")}
+          onRetry={() => void Promise.all([changesQuery.refetch(), changesQuery.repository.refetch(), changesQuery.enrichment.refetch()])}
         />
       )}
-      {!changesQuery.isError &&
-        (stack ? (
+      {(stack ? (
           <ol
             className="ws-stack-rail"
             aria-label={`GitHub Stack based on ${stack.trunk}`}
@@ -272,7 +251,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
                 : null
             }
           />
-        ) : !changesQuery.isPending ? (
+        ) : !changesQuery.isPending && !changesQuery.isError ? (
           <div className="ws-empty">
             No pull request is linked to this thread.
           </div>

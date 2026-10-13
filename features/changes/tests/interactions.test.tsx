@@ -339,17 +339,18 @@ describe("R14 Changes interactions", () => {
       },
     };
     client.setQueryData(changesKeys.projection("thr_one"), projection);
+    client.setQueryData(changesKeys.repository("thr_one"), projection.repository);
     render(<CheckoutHarness rpc={rpc} threadId="thr_one" branch="feature/two" />, { wrapper: wrapper(client) });
     fireEvent.click(screen.getByRole("button", { name: "Check out feature/two" }));
     await waitFor(() => {
       const current = client.getQueryData<Changes>(changesKeys.projection("thr_one"));
-      expect(current?.repository.branch).toBe("feature/two");
+      expect(client.getQueryData<Changes["repository"]>(changesKeys.repository("thr_one"))?.branch).toBe("feature/two");
       expect(current?.githubStack?.stack?.branches.map((entry) => entry.isCurrent)).toEqual([false, true]);
     });
     await act(async () => resolve({ ok: false, message: "Checkout blocked", detail: null }));
     await waitFor(() => {
       const current = client.getQueryData<Changes>(changesKeys.projection("thr_one"));
-      expect(current?.repository.branch).toBe("feature/one");
+      expect(client.getQueryData<Changes["repository"]>(changesKeys.repository("thr_one"))?.branch).toBe("feature/one");
       expect(current?.githubStack?.stack?.branches.map((entry) => entry.isCurrent)).toEqual([true, false]);
     });
   });

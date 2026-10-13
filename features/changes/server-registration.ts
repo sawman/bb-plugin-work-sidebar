@@ -8,6 +8,9 @@ import {
 
 type ChangesHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
+  | "getChangesRepository"
+  | "getChangesPullRequests"
+  | "getChangesProjection"
   | "getChanges"
   | "getChangesFingerprint"
   | "checkoutStackBranch"
@@ -101,6 +104,9 @@ export function createChangesRegistration(
     pullRequestFileDiff: pullRequests.fileDiff,
   });
   return {
+    async getChangesRepository({ threadId }) { return changes.repository(threadId); },
+    async getChangesPullRequests({ threadId }) { return pullRequests.summary(threadId); },
+    async getChangesProjection({ threadId }) { return changes.projection(threadId); },
     async getChanges({ threadId }) { return changes.get(threadId); },
     async getChangesFingerprint({ threadId, url }) {
       return changes.fingerprint(threadId, url);

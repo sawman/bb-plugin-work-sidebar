@@ -10,6 +10,7 @@ import {
   pullRequestFactKey,
 } from "../../pull-requests/facts";
 import { changesInteractionStore } from "../store";
+import { currentPr } from "./latency-fixtures";
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock("sonner", () => ({ toast }));
@@ -92,6 +93,9 @@ function changesResult(
 }
 type ChangesFixture = {
   getChanges: () => Promise<ChangesResult> | ChangesResult;
+  getChangesRepository?: () => unknown;
+  getChangesPullRequests?: () => unknown;
+  getChangesProjection?: () => unknown;
   getWorkContext?: () => typeof context;
   getWorkStatus?: () => unknown;
   getGitHubApiHealth?: () => unknown;
@@ -113,6 +117,9 @@ type ChangesFixture = {
 };
 function rpc({
   getChanges,
+  getChangesRepository,
+  getChangesPullRequests,
+  getChangesProjection,
   getWorkContext = () => context,
   getWorkStatus = () => ({
     currentThread: context.currentThread,
@@ -141,6 +148,9 @@ function rpc({
   return {
     getWorkContext,
     getChanges,
+    getChangesRepository: getChangesRepository ?? (async () => (await getChanges()).repository),
+    getChangesPullRequests: getChangesPullRequests ?? getChanges,
+    getChangesProjection: getChangesProjection ?? getChanges,
     getGitHubApiHealth:
       getGitHubApiHealth ??
       (() => ({
@@ -232,6 +242,54 @@ afterEach(() => {
 });
 
 describe("R13 registered Changes Work slot", () => {
+  it("paints local repository before deferred remote PR and stack enrichment", async () => {
+    const slowRemote = deferred<ChangesResult>();
+    const slot = await changesSlot({
+      getChanges: () => slowRemote.promise,
+      getChangesRepository: () => repository("available", true),
+      getChangesPullRequests: () => slowRemote.promise,
+      getChangesProjection: () => slowRemote.promise,
+    });
+    await waitFor(() => expect(slot.getByText("Changed")).toBeTruthy(), { timeout: 200 });
+    expect(slot.getByRole("button", { name: "Show 3 working-tree files" })).toBeTruthy();
+    expect(slot.queryByText("No pull request is linked to this thread.")).toBeNull();
+    slot.lifecycle.unmount();
+  });
+  it.each(["pending", "error"] as const)("paints canonical PR row with summary/enrichment %s and ready repository", async (state) => {
+    const pending = deferred<ChangesResult>();
+    const remote = state === "pending" ? () => pending.promise : () => Promise.reject(new Error("remote offline"));
+    const slot = await changesSlot({
+      getChanges: remote,
+      getChangesRepository: () => repository("available"),
+      getChangesPullRequests: remote,
+      getChangesProjection: remote,
+      threadPullRequests: { thr_changes: currentPr(42, "Canonical cached PR") },
+    });
+    await waitFor(() => expect(slot.getByText(/#42 Canonical cached PR/)).toBeTruthy());
+    await waitFor(() => expect(slot.getByText("Clean")).toBeTruthy());
+    if (state === "error") expect(slot.getByRole("alert")).toBeTruthy();
+    expect(slot.queryByText("No pull request is linked to this thread.")).toBeNull();
+    slot.lifecycle.unmount();
+  });
+
+  it("cold PR summary paints before slow local repository and file enrichment; confirmed no-PR removes stale association", async () => {
+    const slow = deferred<ChangesResult>();
+    let linked = true;
+    const slot = await changesSlot({
+      getChanges: () => slow.promise,
+      getChangesRepository: () => slow.promise,
+      getChangesPullRequests: () => changesResult(repository("available"), { currentPullRequest: linked ? currentPr(42, "Cold summary") : null }),
+      getChangesProjection: () => slow.promise,
+      threadPullRequests: { thr_changes: currentPr(42, "Cold summary") },
+    });
+    await waitFor(() => expect(slot.getByText(/#42 Cold summary/)).toBeTruthy());
+    expect(slot.getByText("Loading pull requests and working-tree changes…")).toBeTruthy();
+    linked = false;
+    fireEvent.click(slot.getByRole("button", { name: "Refresh work context" }));
+    await waitFor(() => expect(slot.getByText("No pull request is linked to this thread.")).toBeTruthy());
+    expect(slot.queryByText(/#42 Cold summary/)).toBeNull();
+    slot.lifecycle.unmount();
+  });
   it.each([
     ["clean", repository("available"), "Clean"],
     ["absent", repository("absent"), "Unavailable"],
@@ -260,7 +318,7 @@ describe("R13 registered Changes Work slot", () => {
       slot.getByRole("button", { name: "Retry pull request changes" }),
     );
     await waitFor(() => expect(slot.getByText("Clean")).toBeTruthy());
-    expect(getChanges).toHaveBeenCalledTimes(2);
+    expect(getChanges).toHaveBeenCalledTimes(6);
     slot.lifecycle.unmount();
   });
   it("shows the shared PR fact while thread-specific Changes data is loading", async () => {
@@ -690,12 +748,12 @@ describe("R13 registered Changes Work slot", () => {
       getWorkContext,
       getGitHubApiHealth,
     });
-    await waitFor(() => expect(getChanges).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getChanges).toHaveBeenCalledTimes(3));
     expect(getWorkContext).not.toHaveBeenCalled();
     fireEvent.click(slot.getByRole("button", { name: "Refresh work context" }));
-    await waitFor(() => expect(getChanges).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(getChanges).toHaveBeenCalledTimes(6));
     await waitFor(() => expect(getGitHubApiHealth).toHaveBeenCalledTimes(2));
-    expect(getChanges).toHaveBeenCalledTimes(2);
+    expect(getChanges).toHaveBeenCalledTimes(6);
     expect(getWorkContext).not.toHaveBeenCalled();
     slot.lifecycle.unmount();
   });
@@ -703,24 +761,24 @@ describe("R13 registered Changes Work slot", () => {
     const getChanges = vi.fn(() => changesResult());
     const getWorkContext = vi.fn(() => context);
     const slot = await changesSlot({ getChanges, getWorkContext });
-    await waitFor(() => expect(getChanges).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getChanges).toHaveBeenCalledTimes(3));
     expect(getWorkContext).not.toHaveBeenCalled();
     await slot.behavior.emitRealtime("work-sidebar:changed", {
       family: "changes",
       threadId: "thr_other",
     });
-    expect(getChanges).toHaveBeenCalledTimes(1);
+    expect(getChanges).toHaveBeenCalledTimes(3);
     await slot.behavior.emitRealtime("work-sidebar:changed", {
       family: "work",
       threadId: "thr_changes",
     });
-    expect(getChanges).toHaveBeenCalledTimes(1);
+    expect(getChanges).toHaveBeenCalledTimes(3);
     await slot.behavior.emitRealtime("work-sidebar:changed", {
       family: "changes",
       threadId: "thr_changes",
     });
-    await waitFor(() => expect(getChanges).toHaveBeenCalledTimes(2));
-    expect(getChanges).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(getChanges).toHaveBeenCalledTimes(6));
+    expect(getChanges).toHaveBeenCalledTimes(6);
     expect(getWorkContext).not.toHaveBeenCalled();
     slot.lifecycle.unmount();
   });
@@ -733,7 +791,7 @@ describe("R13 registered Changes Work slot", () => {
     await waitFor(() => expect(slot.getByText("Clean")).toBeTruthy());
     expect(slot.getByRole("tabpanel").textContent).toContain("main");
     expect(slot.queryByRole("heading", { name: "Changes" })).toBeNull();
-    expect(getChanges).toHaveBeenCalledTimes(1);
+    expect(getChanges).toHaveBeenCalledTimes(3);
     slot.lifecycle.unmount();
   });
   it("renders clean and dirty repository states through the registered panel and preserves global health", async () => {
@@ -768,7 +826,7 @@ describe("R13 registered Changes Work slot", () => {
       indicator?.getAttribute("aria-describedby") ?? "",
     );
     expect(tooltip?.getAttribute("aria-label")?.length).toBeLessThanOrEqual(40);
-    expect(getChanges).toHaveBeenCalledTimes(1);
+    expect(getChanges).toHaveBeenCalledTimes(3);
     slot.lifecycle.unmount();
   });
   it("keeps checkout busy through success and failure, and lazily opens/closes isolated file previews", async () => {

@@ -25,6 +25,8 @@ import type {
   GitHubSignal,
 } from "./server-types.js";
 
+import { createThreadReadService } from "./thread-read-server.js";
+
 const GITHUB_STACK_PLUGIN_ID = "gh-stack";
 
 type GitHubStackProjection = {
@@ -39,7 +41,7 @@ type ThreadStackHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
   "sidebarThreadPullRequests"
 >;
-export type ThreadStackService = ThreadStackHandlers & Pick<PullRequestChangesAdapter, "projection" | "checkout" | "fileDiff">;
+export type ThreadStackService = ThreadStackHandlers & Pick<PullRequestChangesAdapter, "summary" | "projection" | "checkout" | "fileDiff">;
 
 const ghStackPayloadSchema = z.object({
   stack: z.object({
@@ -268,13 +270,13 @@ export function createThreadStackService(
 ): ThreadStackService {
   const githubStackCall = <T>(method: string, input: PluginRpcInput, outputSchema: z.ZodType<T>) =>
     bb.sdk.plugins.callRpc({ pluginId: GITHUB_STACK_PLUGIN_ID, method, input, outputSchema });
-  const stackForThread = async (threadId: string) => {
+  const readStackForThread = async (threadId: string) => {
     const thread = await bb.sdk.threads.get({ threadId });
     if (!thread.environmentId) return { currentPullRequest: null, stack: null, reason: "This thread has no workspace branch." };
     try {
       const result = await bb.sdk.environments.pullRequest({ environmentId: thread.environmentId });
       if (result.outcome !== "available") {
-        return { currentPullRequest: null, stack: null, reason: result.outcome === "unavailable" ? result.message : "No GitHub pull request is linked to this branch." };
+        return { currentPullRequest: null, stack: null, failed: result.outcome === "unavailable", reason: result.outcome === "unavailable" ? result.message : "No GitHub pull request is linked to this branch." };
       }
       let currentPullRequest = projectCurrentPullRequest({
         number: result.pullRequest.number, title: result.pullRequest.title, url: result.pullRequest.url, state: result.pullRequest.state,
@@ -327,13 +329,33 @@ export function createThreadStackService(
       );
       return stack ? { currentPullRequest, stack, reason: null } : { currentPullRequest, stack: null, reason: "This pull request is not part of a Stack." };
     } catch (error) {
-      return { currentPullRequest: null, stack: null, reason: error instanceof Error ? `Pull request unavailable: ${error.message}` : "Pull request unavailable." };
+      return { currentPullRequest: null, stack: null, failed: true, reason: error instanceof Error ? `Pull request unavailable: ${error.message}` : "Pull request unavailable." };
     }
   };
+  // Only concurrent reads coalesce: freshness remains with Query and GitHub's
+  // existing command caches. Settled thread projections are never retained.
+  const threadReads = lifecycle.own(createThreadReadService(readStackForThread));
+  const stackForThread = (threadId: string) => threadReads.read(threadId);
+  // The SDK owns event subscriptions; release the captured service on dispose.
+  let invalidateThread: ((threadId: string) => void) | null = (threadId) => threadReads.invalidate(threadId);
+  lifecycle.own({ dispose() { invalidateThread = null; } });
+  for (const event of ["thread.active", "thread.idle", "thread.archived", "thread.deleted"] as const)
+    bb.events?.on(event, ({ thread }) => invalidateThread?.(thread.id));
+  const summary: PullRequestChangesAdapter["summary"] = async (threadId) => {
+    const remote = await stackForThread(threadId);
+    if ("failed" in remote && remote.failed) throw new Error(remote.reason ?? "Pull request unavailable.");
+    return { currentPullRequest: remote.currentPullRequest, stack: remote.stack, stackUnavailableReason: remote.reason };
+  };
   const projection: PullRequestChangesAdapter["projection"] = async (threadId) => {
+    // Handle rejection immediately, even while the independent remote read is
+    // still pending, so early gh-stack failures cannot be unhandled promises.
+    const payloadRequest = githubStackCall("getStack", { threadId }, ghStackPayloadSchema)
+      .then((payload) => ({ payload }), (error: unknown) => ({ error }));
     const remote = await stackForThread(threadId);
     try {
-      const payload = await githubStackCall("getStack", { threadId }, ghStackPayloadSchema);
+      const payloadResult = await payloadRequest;
+      if ("error" in payloadResult) throw payloadResult.error;
+      const { payload } = payloadResult;
       const payloadStack = payload.stack ? {
         ...payload.stack,
         branches: payload.stack.branches.map((branch) => ({ ...branch })),
@@ -425,8 +447,11 @@ export function createThreadStackService(
       }
     },
   };
-  const checkout: PullRequestChangesAdapter["checkout"] = (threadId, branch) =>
-    githubStackCall("checkoutBranch", { threadId, branch }, ghStackActionSchema);
+  const checkout: PullRequestChangesAdapter["checkout"] = async (threadId, branch) => {
+    threadReads.invalidate(threadId);
+    try { return await githubStackCall("checkoutBranch", { threadId, branch }, ghStackActionSchema); }
+    finally { threadReads.invalidate(threadId); }
+  };
   const fileDiff: PullRequestChangesAdapter["fileDiff"] = async (
     threadId,
     pullRequestNumber,
@@ -461,5 +486,5 @@ export function createThreadStackService(
       };
     }
   };
-  return { ...handlers, projection, checkout, fileDiff };
+  return { ...handlers, summary, projection, checkout, fileDiff };
 }

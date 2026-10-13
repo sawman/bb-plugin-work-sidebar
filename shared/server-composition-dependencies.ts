@@ -27,6 +27,9 @@ export type TrackerCompositionDependencies = Pick<
 
 /** Changes consumes this PR-only adapter without importing its implementation. */
 export type PullRequestChangesAdapter = {
+  summary(threadId: string): Promise<Awaited<
+    ReturnType<PluginRpcHandlers<typeof rpcContract>["getChangesPullRequests"]>
+  >>;
   projection(threadId: string): Promise<Omit<
     Awaited<ReturnType<PluginRpcHandlers<typeof rpcContract>["getChanges"]>>,
     "repository"
