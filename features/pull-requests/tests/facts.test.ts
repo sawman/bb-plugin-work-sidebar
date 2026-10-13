@@ -122,6 +122,23 @@ describe("pull-request fact directory", () => {
     ).toEqual({ unresolved: 1, resolved: 3 });
   });
 
+  it("keeps per-PR detailed freshness independent of unrelated PRs, partial merges, roster reconciliation and eviction", () => {
+    const detailed = factFromThreadPullRequest(thread);
+    const other = { ...detailed, key: "acme/other#2", number: 2, url: "https://github.com/acme/other/pull/2" };
+    const first = mergePullRequestFacts(undefined, [detailed], {}, 100);
+    const refreshedOther = mergePullRequestFacts(first, [other], {}, 200);
+    const partial = mergePullRequestFacts(refreshedOther, [factFromAuthoredPullRequest(authored)], {}, 300);
+    expect(partial.observedAtByFact?.[detailed.key]).toBe(100);
+    expect(partial.observedAtByFact?.[other.key]).toBe(200);
+    const reconciled = reconcileThreadPullRequestFactReferences(partial, {});
+    expect(reconciled.observedAtByFact).toEqual(partial.observedAtByFact);
+    const authoritative = mergePullRequestFacts(reconciled, [detailed], {}, 400);
+    expect(authoritative.observedAtByFact?.[detailed.key]).toBe(400);
+    const overCapacity = mergePullRequestFacts(authoritative, Array.from({ length: MAX_PULL_REQUEST_FACTS }, (_, index) => ({ ...other, key: `acme/other#${index + 10}` })), {}, 500);
+    expect(Object.keys(overCapacity.observedAtByFact ?? {})).toHaveLength(MAX_PULL_REQUEST_FACTS);
+    expect(overCapacity.observedAtByFact?.[detailed.key]).toBeUndefined();
+    expect(overCapacity.observedAtByFact?.[other.key]).toBeUndefined();
+  });
   it("bounds the project fact directory and retains refreshed facts", () => {
     const baseline = factFromAuthoredPullRequest(authored);
     const incoming = Array.from({ length: MAX_PULL_REQUEST_FACTS + 1 },

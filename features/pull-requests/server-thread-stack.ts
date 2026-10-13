@@ -268,10 +268,17 @@ export function createThreadStackService(
   lifecycle: ServerLifecycle,
   read: GitHubReadRunner,
 ): ThreadStackService {
-  const githubStackCall = <T>(method: string, input: PluginRpcInput, outputSchema: z.ZodType<T>) =>
-    bb.sdk.plugins.callRpc({ pluginId: GITHUB_STACK_PLUGIN_ID, method, input, outputSchema });
+  const githubStackCall = <T>(method: string, input: PluginRpcInput, outputSchema: z.ZodType<T>) => {
+    if (lifecycle.isDisposed) return Promise.reject(new Error("PR service is disposed."));
+    return bb.sdk.plugins.callRpc({ pluginId: GITHUB_STACK_PLUGIN_ID, method, input, outputSchema });
+  };
+  const readWhileActive: GitHubReadRunner = (args, buffer) => {
+    if (lifecycle.isDisposed) return Promise.reject(new Error("PR service is disposed."));
+    return read(args, buffer);
+  };
   const readStackForThread = async (threadId: string) => {
     const thread = await bb.sdk.threads.get({ threadId });
+    if (lifecycle.isDisposed) throw new Error("PR service is disposed.");
     if (!thread.environmentId) return { currentPullRequest: null, stack: null, reason: "This thread has no workspace branch." };
     try {
       const result = await bb.sdk.environments.pullRequest({ environmentId: thread.environmentId });
@@ -294,11 +301,11 @@ export function createThreadStackService(
             match[2],
             currentPullRequest.number,
             lifecycle,
-            (args, buffer) => read(args, buffer),
+            (args, buffer) => readWhileActive(args, buffer),
           ),
         );
       }
-      const stack = await fetchGitHubStack(match[1], match[2], currentPullRequest.number, (args, buffer) => read(args, buffer), lifecycle);
+      const stack = await fetchGitHubStack(match[1], match[2], currentPullRequest.number, (args, buffer) => readWhileActive(args, buffer), lifecycle);
       let signal: GitHubSignal | undefined = stack?.pullRequests.find((pullRequest) =>
         pullRequest.number === currentPullRequest.number,
       );
@@ -309,13 +316,13 @@ export function createThreadStackService(
             match[2],
             [currentPullRequest.number],
             lifecycle,
-            (args, buffer) => read(args, buffer),
+            (args, buffer) => readWhileActive(args, buffer),
           ),
           readGitHubReviewCommentCounts(
             match[1],
             match[2],
             [currentPullRequest.number],
-            (args, buffer) => read(args, buffer),
+            (args, buffer) => readWhileActive(args, buffer),
           ),
         ]);
         signal = signals.get(currentPullRequest.number);
@@ -355,6 +362,7 @@ export function createThreadStackService(
     try {
       const payloadResult = await payloadRequest;
       if ("error" in payloadResult) throw payloadResult.error;
+      if (lifecycle.isDisposed) throw new Error("PR service is disposed.");
       const { payload } = payloadResult;
       const payloadStack = payload.stack ? {
         ...payload.stack,
@@ -386,7 +394,7 @@ export function createThreadStackService(
       const stackWithChanges = await hydratePullRequestDiffs(
         stack,
         remote.currentPullRequest,
-        read,
+        readWhileActive,
       );
       return {
         currentPullRequest: remote.currentPullRequest,
@@ -395,10 +403,11 @@ export function createThreadStackService(
         githubStack: { stack: stackWithChanges, pending: payload.pending, error: payload.error?.message ?? null },
       };
     } catch (error) {
+      if (lifecycle.isDisposed) throw new Error("PR service is disposed.");
       const fallbackStack = await hydratePullRequestDiffs(
         null,
         remote.currentPullRequest,
-        read,
+        readWhileActive,
       );
       return {
         currentPullRequest: remote.currentPullRequest,
@@ -475,7 +484,7 @@ export function createThreadStackService(
         repository[2],
         pullRequestNumber,
         path,
-        (args, buffer) => read(args, buffer),
+        (args, buffer) => readWhileActive(args, buffer),
       );
     } catch (error) {
       return {

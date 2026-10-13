@@ -27,6 +27,8 @@ export type PullRequestFact = PullRequestFactContract;
 export type PullRequestFactDirectory = {
   facts: Record<string, PullRequestFact>;
   threadFactKeys: Record<string, string>;
+  /** Freshness of the authoritative per-PR record in this same Query entry. */
+  observedAtByFact?: Record<string, number>;
 };
 export const MAX_PULL_REQUEST_FACTS = 500;
 export const MAX_THREAD_PULL_REQUEST_REFERENCES = 1_000;
@@ -166,10 +168,12 @@ export function mergePullRequestFacts(
   previous: PullRequestFactDirectory | undefined,
   incoming: readonly PullRequestFact[],
   threadFactKeys: Readonly<Record<string, string>> = {},
+  observedAt = Date.now(),
 ): PullRequestFactDirectory {
   const facts: Record<string, PullRequestFact> = {
     ...(previous?.facts ?? {}),
   };
+  const observedAtByFact = { ...(previous?.observedAtByFact ?? {}) };
   for (const fact of incoming) {
     // Refreshing an existing fact moves it to the newest end of the bounded
     // directory. Object insertion order gives this cache a small, transparent
@@ -177,16 +181,21 @@ export function mergePullRequestFacts(
     const existing = facts[fact.key];
     delete facts[fact.key];
     facts[fact.key] = mergePullRequestFact(existing, fact);
+    const preservesDetailed = Boolean(existing?.checks || existing?.review || existing?.mergeability)
+      && !Boolean(fact.checks || fact.review || fact.mergeability);
+    if (!preservesDetailed) observedAtByFact[fact.key] = observedAt;
   }
   for (const key of Object.keys(facts).slice(0, -MAX_PULL_REQUEST_FACTS))
     delete facts[key];
+  for (const key of Object.keys(observedAtByFact))
+    if (!facts[key]) delete observedAtByFact[key];
   const nextThreadFactKeys = {
     ...(previous?.threadFactKeys ?? {}),
     ...threadFactKeys,
   };
   for (const [threadId, key] of Object.entries(nextThreadFactKeys))
     if (!facts[key]) delete nextThreadFactKeys[threadId];
-  return { facts, threadFactKeys: nextThreadFactKeys };
+  return { facts, threadFactKeys: nextThreadFactKeys, observedAtByFact };
 }
 
 /**

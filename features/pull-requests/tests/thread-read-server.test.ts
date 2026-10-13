@@ -53,6 +53,15 @@ describe("thread PR in-flight ownership", () => {
     await expect(reloaded.read("thr_a")).resolves.toBe("new handle");
   });
 
+  it("disposal before a queued read prevents even starting the old SDK handle", async () => {
+    const load = vi.fn(async () => "old handle");
+    const service = createThreadReadService(load);
+    const pending = service.read("thr_a");
+    service.dispose();
+    await expect(pending).rejects.toThrow("disposed");
+    expect(load).not.toHaveBeenCalled();
+  });
+
   it("summary, enrichment, directory and file resolver share one host PR lookup; gh-stack starts before host completion", async () => {
     const remote = deferred<{ outcome: "not_applicable"; message: string }>();
     const pullRequest = vi.fn(() => remote.promise);
@@ -70,5 +79,8 @@ describe("thread PR in-flight ownership", () => {
     expect(pullRequest).toHaveBeenCalledTimes(2);
     lifecycle.dispose();
     await expect(service.summary("thr_a")).rejects.toThrow("disposed");
+    await expect(service.projection("thr_a")).rejects.toThrow("disposed");
+    expect(callRpc).toHaveBeenCalledTimes(1);
+    expect(pullRequest).toHaveBeenCalledTimes(2);
   });
 });

@@ -983,6 +983,39 @@ executable work queue.
   the live sidebar when the desktop is available; if it is locked, record that
   limitation explicitly rather than claiming visual verification.
 
+#### Loop R40 — progressive Changes readiness (BBPLUG-421)
+
+- **Red:** at canonical base `6405e6147743ce34c20cd900f9bb0064c8ebb5ef`,
+  a registered Changes mount with ready local repository state and deferred
+  remote projection remains in loading. Independent source probes also show
+  gh-stack starts only after the remote PR read, and simultaneous projection,
+  thread-directory and file reads perform three host PR lookups. These are
+  deterministic dependency/call-count measurements, not live UI latency claims.
+- **Green:** mount independent thread-scoped repository, PR-summary and
+  enrichment queries/RPCs. Preserve the existing 30-second stale policy,
+  finite GC, polling, manual/realtime refresh and GitHub cache/backoff. Start
+  gh-stack concurrently with remote discovery. Coalesce only concurrent
+  thread PR reads inside the server lifecycle; retain no settled projection
+  cache. The aggregate RPC is a thin compatibility composition of these same
+  readers for previous frontend/RPC consumers.
+- **Refactor/regressions:** canonical PR facts paint while stages are pending
+  or fail. Confirmed no-PR summaries clear stale fallback. Per-PR freshness
+  metadata stays in the same bounded Query directory; unrelated or partial
+  updates cannot refresh detailed facts. Request-start record identity and
+  Query cancellation guard late publication. Canonical state/title/draft own
+  PR display/actions over late enrichment, while branch-local metadata stays
+  with gh-stack. Expanded missing file data reports loading while enrichment
+  is pending. Deferred tests cover cold repository/PR readiness, warm mounts,
+  A→B→A, no thread leaks, lookup/observer dedupe, failures, manual/realtime
+  refresh, expiry, invalidation, disposal/reload and late fingerprint races.
+- **Scope and acceptance:** a truly cold PR summary still needs host PR,
+  Stack discovery and signals; immediate cached PR paint requires an existing
+  thread-to-PR association. Focused RED/GREEN, final serial suite, typecheck,
+  SDK, build, import/bundle boundaries and diff checks belong to the owning
+  BB Task evidence. Root performs live light/dark acceptance, integration,
+  reload/deploy and remote operations. Roll back this bounded slice against
+  the exact canonical base above. No state-owner decision is reversed.
+
 ### BB child execution protocol
 
 G0 is complete. Each new code-editing loop receives one direct BB execution

@@ -212,6 +212,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
                   pullRequestFacts.data,
                 )}
                 expanded={expandedStackBranches.has(branch.name)}
+                filesLoading={changesQuery.enrichment.isFetching}
                 externalOnModifier={externalOnModifier}
                 checkingOut={
                   checkout.isPending && checkout.variables === branch.name
@@ -238,6 +239,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
             pullRequest={currentPullRequest}
             branch={standaloneBranch}
             expanded={presentation?.currentPullRequestExpanded ?? false}
+            filesLoading={changesQuery.enrichment.isFetching}
             externalOnModifier={externalOnModifier}
             onToggle={() =>
               changesInteractionStore.getState().togglePullRequest(threadId)

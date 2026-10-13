@@ -46,9 +46,7 @@ export function useChanges(
     queryFn: async ({ signal }) => {
       const before = client.getQueryData<PullRequestFactDirectory>(pullRequestKeys.factDirectory());
       const summaryState = client.getQueryState(changesKeys.summary(threadId));
-      const directoryUpdatedAt = client.getQueryState(pullRequestKeys.factDirectory())?.dataUpdatedAt ?? 0;
-      const preserveFreshDirectory = summaryState?.data === undefined && !summaryState?.isInvalidated
-        && Date.now() - directoryUpdatedAt < changesPolicies.projection.staleTime;
+      const coldMount = summaryState?.data === undefined && !summaryState?.isInvalidated;
       const result = await rpc.call("getChangesPullRequests", { threadId });
       if (!signal.aborted) {
         const current = client.getQueryData<PullRequestFactDirectory>(pullRequestKeys.factDirectory());
@@ -60,7 +58,8 @@ export function useChanges(
         // Only publish facts whose canonical record has not changed meanwhile.
         hydratePullRequestFacts(client, facts.filter((fact) =>
           current?.facts[fact.key] === before?.facts[fact.key]
-            && !(preserveFreshDirectory && before?.facts[fact.key]),
+            && !(coldMount && before?.facts[fact.key]
+              && Date.now() - (before.observedAtByFact?.[fact.key] ?? 0) < changesPolicies.projection.staleTime),
         ));
       }
       return result;
@@ -79,11 +78,12 @@ export function useChanges(
   });
   const fingerprint = useQuery({
     queryKey: changesKeys.fingerprint(threadId, url ?? "none"),
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const result = await rpc.call("getChangesFingerprint", {
         threadId,
         url: url!,
       });
+      if (signal.aborted) return result;
       const identity = `${threadId}:${url}`;
       if (
         previous.current.identity === identity &&

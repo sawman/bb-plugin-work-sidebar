@@ -17,7 +17,7 @@ export type StackBranchSignals = Pick<
   | "requestedReviewers"
   | "reviewCommentCount"
   | "reviewCommentCounts"
->;
+> & { title?: string; url?: string };
 
 /** Merge the stack summary and branch-local signals without weakening RPC types. */
 export function mergeStackBranchSignals(
@@ -33,6 +33,8 @@ export function mergeStackBranchSignals(
     return {
       state: sharedFact.state,
       draft: sharedFact.draft,
+      title: sharedFact.title,
+      url: sharedFact.url,
       attention: sharedFact.attention,
       ...sharedFact.signal,
     };
@@ -51,6 +53,8 @@ export function mergeStackBranchSignals(
       ...stackPullRequest,
       state: current.state,
       draft: current.state === "draft",
+      title: current.title,
+      url: current.url,
       attention: current.attention,
       ...current.signal,
     };
@@ -58,7 +62,7 @@ export function mergeStackBranchSignals(
   if (!branch.pr) return stackPullRequest;
   return {
     ...stackPullRequest,
-    state: stackPullRequest?.state ?? branch.pr.state,
+    state: stackPullRequest?.state ?? (branch.isMerged ? "merged" : branch.pr.state),
     draft: stackPullRequest?.draft ?? branch.pr.isDraft,
     attention: stackPullRequest?.attention,
     checks: branch.checks ?? stackPullRequest?.checks ?? "unknown",

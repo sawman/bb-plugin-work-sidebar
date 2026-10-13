@@ -335,9 +335,11 @@ export function ChangesCurrentPullRequestRow({
   onToggle,
   onOpenFile,
   preview,
+  filesLoading = false,
 }: {
   pullRequest: CurrentPullRequestView;
   branch?: GitHubStackBranch | null;
+  filesLoading?: boolean;
   expanded: boolean;
   externalOnModifier?: boolean;
   onToggle(): void;
@@ -362,6 +364,7 @@ export function ChangesCurrentPullRequestRow({
           reviewCommentCounts: pullRequest.signal.reviewCommentCounts,
         }}
         expanded={expanded}
+        filesLoading={filesLoading}
         externalOnModifier={externalOnModifier}
         checkingOut={false}
         onToggle={onToggle}
@@ -378,11 +381,19 @@ export function ChangesCurrentPullRequestRow({
 
 function PullRequestFiles({
   diff,
+  loading = false,
   onOpenFile,
 }: {
   diff: GitHubStackBranch["diff"];
+  loading?: boolean;
   onOpenFile?: (path: string) => void;
 }): ReactElement {
+  if (!diff && loading)
+    return (
+      <div className="ws-stack-files ws-changes-file-list-scroll">
+        <small role="status">Loading changed files…</small>
+      </div>
+    );
   return (
     <ChangedFilesList
       files={diff?.files ?? null}
@@ -404,6 +415,7 @@ export function ChangesStackBranchRow({
   onOpenFile,
   preview,
   expandedDetails,
+  filesLoading = false,
 }: {
   branch: GitHubStackBranch;
   signals?: StackBranchSignals;
@@ -415,13 +427,18 @@ export function ChangesStackBranchRow({
   onOpenFile?: (path: string) => void;
   preview?: ReactNode;
   expandedDetails?: ReactNode;
+  filesLoading?: boolean;
 }) {
-  const pr = branch.pr;
+  const pr = branch.pr ? {
+    ...branch.pr,
+    state: signals?.state ?? branch.pr.state,
+    isDraft: signals?.draft ?? branch.pr.isDraft,
+    title: signals?.title ?? branch.pr.title,
+    url: signals?.url ?? branch.pr.url,
+  } : null;
   const title = pr?.title ?? branch.name;
   const fileCount = branch.diff?.files.length ?? 0;
-  const merged =
-    branch.isMerged ||
-    (pr?.state ?? signals?.state ?? "").toLowerCase() === "merged";
+  const merged = (signals?.state ?? (branch.isMerged ? "merged" : pr?.state ?? "")).toLowerCase() === "merged";
   const status = merged
     ? "merged"
     : (pr?.state ?? signals?.state) === "closed"
@@ -525,7 +542,7 @@ export function ChangesStackBranchRow({
       {expanded && (
         <>
           {expandedDetails}
-          <PullRequestFiles diff={branch.diff} onOpenFile={onOpenFile} />
+          <PullRequestFiles diff={branch.diff} loading={filesLoading} onOpenFile={onOpenFile} />
           {preview}
         </>
       )}

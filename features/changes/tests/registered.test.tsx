@@ -290,6 +290,39 @@ describe("R13 registered Changes Work slot", () => {
     expect(slot.queryByText(/#42 Cold summary/)).toBeNull();
     slot.lifecycle.unmount();
   });
+  it.each(["merged", "draft", "closed"] as const)("late open enrichment preserves fresh canonical %s PR state, title and branch actions", async (state) => {
+    const late = deferred<ChangesResult>();
+    const authoritative = { ...currentPr(42, `Fresh ${state}`), state };
+    const stackSummary = { number: 17, base: "main", currentPullRequest: 42, pullRequests: [] };
+    const slot = await changesSlot({
+      getChanges: () => late.promise,
+      getChangesRepository: () => repository("available"),
+      getChangesPullRequests: () => changesResult(repository("available"), { currentPullRequest: authoritative, stack: stackSummary }),
+      getChangesProjection: () => late.promise,
+    });
+    await waitFor(() => expect(slot.getByText(`#42 Fresh ${state}`)).toBeTruthy());
+    fireEvent.click(slot.getByRole("button", { name: "Show changed files for pull request #42" }));
+    expect(slot.getByText("Loading changed files…")).toBeTruthy();
+    late.resolve(changesResult(repository("available"), {
+      currentPullRequest: currentPr(42, "Old open title"), stack: stackSummary,
+      githubStack: { pending: null, error: null, stack: {
+        trunk: "main", currentBranch: "main", trunkBehind: 0, prunableBranchCount: 0,
+        branches: [{
+          name: "feature/42", isCurrent: false, isMerged: false, isQueued: false,
+          needsRebase: false, hasStash: false, stashCount: null,
+          pr: { number: 42, url: authoritative.url, title: "Old open title", state: "open", isDraft: false, metadataStale: false },
+          diff: null, aheadOfRemote: 0, behindRemote: 0,
+        }],
+      } },
+    }));
+    await waitFor(() => expect(slot.getByRole("list", { name: "GitHub Stack based on main" })).toBeTruthy());
+    expect(slot.getByText(`#42 Fresh ${state}`)).toBeTruthy();
+    expect(slot.container.querySelector(`.ws-stack-state-icon[data-tone="${state}"]`)).toBeTruthy();
+    const checkout = slot.getByRole("button", { name: state === "merged" ? "Merged branch" : "Check out feature/42" });
+    expect(checkout.hasAttribute("disabled")).toBe(state === "merged");
+    expect(slot.queryByText("Old open title")).toBeNull();
+    slot.lifecycle.unmount();
+  });
   it.each([
     ["clean", repository("available"), "Clean"],
     ["absent", repository("absent"), "Unavailable"],
