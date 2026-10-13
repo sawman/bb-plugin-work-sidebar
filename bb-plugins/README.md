@@ -1,5 +1,10 @@
 # Local BB plugin patches
 
+BB 0.46.0 deployment is recorded in
+[`docs/compatibility/bb-0.46.0/DEPLOYMENT.md`](../docs/compatibility/bb-0.46.0/DEPLOYMENT.md).
+Questions and Tasks were deployed from checksum-verified artifacts;
+Automations now uses the native release implementation.
+
 This directory is the versioned catalog for patches applied to BB's bundled
 plugins. It is not a second plugin registry and it is not the work queue—BB
 Tasks remains the source of truth for active implementation work.
