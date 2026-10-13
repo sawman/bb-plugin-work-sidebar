@@ -40,5 +40,8 @@ returned zero. Automations is retired; retained ACP and Tasks patches still lack
 
 Regression coverage tests actual navigation and SDK calls, native lifecycle
 routing, disabled/missing core actions, nullable environment targets, and both
-left and right navigation. Questions adds a real 0.46-context ACP execution matrix: Cursor/OpenCode/custom provider resolution through threads.get, detached calls, auto-send, unanswered retention, atomic capacity rejection, prompt deduplication, failed-delivery retry, ordinary/missing-provider fallback, and global queued digit shortcuts. Upstream timeout/submission-summary tests remain. Validation and artifact checksums are
-recorded after final gates; live acceptance is root-owned.
+left and right navigation. Questions adds a real 0.46-context ACP execution matrix: Cursor/OpenCode/custom provider resolution through threads.get, detached calls, auto-send, unanswered retention, atomic capacity rejection, prompt deduplication, failed-delivery retry, ordinary/missing-provider fallback, and global queued digit shortcuts. Upstream timeout/submission-summary tests remain. Final serial suite: 110 files / 812 tests pass without assertions or timeout
+changes. Typecheck, SDKcheck, production build/bundle boundary, diff checks,
+Questions51/Tasks412 preflight, and pristine Automations148 tests pass. Full
+results: validation.json. Exact paths/checksums: artifacts.json. Live acceptance
+is root-owned.

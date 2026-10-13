@@ -1,0 +1,66 @@
+{
+  "reviewedSourceCommit": "c16ef2076e24dd8f16eb9e3073881d27fc463a83",
+  "canonicalParent": "898a9a3d84b8f18b1887dcbdc0679875d3e11aab",
+  "validatedAt": "2026-10-13T06:05:21.216696+00:00",
+  "workSidebar": {
+    "fullSuite": {
+      "command": "npm test -- --no-file-parallelism",
+      "files": 110,
+      "tests": 812,
+      "status": "passed",
+      "durationSeconds": 106.77,
+      "testTimeoutOverride": false
+    },
+    "typecheck": "passed",
+    "sdkcheck": {
+      "command": "bb plugin types --check .",
+      "sdkVersion": "0.6.37",
+      "status": "passed"
+    },
+    "productionBuild": "passed",
+    "bundleBoundaryTests": "passed within final serial suite",
+    "diffCheck": "passed",
+    "sourceChangesAfterReviewedCommit": false
+  },
+  "builtins": {
+    "ask-user-question": {
+      "tests": 51,
+      "typecheck": "passed",
+      "build": "passed",
+      "metadata": "passed",
+      "disposition": "retain rebased0.46 patch"
+    },
+    "tasks": {
+      "tests": 412,
+      "typecheck": "passed",
+      "build": "passed",
+      "metadata": "passed",
+      "disposition": "retain unchanged patch"
+    },
+    "automations": {
+      "pristineTests": 148,
+      "disposition": "retire0.46 patch by root decision; retain pristine bundled upstream"
+    }
+  },
+  "artifacts": {
+    "stage": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z",
+    "patchedBuiltinFiles": 12,
+    "pristineRollbackFiles": 21,
+    "rollbackArchives": 3,
+    "checksumsVerified": true,
+    "candidateSourceFilesMatchPatch": true
+  },
+  "warnings": [
+    "Existing Node DEP0205 in builder",
+    "Monorepo install warns of not-yet-built bins",
+    "Earlier concurrent test runs exceeded default5s budget; final complete serial run passes without test-code timeout or assertion changes",
+    "Existing dev-only Hono moderate,source-map-js high,Undici high vulnerabilities; lock entries unchanged from canonical parent"
+  ],
+  "productionAuditVulnerabilities": 0,
+  "deploymentPerformed": false,
+  "reloadPerformed": false,
+  "pushPerformed": false,
+  "rootCheckoutModified": false,
+  "finalTaskCompletionOwner": "root",
+  "remainingRetirementDecisions": []
+}

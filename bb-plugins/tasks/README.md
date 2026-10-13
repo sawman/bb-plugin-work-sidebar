@@ -35,6 +35,12 @@ preserved. Pristine version-matched rollback packages and SHA-256 manifests:
 
 Retain the existing patch unchanged: the indexed thread-task read and caller-parent forwarding are still absent in the shipped contract/CLI/delegate.
 
+Final retained-patch catalog preflight passed on 2026-10-13: Questions 51 tests,
+Tasks 412 tests, both typechecks, dependency/standalone builds, and BB/SDK metadata
+checks. Stage: `/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z`.
+Exact paths and SHA-256 are recorded in
+[`artifacts.json`](../../docs/compatibility/bb-0.46.0/artifacts.json). No deployment.
+
 ## BB 0.45.0 compatibility preflight
 
 - Target: `builtin:tasks` in BB `0.45.0`, SDK `0.6.15`, from

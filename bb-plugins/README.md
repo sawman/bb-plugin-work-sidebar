@@ -27,9 +27,9 @@ preflight; its HEAD must still match the catalog's immutable source commit.
 
 | Built-in plugin | Patch | Status |
 | --- | --- | --- |
-| `ask-user-question` | [ACP answer continuation](ask-user-question/README.md) | verified and deployed for BB 0.45.0 |
-| `automations` | [Personal-project availability](automations/README.md) | verified and deployed for BB 0.45.0 |
-| `tasks` | [Thread workflow](tasks/README.md) | verified and deployed for BB 0.45.0 |
+| `ask-user-question` | [ACP answer continuation](ask-user-question/README.md) | BB 0.46 candidate verified/staged; 0.45 deployment historical |
+| `automations` | [Personal-project availability](automations/README.md) | Retired for BB 0.46; keep pristine built-in |
+| `tasks` | [Thread workflow](tasks/README.md) | BB 0.46 candidate verified/staged; 0.45 deployment historical |
 
 Deployment on 2026-10-09 reran the exact-source preflight (43 Questions, 136
 Automations, 412 Tasks tests, plus typechecks/builds). All installed artifacts

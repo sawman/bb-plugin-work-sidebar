@@ -1,0 +1,158 @@
+{
+  "sourceCommit": "4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62",
+  "sourceRef": "desktop-v0.46.0",
+  "sdkVersion": "0.6.37",
+  "reviewedSourceCommit": "c16ef2076e24dd8f16eb9e3073881d27fc463a83",
+  "stagingRoot": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z",
+  "candidateSourceRoot": "/var/folders/2p/_p95gdmd3rv2qzzhs0h2y2th0000gn/T/bb-plugin-sync-0.46.0-MFtlNl/bb",
+  "localReleaseSourceRoot": "/tmp/bb046-audit-418",
+  "artifacts": [
+    {
+      "pluginId": "ask-user-question",
+      "file": "app.css",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/ask-user-question/app.css",
+      "sha256": "982080496599dfa6acb7a7e7d2232477c1b7cafda0a73dd79bdec2a5a7c907da"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "app.js",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/ask-user-question/app.js",
+      "sha256": "8f6454040dd4fc0de7e94e812bbc8d34077355da56a837842dd661e37c78cda4"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "app.meta.json",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/ask-user-question/app.meta.json",
+      "sha256": "aebabd1439a80d306671c7328df6440133863a129c2b60f3c4868bfb05e1b5a2"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "server.js",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/ask-user-question/server.js",
+      "sha256": "978a9cd1e324600a47c1db979cb4b77cf94c8eadff54e0c07efbc616dde997ae"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "server.js.map",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/ask-user-question/server.js.map",
+      "sha256": "a0932397f76745895df77b0028a25c79cf1354eaa5cb946ebbf3515145461cbc"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "server.meta.json",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/ask-user-question/server.meta.json",
+      "sha256": "aebabd1439a80d306671c7328df6440133863a129c2b60f3c4868bfb05e1b5a2"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "app.css",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/tasks/app.css",
+      "sha256": "1a306839a88c29f614ec6344813332a5516f1d62906ff4a9b32e3e5058b6b99c"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "app.js",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/tasks/app.js",
+      "sha256": "deb82ff6124ea10938f5192208915c486f0196d412f3ee9cec0fdaf6a4e71541"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "app.meta.json",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/tasks/app.meta.json",
+      "sha256": "a3cbcab6ceb37f8e888e4c141411811686e16d1d2ccfd19c615508afc2cb28b5"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "server.js",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/tasks/server.js",
+      "sha256": "1452cdb1b1d6cd8a96241156e85124f9406c7588b93b81fa5a34b4c500961bd8"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "server.js.map",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/tasks/server.js.map",
+      "sha256": "80fea95371c3d4b86e6cd5a93a65893ce484c11c78f13a7efc3a3ba3e5873c3e"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "server.meta.json",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/tasks/server.meta.json",
+      "sha256": "a3cbcab6ceb37f8e888e4c141411811686e16d1d2ccfd19c615508afc2cb28b5"
+    }
+  ],
+  "sourcePatches": [
+    {
+      "path": "bb-plugins/ask-user-question/acp-continuation-v0.46.patch",
+      "sha256": "1d94682a6b075f7d916ab73e6ec5c061cf9a4660f65f92aaf54f9c9f5684d494"
+    },
+    {
+      "path": "bb-plugins/tasks/thread-workflow.patch",
+      "sha256": "6e3e377fe6b1726155633305bf6c0421617af2f48625af86d851649eee749ab0"
+    }
+  ],
+  "rollbackRoot": "/Users/matthewsaw/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_ubkkkrgs25-1/bb-plugin-work-sidebar/bb-plugins/rollback/bb-0.46.0",
+  "rollbackArchives": [
+    {
+      "pluginId": "ask-user-question",
+      "file": "ask-user-question.tar.gz",
+      "sha256": "a98eb79a0aa26b770efad02eee36115193f87ac3707abda8f81c24c85254e956",
+      "path": "/Users/matthewsaw/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_ubkkkrgs25-1/bb-plugin-work-sidebar/bb-plugins/rollback/bb-0.46.0/ask-user-question.tar.gz"
+    },
+    {
+      "pluginId": "automations",
+      "file": "automations.tar.gz",
+      "sha256": "0eafa571151938c6b9a487dfc0679803469dab97eff775a64693cc1bf954116b",
+      "path": "/Users/matthewsaw/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_ubkkkrgs25-1/bb-plugin-work-sidebar/bb-plugins/rollback/bb-0.46.0/automations.tar.gz"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "tasks.tar.gz",
+      "sha256": "baf2ac032928253c4316ac22f44712df469d67a51485c9dc18a4c0fefd83f1ff",
+      "path": "/Users/matthewsaw/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_ubkkkrgs25-1/bb-plugin-work-sidebar/bb-plugins/rollback/bb-0.46.0/tasks.tar.gz"
+    }
+  ],
+  "retired": [
+    {
+      "id": "automations-personal-projects",
+      "reason": "Native projects.get accepts the active personal project; root verified proj_personal read on live BB 0.46.0.",
+      "sourcePatch": "bb-plugins/automations/personal-projects.patch"
+    }
+  ],
+  "workSidebarArtifacts": [
+    {
+      "file": "app.css",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/work-sidebar/app.css",
+      "sha256": "6cd45e09dbf400562d2593b637be48c3e3ee75690c1434ee1f97dc943bc5a429"
+    },
+    {
+      "file": "app.js",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/work-sidebar/app.js",
+      "sha256": "995fc019867099964b0664f2a5f02e238c6636ac39e60d27b9e79517eb606b79"
+    },
+    {
+      "file": "app.meta.json",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/work-sidebar/app.meta.json",
+      "sha256": "b5c10b93ac206890145c505f99260aa0f8044263782247694d4af1d2b07c1dae"
+    },
+    {
+      "file": "package.json",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/work-sidebar/package.json",
+      "sha256": "1239d4d885dcad42201a27ed9324f8f0f760b78700d8db9ced39a511cffe7eae"
+    },
+    {
+      "file": "server.js",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/work-sidebar/server.js",
+      "sha256": "a492c53bb46bf2c9416003eaf242ac2dbf89bd8ef628bb3819251c54ea9f8430"
+    },
+    {
+      "file": "server.js.map",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/work-sidebar/server.js.map",
+      "sha256": "c0f23e81d78dfa1aec7f81e8240e65f5ed33d646c71d8f08943b303162d0fa25"
+    },
+    {
+      "file": "server.meta.json",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.0-2026-10-13T05-56-48-377Z/work-sidebar/server.meta.json",
+      "sha256": "b5c10b93ac206890145c505f99260aa0f8044263782247694d4af1d2b07c1dae"
+    }
+  ]
+}

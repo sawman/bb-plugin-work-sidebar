@@ -38,7 +38,12 @@ host search is ignored while local searches remain. No speculative host
 feature implementation, Human decision, or BBPLUG-414 work is included.
 Pristine 0.46 rollback artifacts/checksums are tracked in
 [`bb-plugins/rollback/bb-0.46.0`](../bb-plugins/rollback/bb-0.46.0/README.md).
-No worker deployment or reload; root owns integration and live acceptance.
+Final serial Work Sidebar suite:110files/812tests pass with unchanged
+assertions/default timeouts. Typecheck,SDKcheck,productionbuild/bundle and diff
+checks pass. Final retained-patch preflight:Questions51/Tasks412tests plus
+typechecks/builds/metadata; pristine Automations148tests pass. Exact stages and
+checksums are in the 0.46 audit. No worker deployment or reload; root owns
+integration and live acceptance.
 
 ## BB 0.45.0 audit
 
