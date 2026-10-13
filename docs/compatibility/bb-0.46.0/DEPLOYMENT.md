@@ -29,8 +29,13 @@ production app/server/host builds, and clean omit-dev packaging passed.
 An immediate post-install live smoke missed its shell marker within five
 seconds; an unchanged rerun and three fresh-shell probes subsequently passed,
 including real WASM cell rendering and smoke-owned shell cleanup. The owning
-terminal worker is separating startup readiness from command verification in
-the smoke script; this is not a production runtime change.
+terminal worker separated startup readiness from command verification in
+smoke-only follow-up `6a2ceb2d6bad40af5bd4ad85e1f34e75d32dbc76`, preserving
+the five-second real-cell assertion and owned cleanup. Its 56 focused tests,
+typecheck, and three live smoke runs passed; independent exact-SHA review was
+clean. This is not a production runtime change. The initial failure did not
+reproduce, so startup timing remains an evidence-supported explanation, not
+a conclusively reproduced root cause.
 
 Visual desktop checks remain unverified. A fresh computer-control session
 reported `desktop_unlocked: false`; root closed its session and its daemon,
