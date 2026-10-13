@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { experimental_useSidebarThreadActions, experimental_useSidebarThreads, experimental_useProviders, type PluginThreadListProps, useSettings } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate, experimental_useSidebarThreads, experimental_useProviders, type PluginThreadListProps, useSettings } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { TabSelector } from "@/components/ui/tab-selector";
 import type { ThreadProvider } from "@/components/threads/thread-provider-logo";
@@ -53,7 +53,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   const { status, threads, projects } = experimental_useSidebarThreads();
   const providerDirectory = experimental_useProviders();
   const pluginSettings = useSettings();
-  const actions = experimental_useSidebarThreadActions();
+  const actions = useBbNavigate();
   const queryClient = useQueryClient();
   const threadPreferences = useThreadPreferences();
   const [view, setView] = useState<SidebarView>("work");
@@ -156,7 +156,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     [threadPreferences.saveOrder],
   );
   const saveGroupDisclosure = useGroupDisclosurePreference(groupPreferences, threadPreferences.saveGroups);
-  const effectiveThreadSearchQuery = threadSearchQuery || props.searchQuery;
+  const effectiveThreadSearchQuery = threadSearchQuery;
   const organization = useSidebarThreadOrganization({
     active: view === "work",
     threads: liveThreads,
@@ -209,7 +209,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   );
   const navigateToThread = useCallback(
     (threadId: string, split = false) => {
-      actions.open(threadId, { split });
+      actions.toThread(threadId, { split });
       props.onNavigate();
     },
     [actions, props],
@@ -257,7 +257,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
       searchQuery={threadSearchQuery}
       onSearchQueryChange={setThreadSearchQuery}
       onNewThread={(projectId) =>
-        actions.openNewThread({ projectId, focusPrompt: true })
+        actions.toCompose({ projectId, focusPrompt: true })
       }
     />
   );
@@ -288,12 +288,12 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
           taskLinks={taskLinks}
           ownerThreads={taskOwnerThreads}
           onOpenThread={navigateToThread}
-          searchQuery={props.searchQuery}
+          searchQuery=""
           settingsControl={settings}
         />
         <PullRequestsLeftSidebar
           active={view === "prs"}
-          searchQuery={props.searchQuery}
+          searchQuery=""
           threads={pullRequestThreads}
           threadPullRequests={threadPullRequests.data}
           onOpenThread={navigateToThread}

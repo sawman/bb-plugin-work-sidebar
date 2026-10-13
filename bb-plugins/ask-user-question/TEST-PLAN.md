@@ -135,3 +135,14 @@ artifact. On any failed smoke step:
 3. Confirm the old artifact hashes and run one native question smoke.
 4. Leave the incident and rollback evidence on the related BB Task; do not
    retry a deployment until the failed case has a regression test.
+
+## BB 0.46.0 automated execution coverage
+
+`src/acp-queue.test.ts` in the version-specific patch now executes the real
+plugin through the SDK 0.6.37 harness with its actual tool context (which has
+no providerId). It verifies thread-provider fallback for Cursor, OpenCode, and
+custom ACP providers; detached calls; auto-mode delivery; remaining unanswered
+questions; queue capacity and atomic rejection; deduplication; delivery retry;
+and ordinary/failed-provider lookup paths. `app.test.tsx` explicitly exercises
+the queued global-digit shortcut. Earlier preflight counts alone did not prove
+this matrix; historical counts are preserved as historical evidence.

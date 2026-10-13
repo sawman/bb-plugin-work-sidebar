@@ -28,7 +28,7 @@ vi.mock("@get-bb/plugin-sdk/app", async () => {
   );
   return {
     ...actual,
-    experimental_useSidebarThreadActions: () => host.actions,
+
     experimental_useSidebarThreadSplit: () => ({
       splitProps: {},
       isAvailable: true,
@@ -421,3 +421,5 @@ describe("R21D ThreadRow characterization", () => {
     expect(view.onMoveToGroup).toHaveBeenCalledWith(thread.id, "soon");
   });
 });
+
+vi.mock("@/shared/use-thread-controls", () => ({ useThreadControls: () => host.actions }));

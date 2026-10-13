@@ -115,8 +115,10 @@ decision appear different.
 
 ## BB-specific behavior to preserve
 
-- Use `experimental_useSidebarThreadActions` for opening, renaming,
-  archiving, and recursive delete confirmation.
+- Use `useBbNavigate` for opening threads and compose, and `useSdk().threads`
+  for optimistic title/pin/read writes. Use `experimental_useThreadActions`
+  core archive/delete entries to preserve BB-owned recursive confirmation;
+  `experimental_useSidebarThreadActions` is no longer a public SDK export.
 - Let BB own cascading archive/delete semantics for child threads.
 - Preserve the native thread split gesture from
   `experimental_useSidebarThreadSplit`; custom reordering must yield when a

@@ -1,0 +1,80 @@
+{
+  "sourceCommit": "4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62",
+  "files": [
+    {
+      "path": "packages/plugin-sdk/src/app-contract.ts",
+      "sha256": "99349b777a952aacedc726f9f668ada61fb320ca43cb2ef5bda9a4f0f216c14c",
+      "url": "https://github.com/get-bb/bb/blob/4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62/packages/plugin-sdk/src/app-contract.ts"
+    },
+    {
+      "path": "packages/plugin-sdk/src/app.ts",
+      "sha256": "bf73e54b50615fd676badf0a4f05d6194b88f6418f129f4f83b73bab7eab8a5f",
+      "url": "https://github.com/get-bb/bb/blob/4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62/packages/plugin-sdk/src/app.ts"
+    },
+    {
+      "path": "packages/plugin-sdk/package.json",
+      "sha256": "cd0a2265af39e8e30e122c630d09f4cdc84ed69fbc19fef8dec378e458f23d95",
+      "url": "https://github.com/get-bb/bb/blob/4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62/packages/plugin-sdk/package.json"
+    },
+    {
+      "path": "apps/app/src/lib/thread-actions/core-thread-actions.ts",
+      "sha256": "07ad68367176024d1c132ce2e2a0f01b24ae6c07724d909b40f9f3be5221f7bc",
+      "url": "https://github.com/get-bb/bb/blob/4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62/apps/app/src/lib/thread-actions/core-thread-actions.ts"
+    },
+    {
+      "path": "plugins/ask-user-question/src/server.ts",
+      "sha256": "960920cb3fe0b55584cef4291c3991e62dde6218db0f8b032535a2d7cc91802c",
+      "url": "https://github.com/get-bb/bb/blob/4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62/plugins/ask-user-question/src/server.ts"
+    },
+    {
+      "path": "plugins/automations/src/service.ts",
+      "sha256": "7afef81b0bda0543b71021417b8770a08d1cf05dd22db48387f35069bb8787c8",
+      "url": "https://github.com/get-bb/bb/blob/4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62/plugins/automations/src/service.ts"
+    },
+    {
+      "path": "plugins/tasks/shared/contract.ts",
+      "sha256": "7c3ebf5dda5fcb594cfaad33d96d52b477d1e24f08e510cc814fd7b3017962da",
+      "url": "https://github.com/get-bb/bb/blob/4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62/plugins/tasks/shared/contract.ts"
+    },
+    {
+      "path": "plugins/tasks/cli/index.ts",
+      "sha256": "008d1323a31adb7181f609318d628e0c7f84cf6438dcf4bc44b352a370dce40d",
+      "url": "https://github.com/get-bb/bb/blob/4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62/plugins/tasks/cli/index.ts"
+    },
+    {
+      "path": "plugins/tasks/delegate/index.ts",
+      "sha256": "518afc92b0d02235ebd3037371f01d854b27592369a77b75010d0dde339b8486",
+      "url": "https://github.com/get-bb/bb/blob/4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62/plugins/tasks/delegate/index.ts"
+    },
+    {
+      "path": "apps/app/src/App.tsx",
+      "sha256": "948cd8d63e67746a30df59a506a6825c911c32c66e4e0e8701e039c3b3a67266",
+      "url": "https://github.com/get-bb/bb/blob/4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62/apps/app/src/App.tsx"
+    },
+    {
+      "path": "apps/app/src/lib/url-open-routing.tsx",
+      "sha256": "7397657072374a092d25771df84da7582ba9fde85728874de70ca8f6201ad529",
+      "url": "https://github.com/get-bb/bb/blob/4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62/apps/app/src/lib/url-open-routing.tsx"
+    },
+    {
+      "path": "apps/app/src/components/plugin/PluginPanelRightPanelHost.tsx",
+      "sha256": "912a57c11d96ef9ea56d71c89c2f3ca11973943e4aabd5fed782d64443926136",
+      "url": "https://github.com/get-bb/bb/blob/4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62/apps/app/src/components/plugin/PluginPanelRightPanelHost.tsx"
+    },
+    {
+      "path": "apps/server/src/routes/projects.ts",
+      "sha256": "aaf0f40ce21a600ad13a0475b88be5185fd23f685019ae122c93ac66f755a7d0",
+      "url": "https://github.com/get-bb/bb/blob/4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62/apps/server/src/routes/projects.ts"
+    },
+    {
+      "path": "apps/server/src/services/lib/entity-lookup.ts",
+      "sha256": "53619effaed2cddec142c228cc969dc5892149809cb2bf074275f21c49218dc2",
+      "url": "https://github.com/get-bb/bb/blob/4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62/apps/server/src/services/lib/entity-lookup.ts"
+    },
+    {
+      "path": "packages/db/src/data/projects.ts",
+      "sha256": "9f2ff2ad1ba64dda3e08234903bd09d94ca00617c893960349da2356006fdc24",
+      "url": "https://github.com/get-bb/bb/blob/4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62/packages/db/src/data/projects.ts"
+    }
+  ]
+}

@@ -12,7 +12,7 @@ const packageJson = JSON.parse(readFileSync(resolve(repositoryRoot, "package.jso
   engines?: Record<string, string>;
 };
 const packageLock = JSON.parse(readFileSync(resolve(repositoryRoot, "package-lock.json"), "utf8")) as {
-  packages: Record<string, { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }>;
+  packages: Record<string, { dependencies?: Record<string, string>; devDependencies?: Record<string, string>; engines?: Record<string, string> }>;
 };
 const rootLockPackage = packageLock.packages[""]!;
 
@@ -37,9 +37,11 @@ const hostShims = {
 
 describe("R1 package and compile boundary", () => {
   it("pins the SDK and keeps host shims out of the plugin bundle", () => {
-    expect(packageJson.engines?.bbPluginSdk).toBe(">=0.4.21");
-    expect(packageJson.devDependencies?.["@get-bb/plugin-sdk"]).toBe("0.6.15");
+    expect(packageJson.engines?.bb).toBe(">=0.46.0");
+    expect(packageJson.engines?.bbPluginSdk).toBe(">=0.6.37");
+    expect(packageJson.devDependencies?.["@get-bb/plugin-sdk"]).toBe("0.6.37");
     expect(packageJson.dependencies?.["@get-bb/plugin-sdk"]).toBeUndefined();
+    expect(rootLockPackage.engines).toEqual(packageJson.engines);
 
     for (const [name, version] of Object.entries(hostShims)) {
       expect(packageJson.devDependencies?.[name], `${name} must be a host-aligned devDependency`).toBe(version);

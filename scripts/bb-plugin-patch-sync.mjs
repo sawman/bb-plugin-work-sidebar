@@ -105,7 +105,12 @@ const pluginTestEnvironment = {
 };
 
 try {
-  run("git", ["clone", "--depth", "1", "--branch", plan.sourceRef, registry.coreRepository, sourceRoot]);
+  // A previously fetched release checkout permits an entirely local preflight.
+  // The immutable commit check below remains mandatory in either mode.
+  const localSource = process.env.BB_PATCH_SOURCE_ROOT;
+  run("git", localSource
+    ? ["clone", "--no-hardlinks", localSource, sourceRoot]
+    : ["clone", "--depth", "1", "--branch", plan.sourceRef, registry.coreRepository, sourceRoot]);
   const actualCommit = execFileSync("git", ["rev-parse", "HEAD"], {
     cwd: sourceRoot,
     encoding: "utf8",
@@ -115,6 +120,9 @@ try {
       `Source tag ${plan.sourceRef} resolved to ${actualCommit}, expected ${plan.sourceCommit}. Refusing to build.`,
     );
   }
+  const sourceSdkVersion = JSON.parse(
+    await readFile(join(sourceRoot, "packages/plugin-sdk/package.json"), "utf8"),
+  ).version;
 
   for (const entry of plan.patches) {
     run("git", ["apply", "--check", sourcePatch(entry)], { cwd: sourceRoot });
@@ -195,7 +203,8 @@ try {
       env: standaloneBbEnvironment,
     });
     const metadata = JSON.parse(await readFile(join(pluginRoot, "dist/server.meta.json"), "utf8"));
-    if (metadata.pluginId !== entry.pluginId || metadata.builtWith?.bbVersion !== version) {
+    if (metadata.pluginId !== entry.pluginId || metadata.builtWith?.bbVersion !== version ||
+        metadata.builtWith?.pluginSdkVersion !== sourceSdkVersion || metadata.sdkVersion !== sourceSdkVersion) {
       throw new Error(`Unexpected ${entry.pluginId} build metadata.`);
     }
     await copyPluginArtifacts(join(pluginRoot, "dist"), join(stagingRoot, entry.pluginId));
@@ -203,7 +212,7 @@ try {
 
   await writeFile(
     join(stagingRoot, "manifest.json"),
-    `${JSON.stringify({ version, sourceRef: plan.sourceRef, sourceCommit: plan.sourceCommit, patches: plan.patches, coreArtifacts }, null, 2)}\n`,
+    `${JSON.stringify({ version, sdkVersion: sourceSdkVersion, sourceRef: plan.sourceRef, sourceCommit: plan.sourceCommit, patches: plan.patches, retiredPatches: plan.retiredPatches ?? [], coreArtifacts }, null, 2)}\n`,
   );
   console.log(`Verified build staged at ${stagingRoot}`);
 

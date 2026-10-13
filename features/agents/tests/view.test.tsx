@@ -292,7 +292,7 @@ describe("R15 registered Agents Work slot", () => {
         "Branch bb/agents-details · Worktree Agents",
       ),
     );
-    expect(slot.inspection.sidebarActionCalls).toEqual([]);
+    expect(slot.inspection.navigateCalls).toEqual([]);
     expect(slot.getByText("BBPLUG-52")).toBeTruthy();
     expect(slot.getByText("Enhance the sidebar Agents view")).toBeTruthy();
     expect(slot.getByRole("img", { name: "Working" }).classList).toContain(
@@ -497,11 +497,11 @@ describe("R15 registered Agents Work slot", () => {
     expect(document.getElementById(duration.getAttribute("aria-describedby") ?? "")?.getAttribute("aria-label")).toBe("Age");
     const workspace = slot.getByRole("button", { name: "Copy agent workspace bb/agent-child" });
     expect(workspace.getAttribute("data-workspace-kind")).toBe("managed-worktree");
-    expect(slot.inspection.sidebarActionCalls).toEqual([
-      { method: "open", threadId: "thr_child", options: { split: false } },
-      { method: "open", threadId: "thr_child", options: { split: true } },
-      { method: "open", threadId: "thr_child", options: { split: false } },
-      { method: "open", threadId: "thr_child", options: { split: true } },
+    expect(slot.inspection.navigateCalls).toEqual([
+      { method: "toThread", threadId: "thr_child", options: { split: false } },
+      { method: "toThread", threadId: "thr_child", options: { split: true } },
+      { method: "toThread", threadId: "thr_child", options: { split: false } },
+      { method: "toThread", threadId: "thr_child", options: { split: true } },
     ]);
     slot.lifecycle.unmount();
   });

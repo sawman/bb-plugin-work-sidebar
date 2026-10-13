@@ -1,0 +1,132 @@
+{
+  "bbVersion": "0.46.0",
+  "pluginSdkVersion": "0.6.37",
+  "sourceRef": "desktop-v0.46.0",
+  "sourceCommit": "4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62",
+  "capturedAt": "2026-10-13T05:43:10.657704+00:00",
+  "kind": "pre-deployment-bundled-artifacts",
+  "archives": [
+    {
+      "pluginId": "ask-user-question",
+      "file": "ask-user-question.tar.gz",
+      "sha256": "a98eb79a0aa26b770efad02eee36115193f87ac3707abda8f81c24c85254e956"
+    },
+    {
+      "pluginId": "automations",
+      "file": "automations.tar.gz",
+      "sha256": "0eafa571151938c6b9a487dfc0679803469dab97eff775a64693cc1bf954116b"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "tasks.tar.gz",
+      "sha256": "baf2ac032928253c4316ac22f44712df469d67a51485c9dc18a4c0fefd83f1ff"
+    }
+  ],
+  "artifacts": [
+    {
+      "pluginId": "ask-user-question",
+      "file": "app.css",
+      "sha256": "4f0456fc65bd9d6e450cd9f447bbb0177ad29bf4365513f01b91426bc1802bd1"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "app.js",
+      "sha256": "3b4d85b2b01311ed1083ba1d38eeeae1be6088e9b624c9e575f5496def4623b3"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "app.meta.json",
+      "sha256": "aebabd1439a80d306671c7328df6440133863a129c2b60f3c4868bfb05e1b5a2"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "package.json",
+      "sha256": "1239d4d885dcad42201a27ed9324f8f0f760b78700d8db9ced39a511cffe7eae"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "server.js",
+      "sha256": "bf3a1efc7513e03cb9a6c595de1d4984bd12c9ebc4de69ba2a39752f4c30a0be"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "server.js.map",
+      "sha256": "d8f03241265c4fbb7d7b532fae266b143773facff7eaef01fa8e4c4e674dbce2"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "server.meta.json",
+      "sha256": "aebabd1439a80d306671c7328df6440133863a129c2b60f3c4868bfb05e1b5a2"
+    },
+    {
+      "pluginId": "automations",
+      "file": "app.css",
+      "sha256": "d1699886c7029ffad72e2fc03fdbaece303e419ed5da2cb8c908c6fb89cdc535"
+    },
+    {
+      "pluginId": "automations",
+      "file": "app.js",
+      "sha256": "735cc01ef544cfd175bf078eb9c3bf1cbe34262aa9de464c9f6aa84456ad84a3"
+    },
+    {
+      "pluginId": "automations",
+      "file": "app.meta.json",
+      "sha256": "a225d5392a6ee52ca91e5b1b63155fcbc14804b5843a0b1091f34544c74b6ce2"
+    },
+    {
+      "pluginId": "automations",
+      "file": "package.json",
+      "sha256": "1239d4d885dcad42201a27ed9324f8f0f760b78700d8db9ced39a511cffe7eae"
+    },
+    {
+      "pluginId": "automations",
+      "file": "server.js",
+      "sha256": "52d92423474940af090884fad9897534b7b4335dc4b937cdc713828f609deaea"
+    },
+    {
+      "pluginId": "automations",
+      "file": "server.js.map",
+      "sha256": "b19652d49bdad3f685dae10330d8818df7ceb68f864c158a75d423bcc0f95e5c"
+    },
+    {
+      "pluginId": "automations",
+      "file": "server.meta.json",
+      "sha256": "a225d5392a6ee52ca91e5b1b63155fcbc14804b5843a0b1091f34544c74b6ce2"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "app.css",
+      "sha256": "1a306839a88c29f614ec6344813332a5516f1d62906ff4a9b32e3e5058b6b99c"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "app.js",
+      "sha256": "e5c544d1a1145fb9e7342d4f23d3733d00dc5aeddc22c4edb50cad595e18e841"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "app.meta.json",
+      "sha256": "a3cbcab6ceb37f8e888e4c141411811686e16d1d2ccfd19c615508afc2cb28b5"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "package.json",
+      "sha256": "1239d4d885dcad42201a27ed9324f8f0f760b78700d8db9ced39a511cffe7eae"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "server.js",
+      "sha256": "b752ba2f63a218cbb5030ca57ed5d761b787ab7c3be7eef100ef9299d134db2a"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "server.js.map",
+      "sha256": "56db2b24114a4e2650263ca9d5b3e998e8dba66a1cb35cd03c7d16db8c1ccd45"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "server.meta.json",
+      "sha256": "a3cbcab6ceb37f8e888e4c141411811686e16d1d2ccfd19c615508afc2cb28b5"
+    }
+  ]
+}

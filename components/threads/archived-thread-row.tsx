@@ -1,4 +1,4 @@
-import { experimental_useSidebarThreadActions } from "@get-bb/plugin-sdk/app";
+import { useThreadControls } from "@/shared/use-thread-controls";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -43,7 +43,7 @@ export function ArchivedThreadRow({
   provider?: ThreadProvider;
   onNavigate(): void;
 }) {
-  const actions = experimental_useSidebarThreadActions();
+  const actions = useThreadControls(thread);
   const title = thread.title || thread.titleFallback || "Untitled thread";
   const projectLabel = project?.isPersonal
     ? "Personal"

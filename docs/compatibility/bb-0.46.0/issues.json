@@ -1,0 +1,23 @@
+[
+  {
+    "html_url": "https://github.com/get-bb/bb/issues/1978",
+    "number": 1978,
+    "state": "closed",
+    "title": "Expose complete composer input to plugin customizations",
+    "updated_at": "2026-10-08T16:59:01Z"
+  },
+  {
+    "html_url": "https://github.com/get-bb/bb/issues/2200",
+    "number": 2200,
+    "state": "open",
+    "title": "No way to hand off a prompt as an editable draft: bb thread spawn always starts a turn",
+    "updated_at": "2026-08-23T18:41:10Z"
+  },
+  {
+    "html_url": "https://github.com/get-bb/bb/issues/2836",
+    "number": 2836,
+    "state": "open",
+    "title": "Handoff and spawn-from-thread create siblings instead of children, so second opinions pile up beside the thread",
+    "updated_at": "2026-09-08T09:03:00Z"
+  }
+]

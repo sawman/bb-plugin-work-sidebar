@@ -22,6 +22,19 @@ This adds the capability without changing Work Sidebar's project-wide Tasks
 pane. A future, separately reviewed migration can use the indexed RPC wherever
 the UI specifically needs a per-thread task list.
 
+## BB 0.46.0 compatibility preflight (2026-10-13)
+
+Exact release source: `desktop-v0.46.0` at
+`4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62`, SDK `0.6.37`.
+Source/API evidence and release dispositions are in
+[`docs/compatibility/bb-0.46.0`](../../docs/compatibility/bb-0.46.0).
+This worker stages artifacts only; integration, live acceptance, deployment,
+reload, and final task completion belong to root. Historical audits below are
+preserved. Pristine version-matched rollback packages and SHA-256 manifests:
+[`rollback/bb-0.46.0`](../rollback/bb-0.46.0/README.md).
+
+Retain the existing patch unchanged: the indexed thread-task read and caller-parent forwarding are still absent in the shipped contract/CLI/delegate.
+
 ## BB 0.45.0 compatibility preflight
 
 - Target: `builtin:tasks` in BB `0.45.0`, SDK `0.6.15`, from

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
-import { experimental_useSidebarThreadActions } from "@get-bb/plugin-sdk/app";
+import { useThreadControls } from "@/shared/use-thread-controls";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -151,7 +151,7 @@ function RecycleBinRow({
   duration: string | null;
   onRestore(): void;
 }) {
-  const actions = experimental_useSidebarThreadActions();
+  const actions = useThreadControls(thread);
   const title = threadTitle(thread);
   const projectLabel = project?.isPersonal
     ? "Personal"

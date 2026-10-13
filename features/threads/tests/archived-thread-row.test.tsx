@@ -13,10 +13,7 @@ vi.mock("@get-bb/plugin-sdk/app", async () => {
   );
   return {
     ...actual,
-    experimental_useSidebarThreadActions: () => ({
-      openNewThread: host.openNewThread,
-      requestDelete: vi.fn(),
-    }),
+
   };
 });
 
@@ -60,3 +57,5 @@ describe("ArchivedThreadRow", () => {
     });
   });
 });
+
+vi.mock("@/shared/use-thread-controls", () => ({ useThreadControls: () => ({ openNewThread: host.openNewThread, requestDelete: vi.fn() }) }));

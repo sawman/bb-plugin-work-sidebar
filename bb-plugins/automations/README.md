@@ -13,6 +13,25 @@ list for the same active ID. It preserves the original direct-lookup error for
 missing, deleted, or unreadable projects. The source patch is
 [personal-projects.patch](personal-projects.patch).
 
+## BB 0.46.0 compatibility preflight (2026-10-13)
+
+Exact release source: `desktop-v0.46.0` at
+`4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62`, SDK `0.6.37`.
+Source/API evidence and release dispositions are in
+[`docs/compatibility/bb-0.46.0`](../../docs/compatibility/bb-0.46.0).
+This worker stages artifacts only; integration, live acceptance, deployment,
+reload, and final task completion belong to root. Historical audits below are
+preserved. Pristine version-matched rollback packages and SHA-256 manifests:
+[`rollback/bb-0.46.0`](../rollback/bb-0.46.0/README.md).
+
+Retired for 0.46 by root decision. The plugin uses direct `projects.get`, but
+exact release GET projects/:id now accepts any nondeleted project via
+`requirePublicProject`; database lookup does not filter out kind:personal.
+The live read `bb project show proj_personal --json` succeeds with kind:personal
+(evidence in the 0.46 audit). The historical fallback file is preserved and
+excluded from the 0.46 deployment plan. Root keeps the pristine bundled plugin;
+no automation was created to test this read-only compatibility decision.
+
 ## BB 0.45.0 compatibility preflight
 
 - Target: `builtin:automations` in BB `0.45.0`, SDK `0.6.15`, from

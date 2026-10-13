@@ -27,6 +27,19 @@ coverage for Cursor, OpenCode, and a custom ACP provider, plus dismissal.
 The versioned release criteria and live smoke matrix are in
 [TEST-PLAN.md](TEST-PLAN.md).
 
+## BB 0.46.0 compatibility preflight (2026-10-13)
+
+Exact release source: `desktop-v0.46.0` at
+`4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62`, SDK `0.6.37`.
+Source/API evidence and release dispositions are in
+[`docs/compatibility/bb-0.46.0`](../../docs/compatibility/bb-0.46.0).
+This worker stages artifacts only; integration, live acceptance, deployment,
+reload, and final task completion belong to root. Historical audits below are
+preserved. Pristine version-matched rollback packages and SHA-256 manifests:
+[`rollback/bb-0.46.0`](../rollback/bb-0.46.0/README.md).
+
+The new `acp-continuation-v0.46.patch` retains the bounded ACP queue while preserving shipped configurable timeouts, submission descriptions, and persisted ordinary shared QuestionForm. ACP keyboard behavior remains local; ordinary shortcuts are host-owned.
+
 ## BB 0.45.0 compatibility preflight
 
 - Target: `builtin:ask-user-question` in BB `0.45.0`, SDK `0.6.15`, from

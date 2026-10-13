@@ -1,0 +1,297 @@
+[
+  {
+    "items": [],
+    "total_count": 0
+  },
+  {
+    "items": [
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/3911",
+        "number": 3911,
+        "state": "open",
+        "title": "Pi fails to initialize with custom llama-server model URL (Hermes3.6-35B-A3B GGUF) - suspected acp-provider auth handshake issue"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/2471",
+        "number": 2471,
+        "state": "open",
+        "title": "ACP agents receive an empty mcpServers list at session/new, so agent-side MCP servers never load under bb"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/5004",
+        "number": 5004,
+        "state": "open",
+        "title": "Pi: injected AskUserQuestion interaction stays pending with no card, then times out after 30 minutes"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/3833",
+        "number": 3833,
+        "state": "open",
+        "title": "`--plan` bypasses the provider plan capability gate: provider-pi accepts it silently and the agent looks for a nonexistent EnterPlanMode tool"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/3230",
+        "number": 3230,
+        "state": "open",
+        "title": "Provider maintenance idle-shutdown timer is never scheduled when a maintenance request never settles"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/4463",
+        "number": 4463,
+        "state": "open",
+        "title": "Plugin-form (AskUserQuestion) answers are never persisted to the interaction record, so the transcript loses every answered question"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/3020",
+        "number": 3020,
+        "state": "open",
+        "title": "No visibility into a provider session's subagent mesh: live rosters and interaction attribution"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/4233",
+        "number": 4233,
+        "state": "open",
+        "title": "Session context policy: let a plugin narrow what one agent session loads (BB plugins, skills, MCP, CLI plugins, instructions) \u2014 working prototype"
+      }
+    ],
+    "total_count": 8
+  },
+  {
+    "items": [
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/4446",
+        "number": 4446,
+        "state": "open",
+        "title": "Tasks: project-default preset always dispatches to the primary host, fails for projects on other machines"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/1144",
+        "number": 1144,
+        "state": "open",
+        "title": "Task dependencies: no way to express that one task blocks another"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/2654",
+        "number": 2654,
+        "state": "open",
+        "title": "CLI says \"your command did not run\" after a stall \u2014 a tasks create landed eight times"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/4558",
+        "number": 4558,
+        "state": "open",
+        "title": "Suggestion: Ultrafast for individual Codex threads"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/2382",
+        "number": 2382,
+        "state": "open",
+        "title": "bb status exits 0 against a dead daemon and hangs with zero bytes against a stalled one"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/4805",
+        "number": 4805,
+        "state": "open",
+        "title": "\u041b\u043e\u043a\u0430\u043b\u044c\u043d\u044b\u0439 zoom \u0438 pan \u0432 preview \u0441 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u0435\u043c \u043c\u0430\u0441\u0448\u0442\u0430\u0431\u0430 \u0438 desktop Cmd+/\u2212/0"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/2400",
+        "number": 2400,
+        "state": "open",
+        "title": "thread spawn accepts a nonexistent model: rc=0, provisions a worktree, fails as an agent message"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/4413",
+        "number": 4413,
+        "state": "open",
+        "title": "Search and typeahead stall on full-text SQL, repeated file discovery, and slow mention providers"
+      }
+    ],
+    "total_count": 8
+  },
+  {
+    "items": [
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/3812",
+        "number": 3812,
+        "state": "open",
+        "title": "Plugin overlays render under the native Browser tab view; plugins cannot use the browser-dimming hook"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/5085",
+        "number": 5085,
+        "state": "open",
+        "title": "Run plugin extension operations privately with exclusive Browser access"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/pull/5323",
+        "number": 5323,
+        "state": "open",
+        "title": "Report anonymous browser_session_started and plugin_enabled events"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/pull/4946",
+        "number": 4946,
+        "state": "open",
+        "title": "Hide native browser tabs while plugin dialogs are open"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/pull/4593",
+        "number": 4593,
+        "state": "open",
+        "title": "Replace New tab when opening Browser or plugin actions"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/pull/4986",
+        "number": 4986,
+        "state": "open",
+        "title": "Recommend existing plugins with inline plugin cards"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/5084",
+        "number": 5084,
+        "state": "open",
+        "title": "Protected human takeover of Browser tabs across all automation surfaces"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/3184",
+        "number": 3184,
+        "state": "open",
+        "title": "Embedded Browser focus prevents app and plugin keyboard shortcuts"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/5305",
+        "number": 5305,
+        "state": "open",
+        "title": "Support persistent named profiles for local/headless Browser Automation"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/3957",
+        "number": 3957,
+        "state": "open",
+        "title": "Load Chrome extensions into the built-in desktop browser"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/2525",
+        "number": 2525,
+        "state": "open",
+        "title": "Browser-style tabs for open threads above the chat"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/4432",
+        "number": 4432,
+        "state": "open",
+        "title": "Reloading a plugin interrupts the new instance's pending interactions (`plugin-disposed`), so startup `requestInput` forms are lost"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/3892",
+        "number": 3892,
+        "state": "open",
+        "title": "Desktop browser preview can outlive a renderer-initiated reload"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/pull/4796",
+        "number": 4796,
+        "state": "open",
+        "title": "Add an optional Experimental badge for plugins"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/5416",
+        "number": 5416,
+        "state": "open",
+        "title": "Thread menus trigger expensive plugin CSS matching on populated clients"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/3357",
+        "number": 3357,
+        "state": "open",
+        "title": "Provide a user-approved local file upload path for browser automation"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/4233",
+        "number": 4233,
+        "state": "open",
+        "title": "Session context policy: let a plugin narrow what one agent session loads (BB plugins, skills, MCP, CLI plugins, instructions) \u2014 working prototype"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/5342",
+        "number": 5342,
+        "state": "open",
+        "title": "Plugin-reachable way to open a thread in a new native application window (window placement + targeting in the SDK)"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/5191",
+        "number": 5191,
+        "state": "open",
+        "title": "Desktop browser blocks Local Network Access, so Okta Verify sign-in fails"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/1632",
+        "number": 1632,
+        "state": "open",
+        "title": "Plugin HTTP: trusted local-auth multipart uploads and parameterized plugin routes"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/4944",
+        "number": 4944,
+        "state": "open",
+        "title": "Plugin SDK: three small gaps in RPC and realtime \u2014 no non-500 status for handler-side refusals, `useRealtime` is own-plugin only, `experimental_discoverRpc` has no `signal`"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/4411",
+        "number": 4411,
+        "state": "open",
+        "title": "Open browser from a right-panel new tab leaves the empty new-tab page open"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/2298",
+        "number": 2298,
+        "state": "open",
+        "title": "Archiving a thread leaves its native browser views alive"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/4167",
+        "number": 4167,
+        "state": "open",
+        "title": "Plugin backdrop contract: let plugins show a background through bb's panes without targeting private DOM"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/4438",
+        "number": 4438,
+        "state": "open",
+        "title": "Relative markdown links in plugin-embedded ThreadChat open as broken URLs against the app origin"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/pull/5417",
+        "number": 5417,
+        "state": "open",
+        "title": "Reduce plugin CSS matching cost and thread menu latency"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/4480",
+        "number": 4480,
+        "state": "open",
+        "title": "Docs opener resolves `host` sources against the primary host, not the thread's machine: 502 on server-only deployments, wrong-machine reads and writes elsewhere"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/4956",
+        "number": 4956,
+        "state": "open",
+        "title": "Make the thread Info panel a bundled, forkable plugin (like thread-list)"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/5327",
+        "number": 5327,
+        "state": "open",
+        "title": "Navigation rail (0.46.0) has nowhere to show plugin counts: experimental_sidebarAccessory is no longer shown"
+      },
+      {
+        "html_url": "https://github.com/get-bb/bb/issues/4590",
+        "number": 4590,
+        "state": "open",
+        "title": "Cmd-W with a plugin's inner pane focused closes the whole bb window: plugins have no way to join the close-window-or-side-tab arbitration"
+      }
+    ],
+    "total_count": 90
+  }
+]

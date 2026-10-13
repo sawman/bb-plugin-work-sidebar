@@ -5,6 +5,7 @@ import type { PluginSidebarPullRequest, PluginSidebarThread } from "@get-bb/plug
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getPluginQueryClient } from "../../../query-runtime";
 import { dispatchHrefClickWithoutJsdomNavigation } from "../../../tests/utils/dispatch-href-click";
+import { threadControlsHost, lifecycleCalls } from "../../../tests/utils/thread-controls-host";
 import { sidebarThreadFixture } from "../../../tests/utils/sidebar-thread";
 
 const project = { id: "project", name: "Project", isPersonal: false, href: "/projects/project", settingsHref: "/projects/project/settings" };
@@ -85,6 +86,7 @@ async function leftSlot({
   threads = [thread("thr_one", "One"), thread("thr_two", "Two")],
   groups = [{ id: "group_later", name: "Later", threadIds: [] as string[] }],
   activeProjectId = null,
+  hostSearchQuery = "",
   sidebarPullRequests = {},
   sidebarDraftThreadIds = [],
   providers = [],
@@ -94,6 +96,7 @@ async function leftSlot({
   threads?: ReturnType<typeof thread>[];
   groups?: { id: string; name: string; threadIds: string[] }[];
   activeProjectId?: string | null;
+  hostSearchQuery?: string;
   sidebarPullRequests?: Record<string, PluginSidebarPullRequest>;
   sidebarDraftThreadIds?: readonly string[];
   providers?: unknown[];
@@ -152,9 +155,10 @@ async function leftSlot({
       activeProjectId,
       isCompactViewport: false,
       onNavigate: vi.fn(),
-      searchQuery: "",
+      searchQuery: hostSearchQuery,
     },
     {
+      ...threadControlsHost,
       sidebarThreads: { status: "ready", projects: [project], threads },
       providers: { status: "ready", providers: providers as never },
       settings,
@@ -315,6 +319,19 @@ describe("R18 registered left sidebar parity", () => {
     expect(
       slot.getByRole("button", { name: "Refresh pull requests" }).classList,
     ).toContain("ws-refresh-button");
+  });
+
+  it("ignores deprecated host search while preserving local filtering", async () => {
+    const slot = await leftSlot({ hostSearchQuery: "No host match" });
+    await slot.findByRole("link", { name: /One/ });
+    expect(slot.getByRole("link", { name: /Two/ })).toBeTruthy();
+    fireEvent.click(slot.getByRole("button", { name: "Search threads" }));
+    fireEvent.change(slot.getByRole("searchbox", { name: "Search threads" }), {
+      target: { value: "One" },
+    });
+    await waitFor(() => expect(slot.queryByRole("link", { name: /Two/ })).toBeNull());
+    expect(slot.getByRole("link", { name: /One/ })).toBeTruthy();
+    slot.lifecycle.unmount();
   });
 
   it("keeps the left toolbar action layout stable while search opens", async () => {
@@ -770,7 +787,7 @@ describe("R18 registered left sidebar parity", () => {
     ).toBeTruthy();
     fireEvent.click(owner);
     await waitFor(() => expect(clipboardWrite).toHaveBeenCalledWith("One"));
-    expect(slot.inspection.sidebarActionCalls).toEqual([]);
+    expect(slot.inspection.navigateCalls).toEqual([]);
     slot.lifecycle.unmount();
   });
 
@@ -1626,8 +1643,8 @@ describe("R18 registered left sidebar parity", () => {
     });
     expect(linkedProvider.closest("article")?.textContent).toContain("Base");
     fireEvent.click(linkedProvider);
-    expect(slot.sidebarActionCalls).toContainEqual({
-      method: "open",
+    expect(slot.navigateCalls).toContainEqual({
+      method: "toThread",
       threadId: "thr_child",
       options: { split: false },
     });
@@ -1895,14 +1912,14 @@ describe("R18 registered left sidebar parity", () => {
         groups: [{ id: "group_later", name: "Later", threadIds: [] }],
       })),
     );
-    expect(slot.inspection.sidebarActionCalls).not.toContainEqual({
+    expect(lifecycleCalls).not.toContainEqual({
       method: "archive",
       threadId: "thr_parent",
     });
 
     saved.resolve({ groups: [] });
     await waitFor(() =>
-      expect(slot.inspection.sidebarActionCalls).toContainEqual({
+      expect(lifecycleCalls).toContainEqual({
         method: "archive",
         threadId: "thr_parent",
       }),

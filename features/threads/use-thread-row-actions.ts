@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { experimental_useSidebarThreadActions } from "@get-bb/plugin-sdk/app";
+import { useThreadControls } from "@/shared/use-thread-controls";
 import { threadTitle } from "@/work-model";
 import type { ThreadRowProps } from "./thread-row-types";
 
@@ -14,7 +14,7 @@ export function useThreadRowActions({
   onMoveToGroup,
   onNavigate,
 }: ThreadRowActionInput) {
-  const actions = experimental_useSidebarThreadActions();
+  const actions = useThreadControls(thread);
   const [renaming, setRenaming] = useState(false);
   const [draftTitle, setDraftTitle] = useState(threadTitle(thread));
   const open = (split = false) => {

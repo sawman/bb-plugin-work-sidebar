@@ -13,12 +13,6 @@ vi.mock("@get-bb/plugin-sdk/app", async () => {
   );
   return {
     ...actual,
-    experimental_useSidebarThreadActions: () => ({
-      open: vi.fn(),
-      rename: vi.fn(),
-      archive: vi.fn(),
-      requestDelete: vi.fn(),
-    }),
     experimental_useSidebarThreadSplit: () => ({
       splitProps: { onPointerDown: host.splitPointerDown },
       isAvailable: true,
@@ -266,3 +260,5 @@ describe("ThreadRow split ownership", () => {
     fireEvent.pointerCancel(window, { pointerId: 7 });
   });
 });
+
+vi.mock("@/shared/use-thread-controls", () => ({ useThreadControls: () => ({ open: vi.fn(), rename: vi.fn(), archive: vi.fn(), requestDelete: vi.fn(), setPinned: vi.fn(), setRead: vi.fn() }) }));

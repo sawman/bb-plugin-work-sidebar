@@ -9,7 +9,36 @@ removing any item below. Re-run the linked searches against the current open
 issues and pull requests, then confirm the shipped API through a typed plugin
 test—not just a changelog entry.
 
-Last checked: 2026-10-09 against BB 0.45.0 / SDK 0.6.15.
+Last checked: 2026-10-13 against BB 0.46.0 / SDK 0.6.37.
+
+## BB 0.46.0 audit
+
+Audited immutable `desktop-v0.46.0` at
+`4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62` and published SDK 0.6.37 on
+2026-10-13. Exact source URLs/checksums, current issue/PR query results, API
+migrations, and every watchlist disposition are recorded in the
+[0.46 audit](compatibility/bb-0.46.0/README.md).
+
+The five remaining watchlist capabilities are absent in the shipped release.
+Retain the ACP queue, indexed thread-task read, and Tasks CLI parenting patch.
+Retire Automations by root decision: exact native GET accepts the personal
+project and live proj_personal read succeeds with kind:personal. This corrects
+the direct-lookup inference in historical audits; those audits are preserved. Questions is rebased in a new
+0.46 patch preserving configurable timeout, submission summaries, and the
+persisted shared ordinary form; Tasks applies unchanged. Automations stays pristine. Existing
+0.45 and older audits/patches remain historical. Issue #1978 remains closed;
+#2200 and #2836 remain open. Focused open issue/PR searches found no
+listTasksForThread equivalent, and focused ACP/dispatcher PR searches returned
+zero. Broad unrelated hits are preserved without implying equivalence.
+
+Both sidebar surfaces use `useBbNavigate`; SDK writes replace the removed
+exported `experimental_useSidebarThreadActions` hook. BB's core lifecycle
+actions continue to own recursive archive/delete confirmation. Deprecated
+host search is ignored while local searches remain. No speculative host
+feature implementation, Human decision, or BBPLUG-414 work is included.
+Pristine 0.46 rollback artifacts/checksums are tracked in
+[`bb-plugins/rollback/bb-0.46.0`](../bb-plugins/rollback/bb-0.46.0/README.md).
+No worker deployment or reload; root owns integration and live acceptance.
 
 ## BB 0.45.0 audit
 
@@ -211,7 +240,7 @@ audit intentionally did not create speculative work.
   multi-call queue that keeps unanswered questions visible while each submitted
   answer immediately reaches the agent. The local plugin-only patch supplies
   that queue (maximum 32 questions) and `threads.send({ mode: "auto" })`
-  follow-up. It is cataloged against BB 0.45.0 with an exact source ref,
+  follow-up. It is cataloged against BB 0.46.0 with an exact source ref,
   regression suite, and rollback artifacts in
   [`bb-plugins/ask-user-question/`](bb-plugins/ask-user-question/). On every
   BB release, run `npm run bb-plugins:sync`: remove this patch only when ACP

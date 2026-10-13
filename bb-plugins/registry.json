@@ -272,6 +272,33 @@
           "turboFilter": "bb-plugin-tasks"
         }
       ]
+    },
+    "0.46.0": {
+      "sourceRef": "desktop-v0.46.0",
+      "sourceCommit": "4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62",
+      "patches": [
+        {
+          "id": "ask-user-question-acp-continuation",
+          "pluginId": "ask-user-question",
+          "pluginPath": "plugins/ask-user-question",
+          "sourcePatch": "bb-plugins/ask-user-question/acp-continuation-v0.46.patch",
+          "turboFilter": "bb-plugin-ask-user-question"
+        },
+        {
+          "id": "tasks-thread-workflow",
+          "pluginId": "tasks",
+          "pluginPath": "plugins/tasks",
+          "sourcePatch": "bb-plugins/tasks/thread-workflow.patch",
+          "turboFilter": "bb-plugin-tasks"
+        }
+      ],
+      "retiredPatches": [
+        {
+          "id": "automations-personal-projects",
+          "reason": "Native projects.get accepts the active personal project; root verified proj_personal read on live BB 0.46.0.",
+          "sourcePatch": "bb-plugins/automations/personal-projects.patch"
+        }
+      ]
     }
   }
 }

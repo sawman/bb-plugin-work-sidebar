@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, waitFor } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { toast } from "sonner";
+import { threadControlsHost, lifecycleCalls } from "../../../tests/utils/thread-controls-host";
 import { sidebarThreadFixture } from "../../../tests/utils/sidebar-thread";
 
 vi.mock("sonner", () => ({
@@ -34,6 +35,7 @@ describe("R9 production ThreadRow host behavior", () => {
         searchQuery: "",
       },
       {
+        ...threadControlsHost,
         sidebarThreads: {
           status: "ready",
           projects: [{ id: "project", name: "Project", isPersonal: false, href: "/projects/project", settingsHref: "/projects/project/settings" }],
@@ -166,10 +168,10 @@ describe("R9 production ThreadRow host behavior", () => {
     expect(link.getAttribute("data-sidebar-thread-id")).toBe("thr_parent");
     expect(link.querySelector(":scope > .ws-action-tooltip")).toBeNull();
     fireEvent.click(link, { ctrlKey: true });
-    expect(slot.inspection.sidebarActionCalls).toEqual([]);
+    expect(slot.inspection.navigateCalls).toEqual([]);
     fireEvent.click(link);
-    expect(slot.inspection.sidebarActionCalls).toContainEqual({
-      method: "open",
+    expect(slot.inspection.navigateCalls).toContainEqual({
+      method: "toThread",
       threadId: "thr_parent",
       options: { split: false },
     });
@@ -179,8 +181,8 @@ describe("R9 production ThreadRow host behavior", () => {
       await slot.findByRole("menuitem", { name: "Open in split" }),
     );
     // The harness observes the resulting sidebar action; it cannot inspect BB's pointer handoff.
-    expect(slot.inspection.sidebarActionCalls).toContainEqual({
-      method: "open",
+    expect(slot.inspection.navigateCalls).toContainEqual({
+      method: "toThread",
       threadId: "thr_parent",
       options: { split: true },
     });
@@ -252,10 +254,9 @@ describe("R9 production ThreadRow host behavior", () => {
     });
     fireEvent.keyDown(slot.getByLabelText("Thread title"), { key: "Enter" });
     await waitFor(() =>
-      expect(slot.inspection.sidebarActionCalls).toContainEqual({
-        method: "rename",
-        threadId: "thr_parent",
-        title: "Renamed",
+      expect(slot.inspection.sdkCalls).toContainEqual({
+        method: "threads.update",
+        args: [{ threadId: "thr_parent", title: "Renamed" }],
       }),
     );
     fireEvent.contextMenu(slot.getByRole("link", { name: /Parent/ }));
@@ -279,12 +280,12 @@ describe("R9 production ThreadRow host behavior", () => {
       await slot.findByRole("menuitem", { name: "Archive" }),
     );
     await waitFor(() =>
-      expect(slot.inspection.sidebarActionCalls).toContainEqual({
+      expect(lifecycleCalls).toContainEqual({
         method: "archive",
         threadId: "thr_parent",
       }),
     );
-    expect(slot.inspection.sidebarActionCalls).toContainEqual({
+    expect(lifecycleCalls).toContainEqual({
       method: "requestDelete",
       threadId: "thr_parent",
     });

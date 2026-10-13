@@ -17,6 +17,14 @@ payloads for Questions/Automations and [0.45 packages for all three plugins](rol
 Other historical deployments have local backups only; never use a different
 BB version's rollback payload.
 
+BB 0.46.0 / SDK 0.6.37 Questions and Tasks candidates are cataloged for
+non-deploy verification in BBPLUG-418. Automations is retired for 0.46 by
+root decision: native personal-project reads now work. The 0.45 deployment remains historical; no 0.46
+candidate is active until root deploys it. Pristine 0.46 rollback packages are
+tracked under [rollback/bb-0.46.0](rollback/bb-0.46.0/README.md).
+`BB_PATCH_SOURCE_ROOT` selects an already-fetched local release checkout for
+preflight; its HEAD must still match the catalog's immutable source commit.
+
 | Built-in plugin | Patch | Status |
 | --- | --- | --- |
 | `ask-user-question` | [ACP answer continuation](ask-user-question/README.md) | verified and deployed for BB 0.45.0 |

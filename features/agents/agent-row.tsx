@@ -6,7 +6,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import {
-  experimental_useSidebarThreadActions,
+  useBbNavigate,
   experimental_useSidebarThreadSplit,
 } from "@get-bb/plugin-sdk/app";
 import { CopyBadge } from "../../components/ui/copy-badge";
@@ -106,7 +106,7 @@ export function AgentRow({
   annotation: AgentAnnotation;
   model: string | null;
 }) {
-  const actions = experimental_useSidebarThreadActions();
+  const actions = useBbNavigate();
   const { splitProps, isAvailable } = experimental_useSidebarThreadSplit(
     child.thread.id,
   );
@@ -115,7 +115,7 @@ export function AgentRow({
   const workspace = agentWorkspacePresentation(child.thread);
   const title =
     child.thread.title ?? child.thread.titleFallback ?? "Untitled agent";
-  const open = (split: boolean) => actions.open(child.thread.id, { split });
+  const open = (split: boolean) => actions.toThread(child.thread.id, { split });
   return (
     <article
       className={`ws-agent-card${annotation.taskStatus === "in_review" ? " ws-agent-review" : ""}`}
