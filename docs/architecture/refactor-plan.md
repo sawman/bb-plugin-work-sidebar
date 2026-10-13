@@ -1005,7 +1005,9 @@ executable work queue.
   Query cancellation guard late publication. Canonical state/title/draft own
   PR display/actions over late enrichment, while branch-local metadata stays
   with gh-stack. Expanded missing file data reports loading while enrichment
-  is pending. Deferred tests cover cold repository/PR readiness, warm mounts,
+  is pending. One bounded per-thread PR-identity disclosure state spans
+  summary and enriched stack rows; branch-name disclosure applies only to
+  rows without a PR. Deferred tests cover cold repository/PR readiness, warm mounts,
   A→B→A, no thread leaks, lookup/observer dedupe, failures, manual/realtime
   refresh, expiry, invalidation, disposal/reload and late fingerprint races.
 - **Scope and acceptance:** a truly cold PR summary still needs host PR,

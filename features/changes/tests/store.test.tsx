@@ -14,7 +14,7 @@ describe("R13 Changes presentation store", () => {
     store.getState().toggleRepository("thr_a");
     store.getState().toggleStackBranch("thr_a", "feature/a");
     store.getState().selectFile("thr_a", "a.ts");
-    store.getState().togglePullRequest("thr_b");
+    store.getState().togglePullRequest("thr_b", "acme/repo#42");
 
     expect(store.getState().byThread.get("thr_a")).toMatchObject({
       repositoryExpanded: true,
@@ -27,9 +27,25 @@ describe("R13 Changes presentation store", () => {
         ?.expandedStackBranches.has("feature/a"),
     ).toBe(true);
     expect(store.getState().byThread.get("thr_b")).toMatchObject({
-      currentPullRequestExpanded: true,
+      expandedPullRequests: new Set(["acme/repo#42"]),
       selectedFilePath: null,
     });
+  });
+
+  it("keys one PR disclosure across representations by repository and number, isolates threads and bounds retained identities", () => {
+    const store = createChangesInteractionStore();
+    store.getState().togglePullRequest("thr_a", "acme/repo#42");
+    const expanded = store.getState().byThread.get("thr_a")?.expandedPullRequests;
+    expect(expanded?.has("acme/repo#42")).toBe(true);
+    expect(expanded?.has("acme/other#42")).toBe(false);
+    expect(expanded?.has("acme/repo#43")).toBe(false);
+    expect(store.getState().byThread.get("thr_b")).toBeUndefined();
+    store.getState().togglePullRequest("thr_a", "acme/repo#42");
+    expect(store.getState().byThread.get("thr_a")?.expandedPullRequests.has("acme/repo#42")).toBe(false);
+    for (let number = 0; number < 201; number += 1)
+      store.getState().togglePullRequest("thr_a", `acme/repo#${number}`);
+    expect(store.getState().byThread.get("thr_a")?.expandedPullRequests.size).toBe(200);
+    expect(store.getState().byThread.get("thr_a")?.expandedPullRequests.has("acme/repo#0")).toBe(false);
   });
 
   it("does not rerender a mounted thread selector when a sibling changes", () => {

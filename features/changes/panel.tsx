@@ -11,6 +11,7 @@ import {
 } from "../pull-requests/queries";
 import {
   pullRequestFactForThread,
+  pullRequestFactKey,
   pullRequestFromFact,
   resolvePullRequestFact,
 } from "../pull-requests/facts";
@@ -211,17 +212,19 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
                   currentPullRequest,
                   pullRequestFacts.data,
                 )}
-                expanded={expandedStackBranches.has(branch.name)}
+                expanded={branch.pr
+                  ? presentation?.expandedPullRequests.has(pullRequestFactKey(branch.pr)) ?? false
+                  : expandedStackBranches.has(branch.name)}
                 filesLoading={changesQuery.enrichment.isFetching}
                 externalOnModifier={externalOnModifier}
                 checkingOut={
                   checkout.isPending && checkout.variables === branch.name
                 }
-                onToggle={() =>
-                  changesInteractionStore
-                    .getState()
-                    .toggleStackBranch(threadId, branch.name)
-                }
+                onToggle={() => {
+                  const state = changesInteractionStore.getState();
+                  if (branch.pr) state.togglePullRequest(threadId, pullRequestFactKey(branch.pr));
+                  else state.toggleStackBranch(threadId, branch.name);
+                }}
                 onCheckout={() => checkoutStackBranch(branch.name)}
                 onOpenFile={(path) => {
                   if (branch.pr) openPullRequestDiff(branch.pr.number, path);
@@ -238,11 +241,11 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
           <ChangesCurrentPullRequestRow
             pullRequest={currentPullRequest}
             branch={standaloneBranch}
-            expanded={presentation?.currentPullRequestExpanded ?? false}
+            expanded={presentation?.expandedPullRequests.has(pullRequestFactKey(currentPullRequest)) ?? false}
             filesLoading={changesQuery.enrichment.isFetching}
             externalOnModifier={externalOnModifier}
             onToggle={() =>
-              changesInteractionStore.getState().togglePullRequest(threadId)
+              changesInteractionStore.getState().togglePullRequest(threadId, pullRequestFactKey(currentPullRequest))
             }
             onOpenFile={(path) =>
               openPullRequestDiff(currentPullRequest.number, path)

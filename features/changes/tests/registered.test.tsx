@@ -10,6 +10,7 @@ import {
   pullRequestFactKey,
 } from "../../pull-requests/facts";
 import { changesInteractionStore } from "../store";
+import { changesKeys } from "../model";
 import { currentPr } from "./latency-fixtures";
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
@@ -311,16 +312,54 @@ describe("R13 registered Changes Work slot", () => {
           name: "feature/42", isCurrent: false, isMerged: false, isQueued: false,
           needsRebase: false, hasStash: false, stashCount: null,
           pr: { number: 42, url: authoritative.url, title: "Old open title", state: "open", isDraft: false, metadataStale: false },
-          diff: null, aheadOfRemote: 0, behindRemote: 0,
+          diff: { additions: 1, deletions: 0, truncated: false, files: [
+            { path: "late.ts", previousPath: null, status: "modified", additions: 1, deletions: 0 },
+          ] }, aheadOfRemote: 0, behindRemote: 0,
         }],
       } },
     }));
     await waitFor(() => expect(slot.getByRole("list", { name: "GitHub Stack based on main" })).toBeTruthy());
     expect(slot.getByText(`#42 Fresh ${state}`)).toBeTruthy();
+    expect(slot.getByRole("button", { name: "Hide changed files for pull request #42" }).getAttribute("aria-expanded")).toBe("true");
+    expect(slot.getByText("late.ts")).toBeTruthy();
     expect(slot.container.querySelector(`.ws-stack-state-icon[data-tone="${state}"]`)).toBeTruthy();
     const checkout = slot.getByRole("button", { name: state === "merged" ? "Merged branch" : "Check out feature/42" });
     expect(checkout.hasAttribute("disabled")).toBe(state === "merged");
     expect(slot.queryByText("Old open title")).toBeNull();
+    slot.lifecycle.unmount();
+  });
+  it("a different PR cannot inherit the expanded summary disclosure or mismatched late stack", async () => {
+    const late = deferred<ChangesResult>();
+    let number = 42;
+    const slot = await changesSlot({
+      getChanges: () => late.promise,
+      getChangesRepository: () => repository("available"),
+      getChangesPullRequests: () => changesResult(repository("available"), { currentPullRequest: currentPr(number), stack: null }),
+      getChangesProjection: () => late.promise,
+    });
+    await waitFor(() => expect(slot.getByText("#42 PR 42")).toBeTruthy());
+    fireEvent.click(slot.getByRole("button", { name: "Show changed files for pull request #42" }));
+    expect(slot.getByText("Loading changed files…")).toBeTruthy();
+    number = 43;
+    await getPluginQueryClient().invalidateQueries({ queryKey: changesKeys.summary("thr_changes") });
+    await waitFor(() => expect(slot.getByText("#43 PR 43")).toBeTruthy());
+    expect(slot.getByRole("button", { name: "Show changed files for pull request #43" }).getAttribute("aria-expanded")).toBe("false");
+    late.resolve(changesResult(repository("available"), {
+      currentPullRequest: currentPr(42),
+      githubStack: { pending: null, error: null, stack: {
+        trunk: "main", currentBranch: "feature/42", trunkBehind: 0, prunableBranchCount: 0,
+        branches: [42, 44].map((prNumber) => ({
+          name: `feature/${prNumber}`, isCurrent: prNumber === 42, isMerged: false, isQueued: false,
+          needsRebase: false, hasStash: false, stashCount: null,
+          pr: { number: prNumber, url: currentPr(prNumber).url, title: `Old PR ${prNumber}`, state: "open", isDraft: false, metadataStale: false },
+          diff: null, aheadOfRemote: 0, behindRemote: 0,
+        })),
+      } },
+    }));
+    await waitFor(() => expect(getPluginQueryClient().getQueryState(changesKeys.projection("thr_changes"))?.fetchStatus).toBe("idle"));
+    expect(slot.getByText("#43 PR 43")).toBeTruthy();
+    expect(slot.queryByText("Loading changed files…")).toBeNull();
+    expect(slot.getByRole("button", { name: "Show changed files for pull request #43" }).getAttribute("aria-expanded")).toBe("false");
     slot.lifecycle.unmount();
   });
   it.each([

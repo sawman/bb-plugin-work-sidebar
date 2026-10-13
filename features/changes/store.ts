@@ -2,7 +2,7 @@ import { createStore } from "zustand/vanilla";
 
 type ChangesPresentation = {
   repositoryExpanded: boolean;
-  currentPullRequestExpanded: boolean;
+  expandedPullRequests: Set<string>;
   expandedStackBranches: Set<string>;
   selectedFilePath: string | null;
   selectedPullRequestNumber: number | null;
@@ -10,13 +10,13 @@ type ChangesPresentation = {
 export type ChangesInteractionState = {
   byThread: Map<string, ChangesPresentation>;
   toggleRepository(threadId: string): void;
-  togglePullRequest(threadId: string): void;
+  togglePullRequest(threadId: string, identity: string): void;
   toggleStackBranch(threadId: string, branch: string): void;
   selectFile(threadId: string, path: string | null, pullRequestNumber?: number | null): void;
 };
 const empty = (): ChangesPresentation => ({
   repositoryExpanded: false,
-  currentPullRequestExpanded: false,
+  expandedPullRequests: new Set(),
   expandedStackBranches: new Set(),
   selectedFilePath: null,
   selectedPullRequestNumber: null,
@@ -40,15 +40,18 @@ export function createChangesInteractionStore() {
         });
         return { byThread: cap(byThread) };
       }),
-    togglePullRequest: (threadId) =>
+    togglePullRequest: (threadId, identity) =>
       set((state) => {
         const byThread = new Map(state.byThread);
         const value = byThread.get(threadId) ?? empty();
+        const expandedPullRequests = new Set(value.expandedPullRequests);
+        if (expandedPullRequests.has(identity)) expandedPullRequests.delete(identity);
+        else expandedPullRequests.add(identity);
+        // Bound per-thread presentation identities as well as thread entries.
+        while (expandedPullRequests.size > 200)
+          expandedPullRequests.delete(expandedPullRequests.values().next().value!);
         byThread.delete(threadId);
-        byThread.set(threadId, {
-          ...value,
-          currentPullRequestExpanded: !value.currentPullRequestExpanded,
-        });
+        byThread.set(threadId, { ...value, expandedPullRequests });
         return { byThread: cap(byThread) };
       }),
     toggleStackBranch: (threadId, branch) =>
