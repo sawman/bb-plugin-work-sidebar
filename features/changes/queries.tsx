@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PluginRpcClient } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
 import { changesKeys, changesPolicies, remoteChangesIdentity, remoteFilesProjection } from "./model";
-import type { Changes } from "./schemas";
+import type { Changes, RemoteFileHead } from "./schemas";
 import { hydratePullRequestFacts, pullRequestKeys } from "../pull-requests/queries";
 import { factFromPullRequest, factFromSidebarStackLayer, type PullRequestFactDirectory } from "../pull-requests/facts";
 
@@ -78,7 +78,7 @@ export function useChanges(
     queryKey: changesKeys.remoteFiles(remoteIdentity?.repository ?? "none", remoteIdentity?.content ?? "none"),
     queryFn: () => rpc.call("getChangesRemoteFiles", remoteIdentity!.input),
     enabled: Boolean(remoteIdentity),
-    ...changesPolicies.projection,
+    ...stagePolling,
   });
   const url = summary.data?.currentPullRequest?.url;
   const previous = useRef<{ identity: string; fingerprint: string | null }>({
@@ -157,6 +157,7 @@ export function usePullRequestFileDiff(
   pullRequestNumber: number | null,
   path: string | null,
   identity?: string,
+  expectedHead?: RemoteFileHead,
 ) {
   return useQuery({
     queryKey: changesKeys.pullRequestFileDiff(
@@ -165,12 +166,16 @@ export function usePullRequestFileDiff(
       path ?? "none",
       identity,
     ),
-    queryFn: () =>
-      rpc.call("getPullRequestFileDiff", {
+    queryFn: async () => {
+      const result = await rpc.call("getPullRequestFileDiff", {
         threadId,
         pullRequestNumber: pullRequestNumber!,
         path: path!,
-      }),
+        ...(expectedHead ? { expectedHead } : {}),
+      });
+      if (result.kind === "unavailable") throw new Error(result.message);
+      return result;
+    },
     enabled: Boolean(path && pullRequestNumber),
     ...changesPolicies.fileDiff,
   });

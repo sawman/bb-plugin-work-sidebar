@@ -660,8 +660,11 @@ export async function fetchGitHubStack(
   pullRequest: number,
   run: GitHubApiRunner,
   lifecycle: ServerLifecycle,
+  discovered?: ReturnType<typeof parseGitHubStackResponse>,
 ): Promise<{ number: number; base: string; currentPullRequest: number; pullRequests: Array<GitHubPullRequest & GitHubSignal> } | null> {
-  const raw = parseGitHubStackResponse(JSON.parse(await run(githubStackApiArgs(owner, repo, pullRequest), 4_000_000)));
+  const raw = discovered === undefined
+    ? parseGitHubStackResponse(JSON.parse(await run(githubStackApiArgs(owner, repo, pullRequest), 4_000_000)))
+    : discovered;
   if (!raw) return null;
   const pullRequests = await Promise.all(raw.pullRequests.map(async (item) => {
     if (!needsGitHubPullRequestRecovery(item)) return item;

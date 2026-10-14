@@ -209,6 +209,8 @@ describe("R2 server registration and disposal", () => {
       "listHumanMessages",
       "acknowledgeHumanMessage",
       "setHumanMessageBookmark",
+      "getChangesRemoteFiles",
+      "invalidateChangesRemote",
       "getChanges",
       "getChangesRepository",
       "getChangesPullRequests",

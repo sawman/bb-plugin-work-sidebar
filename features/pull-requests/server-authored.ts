@@ -3,6 +3,7 @@ import { z } from "zod";
 import { rpcContract } from "../../contracts.js";
 import type { ServerLifecycle } from "../../server-lifecycle.js";
 import { clearGitHubReadCache, githubReadHealth } from "../../shared/github/read-cache.js";
+import type { RepositoryTopologyReader } from "./remote-topology-server.js";
 import type { GitHubCommandService } from "./server-github-read.js";
 import { createPullRequestService } from "./server.js";
 import {
@@ -127,7 +128,7 @@ function createAuthoredReader(
   };
 }
 
-function createAuthoredStackReader(read: GitHubReadRunner) {
+function createAuthoredStackReader(read: GitHubReadRunner, topology?: RepositoryTopologyReader) {
   return async (base: AuthoredPullRequest[]): Promise<AuthoredPullRequest[]> => {
     const byPullRequest = new Map(base.map((item) => [`${item.repository}#${item.number}`, item]));
     const byRepository = new Map<string, AuthoredPullRequest[]>();
@@ -148,7 +149,7 @@ function createAuthoredStackReader(read: GitHubReadRunner) {
         authoredItems.map((item) => item.number),
       );
       try {
-        const stacks = parseGitHubStacksResponse(
+        const stacks = topology ? await topology.repository(owner, repo) : parseGitHubStacksResponse(
           JSON.parse(
             await read(githubStacksApiArgs(owner, repo), 12_000_000),
           ) as unknown,
@@ -207,6 +208,7 @@ export function createAuthoredPullRequestService(
   bb: BbPluginApi,
   lifecycle: ServerLifecycle,
   commands: GitHubCommandService,
+  topology?: RepositoryTopologyReader,
 ): AuthoredHandlers {
   const settings = bb.settings.define({
     githubAuthoredLogin: {
@@ -234,7 +236,7 @@ export function createAuthoredPullRequestService(
   const authored = createPullRequestService<AuthoredPullRequest>({
     now: () => Date.now(),
     readAuthored: createAuthoredReader(lifecycle, commands.read, readAuthor),
-    readStacks: createAuthoredStackReader(commands.read),
+    readStacks: createAuthoredStackReader(commands.read, topology),
     archivedRepositories: async (items) => archivedRepositories(items.map((item) => item.repository)),
     setDraft: async (url, draft) => {
       await commands.execute(["pr", "ready", url, ...(draft ? ["--undo"] : [])], 1_000_000);

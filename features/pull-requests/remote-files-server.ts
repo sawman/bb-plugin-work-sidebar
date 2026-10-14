@@ -1,16 +1,22 @@
+import { z } from "zod";
 import type { RemoteFiles, RemoteFilesInput } from "../changes/schemas.js";
 import type { ServerLifecycle } from "../../server-lifecycle.js";
 import type { GitHubReadRunner } from "./server-types.js";
 import { createRemoteCache } from "./remote-cache.js";
 import { readGitHubPullRequestDiff } from "./server-stack.js";
 
+export const REMOTE_FILES_VALIDATION_MS = 120_000;
+export const REMOTE_FILES_RETENTION_MS = 10 * 60_000;
+const remoteHeadSchema = z.object({ sha: z.string().min(1), ref: z.string() });
+export const remoteMetadataSchema = z.object({ head: remoteHeadSchema, base: remoteHeadSchema });
+type FileSnapshot = { record: RemoteFiles["files"][number]; validatedAt: number };
 export function repositoryFromUrl(url: string): string | null {
   const match = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/([1-9]\d*)$/i);
   return match ? `${match[1]}/${match[2]}`.toLowerCase() : null;
 }
-/** Only GitHub-derived file collections cross thread boundaries. No SDK handles. */
+/** One bounded retained snapshot; only the validation deadline controls upstream reads. */
 export function createRemoteFilesService(lifecycle: ServerLifecycle, read: GitHubReadRunner) {
-  const cache = lifecycle.own(createRemoteCache<RemoteFiles["files"][number]>());
+  const cache = lifecycle.own(createRemoteCache<FileSnapshot>({ ttlMs: REMOTE_FILES_RETENTION_MS }));
   lifecycle.onRemoteInvalidated((repository) => cache.invalidate(repository ? `${repository}:` : ""));
   async function loadPr(entry: RemoteFilesInput["pullRequests"][number]) {
     const repository = repositoryFromUrl(entry.url);
@@ -18,22 +24,30 @@ export function createRemoteFilesService(lifecycle: ServerLifecycle, read: GitHu
     const number = Number(entry.url.split("/").pop());
     const revision = lifecycle.remoteGeneration(repository);
     const key = `${repository}:${number}:${JSON.stringify([entry.head, entry.base])}`;
-    return cache.read(key, async () => {
-      const args = ["api", "--method", "GET", `repos/${repository}/pulls/${number}`];
+    const previous = cache.peek(key);
+    const result = await cache.read(key, async () => {
       const metadata = async () => {
-        const value = JSON.parse(await read(args, 2_000_000, 0)) as { head?: { sha?: string; ref?: string }; base?: { sha?: string; ref?: string } };
-        if (!value.head?.sha || !value.base?.sha || value.head.ref !== entry.head || value.base.ref !== entry.base)
+        const raw = await read(["api", "--method", "GET", `repos/${repository}/pulls/${number}`], 2_000_000, 0);
+        const value = remoteMetadataSchema.parse(JSON.parse(raw));
+        if (value.head.ref !== entry.head || value.base.ref !== entry.base)
           throw new Error("Remote pull request identity changed. Refresh Changes.");
         return { headSha: value.head.sha, baseSha: value.base.sha };
       };
       const before = await metadata();
-      const [owner, repo] = repository.split("/");
-      const diff = await readGitHubPullRequestDiff(owner, repo, number, (args, buffer) => read(args, buffer, 0));
-      const after = await metadata();
-      if (before.headSha !== after.headSha || before.baseSha !== after.baseSha || lifecycle.remoteGeneration(repository) !== revision || lifecycle.isDisposed)
+      let diff = previous?.record.headSha === before.headSha && previous.record.baseSha === before.baseSha
+        ? previous.record.diff : null;
+      if (!diff) {
+        const [owner, repo] = repository.split("/");
+        diff = await readGitHubPullRequestDiff(owner, repo, number, (args, buffer) => read(args, buffer, 0, JSON.stringify(before)));
+        const after = await metadata();
+        if (before.headSha !== after.headSha || before.baseSha !== after.baseSha)
+          throw new Error("Remote pull request identity changed during the read.");
+      }
+      if (lifecycle.remoteGeneration(repository) !== revision || lifecycle.isDisposed)
         throw new Error("Remote pull request identity changed during the read.");
-      return { ...entry, url: `https://github.com/${repository}/pull/${number}`, ...after, diff };
-    });
+      return { record: { ...entry, url: `https://github.com/${repository}/pull/${number}`, ...before, diff }, validatedAt: Date.now() };
+    }, () => true, { reuse: (snapshot) => Date.now() - snapshot.validatedAt < REMOTE_FILES_VALIDATION_MS });
+    return result.record;
   }
   return {
     async files(input: RemoteFilesInput): Promise<RemoteFiles> {

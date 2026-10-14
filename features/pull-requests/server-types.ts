@@ -63,7 +63,7 @@ export type GitHubSignal = {
 };
 
 export type GitHubApiRunner = (args: readonly string[], maxBuffer: number) => Promise<string>;
-export type GitHubReadRunner = (args: readonly string[], maxBuffer: number, cacheTtlMs?: number) => Promise<string>;
+export type GitHubReadRunner = (args: readonly string[], maxBuffer: number, cacheTtlMs?: number, identity?: string) => Promise<string>;
 
 export type AuthoredPullRequest = {
   number: number;

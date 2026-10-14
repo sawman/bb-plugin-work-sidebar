@@ -121,8 +121,8 @@ export function createChangesRegistration(
     async getWorkingTreeFileDiff({ threadId, path }) {
       return changes.fileDiff(threadId, path);
     },
-    async getPullRequestFileDiff({ threadId, pullRequestNumber, path }) {
-      return changes.pullRequestFileDiff(threadId, pullRequestNumber, path);
+    async getPullRequestFileDiff({ threadId, pullRequestNumber, path, expectedHead }) {
+      return changes.pullRequestFileDiff(threadId, pullRequestNumber, path, expectedHead);
     },
   };
 }

@@ -1,3 +1,7 @@
+import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
+import { createPullRequestRegistration } from "../server-registration";
+import { createChangesRegistration } from "../../changes/server-registration";
+import { createRepositoryTopologyReader } from "../remote-topology-server";
 import { describe, expect, it, vi } from "vitest";
 import { createRemoteCache } from "../remote-cache";
 import { createRemoteFilesService } from "../remote-files-server";
@@ -144,5 +148,123 @@ describe("R41 related invalidation", () => {
     await expect(read).resolves.toBe("unrelated");
     expect(lifecycle.githubReadCache.size).toBe(1);
     lifecycle.dispose();
+  });
+});
+
+describe("R41 topology upstream deadline", () => {
+  it("a119s refill and aliases cannot extend contributing raw120s expiry", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(100_000);
+    const lifecycle = createServerLifecycle(); let title = "old";
+    const command = vi.fn(async (args: readonly string[]) => args[3]?.includes("stacks")
+      ? JSON.stringify([{ number: 17, base: { ref: "main" }, pull_requests: [{ number: 1, state: "open", draft: false, title,
+        html_url: currentPr(1).url, head: { ref: "feature/1" }, base: { ref: "main" } }] }])
+      : JSON.stringify({ data: { repository: { p0: { reviewDecision: "APPROVED", reviewRequests: { nodes: [] }, reviews: { nodes: [] }, commits: { nodes: [] } } } } }));
+    const read = (args: readonly string[], buffer: number, ttlMs = 120_000) => readGitHub(lifecycle, command,
+      () => ({ state: "unavailable", scope: "rest", message: null, retryAt: null }), args, buffer, ttlMs);
+    const bb = { sdk: { threads: { get: async () => ({ environmentId: "env" }) }, environments: { pullRequest: async () => ({
+      outcome: "available", pullRequest: { ...currentPr(1), headRefName: "feature/1", baseRefName: "main" },
+    }) } } };
+    const service = createThreadStackService(bb as never, lifecycle, read);
+    expect((await service.summary("thr_a")).stack?.pullRequests[0].title).toBe("old");
+    title = "new"; vi.setSystemTime(219_000);
+    expect((await service.summary("thr_b")).stack?.pullRequests[0].title).toBe("old");
+    vi.setSystemTime(220_001);
+    expect((await service.summary("thr_c")).stack?.pullRequests[0].title).toBe("new");
+    expect(command.mock.calls.filter(([args]) => args[3]?.includes("stacks"))).toHaveLength(2);
+    lifecycle.dispose(); vi.useRealTimers();
+  });
+});
+
+describe("R41 conditional file validation budget", () => {
+  it("hits do not advance120s validation; stable SHA costs one lookup and changed SHA costs three", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(100_000);
+    const lifecycle = createServerLifecycle(); let sha = "one";
+    const read = vi.fn(async (args: readonly string[]) => args[3].endsWith("files?per_page=100")
+      ? JSON.stringify([{ filename: "a.ts", status: "modified", additions: 1, deletions: 0 }])
+      : JSON.stringify({ head: { ref: "one", sha }, base: { ref: "main", sha: "base" } }));
+    const service = createRemoteFilesService(lifecycle, read);
+    const input = { pullRequests: [{ url: "https://github.com/acme/repo/pull/1", head: "one", base: "main" }] };
+    await service.files(input); expect(read).toHaveBeenCalledTimes(3);
+    for (const elapsed of [30_000, 60_000, 90_000, 119_999]) { vi.setSystemTime(100_000 + elapsed); await service.files(input); }
+    expect(read).toHaveBeenCalledTimes(3);
+    vi.setSystemTime(220_000); await service.files(input); expect(read).toHaveBeenCalledTimes(4);
+    sha = "two"; vi.setSystemTime(340_000);
+    expect((await service.files(input)).files[0].headSha).toBe("two");
+    expect(read).toHaveBeenCalledTimes(7);
+    expect(read.mock.calls.filter(([args]) => args[3].endsWith("files?per_page=100"))).toHaveLength(2);
+    service.invalidate("acme/repo"); await service.files(input); expect(read).toHaveBeenCalledTimes(10);
+    lifecycle.dispose(); vi.useRealTimers();
+  });
+});
+
+describe("R41 registered common topology", () => {
+  it.each(["left-first", "right-first"])("%s uses one semantic repository batch; authored filtering does not prune full right topology", async (order) => {
+    const host = createFakePluginHost(); const lifecycle = createServerLifecycle();
+    const rawMembers = [1, 2].map((number) => ({ number, state: number === 2 ? "merged" : "open", draft: false,
+      title: `Raw ${number}`, html_url: currentPr(number).url, head: { ref: `feature/${number}` }, base: { ref: "main" } }));
+    const read = vi.fn(async (args: readonly string[]) => {
+      if (args[0] === "search") return JSON.stringify([{ number: 1, title: "Authored title", url: currentPr(1).url, repository: { nameWithOwner: "acme/repo" }, state: "OPEN", isDraft: false }]);
+      if (args[3]?.includes("stacks")) return JSON.stringify([[{ number: 17, base: { ref: "main" }, pull_requests: rawMembers }]]);
+      if (args.join(" ").includes("isArchived")) return JSON.stringify({ data: { r0: { isArchived: false } } });
+      return JSON.stringify({ data: { repository: {
+        p0: { headRefName: "feature/1", baseRefName: "main", reviewDecision: "APPROVED", reviewRequests: { nodes: [] }, reviews: { nodes: [] }, commits: { nodes: [] } },
+        p1: { headRefName: "feature/2", baseRefName: "main", reviewDecision: "APPROVED", reviewRequests: { nodes: [] }, reviews: { nodes: [] }, commits: { nodes: [] } },
+      } } });
+    });
+    const bb = { ...host.bb, sdk: { ...host.bb.sdk,
+      threads: { get: vi.fn(async () => ({ environmentId: "env" })) },
+      environments: { pullRequest: vi.fn(async () => ({ outcome: "available", pullRequest: { ...currentPr(1), headRefName: "feature/1", baseRefName: "main" } })) },
+    } };
+    const pullRequests = createPullRequestRegistration(bb as never, lifecycle, { read, execute: vi.fn() });
+    const changes = createChangesRegistration({ bb, pullRequests } as never);
+    const loadLeft = () => pullRequests.sidebarAuthoredPullRequestStacks(null);
+    const loadRight = () => changes.getChangesPullRequests({ threadId: "thr_a" });
+    const left = order === "left-first" ? await loadLeft() : (await loadRight(), await loadLeft());
+    const right = await loadRight();
+    expect(left.available).toBe(true); expect(left.pullRequests).toHaveLength(1);
+    expect(left.pullRequests[0].title).toBe("Authored title");
+    expect(left.pullRequests[0].stack?.pullRequests.map((entry) => entry.number)).toEqual([1]);
+    expect(right.stack?.pullRequests.map((entry) => entry.number)).toEqual([1, 2]);
+    expect(read.mock.calls.filter(([args]) => args[3]?.includes("stacks"))).toHaveLength(1);
+    expect(read.mock.calls.find(([args]) => args[3]?.includes("stacks"))![0]).toContain("--paginate");
+    lifecycle.dispose();
+  });
+
+  it("isolates same stack/PR numbers by repo and retains full targeted fallback when listing omits a stack", async () => {
+    const lifecycle = createServerLifecycle();
+    const read = vi.fn(async (args: readonly string[]) => {
+      const scope = args[3].includes("other/repo") ? "other/repo" : "acme/repo";
+      if (args.includes("--paginate") && scope === "acme/repo") return "[]";
+      return JSON.stringify([{ number: 17, base: { ref: "main" }, pull_requests: [1, 2].map((number) => ({
+        number, state: number === 2 ? "merged" : "open", draft: false, title: `${scope} ${number}`,
+        html_url: `https://github.com/${scope}/pull/${number}`, head: { ref: `feature/${number}` }, base: { ref: "main" },
+      })) }]);
+    });
+    const topology = createRepositoryTopologyReader(lifecycle, read);
+    expect((await topology.member("acme", "repo", 1, "feature/1", "main"))?.pullRequests).toHaveLength(2);
+    expect((await topology.repository("acme", "repo"))[0].pullRequests[1].state).toBe("merged");
+    expect((await topology.member("other", "repo", 1, "feature/1", "main"))?.pullRequests[0].title).toBe("other/repo 1");
+    expect(read.mock.calls.filter(([args]) => args.includes("--paginate"))).toHaveLength(2);
+    clearGitHubReadCache(lifecycle, "acme/repo");
+    await topology.member("acme", "repo", 1, "feature/1", "main");
+    expect(read.mock.calls.filter(([args]) => args[3].includes("acme/repo"))).toHaveLength(4);
+    await topology.member("other", "repo", 1, "feature/1", "main");
+    expect(read.mock.calls.filter(([args]) => args[3].includes("other/repo"))).toHaveLength(1);
+    lifecycle.dispose(); await expect(topology.repository("acme", "repo")).rejects.toThrow("disposed");
+  });
+});
+
+describe("R41 immutable pending identity", () => {
+  it("a new SHA pair cannot join an old file command even with identical GitHub args", async () => {
+    const lifecycle = createServerLifecycle(); const old = deferred<string>(); const fresh = deferred<string>();
+    const command = vi.fn().mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise);
+    const classify = () => ({ state: "unavailable" as const, scope: "rest" as const, message: null, retryAt: null });
+    const args = ["api", "--method", "GET", "repos/acme/repo/pulls/1/files?per_page=100"];
+    const a = readGitHub(lifecycle, command, classify, args, 100, 0, "head1:base");
+    const b = readGitHub(lifecycle, command, classify, args, 100, 0, "head2:base");
+    expect(command).toHaveBeenCalledTimes(2);
+    fresh.resolve("new head"); await expect(b).resolves.toBe("new head");
+    old.resolve("old head"); await expect(a).resolves.toBe("old head");
+    expect(lifecycle.githubReadCache.size).toBe(0); lifecycle.dispose();
   });
 });

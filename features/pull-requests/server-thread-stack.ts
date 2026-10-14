@@ -25,7 +25,8 @@ import type {
   GitHubSignal,
 } from "./server-types.js";
 
-import { createRemoteCache } from "./remote-cache.js";
+import { remoteMetadataSchema } from "./remote-files-server.js";
+import { createRepositoryTopologyReader, type RepositoryTopologyReader } from "./remote-topology-server.js";
 import { createThreadReadService } from "./thread-read-server.js";
 
 const GITHUB_STACK_PLUGIN_ID = "gh-stack";
@@ -241,10 +242,10 @@ async function hydratePullRequestDiffs(
     /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+/,
   );
   if (!projection || !repository) return projection;
-  return {
-    ...projection,
-    branches: await Promise.all(
-      projection.branches.map(async (branch) => {
+  const branches: GitHubStackBranch[] = [];
+  for (let offset = 0; offset < projection.branches.length; offset += 8) {
+    branches.push(...await Promise.all(
+      projection.branches.slice(offset, offset + 8).map(async (branch) => {
         if (branch.diff || !branch.pr) return branch;
         try {
           return {
@@ -263,8 +264,9 @@ async function hydratePullRequestDiffs(
           return branch;
         }
       }),
-    ),
-  };
+    ));
+  }
+  return { ...projection, branches };
 }
 
 /** Thread-facing Stack projection and gh-stack RPC adapter. REST enrichment stays in server-stack. */
@@ -273,17 +275,16 @@ export function createThreadStackService(
   lifecycle: ServerLifecycle,
   read: GitHubReadRunner,
   remoteFiles?: PullRequestChangesAdapter["remoteFiles"],
+  topology: RepositoryTopologyReader = createRepositoryTopologyReader(lifecycle, read),
 ): ThreadStackService {
-  type RemoteStack = Omit<NonNullable<Awaited<ReturnType<typeof fetchGitHubStack>>>, "currentPullRequest">;
-  const remoteStacks = lifecycle.own(createRemoteCache<RemoteStack>());
-  lifecycle.onRemoteInvalidated((repository) => remoteStacks.invalidate(repository ? `${repository}:` : ""));
   const githubStackCall = <T>(method: string, input: PluginRpcInput, outputSchema: z.ZodType<T>) => {
     if (lifecycle.isDisposed) return Promise.reject(new Error("PR service is disposed."));
     return bb.sdk.plugins.callRpc({ pluginId: GITHUB_STACK_PLUGIN_ID, method, input, outputSchema });
   };
-  const readWhileActive: GitHubReadRunner = (args, buffer, ttlMs) => {
+  const readWhileActive: GitHubReadRunner = (args, buffer, ttlMs, identity) => {
     if (lifecycle.isDisposed) return Promise.reject(new Error("PR service is disposed."));
-    return read(args, buffer, ttlMs);
+    if (identity !== undefined) return read(args, buffer, ttlMs, identity);
+    return ttlMs === undefined ? read(args, buffer) : read(args, buffer, ttlMs);
   };
   const readStackForThread = async (threadId: string) => {
     const thread = await bb.sdk.threads.get({ threadId });
@@ -314,26 +315,9 @@ export function createThreadStackService(
           ),
         );
       }
-      const repository = `${match[1]}/${match[2]}`.toLowerCase();
-      const stackKey = (number: number, head: string, base: string) => `${repository}:${JSON.stringify([number, head, base])}`;
-      const revision = lifecycle.remoteGeneration(repository);
-      const requestKey = stackKey(currentPullRequest.number, currentPullRequest.head, currentPullRequest.base);
-      const shared = await remoteStacks.read(
-        requestKey,
-        async () => {
-          const discovered = await fetchGitHubStack(match[1], match[2], currentPullRequest.number, (args, buffer) => readWhileActive(args, buffer), lifecycle);
-          if (revision !== lifecycle.remoteGeneration(repository) || lifecycle.isDisposed) throw new Error("Remote stack changed during the read.");
-          if (!discovered) return null!;
-          const { currentPullRequest: _requestedNumber, ...snapshot } = discovered;
-          return snapshot;
-        },
-        (value) => Boolean(value) && lifecycle.githubRestHealth.state === "available"
-          && lifecycle.githubGraphqlHealth.state === "available",
-      );
-      if (revision !== lifecycle.remoteGeneration(repository) || lifecycle.isDisposed) throw new Error("Remote stack changed during the read.");
-      if (shared) for (const member of shared.pullRequests)
-        remoteStacks.alias(requestKey, stackKey(member.number, member.head, member.base));
-      const stack = shared ? { ...shared, currentPullRequest: currentPullRequest.number } : null;
+      const discovered = await topology.member(match[1], match[2], currentPullRequest.number, currentPullRequest.head, currentPullRequest.base);
+      const stack = await fetchGitHubStack(match[1], match[2], currentPullRequest.number,
+        (args, buffer) => readWhileActive(args, buffer), lifecycle, discovered);
       let signal: GitHubSignal | undefined = stack?.pullRequests.find((pullRequest) =>
         pullRequest.number === currentPullRequest.number,
       );
@@ -499,6 +483,7 @@ export function createThreadStackService(
     threadId,
     pullRequestNumber,
     path,
+    expectedHead,
   ) => {
     const remote = await stackForThread(threadId);
     const current = remote.currentPullRequest;
@@ -513,13 +498,27 @@ export function createThreadStackService(
         message: "This pull request is no longer available for the thread.",
       };
     try {
-      return await readGitHubPullRequestFilePatch(
+      const metadata = async () => {
+        const raw = await readWhileActive(["api", "--method", "GET", `repos/${repository[1]}/${repository[2]}/pulls/${pullRequestNumber}`], 2_000_000, 0);
+        const head = remoteMetadataSchema.parse(JSON.parse(raw));
+        return { headSha: head.head.sha, baseSha: head.base.sha };
+      };
+      const before = expectedHead ? await metadata() : null;
+      if (expectedHead && (before?.headSha !== expectedHead.headSha || before.baseSha !== expectedHead.baseSha))
+        throw new Error("Pull request head changed. Refresh Changes.");
+      const result = await readGitHubPullRequestFilePatch(
         repository[1],
         repository[2],
         pullRequestNumber,
         path,
-        (args, buffer) => readWhileActive(args, buffer, 0),
+        (args, buffer) => readWhileActive(args, buffer, 0, before ? JSON.stringify(before) : undefined),
       );
+      if (expectedHead) {
+        const after = await metadata();
+        if (after.headSha !== expectedHead.headSha || after.baseSha !== expectedHead.baseSha)
+          throw new Error("Pull request head changed during the read. Refresh Changes.");
+      }
+      return result;
     } catch (error) {
       return {
         kind: "unavailable",
@@ -531,7 +530,7 @@ export function createThreadStackService(
   };
   return { ...handlers, summary, projection, checkout, fileDiff,
     invalidateRemote(repository) {
-      remoteStacks.invalidate(repository ? `${repository.toLowerCase()}:` : "");
+      topology.invalidate(repository);
       // Host associations stay concurrent-only; retire in-flight summaries too.
       threadReads.invalidateAll();
     },

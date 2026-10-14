@@ -111,3 +111,43 @@ describe("R41 remote readiness and Query ownership", () => {
     view.unmount(); second.unmount(); client.clear();
   });
 });
+
+describe("R41 mounted remote expiry", () => {
+  it("polls a stable semantic roster for sibling SHA changes while local enrichment is pending", async () => {
+    vi.useFakeTimers(); const client = new QueryClient(); let additions = 1;
+    const rpc = { call: vi.fn(async (method: string, input: any) => {
+      if (method === "getChangesRepository") return repo("A");
+      if (method === "getChangesPullRequests") return summary();
+      if (method === "getChangesProjection") return new Promise(() => {});
+      if (method === "getChangesRemoteFiles") return { files: input.pullRequests.map((entry: any) => ({ ...entry, headSha: String(additions), baseSha: "base", diff: { ...diff, additions } })) };
+      return { fingerprint: "unchanged" };
+    }) };
+    const view = renderHook(() => useChanges(rpc as never, "thr_a", polling), { wrapper: wrapper(client) });
+    await act(async () => { await vi.advanceTimersByTimeAsync(10); });
+    expect(view.result.current.remoteFiles.data?.files[1].diff.additions).toBe(1);
+    additions = 9;
+    await act(async () => { await vi.advanceTimersByTimeAsync(180_001); });
+    expect(view.result.current.remoteFiles.data?.files[1].diff.additions).toBe(9);
+    expect(view.result.current.enrichment.isPending).toBe(true);
+    view.unmount(); client.clear(); vi.useRealTimers();
+  });
+});
+
+describe("R41 refresh coordination", () => {
+  it("coalesces parallel manual/same-event refreshes and executes a distinct successor after failure", async () => {
+    const client = new QueryClient(); client.setQueryData(changesKeys.summary("thr_a"), summary());
+    const first = deferred<any>(); let calls = 0;
+    const rpc = { call: vi.fn(async () => { calls++; return calls === 1 ? first.promise : { ok: true }; }) };
+    const token = {};
+    const a = refreshChanges(rpc as never, client, "thr_a", token);
+    const b = refreshChanges(rpc as never, client, "thr_a", token);
+    const manual = refreshChanges(rpc as never, client, "thr_a");
+    await waitFor(() => expect(calls).toBe(1));
+    const next = refreshChanges(rpc as never, client, "thr_a", {});
+    first.resolve(Promise.reject(new Error("first failed")));
+    await Promise.all([a, b, manual, next]);
+    expect(calls).toBe(2);
+    await refreshChanges(rpc as never, client, "thr_a"); expect(calls).toBe(3);
+    client.clear();
+  });
+});

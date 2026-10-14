@@ -148,6 +148,8 @@ export const remoteFilesInputSchema = z.object({
 export const remoteFilesSchema = z.object({
   files: z.array(z.object({ url: z.string().url(), head: z.string(), base: z.string(), headSha: z.string(), baseSha: z.string(), diff: stackChange }).strict()),
 }).strict();
+export const remoteFileHeadSchema = z.object({ headSha: z.string().min(1), baseSha: z.string().min(1) }).strict();
+export type RemoteFileHead = z.infer<typeof remoteFileHeadSchema>;
 export type RemoteFilesInput = z.infer<typeof remoteFilesInputSchema>;
 export type RemoteFiles = z.infer<typeof remoteFilesSchema>;
 export const changesRpcSchemas = {
@@ -190,6 +192,7 @@ export const changesRpcSchemas = {
         threadId: z.string().startsWith("thr_"),
         pullRequestNumber: z.number().int().positive(),
         path: z.string().min(1),
+        expectedHead: remoteFileHeadSchema.optional(),
       })
       .strict(),
     output: workingTreeFileDiffSchema,

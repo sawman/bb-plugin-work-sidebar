@@ -33,22 +33,76 @@ export function invalidateChanges(
   ]);
 }
 
-/** Retire server/raw work before refetching the related semantic Query keys. */
-export async function refreshChanges(rpc: PluginRpcClient<typeof rpcContract>, client: QueryClient, threadId: string) {
+type RefreshCycle = {
+  promise: Promise<void>;
+  signals: WeakSet<object>;
+  followup: boolean;
+  threadId: string;
+};
+// Pending coordination only; no domain records, SDK singleton or retained timer.
+const refreshCycles = new WeakMap<QueryClient, Map<string, RefreshCycle>>();
+
+/** One remote invalidation at a time per client/repository. New events get a successor. */
+export async function refreshChanges(
+  rpc: PluginRpcClient<typeof rpcContract>, client: QueryClient, threadId: string,
+  eventToken?: object,
+) {
   const summary = client.getQueryData<Parameters<typeof remoteChangesIdentity>[0]>(changesKeys.summary(threadId));
   const identity = remoteChangesIdentity(summary);
-  if (identity) {
-    await client.cancelQueries({ queryKey: changesKeys.remoteFiles(identity.repository) });
-    const related = client.getQueriesData({ queryKey: ["work-sidebar", "changes"] })
-      .filter(([key, value]) => key[3] === "summary" && remoteChangesIdentity(value as Parameters<typeof remoteChangesIdentity>[0])?.repository === identity.repository);
-    await Promise.all([...new Set([threadId, ...related.map(([key]) => String(key[2]))])].flatMap((entry) =>
-      ["summary", "projection", "pull-request-file-diff"].map((stage) =>
-        client.cancelQueries({ queryKey: ["work-sidebar", "changes", entry, stage] }),
-      ),
-    ));
+  const scope = identity?.repository ?? "unknown";
+  let cycles = refreshCycles.get(client);
+  if (!cycles) { cycles = new Map(); refreshCycles.set(client, cycles); }
+  let cycle = cycles.get(scope);
+  if (cycle) {
+    if (eventToken && !cycle.signals.has(eventToken)) {
+      cycle.signals.add(eventToken); cycle.followup = true; cycle.threadId = threadId;
+    }
+  } else {
+    if (cycles.size >= 128) throw new Error("Changes refresh capacity reached.");
+    cycle = { promise: Promise.resolve(), signals: new WeakSet(), followup: false, threadId };
+    if (eventToken) cycle.signals.add(eventToken);
+    const active = cycle;
+    const owners = cycles;
+    owners.set(scope, active);
+    active.promise = Promise.resolve().then(() => client.fetchQuery({
+      queryKey: ["work-sidebar", "changes-refresh", scope],
+      staleTime: 0, gcTime: 0, retry: false,
+      queryFn: async ({ signal }) => {
+        let failure: unknown;
+        do {
+          active.followup = false;
+          failure = undefined;
+          try {
+            if (signal.aborted) throw new Error("Changes refresh was cancelled.");
+            const target = active.threadId;
+            const related = client.getQueriesData({ queryKey: ["work-sidebar", "changes"] })
+              .filter(([key, value]) => key[3] === "summary" && remoteChangesIdentity(value as Parameters<typeof remoteChangesIdentity>[0])?.repository === identity?.repository);
+            const threads = [...new Set([target, ...related.map(([key]) => String(key[2]))])];
+            await Promise.all([
+              ...(identity ? [client.cancelQueries({ queryKey: changesKeys.remoteFiles(identity.repository) })] : []),
+              ...threads.flatMap((entry) => ["summary", "projection", "pull-request-file-diff"].map((stage) =>
+                client.cancelQueries({ queryKey: ["work-sidebar", "changes", entry, stage] }),
+              )),
+            ]);
+            if (signal.aborted) throw new Error("Changes refresh was cancelled.");
+            await rpc.call("invalidateChangesRemote", { repository: identity?.repository ?? null });
+            if (signal.aborted) throw new Error("Changes refresh was cancelled.");
+            await invalidateChanges(client, target);
+          } catch (error) { failure = error; }
+          // Each pass consumes one coalesced set of genuinely new signals.
+          // There is no retry on failure and no overlap between invalidations.
+        } while (active.followup && !signal.aborted);
+        if (failure) throw failure;
+        return null;
+      },
+    })).then(() => undefined).finally(() => {
+      if (owners.get(scope) === active) owners.delete(scope);
+      if (!owners.size) refreshCycles.delete(client);
+    });
   }
-  await rpc.call("invalidateChangesRemote", { repository: identity?.repository ?? null });
-  return invalidateChanges(client, threadId);
+  await cycle.promise;
+  if (threadId !== cycle.threadId)
+    await client.invalidateQueries({ queryKey: changesKeys.repository(threadId) }, { cancelRefetch: false });
 }
 
 export async function invalidateRemoteChangesForRepository(client: QueryClient, repository: string) {

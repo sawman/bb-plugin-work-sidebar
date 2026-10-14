@@ -10,6 +10,7 @@ export type ChangesServiceDependencies = {
     threadId: string,
     pullRequestNumber: number,
     path: string,
+    expectedHead?: import("./schemas.js").RemoteFileHead,
   ): Promise<WorkingTreeFileDiff>;
 };
 
@@ -66,8 +67,10 @@ export function createChangesService(dependencies: ChangesServiceDependencies) {
     fingerprint(threadId: string, url: string) { return dependencies.fingerprint(threadId, url); },
     checkout(threadId: string, branch: string) { return dependencies.checkout(threadId, branch); },
     fileDiff(threadId: string, path: string) { return dependencies.fileDiff(threadId, path); },
-    pullRequestFileDiff(threadId: string, pullRequestNumber: number, path: string) {
-      return dependencies.pullRequestFileDiff(threadId, pullRequestNumber, path);
+    pullRequestFileDiff(threadId: string, pullRequestNumber: number, path: string, expectedHead?: import("./schemas.js").RemoteFileHead) {
+      return expectedHead
+        ? dependencies.pullRequestFileDiff(threadId, pullRequestNumber, path, expectedHead)
+        : dependencies.pullRequestFileDiff(threadId, pullRequestNumber, path);
     },
   };
 }

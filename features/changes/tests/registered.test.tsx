@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getPluginQueryClient } from "../../../query-runtime";
@@ -97,6 +97,8 @@ type ChangesFixture = {
   getChangesRepository?: () => unknown;
   getChangesPullRequests?: () => unknown;
   getChangesProjection?: () => unknown;
+  getChangesRemoteFiles?: () => unknown;
+  invalidateChangesRemote?: () => unknown;
   getWorkContext?: () => typeof context;
   getWorkStatus?: () => unknown;
   getGitHubApiHealth?: () => unknown;
@@ -121,6 +123,8 @@ function rpc({
   getChangesRepository,
   getChangesPullRequests,
   getChangesProjection,
+  getChangesRemoteFiles = () => ({ files: [] }),
+  invalidateChangesRemote = () => ({ ok: true }),
   getWorkContext = () => context,
   getWorkStatus = () => ({
     currentThread: context.currentThread,
@@ -147,8 +151,8 @@ function rpc({
   }),
 }: ChangesFixture) {
   return {
-    invalidateChangesRemote: () => ({ ok: true }),
-    getChangesRemoteFiles: () => ({ files: [] }),
+    invalidateChangesRemote,
+    getChangesRemoteFiles,
     getWorkContext,
     getChanges,
     getChangesRepository: getChangesRepository ?? (async () => (await getChanges()).repository),
@@ -1071,5 +1075,49 @@ describe("R13 registered Changes Work slot", () => {
       remounted.queryByRole("button", { name: "Close diff for renamed.ts" }),
     ).toBeNull();
     remounted.lifecycle.unmount();
+  });
+});
+
+describe("R41 registered host refresh and selected head identity", () => {
+  it("coalesces actual mounted duplicate realtime consumers but keeps a distinct successor", async () => {
+    const gate = deferred<{ ok: boolean }>(); let calls = 0;
+    const fixture = { getChanges: () => changesResult(repository("available"), { currentPullRequest: currentPr(42) }),
+      invalidateChangesRemote: vi.fn(() => { calls++; return calls === 1 ? gate.promise : { ok: true }; }) };
+    const first = await changesSlot(fixture);
+    const app = await loadPluginApp(() => import("../../../app"));
+    const second = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_changes", params: null }, { rpc: rpc(fixture) });
+    await waitFor(() => expect(getPluginQueryClient().getQueryData(changesKeys.summary("thr_changes"))).toBeTruthy());
+    const event = { family: "changes", threadId: "thr_changes" };
+    await first.behavior.emitRealtime("work-sidebar:changed", event);
+    await second.behavior.emitRealtime("work-sidebar:changed", event);
+    await waitFor(() => expect(calls).toBe(1));
+    await second.behavior.emitRealtime("work-sidebar:changed", { ...event });
+    gate.reject(new Error("first refresh failed"));
+    await waitFor(() => expect(calls).toBe(2));
+    first.lifecycle.unmount(); second.lifecycle.unmount();
+  });
+
+  it("a selected sibling SHA change refetches its patch with current fingerprint unchanged", async () => {
+    const member = currentPr(43);
+    const fileDiff = { additions: 1, deletions: 0, files: [{ path: "sibling.ts", previousPath: null, status: "modified", additions: 1, deletions: 0 }], truncated: false };
+    const layer = { ...member, draft: false, state: "open", checks: "passing", review: "approved", reviewCommentCount: 0 };
+    const data = changesResult(repository("available"), { currentPullRequest: currentPr(42),
+      stack: { number: 17, base: "main", currentPullRequest: 42, pullRequests: [layer] },
+      githubStack: { pending: null, error: null, stack: { trunk: "main", currentBranch: "feature/42", trunkBehind: null, prunableBranchCount: null,
+        branches: [{ name: member.head, isCurrent: false, isMerged: false, isQueued: false, needsRebase: false, hasStash: false, stashCount: null,
+          pr: { number: 43, url: member.url, state: "open", title: member.title, isDraft: false, metadataStale: false }, diff: fileDiff, aheadOfRemote: null, behindRemote: null }] } },
+    });
+    const remote = { files: [{ url: member.url, head: member.head, base: member.base, headSha: "old", baseSha: "base", diff: fileDiff }] };
+    const patches = vi.fn(({ path }: { path: string }) => ({ kind: "absent", path, patch: null, message: "No diff" }));
+    const slot = await changesSlot({ getChanges: () => data, getChangesRemoteFiles: () => remote, getPullRequestFileDiff: patches });
+    await waitFor(() => expect(slot.getByText("#43 PR 43")).toBeTruthy());
+    await waitFor(() => expect(getPluginQueryClient().getQueriesData({ queryKey: ["work-sidebar", "changes-remote"] }).some(([, value]) => Boolean(value))).toBe(true));
+    fireEvent.click(slot.getByRole("button", { name: "Show changed files for pull request #43" }));
+    fireEvent.click(slot.getByRole("button", { name: "Open pull request diff for sibling.ts" }));
+    await waitFor(() => expect(patches).toHaveBeenCalledTimes(1));
+    const key = getPluginQueryClient().getQueriesData({ queryKey: ["work-sidebar", "changes-remote"] }).find(([, value]) => Boolean(value))![0];
+    getPluginQueryClient().setQueryData(key, { files: [{ ...remote.files[0], headSha: "new" }] });
+    await waitFor(() => expect(patches).toHaveBeenCalledTimes(2));
+    slot.lifecycle.unmount();
   });
 });

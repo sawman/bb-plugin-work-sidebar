@@ -21,6 +21,7 @@ export function createRemoteCache<T>(options: {
   function put(key: string, value: T, expiresAt = now() + ttlMs) {
     if (disposed) return;
     prune(); remove(key);
+    if (expiresAt <= now()) return;
     const size = Buffer.byteLength(JSON.stringify(value));
     if (size > maxBytes) return;
     while (entries.size >= maxEntries || bytes + size > maxBytes)
@@ -33,11 +34,15 @@ export function createRemoteCache<T>(options: {
       prune(); const source = entries.get(sourceKey);
       if (source && sourceKey !== aliasKey) put(aliasKey, source.value, source.expiresAt);
     },
-    read(key: string, load: () => Promise<T>, accept: (value: T) => boolean = () => true): Promise<T> {
+    peek(key: string) { prune(); return entries.get(key)?.value; },
+    select(prefix: string) { prune(); return [...entries].filter(([key]) => key.startsWith(prefix)).map(([, entry]) => entry.value); },
+    read(key: string, load: () => Promise<T>, accept: (value: T) => boolean = () => true,
+      policy: { expiresAt?: () => number; reuse?: (value: T) => boolean } = {},
+    ): Promise<T> {
       if (disposed) return Promise.reject(new Error("Remote cache is disposed."));
       prune();
       const cached = entries.get(key);
-      if (cached) { entries.delete(key); entries.set(key, cached); return Promise.resolve(cached.value); }
+      if (cached && (policy.reuse?.(cached.value) ?? true)) { entries.delete(key); entries.set(key, cached); return Promise.resolve(cached.value); }
       const existing = pending.get(key);
       if (existing) return existing;
       if (inFlight >= maxEntries) return Promise.reject(new Error("Remote read capacity reached."));
@@ -47,7 +52,7 @@ export function createRemoteCache<T>(options: {
         return load();
       }).then((value) => {
         if (disposed || pending.get(key) !== request) throw new Error("Remote data changed during the read.");
-        if (accept(value)) put(key, value);
+        if (accept(value)) put(key, value, policy.expiresAt?.());
         return value;
       }).finally(() => { inFlight--; if (pending.get(key) === request) pending.delete(key); });
       pending.set(key, request); return request;

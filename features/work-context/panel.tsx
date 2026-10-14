@@ -113,7 +113,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
     if (event.family === "changes" && (event.threadId === scope.threadId
       || changesShareRepository(queryClient, scope.threadId, event.threadId))) {
       void Promise.all([
-        refreshChanges(changesRpc, queryClient, event.threadId),
+        refreshChanges(changesRpc, queryClient, event.threadId, payload as object),
         invalidateThreadPullRequestDirectory(queryClient),
       ]);
       return;

@@ -84,10 +84,11 @@ export async function readGitHub(
   args: readonly string[],
   maxBuffer: number,
   ttlMs: number,
+  identity?: string,
 ): Promise<string> {
   if (lifecycle.isDisposed) throw new Error("GitHub read lifecycle is disposed.");
   const scope = scopeFor(args);
-  const key = args.join("\u0000") + (ttlMs === 0 ? "\u0000fresh" : "");
+  const key = args.join("\u0000") + (ttlMs === 0 ? "\u0000fresh" : "") + (identity ? `\u0000${identity}` : "");
   const cached = lifecycle.githubReadCache.get(key);
   if (ttlMs > 0 && cached && cached.expiresAt > Date.now()) return cached.value;
   const health = scope === "graphql" ? lifecycle.githubGraphqlHealth : lifecycle.githubRestHealth;

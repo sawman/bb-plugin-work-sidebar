@@ -1029,8 +1029,26 @@ executable work queue.
   lifecycle-owned bounded caches and semantic TanStack Query keys. Keep host
   discovery and every gh-stack response thread-local. Preserve the canonical
   PR fact directory; remote file collections contain no status/title/review.
+  One cached repository topology reader is injected into the left authored
+  repository batch, left thread directory and right Changes member lookup.
+  It preserves full members and ordering; authored/open filtering and local
+  worktree overlays remain consumer projections. Paginated listing omissions
+  use one targeted confirmed-PR fallback; no completeness assumption hides
+  closed/merged/recent members. The topology cache stores raw discovery seeds,
+  never computed check/review facts or a second frontend fact directory.
   Keep 30-second stale policy and 10-minute Query GC. Resolve actual remote
   head/base SHA when reading files; reject identity changes during the read.
+  Preserve the upstream 120-second topology/raw budget: 30-second semantic
+  retention and aliases cannot outlive contributing raw discovery expiry.
+  File snapshots retain at most 10 minutes, 128 entries and 8 MiB; hits never
+  advance the 120-second validation deadline. Initial/changed SHA reads cost
+  metadata/files/metadata (three reads); stable deadline revalidation costs
+  one metadata read and reuses the immutable SHA-pair diff. Client configured
+  polling shares this result across observers; selected patches use that PR's
+  SHA pair, with pending raw requests segregated by SHA and expected-head guards.
+  A pending-only QueryClient/repository coordinator coalesces same-broadcast
+  consumers and parallel manual refresh; genuinely new signals get a serial
+  successor even when the previous pass fails. Clear/reload cancels ownership.
 - **Refactor:** remove duplicate remote file enrichment, retain local diff
   precedence and local-only checkout invalidation. Manual/fingerprint/realtime
   and PR mutations retire related semantic/raw generations; cancelled or late

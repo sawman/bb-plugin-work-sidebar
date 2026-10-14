@@ -68,6 +68,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
     changesQuery.fingerprint.data?.fingerprint ?? null,
     selectedPullRequestNumber ? null : selectedFilePath,
   );
+  const selectedRemoteFile = changesQuery.remoteFiles.data?.files.find((entry) => entry.url.endsWith(`/pull/${selectedPullRequestNumber}`));
   const pullRequestDiff = usePullRequestFileDiff(
     rpc,
     threadId,
@@ -76,7 +77,10 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
       || changesQuery.data?.githubStack?.stack?.branches.some((branch) => branch.pr?.number === selectedPullRequestNumber)) ? selectedFilePath : null,
     JSON.stringify([remoteChangesIdentity(changesQuery.data),
       changesQuery.data?.githubStack?.stack?.branches.find((branch) => branch.pr?.number === selectedPullRequestNumber)?.pr?.url,
+      selectedRemoteFile?.headSha,
+      selectedRemoteFile?.baseSha,
       changesQuery.fingerprint.data?.fingerprint]),
+    selectedRemoteFile ? { headSha: selectedRemoteFile.headSha, baseSha: selectedRemoteFile.baseSha } : undefined,
   );
   const checkout = useCheckoutStackBranch(rpc, threadId);
   const expandedStackBranches =

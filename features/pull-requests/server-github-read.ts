@@ -19,7 +19,7 @@ export function createGitHubCommandService(lifecycle: ServerLifecycle): GitHubCo
     (await execFileAsync("gh", [...args], { maxBuffer })).stdout;
   return {
     execute,
-    read: (args, maxBuffer, cacheTtlMs = GITHUB_READ_CACHE_MS) =>
-      readGitHub(lifecycle, execute, classifyPullRequestError, args, maxBuffer, cacheTtlMs),
+    read: (args, maxBuffer, cacheTtlMs = GITHUB_READ_CACHE_MS, identity) =>
+      readGitHub(lifecycle, execute, classifyPullRequestError, args, maxBuffer, cacheTtlMs, identity),
   };
 }
