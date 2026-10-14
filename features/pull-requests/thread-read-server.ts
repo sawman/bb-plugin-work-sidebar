@@ -23,6 +23,7 @@ export function createThreadReadService<T>(load: (threadId: string) => Promise<T
       pending.set(threadId, request);
       return request;
     },
+    invalidateAll() { pending.clear(); },
     invalidate(threadId: string) { pending.delete(threadId); },
     dispose() { disposed = true; pending.clear(); },
     inspect() { return { pending: pending.size, disposed }; },

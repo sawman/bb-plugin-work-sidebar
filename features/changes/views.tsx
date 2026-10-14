@@ -287,7 +287,7 @@ function currentPullRequestBranch(
 ): GitHubStackBranch {
   return {
     name: branch?.name ?? pullRequest.head,
-    isCurrent: true,
+    isCurrent: branch?.isCurrent ?? true,
     isMerged: pullRequest.state === "merged",
     isQueued: branch?.isQueued ?? false,
     needsRebase: branch?.needsRebase ?? false,
@@ -410,6 +410,7 @@ export function ChangesStackBranchRow({
   expanded,
   externalOnModifier = false,
   checkingOut,
+  checkoutAvailable = true,
   onToggle,
   onCheckout,
   onOpenFile,
@@ -422,6 +423,7 @@ export function ChangesStackBranchRow({
   expanded: boolean;
   externalOnModifier?: boolean;
   checkingOut: boolean;
+  checkoutAvailable?: boolean;
   onToggle(): void;
   onCheckout(): void;
   onOpenFile?: (path: string) => void;
@@ -530,6 +532,7 @@ export function ChangesStackBranchRow({
           branchName={branch.name}
           merged={merged}
           current={branch.isCurrent}
+          checkoutAvailable={checkoutAvailable}
           checkingOut={checkingOut}
           hasDisclosure={hasDisclosure}
           expanded={expanded}

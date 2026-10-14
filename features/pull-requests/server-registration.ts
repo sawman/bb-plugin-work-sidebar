@@ -5,6 +5,8 @@ import type { PullRequestChangesAdapter } from "../../shared/server-composition-
 import { createAuthoredPullRequestService } from "./server-authored.js";
 import { createGitHubCommandService } from "./server-github-read.js";
 import { createGitHubPollingService } from "./server-polling.js";
+import { createRemoteFilesService } from "./remote-files-server.js";
+import { clearGitHubReadCache } from "../../shared/github/read-cache.js";
 import { createThreadStackService } from "./server-thread-stack.js";
 
 type PullRequestHandlers = Pick<
@@ -29,8 +31,17 @@ export function createPullRequestRegistration(
   const commands = createGitHubCommandService(lifecycle);
   const authored = createAuthoredPullRequestService(bb, lifecycle, commands);
   const polling = createGitHubPollingService(bb, commands.read);
-  const threadStack = createThreadStackService(bb, lifecycle, commands.read);
-  const registration: PullRequestRegistration = { ...polling, ...authored, ...threadStack };
+  const remoteFiles = createRemoteFilesService(lifecycle, commands.read);
+  const threadStack = createThreadStackService(bb, lifecycle, commands.read, remoteFiles.files);
+  const registration: PullRequestRegistration = { ...polling, ...authored, ...threadStack,
+    remoteFiles: remoteFiles.files,
+    invalidateRemote(repository) {
+      clearGitHubReadCache(lifecycle, repository);
+      remoteFiles.invalidate(repository);
+      threadStack.invalidateRemote(repository);
+      return { ok: true };
+    },
+  };
   return registration;
 }
 

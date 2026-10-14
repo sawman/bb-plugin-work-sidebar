@@ -35,6 +35,30 @@ export const MAX_LEGACY_WORK_CACHE = 128;
 type DisposableService = { dispose(): void };
 
 export class ServerLifecycle {
+  remoteRevision = 0;
+  private remoteSequence = 0;
+  private readonly remoteRepositoryGenerations = new Map<string, number>();
+  remoteGeneration(repository: string) {
+    if (this.disposed) return `${this.remoteRevision}:disposed`;
+    const key = repository.toLowerCase();
+    let generation = this.remoteRepositoryGenerations.get(key);
+    if (generation === undefined) generation = ++this.remoteSequence;
+    this.remoteRepositoryGenerations.delete(key);
+    if (this.remoteRepositoryGenerations.size >= 128)
+      this.remoteRepositoryGenerations.delete(this.remoteRepositoryGenerations.keys().next().value!);
+    this.remoteRepositoryGenerations.set(key, generation);
+    return `${this.remoteRevision}:${generation}`;
+  }
+  private readonly remoteInvalidators = new Set<(repository: string | null) => void>();
+  onRemoteInvalidated(invalidate: (repository: string | null) => void) {
+    this.remoteInvalidators.add(invalidate);
+    this.own({ dispose: () => { this.remoteInvalidators.delete(invalidate); } });
+  }
+  invalidateRemoteCaches(repository: string | null) {
+    if (repository) this.remoteRepositoryGenerations.delete(repository.toLowerCase());
+    else { this.remoteRevision++; this.remoteRepositoryGenerations.clear(); }
+    for (const invalidate of this.remoteInvalidators) invalidate(repository);
+  }
   readonly githubReadCache = new Map<
     string,
     { expiresAt: number; value: string }
@@ -87,7 +111,20 @@ export class ServerLifecycle {
   }
 
   cacheGitHubRead(key: string, value: string, expiresAt: number): void {
-    if (!this.disposed) this.githubReadCache.set(key, { value, expiresAt });
+    if (this.disposed) return;
+    for (const [entryKey, entry] of this.githubReadCache)
+      if (entry.expiresAt <= Date.now()) this.githubReadCache.delete(entryKey);
+    const byteLimit = 16 * 1024 * 1024;
+    const bytes = Buffer.byteLength(value);
+    if (bytes > byteLimit) return;
+    this.githubReadCache.delete(key);
+    let retainedBytes = [...this.githubReadCache.values()].reduce((total, entry) => total + Buffer.byteLength(entry.value), 0);
+    while (retainedBytes + bytes > byteLimit && this.githubReadCache.size) {
+      const oldest = this.githubReadCache.keys().next().value!;
+      retainedBytes -= Buffer.byteLength(this.githubReadCache.get(oldest)!.value);
+      this.githubReadCache.delete(oldest);
+    }
+    this.githubReadCache.set(key, { value, expiresAt });
   }
 
   cacheGitHubPullRequestSignal(
@@ -218,6 +255,7 @@ export class ServerLifecycle {
     this.disposed = true;
     for (const service of this.ownedServices) service.dispose();
     this.ownedServices.clear();
+    this.remoteRepositoryGenerations.clear();
     this.githubReadCache.clear();
     this.githubReadPending.clear();
     this.githubPullRequestSignalCache.clear();

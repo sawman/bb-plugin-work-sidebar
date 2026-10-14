@@ -147,6 +147,8 @@ function rpc({
   }),
 }: ChangesFixture) {
   return {
+    invalidateChangesRemote: () => ({ ok: true }),
+    getChangesRemoteFiles: () => ({ files: [] }),
     getWorkContext,
     getChanges,
     getChangesRepository: getChangesRepository ?? (async () => (await getChanges()).repository),

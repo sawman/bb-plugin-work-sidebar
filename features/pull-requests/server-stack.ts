@@ -481,6 +481,8 @@ export async function readGitHubSignals(
   lifecycle: ServerLifecycle,
   run: GitHubApiRunner,
 ): Promise<Map<number, GitHubSignal>> {
+  const revision = lifecycle.remoteGeneration(`${owner}/${repo}`);
+  const assertCurrent = () => { if (revision !== lifecycle.remoteGeneration(`${owner}/${repo}`) || lifecycle.isDisposed) throw new Error("GitHub signals changed during the read."); };
   const unique = [...new Set(numbers)].filter((number) => Number.isInteger(number) && number > 0);
   const signals = new Map<number, GitHubSignal>();
   const missing: number[] = [];
@@ -504,6 +506,7 @@ export async function readGitHubSignals(
       .join(" ");
     try {
       const stdout = await run(["api", "graphql", "-f", `query=query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${selections} } }`], 4_000_000);
+      assertCurrent();
       const parsed: unknown = JSON.parse(stdout);
       const repository = isRecord(parsed) && isRecord(parsed.data) && isRecord(parsed.data.repository) ? parsed.data.repository : {};
       missing.forEach((number, index) => {
@@ -513,6 +516,7 @@ export async function readGitHubSignals(
         lifecycle.cacheGitHubPullRequestSignal(signalKey(owner, repo, number), signal, Date.now() + GITHUB_SIGNAL_CACHE_MS);
       });
     } catch (error) {
+      assertCurrent();
       if (graphQlRateLimited(error)) lifecycle.githubGraphqlBackoffUntil = Date.now() + GITHUB_GRAPHQL_BACKOFF_MS;
     }
   }
@@ -521,11 +525,15 @@ export async function readGitHubSignals(
     const pending = lifecycle.githubPullRequestSignalPending.get(key);
     if (pending) return [number, await pending] as const;
     const request = readGitHubPullRequestRest(owner, repo, number, lifecycle, run)
-      .then((recovered) => recovered?.signal ?? null)
-      .finally(() => lifecycle.releasePending("pullRequestSignal", key));
+      .then((recovered) => { assertCurrent(); return recovered?.signal ?? null; })
+      .finally(() => {
+        if (lifecycle.githubPullRequestSignalPending.get(key) === request)
+          lifecycle.releasePending("pullRequestSignal", key);
+      });
     lifecycle.githubPullRequestSignalPending.set(key, request);
     return [number, await request] as const;
   }));
+  assertCurrent();
   for (const [number, signal] of fallback) {
     if (signal) signals.set(number, signal);
   }
@@ -539,6 +547,7 @@ export async function readGitHubPullRequestRest(
   lifecycle: ServerLifecycle,
   run: GitHubApiRunner,
 ): Promise<GitHubRestPullRequest | null> {
+  const revision = lifecycle.remoteGeneration(`${owner}/${repo}`);
   try {
     const headers = ["-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`];
     const [pullRequestText, reviewsText] = await Promise.all([
@@ -626,6 +635,7 @@ export async function readGitHubPullRequestRest(
         : {}),
       ...metadata,
     } satisfies GitHubSignal;
+    if (revision !== lifecycle.remoteGeneration(`${owner}/${repo}`) || lifecycle.isDisposed) throw new Error("GitHub signals changed during the read.");
     lifecycle.cacheGitHubPullRequestSignal(signalKey(owner, repo, number), signal, Date.now() + GITHUB_SIGNAL_CACHE_MS);
     return {
       pullRequest: recoveredPullRequest,

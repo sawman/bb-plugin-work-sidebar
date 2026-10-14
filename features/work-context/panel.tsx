@@ -3,13 +3,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useStore } from "zustand";
 import {
   useRealtime,
+  useRpc,
   useBbContext,
   type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
 import { RefreshButton } from "../../components/ui/refresh-button";
 import { TabSelector } from "../../components/ui/tab-selector";
 import { ChangesPanel } from "../changes/panel";
-import { invalidateChanges } from "../changes/queries";
+import type { rpcContract } from "../../contracts";
+import { refreshChanges, changesShareRepository } from "../changes/invalidation";
 import { changesInteractionStore } from "../changes/store";
 import { AgentsView } from "../agents/views";
 import { invalidateAgentDetails } from "../agents/queries";
@@ -58,6 +60,7 @@ function queueRootEvent(scope: WorkPanelScope, rootThreadId: string) {
 
 export function WorkPanel({ threadId }: PluginThreadPanelProps) {
   const queryClient = useQueryClient();
+  const changesRpc = useRpc<typeof rpcContract>();
   const { projectId } = useBbContext();
   const appearance = useSidebarAppearancePreferences();
   const tab = useStore(
@@ -107,14 +110,17 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
       void invalidateWorkContextCards(queryClient, scope.threadId);
       return;
     }
+    if (event.family === "changes" && (event.threadId === scope.threadId
+      || changesShareRepository(queryClient, scope.threadId, event.threadId))) {
+      void Promise.all([
+        refreshChanges(changesRpc, queryClient, event.threadId),
+        invalidateThreadPullRequestDirectory(queryClient),
+      ]);
+      return;
+    }
     if (event.threadId !== scope.threadId) return;
     if (event.family === "tracker")
       void invalidateTracker(queryClient, scope.threadId);
-    if (event.family === "changes")
-      void Promise.all([
-        invalidateChanges(queryClient, scope.threadId),
-        invalidateThreadPullRequestDirectory(queryClient),
-      ]);
   });
   const selectTab = (next: WorkTab) =>
     threadInteractionStore.getState().setWorkTab(threadId, next);
@@ -149,7 +155,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
                   status.data?.currentThread,
                 ),
                 invalidateTracker(queryClient, threadId),
-                invalidateChanges(queryClient, threadId),
+                refreshChanges(changesRpc, queryClient, threadId),
                 invalidateAgentDetails(queryClient),
                 invalidateGitHubApiHealth(queryClient),
                 invalidateThreadPullRequestDirectory(queryClient),

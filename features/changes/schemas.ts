@@ -28,7 +28,7 @@ export const stackDiffFileSchema = z.object({
   additions: z.number().nullable(),
   deletions: z.number().nullable(),
 });
-const stackChange = z.object({
+export const stackChange = z.object({
   additions: z.number(),
   deletions: z.number(),
   files: z.array(stackDiffFileSchema),
@@ -142,7 +142,17 @@ export const workingTreeFileDiffSchema = z.discriminatedUnion("kind", [
     })
     .strict(),
 ]);
+export const remoteFilesInputSchema = z.object({
+  pullRequests: z.array(z.object({ url: z.string().url(), head: z.string(), base: z.string() }).strict()).min(1).max(100),
+}).strict();
+export const remoteFilesSchema = z.object({
+  files: z.array(z.object({ url: z.string().url(), head: z.string(), base: z.string(), headSha: z.string(), baseSha: z.string(), diff: stackChange }).strict()),
+}).strict();
+export type RemoteFilesInput = z.infer<typeof remoteFilesInputSchema>;
+export type RemoteFiles = z.infer<typeof remoteFilesSchema>;
 export const changesRpcSchemas = {
+  getChangesRemoteFiles: { input: remoteFilesInputSchema, output: remoteFilesSchema },
+  invalidateChangesRemote: { input: z.object({ repository: z.string().nullable() }).strict(), output: z.object({ ok: z.boolean() }) },
   getChanges: { input: threadInput, output: changesSchema },
   getChangesRepository: { input: threadInput, output: repositorySchema },
   getChangesPullRequests: { input: threadInput, output: changesPullRequestsSchema },

@@ -1,8 +1,10 @@
+import { refreshChanges } from "./invalidation";
+export { invalidateChanges, refreshChanges } from "./invalidation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PluginRpcClient } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
-import { changesKeys, changesPolicies } from "./model";
+import { changesKeys, changesPolicies, remoteChangesIdentity, remoteFilesProjection } from "./model";
 import type { Changes } from "./schemas";
 import { hydratePullRequestFacts, pullRequestKeys } from "../pull-requests/queries";
 import { factFromPullRequest, factFromSidebarStackLayer, type PullRequestFactDirectory } from "../pull-requests/facts";
@@ -71,6 +73,13 @@ export function useChanges(
     queryFn: () => rpc.call("getChangesProjection", { threadId }),
     ...stagePolling,
   });
+  const remoteIdentity = remoteChangesIdentity(summary.data);
+  const remoteFiles = useQuery({
+    queryKey: changesKeys.remoteFiles(remoteIdentity?.repository ?? "none", remoteIdentity?.content ?? "none"),
+    queryFn: () => rpc.call("getChangesRemoteFiles", remoteIdentity!.input),
+    enabled: Boolean(remoteIdentity),
+    ...changesPolicies.projection,
+  });
   const url = summary.data?.currentPullRequest?.url;
   const previous = useRef<{ identity: string; fingerprint: string | null }>({
     identity: "",
@@ -91,7 +100,7 @@ export function useChanges(
         previous.current.fingerprint &&
         result.fingerprint !== previous.current.fingerprint
       )
-        void invalidateChanges(client, threadId);
+        void refreshChanges(rpc, client, threadId);
       previous.current = { identity, fingerprint: result.fingerprint };
       return result;
     },
@@ -102,33 +111,30 @@ export function useChanges(
   const data = useMemo(() => {
     if (!summary.data) return undefined;
     const enriched = projection.data;
-    const sameIdentity = enriched?.currentPullRequest?.url === summary.data.currentPullRequest?.url
-      && enriched?.stack?.number === summary.data.stack?.number;
-    return { ...summary.data, githubStack: sameIdentity ? enriched?.githubStack ?? null : null };
-  }, [summary.data, projection.data]);
+    const sameIdentity = remoteChangesIdentity(enriched)?.content === remoteChangesIdentity(summary.data)?.content
+      && enriched?.currentPullRequest?.url === summary.data.currentPullRequest?.url;
+    const local = sameIdentity ? enriched?.githubStack : null;
+    const withRemoteFiles = local?.stack ? { ...local, stack: { ...local.stack,
+      branches: local.stack.branches.map((branch) => ({ ...branch,
+        diff: branch.diff ?? remoteFiles.data?.files?.find((entry) =>
+          entry.url.toLowerCase() === branch.pr?.url.toLowerCase() && entry.head === branch.name)?.diff ?? null,
+      })),
+    } } : local;
+    return { ...summary.data, githubStack: withRemoteFiles ?? remoteFilesProjection(summary.data, remoteFiles.data) };
+  }, [summary.data, projection.data, remoteFiles.data]);
   return {
     ...summary,
     // Enrichment never publishes PR facts. Its potentially late response may
     // only fill branch/file metadata; summary owns PR identity and signals.
     data,
     repository,
+    remoteFiles,
+    localReady: Boolean(projection.data?.githubStack && remoteChangesIdentity(projection.data)?.content === remoteIdentity?.content
+      && projection.data.currentPullRequest?.url === summary.data?.currentPullRequest?.url),
+    refresh: () => refreshChanges(rpc, client, threadId),
     enrichment: projection,
     fingerprint,
   };
-}
-export function invalidateChanges(
-  client: {
-    invalidateQueries(filters: {
-      queryKey: readonly unknown[];
-    }): Promise<unknown> | unknown;
-  },
-  threadId: string,
-) {
-  return Promise.all([
-    client.invalidateQueries({ queryKey: changesKeys.repository(threadId) }),
-    client.invalidateQueries({ queryKey: changesKeys.summary(threadId) }),
-    client.invalidateQueries({ queryKey: changesKeys.projection(threadId) }),
-  ]);
 }
 
 export function useWorkingTreeFileDiff(
@@ -150,12 +156,14 @@ export function usePullRequestFileDiff(
   threadId: string,
   pullRequestNumber: number | null,
   path: string | null,
+  identity?: string,
 ) {
   return useQuery({
     queryKey: changesKeys.pullRequestFileDiff(
       threadId,
       pullRequestNumber ?? 0,
       path ?? "none",
+      identity,
     ),
     queryFn: () =>
       rpc.call("getPullRequestFileDiff", {
@@ -201,14 +209,20 @@ export function useCheckoutStackBranch(rpc: ChangesRpc, threadId: string) {
     onError: (_error, _branch, context) => {
       if (context?.previous) client.setQueryData(queryKey, context.previous);
       if (context?.previousRepository) client.setQueryData(repositoryKey, context.previousRepository);
-      void invalidateChanges(client, threadId);
+      void invalidateLocalChanges(client, threadId);
     },
     onSuccess: async (result, _branch, context) => {
       if (!result.ok) {
         if (context?.previous) client.setQueryData(queryKey, context.previous);
         if (context?.previousRepository) client.setQueryData(repositoryKey, context.previousRepository);
       }
-      await invalidateChanges(client, threadId);
+      await invalidateLocalChanges(client, threadId);
     },
   });
+}
+
+function invalidateLocalChanges(client: ReturnType<typeof useQueryClient>, threadId: string) {
+  return Promise.all(["repository", "summary", "projection", "file-diff", "pull-request-file-diff"].map((stage) =>
+    client.invalidateQueries({ queryKey: ["work-sidebar", "changes", threadId, stage] }),
+  ));
 }

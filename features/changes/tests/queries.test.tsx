@@ -126,6 +126,8 @@ describe("R13 Changes queries", () => {
             message: null,
           };
         }
+        if (method === "invalidateChangesRemote") return { ok: true };
+        if (method === "getChangesRemoteFiles") return { files: [] };
         throw new Error(`Unexpected RPC method: ${method}`);
       }),
     };

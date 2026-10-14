@@ -8,6 +8,8 @@ import {
 
 type ChangesHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
+  | "getChangesRemoteFiles"
+  | "invalidateChangesRemote"
   | "getChangesRepository"
   | "getChangesPullRequests"
   | "getChangesProjection"
@@ -104,6 +106,8 @@ export function createChangesRegistration(
     pullRequestFileDiff: pullRequests.fileDiff,
   });
   return {
+    async getChangesRemoteFiles(input) { return pullRequests.remoteFiles(input); },
+    async invalidateChangesRemote({ repository }) { return pullRequests.invalidateRemote(repository); },
     async getChangesRepository({ threadId }) { return changes.repository(threadId); },
     async getChangesPullRequests({ threadId }) { return pullRequests.summary(threadId); },
     async getChangesProjection({ threadId }) { return changes.projection(threadId); },

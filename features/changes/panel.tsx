@@ -22,7 +22,7 @@ import {
 import { StackNumberBadge } from "../pull-requests/stack-number";
 import { useSidebarAppearance } from "../threads/queries";
 import { DEFAULT_OPEN_PR_LINKS_EXTERNALLY_WITH_MODIFIER } from "../threads/sidebar-appearance";
-import { mergeStackBranchSignals } from "./model";
+import { mergeStackBranchSignals, remoteChangesIdentity } from "./model";
 import {
   useChanges,
   useCheckoutStackBranch,
@@ -72,7 +72,11 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
     rpc,
     threadId,
     selectedPullRequestNumber,
-    selectedPullRequestNumber ? selectedFilePath : null,
+    selectedPullRequestNumber && (changesQuery.data?.currentPullRequest
+      || changesQuery.data?.githubStack?.stack?.branches.some((branch) => branch.pr?.number === selectedPullRequestNumber)) ? selectedFilePath : null,
+    JSON.stringify([remoteChangesIdentity(changesQuery.data),
+      changesQuery.data?.githubStack?.stack?.branches.find((branch) => branch.pr?.number === selectedPullRequestNumber)?.pr?.url,
+      changesQuery.fingerprint.data?.fingerprint]),
   );
   const checkout = useCheckoutStackBranch(rpc, threadId);
   const expandedStackBranches =
@@ -191,10 +195,10 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
           selectedPullRequestNumber === null ? selectedDiffPreview : null
         }
       />
-      {(changesQuery.isError || changesQuery.repository.isError || changesQuery.enrichment.isError) && (
+      {(changesQuery.isError || changesQuery.repository.isError || changesQuery.enrichment.isError || changesQuery.remoteFiles.isError) && (
         <ChangesError
-          error={changesQuery.error ?? changesQuery.repository.error ?? changesQuery.enrichment.error ?? new Error("Changes are unavailable.")}
-          onRetry={() => void Promise.all([changesQuery.refetch(), changesQuery.repository.refetch(), changesQuery.enrichment.refetch()])}
+          error={changesQuery.error ?? changesQuery.repository.error ?? changesQuery.enrichment.error ?? changesQuery.remoteFiles.error ?? new Error("Changes are unavailable.")}
+          onRetry={() => void changesQuery.refresh()}
         />
       )}
       {(stack ? (
@@ -215,7 +219,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
                 expanded={branch.pr
                   ? presentation?.expandedPullRequests.has(pullRequestFactKey(branch.pr)) ?? false
                   : expandedStackBranches.has(branch.name)}
-                filesLoading={changesQuery.enrichment.isFetching}
+                filesLoading={changesQuery.enrichment.isFetching || changesQuery.remoteFiles.isFetching}
                 externalOnModifier={externalOnModifier}
                 checkingOut={
                   checkout.isPending && checkout.variables === branch.name
@@ -225,6 +229,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
                   if (branch.pr) state.togglePullRequest(threadId, pullRequestFactKey(branch.pr));
                   else state.toggleStackBranch(threadId, branch.name);
                 }}
+                checkoutAvailable={changesQuery.localReady}
                 onCheckout={() => checkoutStackBranch(branch.name)}
                 onOpenFile={(path) => {
                   if (branch.pr) openPullRequestDiff(branch.pr.number, path);
@@ -242,7 +247,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
             pullRequest={currentPullRequest}
             branch={standaloneBranch}
             expanded={presentation?.expandedPullRequests.has(pullRequestFactKey(currentPullRequest)) ?? false}
-            filesLoading={changesQuery.enrichment.isFetching}
+            filesLoading={changesQuery.enrichment.isFetching || changesQuery.remoteFiles.isFetching}
             externalOnModifier={externalOnModifier}
             onToggle={() =>
               changesInteractionStore.getState().togglePullRequest(threadId, pullRequestFactKey(currentPullRequest))

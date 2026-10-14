@@ -1,5 +1,5 @@
 import type { GitHubStackBranch, GitHubStackSignal } from "../../contracts.js";
-import type { Changes, Repository } from "./schemas.js";
+import type { Changes, Repository, RemoteFiles, RemoteFilesInput } from "./schemas.js";
 import {
   pullRequestFactKey,
   type PullRequestFactDirectory,
@@ -72,7 +72,47 @@ export function mergeStackBranchSignals(
   };
 }
 
+export function remoteChangesIdentity(summary: Omit<Changes, "repository" | "githubStack"> | undefined) {
+  const current = summary?.currentPullRequest;
+  if (!current) return null;
+  const match = current.url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+$/i);
+  if (!match) return null;
+  const repository = `${match[1]}/${match[2]}`.toLowerCase();
+  const members = summary.stack?.pullRequests.length ? summary.stack.pullRequests : [current];
+  if (members.some((member) => {
+    const memberRepo = member.url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+$/i);
+    return !memberRepo || `${memberRepo[1]}/${memberRepo[2]}`.toLowerCase() !== repository;
+  })) return null;
+  const pullRequests = members.map((member) => ({
+    url: member.url.replace(/^https:\/\/github\.com\/[^/]+\/[^/]+/i, `https://github.com/${repository}`),
+    head: member.head, base: member.base,
+  })).sort((left, right) => left.url.localeCompare(right.url));
+  return { repository, content: JSON.stringify([summary.stack?.number ?? null, summary.stack?.base ?? current.base, pullRequests]), input: { pullRequests } satisfies RemoteFilesInput };
+}
+
+/** Remote-only rows are a readiness fallback; local roster/diffs always win. */
+export function remoteFilesProjection(summary: Omit<Changes, "repository" | "githubStack">, remote: RemoteFiles | undefined) {
+  if (!remote?.files?.length || !summary.currentPullRequest) return null;
+  const members = summary.stack?.pullRequests.length ? summary.stack.pullRequests : [summary.currentPullRequest];
+  return {
+    stack: {
+      trunk: summary.stack?.base ?? summary.currentPullRequest.base, currentBranch: null,
+      trunkBehind: null, prunableBranchCount: null,
+      branches: members.map((member) => ({
+        name: member.head, isCurrent: false, isMerged: false, isQueued: false,
+        needsRebase: false, hasStash: false, stashCount: null,
+        aheadOfRemote: null, behindRemote: null,
+        pr: { number: member.number, url: member.url, state: member.state, title: member.title,
+          isDraft: "draft" in member ? member.draft : member.state === "draft", metadataStale: false },
+        diff: remote.files.find((entry) => entry.url.toLowerCase() === member.url.toLowerCase()
+          && entry.head === member.head && entry.base === member.base)?.diff ?? null,
+      })),
+    }, pending: null, error: null,
+  };
+}
 export const changesKeys = {
+  remoteFiles: (repository: string, content?: string) =>
+    ["work-sidebar", "changes-remote", repository, ...(content === undefined ? [] : [content])] as const,
   repository: (threadId: string) =>
     ["work-sidebar", "changes", threadId, "repository"] as const,
   summary: (threadId: string) =>
@@ -90,12 +130,13 @@ export const changesKeys = {
       fingerprint ?? "unknown",
       path,
     ] as const,
-  pullRequestFileDiff: (threadId: string, pullRequestNumber: number, path: string) =>
+  pullRequestFileDiff: (threadId: string, pullRequestNumber: number, path: string, identity?: string) =>
     [
       "work-sidebar",
       "changes",
       threadId,
       "pull-request-file-diff",
+      ...(identity === undefined ? [] : [identity]),
       pullRequestNumber,
       path,
     ] as const,

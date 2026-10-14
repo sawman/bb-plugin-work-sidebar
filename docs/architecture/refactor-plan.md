@@ -1018,6 +1018,30 @@ executable work queue.
   reload/deploy and remote operations. Roll back this bounded slice against
   the exact canonical base above. No state-owner decision is reversed.
 
+#### Loop R41 — shared remote Changes stack and files (BBPLUG-423)
+
+- **RED:** prove two distinct threads in one remote stack reuse topology and
+  file reads while current/stash/rebase/extra local branches stay independent.
+  Characterize concurrent dedupe, warm remote files before local enrichment,
+  repository/stack/head identity changes, canonical late fact precedence and
+  retained summary disclosure. Expose force refresh joining old raw requests.
+- **GREEN:** share remote-only GitHub topology and file collections through
+  lifecycle-owned bounded caches and semantic TanStack Query keys. Keep host
+  discovery and every gh-stack response thread-local. Preserve the canonical
+  PR fact directory; remote file collections contain no status/title/review.
+  Keep 30-second stale policy and 10-minute Query GC. Resolve actual remote
+  head/base SHA when reading files; reject identity changes during the read.
+- **Refactor:** remove duplicate remote file enrichment, retain local diff
+  precedence and local-only checkout invalidation. Manual/fingerprint/realtime
+  and PR mutations retire related semantic/raw generations; cancelled or late
+  failures cannot republish old data. No detached timers or stale SDK handles.
+- **Evidence:** focused RED then focused GREEN/typecheck, immutable local
+  review commit, then one full serial suite on final code (833 prior tests),
+  SDK, build/import/bundle and diff checks. Include TTL/cap/byte/GC, no-PR,
+  non-stack/error/rate-limit, unmount, invalidation-in-flight, disposal/reload
+  regressions. Root owns integration/live themes, reload and deployment.
+  Exact rollback base: `4322f9124d580a4c2410b29492d60fc768486af1`.
+
 ### BB child execution protocol
 
 G0 is complete. Each new code-editing loop receives one direct BB execution

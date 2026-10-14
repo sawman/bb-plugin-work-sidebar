@@ -1,3 +1,4 @@
+import { invalidateRemoteChangesForRepository } from "../changes/invalidation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
@@ -494,8 +495,10 @@ export function useSetAuthoredPullRequestDraft(rpc: PullRequestRpc) {
     scope: { id: "authored-pull-request-draft" },
     mutationFn: ({ url, draft }: { url: string; draft: boolean }) =>
       rpc.call("setAuthoredPullRequestDraft", { url, draft }),
-    onSettled: async () => {
+    onSettled: async (_data, _error, input) => {
+      const repository = input.url.match(/^https:\/\/github\.com\/([^/]+\/[^/]+)\/pull\//)?.[1];
       await Promise.all([
+        ...(repository ? [invalidateRemoteChangesForRepository(client, repository)] : []),
         client.invalidateQueries({ queryKey: pullRequestKeys.authored() }),
         client.invalidateQueries({
           queryKey: pullRequestKeys.authoredStacks(),
@@ -536,8 +539,9 @@ export function useUpdatePullRequestReviewers(
     }) => rpc.call("updatePullRequestReviewers", input),
     onSuccess: () => callbacks.onSuccess?.(),
     onError: (error) => callbacks.onError?.(error),
-    onSettled: async () => {
+    onSettled: async (_data, _error, input) => {
       await Promise.all([
+        invalidateRemoteChangesForRepository(client, input.repository),
         client.invalidateQueries({ queryKey: pullRequestKeys.authored() }),
         client.invalidateQueries({
           queryKey: pullRequestKeys.authoredStacks(),

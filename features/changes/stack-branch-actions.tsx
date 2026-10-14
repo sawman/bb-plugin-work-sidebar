@@ -10,6 +10,7 @@ type StackBranchActionsProps = {
   merged: boolean;
   current: boolean;
   checkingOut: boolean;
+  checkoutAvailable?: boolean;
   hasDisclosure: boolean;
   expanded: boolean;
   filesLabel: string;
@@ -24,6 +25,7 @@ export function StackBranchActions({
   merged,
   current,
   checkingOut,
+  checkoutAvailable = true,
   hasDisclosure,
   expanded,
   filesLabel,
@@ -63,7 +65,7 @@ export function StackBranchActions({
               type="button"
               className="ws-stack-checkout"
               onClick={onCheckout}
-              disabled={merged || current || checkingOut}
+              disabled={!checkoutAvailable || merged || current || checkingOut}
               aria-label={checkoutLabel}
               aria-describedby={tooltipId}
             >

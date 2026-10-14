@@ -25,6 +25,7 @@ import type {
   GitHubSignal,
 } from "./server-types.js";
 
+import { createRemoteCache } from "./remote-cache.js";
 import { createThreadReadService } from "./thread-read-server.js";
 
 const GITHUB_STACK_PLUGIN_ID = "gh-stack";
@@ -41,7 +42,7 @@ type ThreadStackHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
   "sidebarThreadPullRequests"
 >;
-export type ThreadStackService = ThreadStackHandlers & Pick<PullRequestChangesAdapter, "summary" | "projection" | "checkout" | "fileDiff">;
+export type ThreadStackService = ThreadStackHandlers & Pick<PullRequestChangesAdapter, "summary" | "projection" | "checkout" | "fileDiff"> & { invalidateRemote(repository: string | null): void };
 
 const ghStackPayloadSchema = z.object({
   stack: z.object({
@@ -232,6 +233,7 @@ async function hydratePullRequestDiffs(
   stack: GitHubStackProjection | null,
   pullRequest: CurrentPullRequest | null,
   read: GitHubReadRunner,
+  remoteFiles?: PullRequestChangesAdapter["remoteFiles"],
 ): Promise<GitHubStackProjection | null> {
   const projection = stack ??
     (pullRequest ? standalonePullRequestStack(pullRequest) : null);
@@ -247,7 +249,10 @@ async function hydratePullRequestDiffs(
         try {
           return {
             ...branch,
-            diff: await readGitHubPullRequestDiff(
+            diff: remoteFiles ? (await remoteFiles({ pullRequests: [{
+              url: branch.pr.url, head: branch.name,
+              base: projection.trunk,
+            }] })).files[0].diff : await readGitHubPullRequestDiff(
               repository[1],
               repository[2],
               branch.pr.number,
@@ -267,14 +272,18 @@ export function createThreadStackService(
   bb: BbPluginApi,
   lifecycle: ServerLifecycle,
   read: GitHubReadRunner,
+  remoteFiles?: PullRequestChangesAdapter["remoteFiles"],
 ): ThreadStackService {
+  type RemoteStack = Omit<NonNullable<Awaited<ReturnType<typeof fetchGitHubStack>>>, "currentPullRequest">;
+  const remoteStacks = lifecycle.own(createRemoteCache<RemoteStack>());
+  lifecycle.onRemoteInvalidated((repository) => remoteStacks.invalidate(repository ? `${repository}:` : ""));
   const githubStackCall = <T>(method: string, input: PluginRpcInput, outputSchema: z.ZodType<T>) => {
     if (lifecycle.isDisposed) return Promise.reject(new Error("PR service is disposed."));
     return bb.sdk.plugins.callRpc({ pluginId: GITHUB_STACK_PLUGIN_ID, method, input, outputSchema });
   };
-  const readWhileActive: GitHubReadRunner = (args, buffer) => {
+  const readWhileActive: GitHubReadRunner = (args, buffer, ttlMs) => {
     if (lifecycle.isDisposed) return Promise.reject(new Error("PR service is disposed."));
-    return read(args, buffer);
+    return read(args, buffer, ttlMs);
   };
   const readStackForThread = async (threadId: string) => {
     const thread = await bb.sdk.threads.get({ threadId });
@@ -305,7 +314,26 @@ export function createThreadStackService(
           ),
         );
       }
-      const stack = await fetchGitHubStack(match[1], match[2], currentPullRequest.number, (args, buffer) => readWhileActive(args, buffer), lifecycle);
+      const repository = `${match[1]}/${match[2]}`.toLowerCase();
+      const stackKey = (number: number, head: string, base: string) => `${repository}:${JSON.stringify([number, head, base])}`;
+      const revision = lifecycle.remoteGeneration(repository);
+      const requestKey = stackKey(currentPullRequest.number, currentPullRequest.head, currentPullRequest.base);
+      const shared = await remoteStacks.read(
+        requestKey,
+        async () => {
+          const discovered = await fetchGitHubStack(match[1], match[2], currentPullRequest.number, (args, buffer) => readWhileActive(args, buffer), lifecycle);
+          if (revision !== lifecycle.remoteGeneration(repository) || lifecycle.isDisposed) throw new Error("Remote stack changed during the read.");
+          if (!discovered) return null!;
+          const { currentPullRequest: _requestedNumber, ...snapshot } = discovered;
+          return snapshot;
+        },
+        (value) => Boolean(value) && lifecycle.githubRestHealth.state === "available"
+          && lifecycle.githubGraphqlHealth.state === "available",
+      );
+      if (revision !== lifecycle.remoteGeneration(repository) || lifecycle.isDisposed) throw new Error("Remote stack changed during the read.");
+      if (shared) for (const member of shared.pullRequests)
+        remoteStacks.alias(requestKey, stackKey(member.number, member.head, member.base));
+      const stack = shared ? { ...shared, currentPullRequest: currentPullRequest.number } : null;
       let signal: GitHubSignal | undefined = stack?.pullRequests.find((pullRequest) =>
         pullRequest.number === currentPullRequest.number,
       );
@@ -395,6 +423,9 @@ export function createThreadStackService(
         stack,
         remote.currentPullRequest,
         readWhileActive,
+        remoteFiles ? (input) => remoteFiles({ pullRequests: input.pullRequests.map((entry) => ({
+          ...entry, base: remote.stack?.pullRequests.find((member) => member.url === entry.url)?.base ?? entry.base,
+        })) }) : undefined,
       );
       return {
         currentPullRequest: remote.currentPullRequest,
@@ -408,6 +439,9 @@ export function createThreadStackService(
         null,
         remote.currentPullRequest,
         readWhileActive,
+        remoteFiles ? (input) => remoteFiles({ pullRequests: input.pullRequests.map((entry) => ({
+          ...entry, base: remote.stack?.pullRequests.find((member) => member.url === entry.url)?.base ?? entry.base,
+        })) }) : undefined,
       );
       return {
         currentPullRequest: remote.currentPullRequest,
@@ -484,7 +518,7 @@ export function createThreadStackService(
         repository[2],
         pullRequestNumber,
         path,
-        (args, buffer) => readWhileActive(args, buffer),
+        (args, buffer) => readWhileActive(args, buffer, 0),
       );
     } catch (error) {
       return {
@@ -495,5 +529,11 @@ export function createThreadStackService(
       };
     }
   };
-  return { ...handlers, summary, projection, checkout, fileDiff };
+  return { ...handlers, summary, projection, checkout, fileDiff,
+    invalidateRemote(repository) {
+      remoteStacks.invalidate(repository ? `${repository.toLowerCase()}:` : "");
+      // Host associations stay concurrent-only; retire in-flight summaries too.
+      threadReads.invalidateAll();
+    },
+  };
 }
