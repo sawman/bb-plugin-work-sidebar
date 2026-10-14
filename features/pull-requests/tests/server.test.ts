@@ -122,13 +122,14 @@ describe("R5 pull-request server ownership", () => {
       setDraft: async () => ({ draft: true }),
     });
     const oldRead = service.stacks();
-    await Promise.resolve();
+    const oldRejected = expect(oldRead).rejects.toThrow("topology changed");
+    await vi.waitFor(() => expect(readStacks).toHaveBeenCalledTimes(1));
     const replacement = service.stacks(true);
     await Promise.resolve();
     newStacks.resolve([{ repository: "acme/sidebar", title: "new stack" }]);
     await expect(replacement).resolves.toEqual([{ repository: "acme/sidebar", title: "new stack" }]);
     oldStacks.resolve([{ repository: "acme/sidebar", title: "old stack" }]);
-    await expect(oldRead).resolves.toEqual([{ repository: "acme/sidebar", title: "old stack" }]);
+    await oldRejected;
     expect(await service.stacks()).toEqual([{ repository: "acme/sidebar", title: "latest stack" }]);
     expect(readStacks).toHaveBeenCalledTimes(3);
   });
@@ -155,5 +156,26 @@ describe("R5 pull-request server ownership", () => {
     oldRead.resolve([{ repository: "acme/sidebar", title: "old generation" }]);
     await expect(staleCaller).resolves.toEqual([{ repository: "acme/sidebar", title: "old generation" }]);
     expect(await service.authored()).toEqual([{ repository: "acme/sidebar", title: "new generation" }]);
+  });
+});
+
+
+describe("R41 pending authored topology coherence", () => {
+  it("retires a related pending multi-repo projection without refetching the authored search", async () => {
+    const old = deferred<Array<{ repository: string; title: string }>>();
+    const readAuthored = vi.fn(async () => [{ repository: "acme/repo", title: "base" }, { repository: "other/repo", title: "other" }]);
+    const readStacks = vi.fn().mockReturnValueOnce(old.promise).mockResolvedValue([{ repository: "acme/repo", title: "new stack" }]);
+    const service = createPullRequestService({ now: () => 0, readAuthored, readStacks,
+      archivedRepositories: async () => new Set(), setDraft: async () => ({ draft: true }) });
+    const pending = service.stacks();
+    await vi.waitFor(() => expect(readStacks).toHaveBeenCalledTimes(1));
+    const rejected = expect(pending).rejects.toThrow("topology changed");
+    service.invalidateStacks("acme/repo");
+    const replacement = service.stacks();
+    old.resolve([{ repository: "acme/repo", title: "old stack" }]);
+    await rejected;
+    await expect(replacement).resolves.toEqual([{ repository: "acme/repo", title: "new stack" }]);
+    expect(readAuthored).toHaveBeenCalledTimes(1);
+    expect(readStacks).toHaveBeenCalledTimes(2);
   });
 });

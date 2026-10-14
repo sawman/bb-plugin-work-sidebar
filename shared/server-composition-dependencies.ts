@@ -28,7 +28,7 @@ export type TrackerCompositionDependencies = Pick<
 /** Changes consumes this PR-only adapter without importing its implementation. */
 export type PullRequestChangesAdapter = {
   remoteFiles(input: import("../features/changes/schemas.js").RemoteFilesInput): Promise<import("../features/changes/schemas.js").RemoteFiles>;
-  invalidateRemote(repository: string | null, threadId?: string): { ok: boolean };
+  invalidateRemote(repository: string | null, threadIds?: string[]): { ok: boolean };
   summary(threadId: string): Promise<Awaited<
     ReturnType<PluginRpcHandlers<typeof rpcContract>["getChangesPullRequests"]>
   >>;

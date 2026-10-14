@@ -37,11 +37,12 @@ export function createPullRequestRegistration(
   const threadStack = createThreadStackService(bb, lifecycle, commands.read, remoteFiles.files, topology);
   const registration: PullRequestRegistration = { ...polling, ...authored, ...threadStack,
     remoteFiles: remoteFiles.files,
-    invalidateRemote(repository, threadId) {
-      if (repository === null && threadId) {
-        threadStack.invalidateThread(threadId);
+    invalidateRemote(repository, threadIds) {
+      if (repository === null && threadIds) {
+        for (const threadId of threadIds) threadStack.invalidateThread(threadId);
         return { ok: true };
       }
+      for (const threadId of threadIds ?? []) threadStack.invalidateThread(threadId);
       clearGitHubReadCache(lifecycle, repository);
       remoteFiles.invalidate(repository);
       threadStack.invalidateRemote(repository);

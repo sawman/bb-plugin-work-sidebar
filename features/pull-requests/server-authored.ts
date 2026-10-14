@@ -244,6 +244,7 @@ export function createAuthoredPullRequestService(
       return { draft };
     },
   });
+  lifecycle.onRemoteInvalidated((repository) => authored.invalidateStacks(repository));
   const reviewers = createPullRequestReviewerService(
     lifecycle,
     commands,

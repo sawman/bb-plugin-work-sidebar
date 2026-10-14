@@ -1028,6 +1028,10 @@ executable work queue.
   boundary; direct refresh promises retain rejection and allow later retry.
   Registered and mounted regressions cover bidirectional refresh, unknown
   isolation, failed refresh without a successor and successful recovery.
+  Related authored projections are generation-guarded and retired in flight;
+  cold authored queries are canceled before server clear. The bounded explicit
+  target/related thread scopes retire unconfirmed host reads while unrelated
+  unknown reads remain active; the authored base-search cache is preserved.
 
 - **RED:** prove two distinct threads in one remote stack reuse topology and
   file reads while current/stash/rebase/extra local branches stay independent.

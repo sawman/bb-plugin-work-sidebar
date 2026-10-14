@@ -94,15 +94,20 @@ export async function refreshChanges(
             const related = identity ? cachedSummaries(client)
               .filter(([, value]) => remoteChangesIdentity(value)?.repository === identity.repository) : [];
             const threads = [...new Set([target, ...related.map(([key]) => String(key[2]))])];
+            if (threads.length > 128) throw new Error("Changes refresh thread capacity reached.");
             await Promise.all([
-              ...(identity ? [client.cancelQueries({ queryKey: changesKeys.remoteFiles(identity.repository) })] : []),
+              ...(identity ? [
+                client.cancelQueries({ queryKey: changesKeys.remoteFiles(identity.repository) }),
+                client.cancelQueries({ queryKey: ["work-sidebar", "pull-requests", "authored", "stacks"] }),
+                client.cancelQueries({ queryKey: ["work-sidebar", "pull-requests", "thread-directory"] }),
+              ] : []),
               ...threads.flatMap((entry) => ["summary", "projection", "pull-request-file-diff"].map((stage) =>
                 client.cancelQueries({ queryKey: ["work-sidebar", "changes", entry, stage] }),
               )),
             ]);
             if (signal.aborted) throw new Error("Changes refresh was cancelled.");
             await rpc.call("invalidateChangesRemote", { repository: identity?.repository ?? null,
-              ...(identity ? {} : { threadId: target }),
+              threadIds: threads,
             });
             if (signal.aborted) throw new Error("Changes refresh was cancelled.");
             await invalidateChanges(client, target);

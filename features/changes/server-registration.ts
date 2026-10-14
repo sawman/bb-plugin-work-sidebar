@@ -107,7 +107,7 @@ export function createChangesRegistration(
   });
   return {
     async getChangesRemoteFiles(input) { return pullRequests.remoteFiles(input); },
-    async invalidateChangesRemote({ repository, threadId }) { return pullRequests.invalidateRemote(repository, threadId); },
+    async invalidateChangesRemote({ repository, threadIds }) { return pullRequests.invalidateRemote(repository, threadIds); },
     async getChangesRepository({ threadId }) { return changes.repository(threadId); },
     async getChangesPullRequests({ threadId }) { return pullRequests.summary(threadId); },
     async getChangesProjection({ threadId }) { return changes.projection(threadId); },

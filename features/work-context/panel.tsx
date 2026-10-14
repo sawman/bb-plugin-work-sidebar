@@ -160,7 +160,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
                 invalidateAgentDetails(queryClient),
                 invalidateGitHubApiHealth(queryClient),
                 invalidateThreadPullRequestDirectory(queryClient),
-              ]).catch((error) => { toast.error("Could not refresh Changes."); throw error; })
+              ]).catch((error) => { toast.error("Could not refresh sidebar."); throw error; })
             }
             disabled={tab === "work" && status.isPending}
           />

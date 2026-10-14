@@ -1144,7 +1144,7 @@ describe("R41 registered refresh failure recovery", () => {
       fingerprint = "two";
       await getPluginQueryClient().refetchQueries({ queryKey: changesKeys.fingerprint("thr_changes", currentPr(42).url) });
     }
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Could not refresh Changes."));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(trigger === "manual" ? "Could not refresh sidebar." : "Could not refresh Changes."));
     expect(invalidate).toHaveBeenCalledTimes(1);
     failed = false;
     fireEvent.click(slot.getByRole("button", { name: "Refresh work context" }));

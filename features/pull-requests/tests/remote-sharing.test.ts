@@ -287,3 +287,34 @@ describe("R41 unknown thread read retirement", () => {
     lifecycle.dispose();
   });
 });
+
+
+describe("R41 explicit unconfirmed related scope retirement", () => {
+  it("retires known target and related host lookups but preserves genuinely unrelated unknown lookup", async () => {
+    const host = createFakePluginHost(); const lifecycle = createServerLifecycle();
+    const gates = new Map(["thr_a", "thr_a2", "thr_b"].map((threadId) => [threadId, deferred<any>()]));
+    const counts = new Map<string, number>();
+    const bb = { ...host.bb, sdk: { ...host.bb.sdk,
+      threads: { get: async ({ threadId }: { threadId: string }) => ({ environmentId: threadId }) },
+      environments: { pullRequest: async ({ environmentId }: { environmentId: string }) => {
+        const count = (counts.get(environmentId) ?? 0) + 1; counts.set(environmentId, count);
+        if (count === 1) return gates.get(environmentId)!.promise;
+        return { outcome: "available", pullRequest: { ...currentPr(environmentId === "thr_a" ? 2 : 3), headRefName: "feature/2", baseRefName: "main" } };
+      } },
+    } };
+    const services = createPullRequestRegistration(bb as never, lifecycle, { read: vi.fn(async () => "[]"), execute: vi.fn() });
+    const a = services.summary("thr_a"); const a2 = services.summary("thr_a2"); const b = services.summary("thr_b");
+    await vi.waitFor(() => expect(counts.size).toBe(3));
+    const retiredA = expect(a).rejects.toThrow("Thread PR changed");
+    const retiredA2 = expect(a2).rejects.toThrow("Thread PR changed");
+    services.invalidateRemote("acme/repo", ["thr_a", "thr_a2"]);
+    const freshA = services.summary("thr_a"); const freshA2 = services.summary("thr_a2");
+    await expect(freshA).resolves.toMatchObject({ currentPullRequest: { number: 2 } });
+    await expect(freshA2).resolves.toMatchObject({ currentPullRequest: { number: 3 } });
+    for (const gate of gates.values()) gate.resolve({ outcome: "not_applicable" });
+    await retiredA; await retiredA2;
+    await expect(b).resolves.toMatchObject({ currentPullRequest: null });
+    expect(Object.fromEntries(counts)).toEqual({ thr_a: 2, thr_a2: 2, thr_b: 1 });
+    lifecycle.dispose();
+  });
+});

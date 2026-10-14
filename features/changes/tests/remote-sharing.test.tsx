@@ -78,6 +78,7 @@ describe("R41 remote readiness and Query ownership", () => {
     const rpc = { call: vi.fn(async (method: string) => { calls.push(method); return { ok: true }; }) };
     await refreshChanges(rpc as never, client, "thr_a");
     expect(calls).toEqual(["invalidateChangesRemote"]);
+    expect(rpc.call).toHaveBeenCalledWith("invalidateChangesRemote", { repository: "acme/repo", threadIds: ["thr_a", "thr_b"] });
     for (const threadId of ["thr_a", "thr_b"]) {
       expect(client.getQueryState(changesKeys.summary(threadId))?.isInvalidated).toBe(true);
       expect(client.getQueryState(changesKeys.pullRequestFileDiff(threadId, 1, "a.ts", "sha"))?.isInvalidated).toBe(true);
@@ -163,8 +164,8 @@ describe("R41 unknown refresh isolation", () => {
     const rpc = { call: vi.fn(async (_method: string, input: any) => { calls.push(input); return { ok: true }; }) };
     await Promise.all([refreshChanges(rpc as never, client, "thr_a"), refreshChanges(rpc as never, client, "thr_b")]);
     expect(calls).toHaveLength(2);
-    expect(calls).toContainEqual({ repository: null, threadId: "thr_a" });
-    expect(calls).toContainEqual({ repository: null, threadId: "thr_b" });
+    expect(calls).toContainEqual({ repository: null, threadIds: ["thr_a"] });
+    expect(calls).toContainEqual({ repository: null, threadIds: ["thr_b"] });
     for (const threadId of ["thr_a", "thr_b"]) {
       expect(client.getQueryState(changesKeys.summary(threadId))?.isInvalidated).toBe(true);
       expect(client.getQueryState(changesKeys.projection(threadId))?.isInvalidated).toBe(true);
@@ -214,11 +215,35 @@ describe("R41 known and unknown independence", () => {
     const calls: any[] = [];
     const rpc = { call: vi.fn(async (_method: string, input: any) => { calls.push(input); return { ok: true }; }) };
     await Promise.all([refreshChanges(rpc as never, client, "thr_unknown"), refreshChanges(rpc as never, client, "thr_known")]);
-    expect(calls).toContainEqual({ repository: null, threadId: "thr_unknown" });
-    expect(calls).toContainEqual({ repository: "acme/repo" });
+    expect(calls).toContainEqual({ repository: null, threadIds: ["thr_unknown"] });
+    expect(calls).toContainEqual({ repository: "acme/repo", threadIds: ["thr_known"] });
     expect(client.getQueryState(changesKeys.summary("thr_cold"))?.fetchStatus).toBe("fetching");
     cold.resolve(summary(2)); await pending;
     expect(client.getQueryData(changesKeys.summary("thr_cold"))).toEqual(summary(2));
     client.clear();
+  });
+});
+
+
+describe("R41 initial authored projection retirement", () => {
+  it("cancels a cold authored query before remote clear and never hydrates its late old facts", async () => {
+    const client = new QueryClient(); const old = deferred<any>(); let generation = 0; let stackCalls = 0;
+    const authored = { ...summary().stack.pullRequests[0], title: "new fact", repository: "acme/repo", author: "me", stack: null };
+    const rpc = { call: vi.fn(async (method: string) => {
+      if (method === "sidebarAuthoredPullRequests") return { available: true, pullRequests: [authored], error: null };
+      if (method === "sidebarAuthoredPullRequestStacks") { stackCalls++; return generation === 0 ? old.promise : { available: true, pullRequests: [{ ...authored, stack: { number: 18, base: "main", pullRequests: [] } }], error: null }; }
+      if (method === "invalidateChangesRemote") { generation++; return { ok: true }; }
+      return { fingerprint: null };
+    }) };
+    client.setQueryData(changesKeys.summary("thr_a"), summary());
+    const left = renderHook(() => useAuthoredPullRequests(rpc as never), { wrapper: wrapper(client) });
+    await waitFor(() => expect(stackCalls).toBe(1));
+    await act(async () => { await refreshChanges(rpc as never, client, "thr_a"); });
+    await waitFor(() => expect(left.result.current.data?.[0].stack?.number).toBe(18));
+    await act(async () => { old.resolve({ available: true, pullRequests: [{ ...authored, title: "stale fact", stack: { number: 17, base: "main", pullRequests: [] } }], error: null }); });
+    expect(left.result.current.data?.[0].title).toBe("new fact");
+    expect(left.result.current.data?.[0].stack?.number).toBe(18);
+    expect(stackCalls).toBe(2);
+    left.unmount(); client.clear();
   });
 });

@@ -37,6 +37,8 @@ export class PullRequestService<T extends AuthoredPullRequestRecord> {
   private authoredCache: CacheEntry<T[]> | null = null;
   private authoredPending: Promise<T[]> | null = null;
   private stacksPending: Promise<T[]> | null = null;
+  private stacksRepositories: Set<string> | null = null;
+  private stacksGeneration = 0;
   private disposed = false;
   private generation = 0;
 
@@ -68,7 +70,15 @@ export class PullRequestService<T extends AuthoredPullRequestRecord> {
     if (!force && this.stacksPending) return this.stacksPending;
     // Settled topology belongs to the shared repository reader; dedupe only
     // concurrent authored projections so a remote clear cannot leave a mirror.
-    const pending = this.authored().then((items) => this.options.readStacks(items)).finally(() => { if (this.stacksPending === pending) this.stacksPending = null; });
+    const generation = this.stacksGeneration;
+    const pending = this.authored().then((items) => {
+      if (this.disposed || generation !== this.stacksGeneration) throw new Error("Authored topology changed during the read.");
+      this.stacksRepositories = new Set(items.map((item) => item.repository.toLowerCase()));
+      return this.options.readStacks(items);
+    }).then((items) => {
+      if (this.disposed || generation !== this.stacksGeneration) throw new Error("Authored topology changed during the read.");
+      return items;
+    }).finally(() => { if (this.stacksPending === pending) { this.stacksPending = null; this.stacksRepositories = null; } });
     this.stacksPending = pending;
     return pending;
   }
@@ -81,13 +91,20 @@ export class PullRequestService<T extends AuthoredPullRequestRecord> {
     return result;
   }
 
+  invalidateStacks(repository: string | null = null): void {
+    if (repository && !this.stacksRepositories?.has(repository.toLowerCase())) return;
+    this.stacksGeneration++;
+    this.stacksPending = null;
+    this.stacksRepositories = null;
+  }
+
   clear(): void {
     this.generation += 1;
     this.authoredCache = null;
     // A late completion still resolves its original caller, but no normal
     // read may join work from the generation this clear replaced.
     this.authoredPending = null;
-    this.stacksPending = null;
+    this.invalidateStacks();
   }
   dispose(): void { this.disposed = true; this.clear(); this.authoredPending = null; this.stacksPending = null; }
   classifyError(error: unknown, scope: PullRequestHealth["scope"]): PullRequestHealth {
