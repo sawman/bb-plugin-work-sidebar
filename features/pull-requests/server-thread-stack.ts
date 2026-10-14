@@ -43,7 +43,7 @@ type ThreadStackHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
   "sidebarThreadPullRequests"
 >;
-export type ThreadStackService = ThreadStackHandlers & Pick<PullRequestChangesAdapter, "summary" | "projection" | "checkout" | "fileDiff"> & { invalidateRemote(repository: string | null): void };
+export type ThreadStackService = ThreadStackHandlers & Pick<PullRequestChangesAdapter, "summary" | "projection" | "checkout" | "fileDiff"> & { invalidateRemote(repository: string | null): void; invalidateThread(threadId: string): void };
 
 const ghStackPayloadSchema = z.object({
   stack: z.object({
@@ -286,7 +286,7 @@ export function createThreadStackService(
     if (identity !== undefined) return read(args, buffer, ttlMs, identity);
     return ttlMs === undefined ? read(args, buffer) : read(args, buffer, ttlMs);
   };
-  const readStackForThread = async (threadId: string) => {
+  const readStackForThread = async (threadId: string, observedRepository: (repository: string) => void) => {
     const thread = await bb.sdk.threads.get({ threadId });
     if (lifecycle.isDisposed) throw new Error("PR service is disposed.");
     if (!thread.environmentId) return { currentPullRequest: null, stack: null, reason: "This thread has no workspace branch." };
@@ -303,6 +303,7 @@ export function createThreadStackService(
       });
       const match = currentPullRequest.url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
       if (!match) return { currentPullRequest, stack: null, reason: "The linked pull request is not hosted on GitHub." };
+      observedRepository(`${match[1]}/${match[2]}`.toLowerCase());
       if (needsGitHubPullRequestRecovery(currentPullRequestRecord(currentPullRequest))) {
         currentPullRequest = applyRestPullRequestRecovery(
           currentPullRequest,
@@ -353,7 +354,17 @@ export function createThreadStackService(
   };
   // Only concurrent reads coalesce: freshness remains with Query and GitHub's
   // existing command caches. Settled thread projections are never retained.
-  const threadReads = lifecycle.own(createThreadReadService(readStackForThread));
+  const pendingRepositories = new Map<string, { repository: string | null }>();
+  lifecycle.own({ dispose() { pendingRepositories.clear(); } });
+  const threadReads = lifecycle.own(createThreadReadService((threadId) => {
+    if (pendingRepositories.size >= 128 && !pendingRepositories.has(threadId))
+      throw new Error("Thread PR read capacity reached.");
+    const marker: { repository: string | null } = { repository: null };
+    pendingRepositories.set(threadId, marker);
+    return readStackForThread(threadId, (repository) => { marker.repository = repository; }).finally(() => {
+      if (pendingRepositories.get(threadId) === marker) pendingRepositories.delete(threadId);
+    });
+  }));
   const stackForThread = (threadId: string) => threadReads.read(threadId);
   // The SDK owns event subscriptions; release the captured service on dispose.
   let invalidateThread: ((threadId: string) => void) | null = (threadId) => threadReads.invalidate(threadId);
@@ -529,10 +540,13 @@ export function createThreadStackService(
     }
   };
   return { ...handlers, summary, projection, checkout, fileDiff,
+    invalidateThread(threadId) { threadReads.invalidate(threadId); },
     invalidateRemote(repository) {
       topology.invalidate(repository);
-      // Host associations stay concurrent-only; retire in-flight summaries too.
-      threadReads.invalidateAll();
+      // Only proven related in-flight associations are retired. Unknown
+      // threads may be discovering a different repository and keep ownership.
+      for (const [threadId, marker] of pendingRepositories)
+        if (repository === null || marker.repository === repository.toLowerCase()) threadReads.invalidate(threadId);
     },
   };
 }

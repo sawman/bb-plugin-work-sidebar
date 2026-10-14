@@ -202,7 +202,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
       {(changesQuery.isError || changesQuery.repository.isError || changesQuery.enrichment.isError || changesQuery.remoteFiles.isError) && (
         <ChangesError
           error={changesQuery.error ?? changesQuery.repository.error ?? changesQuery.enrichment.error ?? changesQuery.remoteFiles.error ?? new Error("Changes are unavailable.")}
-          onRetry={() => void changesQuery.refresh()}
+          onRetry={() => void changesQuery.refresh().catch(() => { toast.error("Could not refresh Changes."); })}
         />
       )}
       {(stack ? (

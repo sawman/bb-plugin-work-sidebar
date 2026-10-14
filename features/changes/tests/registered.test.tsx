@@ -99,6 +99,7 @@ type ChangesFixture = {
   getChangesProjection?: () => unknown;
   getChangesRemoteFiles?: () => unknown;
   invalidateChangesRemote?: () => unknown;
+  getChangesFingerprint?: () => unknown;
   getWorkContext?: () => typeof context;
   getWorkStatus?: () => unknown;
   getGitHubApiHealth?: () => unknown;
@@ -125,6 +126,7 @@ function rpc({
   getChangesProjection,
   getChangesRemoteFiles = () => ({ files: [] }),
   invalidateChangesRemote = () => ({ ok: true }),
+  getChangesFingerprint = () => ({ fingerprint: "initial" }),
   getWorkContext = () => context,
   getWorkStatus = () => ({
     currentThread: context.currentThread,
@@ -152,6 +154,7 @@ function rpc({
 }: ChangesFixture) {
   return {
     invalidateChangesRemote,
+    getChangesFingerprint,
     getChangesRemoteFiles,
     getWorkContext,
     getChanges,
@@ -1118,6 +1121,36 @@ describe("R41 registered host refresh and selected head identity", () => {
     const key = getPluginQueryClient().getQueriesData({ queryKey: ["work-sidebar", "changes-remote"] }).find(([, value]) => Boolean(value))![0];
     getPluginQueryClient().setQueryData(key, { files: [{ ...remote.files[0], headSha: "new" }] });
     await waitFor(() => expect(patches).toHaveBeenCalledTimes(2));
+    slot.lifecycle.unmount();
+  });
+});
+
+
+describe("R41 registered refresh failure recovery", () => {
+  it.each(["realtime", "manual", "fingerprint"])("%s refresh reports failure and permits a successful retry", async (trigger) => {
+    let failed = true; let fingerprint = "one";
+    const invalidate = vi.fn(async () => { if (failed) throw new Error("remote refresh failed"); return { ok: true }; });
+    const fixture = {
+      getChanges: () => changesResult(repository("available"), { currentPullRequest: currentPr(42) }),
+      getChangesFingerprint: () => ({ fingerprint }),
+      invalidateChangesRemote: invalidate,
+    };
+    const slot = await changesSlot(fixture);
+    await waitFor(() => expect(getPluginQueryClient().getQueryData(changesKeys.summary("thr_changes"))).toBeTruthy());
+    if (trigger === "realtime") await slot.behavior.emitRealtime("work-sidebar:changed", { family: "changes", threadId: "thr_changes" });
+    else if (trigger === "manual") fireEvent.click(slot.getByRole("button", { name: "Refresh work context" }));
+    else {
+      await waitFor(() => expect(getPluginQueryClient().getQueryData(changesKeys.fingerprint("thr_changes", currentPr(42).url))).toBeTruthy());
+      fingerprint = "two";
+      await getPluginQueryClient().refetchQueries({ queryKey: changesKeys.fingerprint("thr_changes", currentPr(42).url) });
+    }
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Could not refresh Changes."));
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    failed = false;
+    fireEvent.click(slot.getByRole("button", { name: "Refresh work context" }));
+    await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(slot.getByRole("button", { name: "Refresh work context" })).toHaveProperty("disabled", false));
+    expect(toast.error).toHaveBeenCalledTimes(1);
     slot.lifecycle.unmount();
   });
 });

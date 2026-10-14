@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { changesKeys, remoteChangesIdentity } from "../model";
 import { refreshChanges, useChanges } from "../queries";
 import { currentPr } from "./latency-fixtures";
-import { pullRequestKeys } from "../../pull-requests/queries";
+import { useAuthoredPullRequests, pullRequestKeys } from "../../pull-requests/queries";
 import { factFromPullRequest, mergePullRequestFacts } from "../../pull-requests/facts";
 const polling = { visiblePollMs: 60_000, backgroundPollMs: 300_000 };
 const summary = (number = 1, repo = "acme/repo") => ({ currentPullRequest: { ...currentPr(number), url: `https://github.com/${repo}/pull/${number}` },
@@ -148,6 +148,77 @@ describe("R41 refresh coordination", () => {
     await Promise.all([a, b, manual, next]);
     expect(calls).toBe(2);
     await refreshChanges(rpc as never, client, "thr_a"); expect(calls).toBe(3);
+    client.clear();
+  });
+});
+
+describe("R41 unknown refresh isolation", () => {
+  it("parallel unknown threads refresh their own summary/projection and never globally clear GitHub", async () => {
+    const client = new QueryClient(); const noPr = { currentPullRequest: null, stack: null, stackUnavailableReason: null };
+    for (const threadId of ["thr_a", "thr_b"]) {
+      client.setQueryData(changesKeys.summary(threadId), noPr);
+      client.setQueryData(changesKeys.projection(threadId), { ...noPr, githubStack: null });
+    }
+    const calls: any[] = [];
+    const rpc = { call: vi.fn(async (_method: string, input: any) => { calls.push(input); return { ok: true }; }) };
+    await Promise.all([refreshChanges(rpc as never, client, "thr_a"), refreshChanges(rpc as never, client, "thr_b")]);
+    expect(calls).toHaveLength(2);
+    expect(calls).toContainEqual({ repository: null, threadId: "thr_a" });
+    expect(calls).toContainEqual({ repository: null, threadId: "thr_b" });
+    for (const threadId of ["thr_a", "thr_b"]) {
+      expect(client.getQueryState(changesKeys.summary(threadId))?.isInvalidated).toBe(true);
+      expect(client.getQueryState(changesKeys.projection(threadId))?.isInvalidated).toBe(true);
+    }
+    client.clear();
+  });
+});
+
+
+describe("R41 cross-sidebar topology refresh", () => {
+  it("right refresh and left force refresh update both mounted projections without loops", async () => {
+    const client = new QueryClient(); let stackNumber = 17; let summaryReads = 0;
+    const authored = { ...summary().stack.pullRequests[0], repository: "acme/repo", author: "me", stack: null };
+    const rpc = { call: vi.fn(async (method: string, input: any) => {
+      if (method === "sidebarAuthoredPullRequests") return { available: true, pullRequests: [authored], error: null };
+      if (method === "sidebarAuthoredPullRequestStacks") return { available: true, pullRequests: [{ ...authored, stack: { number: stackNumber, base: "main", pullRequests: summary().stack.pullRequests } }], error: null };
+      if (method === "getChangesPullRequests") { summaryReads++; return { ...summary(), stack: { ...summary().stack, number: stackNumber } }; }
+      if (method === "getChangesRepository") return repo("A");
+      if (method === "getChangesProjection") return { ...summary(), stack: { ...summary().stack, number: stackNumber }, githubStack: null };
+      if (method === "getChangesRemoteFiles") return { files: [] };
+      if (method === "invalidateChangesRemote") return { ok: true };
+      return { fingerprint: null };
+    }) };
+    const left = renderHook(() => useAuthoredPullRequests(rpc as never), { wrapper: wrapper(client) });
+    const right = renderHook(() => useChanges(rpc as never, "thr_a", polling), { wrapper: wrapper(client) });
+    await waitFor(() => expect(left.result.current.data?.[0].stack?.number).toBe(17));
+    await waitFor(() => expect(right.result.current.data?.stack?.number).toBe(17));
+    stackNumber = 18;
+    await act(async () => { await right.result.current.refresh(); });
+    await waitFor(() => expect(left.result.current.data?.[0].stack?.number).toBe(18));
+    expect(right.result.current.data?.stack?.number).toBe(18);
+    stackNumber = 19;
+    await act(async () => { await left.result.current.refresh(); });
+    await waitFor(() => expect(right.result.current.data?.stack?.number).toBe(19));
+    expect(left.result.current.data?.[0].stack?.number).toBe(19);
+    expect(summaryReads).toBe(3);
+    left.unmount(); right.unmount(); client.clear();
+  });
+});
+
+
+describe("R41 known and unknown independence", () => {
+  it("keeps unrelated cold queries running while known and unknown refreshes each execute", async () => {
+    const client = new QueryClient(); const cold = deferred<any>();
+    client.setQueryData(changesKeys.summary("thr_known"), summary());
+    const pending = client.fetchQuery({ queryKey: changesKeys.summary("thr_cold"), queryFn: () => cold.promise });
+    const calls: any[] = [];
+    const rpc = { call: vi.fn(async (_method: string, input: any) => { calls.push(input); return { ok: true }; }) };
+    await Promise.all([refreshChanges(rpc as never, client, "thr_unknown"), refreshChanges(rpc as never, client, "thr_known")]);
+    expect(calls).toContainEqual({ repository: null, threadId: "thr_unknown" });
+    expect(calls).toContainEqual({ repository: "acme/repo" });
+    expect(client.getQueryState(changesKeys.summary("thr_cold"))?.fetchStatus).toBe("fetching");
+    cold.resolve(summary(2)); await pending;
+    expect(client.getQueryData(changesKeys.summary("thr_cold"))).toEqual(summary(2));
     client.clear();
   });
 });

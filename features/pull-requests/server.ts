@@ -35,7 +35,6 @@ export function classifyPullRequestError(error: unknown, scope: PullRequestHealt
 
 export class PullRequestService<T extends AuthoredPullRequestRecord> {
   private authoredCache: CacheEntry<T[]> | null = null;
-  private stacksCache: CacheEntry<T[]> | null = null;
   private authoredPending: Promise<T[]> | null = null;
   private stacksPending: Promise<T[]> | null = null;
   private disposed = false;
@@ -66,13 +65,10 @@ export class PullRequestService<T extends AuthoredPullRequestRecord> {
   async stacks(force = false): Promise<T[]> {
     if (this.disposed) throw new Error("Pull-request service is disposed");
     if (force) this.clear();
-    if (!force && this.stacksCache && this.stacksCache.expiresAt > this.options.now()) return this.stacksCache.value;
     if (!force && this.stacksPending) return this.stacksPending;
-    const generation = this.generation;
-    const pending = this.authored().then((items) => this.options.readStacks(items)).then((items) => {
-      if (!this.disposed && generation === this.generation) this.stacksCache = { value: items, expiresAt: this.options.now() + AUTHORED_TTL };
-      return items;
-    }).finally(() => { if (this.stacksPending === pending) this.stacksPending = null; });
+    // Settled topology belongs to the shared repository reader; dedupe only
+    // concurrent authored projections so a remote clear cannot leave a mirror.
+    const pending = this.authored().then((items) => this.options.readStacks(items)).finally(() => { if (this.stacksPending === pending) this.stacksPending = null; });
     this.stacksPending = pending;
     return pending;
   }
@@ -88,7 +84,6 @@ export class PullRequestService<T extends AuthoredPullRequestRecord> {
   clear(): void {
     this.generation += 1;
     this.authoredCache = null;
-    this.stacksCache = null;
     // A late completion still resolves its original caller, but no normal
     // read may join work from the generation this clear replaced.
     this.authoredPending = null;
@@ -98,7 +93,7 @@ export class PullRequestService<T extends AuthoredPullRequestRecord> {
   classifyError(error: unknown, scope: PullRequestHealth["scope"]): PullRequestHealth {
     return classifyPullRequestError(error, scope, this.options.now);
   }
-  inspect() { return { disposed: this.disposed, authoredCached: this.authoredCache !== null, stacksCached: this.stacksCache !== null, pending: Number(this.authoredPending !== null) + Number(this.stacksPending !== null) }; }
+  inspect() { return { disposed: this.disposed, authoredCached: this.authoredCache !== null, stacksCached: false, pending: Number(this.authoredPending !== null) + Number(this.stacksPending !== null) }; }
 }
 
 export function createPullRequestService<T extends AuthoredPullRequestRecord>(options: Options<T>) { return new PullRequestService(options); }

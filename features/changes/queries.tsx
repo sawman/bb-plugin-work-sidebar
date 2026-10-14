@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { refreshChanges } from "./invalidation";
 export { invalidateChanges, refreshChanges } from "./invalidation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -100,7 +101,7 @@ export function useChanges(
         previous.current.fingerprint &&
         result.fingerprint !== previous.current.fingerprint
       )
-        void refreshChanges(rpc, client, threadId);
+        void refreshChanges(rpc, client, threadId).catch(() => { toast.error("Could not refresh Changes."); });
       previous.current = { identity, fingerprint: result.fingerprint };
       return result;
     },

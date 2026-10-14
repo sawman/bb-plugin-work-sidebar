@@ -451,6 +451,8 @@ export function useAuthoredPullRequests(
         }),
         refreshLoadedReviewerDirectories(client, rpc),
         invalidateThreadPullRequestDirectory(client),
+        ...[...new Set((refreshedBase.data ?? []).map((item) => item.repository))]
+          .map((repository) => invalidateRemoteChangesForRepository(client, repository)),
       ]);
     } finally {
       forceRefresh.current = false;

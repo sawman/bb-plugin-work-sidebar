@@ -202,9 +202,10 @@ describe("R41 registered common topology", () => {
     const host = createFakePluginHost(); const lifecycle = createServerLifecycle();
     const rawMembers = [1, 2].map((number) => ({ number, state: number === 2 ? "merged" : "open", draft: false,
       title: `Raw ${number}`, html_url: currentPr(number).url, head: { ref: `feature/${number}` }, base: { ref: "main" } }));
+    let stackNumber = 17;
     const read = vi.fn(async (args: readonly string[]) => {
       if (args[0] === "search") return JSON.stringify([{ number: 1, title: "Authored title", url: currentPr(1).url, repository: { nameWithOwner: "acme/repo" }, state: "OPEN", isDraft: false }]);
-      if (args[3]?.includes("stacks")) return JSON.stringify([[{ number: 17, base: { ref: "main" }, pull_requests: rawMembers }]]);
+      if (args[3]?.includes("stacks")) return JSON.stringify([[{ number: stackNumber, base: { ref: "main" }, pull_requests: rawMembers }]]);
       if (args.join(" ").includes("isArchived")) return JSON.stringify({ data: { r0: { isArchived: false } } });
       return JSON.stringify({ data: { repository: {
         p0: { headRefName: "feature/1", baseRefName: "main", reviewDecision: "APPROVED", reviewRequests: { nodes: [] }, reviews: { nodes: [] }, commits: { nodes: [] } },
@@ -227,6 +228,10 @@ describe("R41 registered common topology", () => {
     expect(right.stack?.pullRequests.map((entry) => entry.number)).toEqual([1, 2]);
     expect(read.mock.calls.filter(([args]) => args[3]?.includes("stacks"))).toHaveLength(1);
     expect(read.mock.calls.find(([args]) => args[3]?.includes("stacks"))![0]).toContain("--paginate");
+    stackNumber = 18;
+    changes.invalidateChangesRemote({ repository: "acme/repo" });
+    expect((await loadRight()).stack?.number).toBe(18);
+    expect((await loadLeft()).pullRequests[0].stack?.number).toBe(18);
     lifecycle.dispose();
   });
 
@@ -266,5 +271,19 @@ describe("R41 immutable pending identity", () => {
     fresh.resolve("new head"); await expect(b).resolves.toBe("new head");
     old.resolve("old head"); await expect(a).resolves.toBe("old head");
     expect(lifecycle.githubReadCache.size).toBe(0); lifecycle.dispose();
+  });
+});
+
+describe("R41 unknown thread read retirement", () => {
+  it("repository invalidation leaves an unrelated not-yet-discovered host association alive", async () => {
+    const pending = deferred<any>(); const lifecycle = createServerLifecycle();
+    const bb = { sdk: { threads: { get: async () => ({ environmentId: "env_unknown" }) }, environments: { pullRequest: () => pending.promise } } };
+    const service = createThreadStackService(bb as never, lifecycle, vi.fn(async () => "[]"));
+    const unknown = service.summary("thr_unknown");
+    await Promise.resolve(); await Promise.resolve();
+    service.invalidateRemote("acme/repo");
+    pending.resolve({ outcome: "not_applicable" });
+    await expect(unknown).resolves.toMatchObject({ currentPullRequest: null, stack: null });
+    lifecycle.dispose();
   });
 });

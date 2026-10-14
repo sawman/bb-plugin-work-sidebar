@@ -63,7 +63,7 @@ describe("R5 pull-request server ownership", () => {
     expect(readAuthored).toHaveBeenCalledTimes(1);
     await service.stacks();
     await service.stacks();
-    expect(service.inspect()).toMatchObject({ authoredCached: true, stacksCached: true, pending: 0 });
+    expect(service.inspect()).toMatchObject({ authoredCached: true, stacksCached: false, pending: 0 });
 
     const rateLimit = new Error("API rate limit already exceeded");
     expect(service.classifyError(rateLimit, "rest")).toMatchObject({ state: "rate_limited", scope: "rest" });
@@ -112,7 +112,8 @@ describe("R5 pull-request server ownership", () => {
     const newStacks = deferred<Array<{ repository: string; title: string }>>();
     const readStacks = vi.fn()
       .mockImplementationOnce(() => oldStacks.promise)
-      .mockImplementationOnce(() => newStacks.promise);
+      .mockImplementationOnce(() => newStacks.promise)
+      .mockResolvedValue([{ repository: "acme/sidebar", title: "latest stack" }]);
     const service = createPullRequestService({
       now: () => 0,
       readAuthored: async () => [{ repository: "acme/sidebar", title: "base" }],
@@ -128,7 +129,8 @@ describe("R5 pull-request server ownership", () => {
     await expect(replacement).resolves.toEqual([{ repository: "acme/sidebar", title: "new stack" }]);
     oldStacks.resolve([{ repository: "acme/sidebar", title: "old stack" }]);
     await expect(oldRead).resolves.toEqual([{ repository: "acme/sidebar", title: "old stack" }]);
-    expect(await service.stacks()).toEqual([{ repository: "acme/sidebar", title: "new stack" }]);
+    expect(await service.stacks()).toEqual([{ repository: "acme/sidebar", title: "latest stack" }]);
+    expect(readStacks).toHaveBeenCalledTimes(3);
   });
 
   it("detaches pre-mutation pending reads so ordinary refetches enter the new generation", async () => {

@@ -1020,6 +1020,15 @@ executable work queue.
 
 #### Loop R41 — shared remote Changes stack and files (BBPLUG-423)
 
+- **Review amendment:** no settled authored stack projection mirror; both sidebar
+  Query projections invalidate across remote refresh. Unknown associations use
+  a thread-scoped retirement RPC, never a global GitHub clear or an unrelated
+  cancellation. Known invalidations retire only proven related host reads.
+  Realtime, fingerprint and manual refresh failures use the existing toast
+  boundary; direct refresh promises retain rejection and allow later retry.
+  Registered and mounted regressions cover bidirectional refresh, unknown
+  isolation, failed refresh without a successor and successful recovery.
+
 - **RED:** prove two distinct threads in one remote stack reuse topology and
   file reads while current/stash/rebase/extra local branches stay independent.
   Characterize concurrent dedupe, warm remote files before local enrichment,

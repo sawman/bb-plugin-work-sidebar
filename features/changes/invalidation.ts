@@ -1,11 +1,23 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { PluginRpcClient } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
+import type { Changes } from "./schemas";
 import { changesKeys, remoteChangesIdentity } from "./model";
+
+type ChangesSummary = Omit<Changes, "repository" | "githubStack">;
+type SummaryClient = {
+  getQueriesData?: <T>(filters: { queryKey: readonly unknown[] }) => Array<[readonly unknown[], T | undefined]>;
+};
+function cachedSummaries(client: SummaryClient) {
+  // The centralized summary key has one typed, schema-validated RPC producer.
+  // Other stages in the Changes family are excluded before reading this type.
+  return (client.getQueriesData?.<ChangesSummary>({ queryKey: ["work-sidebar", "changes"] }) ?? [])
+    .filter(([key]) => key[3] === "summary");
+}
 
 export function invalidateChanges(
   client: {
-    getQueriesData?: (filters: { queryKey: readonly unknown[] }) => Array<[readonly unknown[], unknown]>;
+    getQueriesData?: SummaryClient["getQueriesData"];
     cancelQueries?: (filters: { queryKey: readonly unknown[] }) => Promise<unknown>;
     invalidateQueries(filters: {
       queryKey: readonly unknown[];
@@ -13,14 +25,18 @@ export function invalidateChanges(
   },
   threadId: string,
 ) {
-  const summaries = client.getQueriesData?.({ queryKey: ["work-sidebar", "changes"] }) ?? [];
+  const summaries = cachedSummaries(client);
   const current = summaries.find(([key]) => key[2] === threadId && key[3] === "summary")?.[1];
-  const identity = remoteChangesIdentity(current as Parameters<typeof remoteChangesIdentity>[0]);
+  const identity = remoteChangesIdentity(current);
   const related = identity ? summaries.filter(([key, value]) => key[3] === "summary"
-    && remoteChangesIdentity(value as Parameters<typeof remoteChangesIdentity>[0])?.repository === identity.repository
+    && remoteChangesIdentity(value)?.repository === identity.repository
   ).map(([key]) => String(key[2])) : [];
   return Promise.all([
-    ...(identity ? [client.invalidateQueries({ queryKey: changesKeys.remoteFiles(identity.repository) })] : []),
+    ...(identity ? [
+      client.invalidateQueries({ queryKey: changesKeys.remoteFiles(identity.repository) }),
+      client.invalidateQueries({ queryKey: ["work-sidebar", "pull-requests", "authored", "stacks"] }),
+      client.invalidateQueries({ queryKey: ["work-sidebar", "pull-requests", "thread-directory"] }),
+    ] : []),
     ...[...new Set(related)].filter((entry) => entry !== threadId).flatMap((entry) => [
       client.invalidateQueries({ queryKey: changesKeys.summary(entry) }),
       client.invalidateQueries({ queryKey: changesKeys.projection(entry) }),
@@ -47,9 +63,9 @@ export async function refreshChanges(
   rpc: PluginRpcClient<typeof rpcContract>, client: QueryClient, threadId: string,
   eventToken?: object,
 ) {
-  const summary = client.getQueryData<Parameters<typeof remoteChangesIdentity>[0]>(changesKeys.summary(threadId));
+  const summary = client.getQueryData<ChangesSummary>(changesKeys.summary(threadId));
   const identity = remoteChangesIdentity(summary);
-  const scope = identity?.repository ?? "unknown";
+  const scope = identity?.repository ?? `thread:${threadId}`;
   let cycles = refreshCycles.get(client);
   if (!cycles) { cycles = new Map(); refreshCycles.set(client, cycles); }
   let cycle = cycles.get(scope);
@@ -75,8 +91,8 @@ export async function refreshChanges(
           try {
             if (signal.aborted) throw new Error("Changes refresh was cancelled.");
             const target = active.threadId;
-            const related = client.getQueriesData({ queryKey: ["work-sidebar", "changes"] })
-              .filter(([key, value]) => key[3] === "summary" && remoteChangesIdentity(value as Parameters<typeof remoteChangesIdentity>[0])?.repository === identity?.repository);
+            const related = identity ? cachedSummaries(client)
+              .filter(([, value]) => remoteChangesIdentity(value)?.repository === identity.repository) : [];
             const threads = [...new Set([target, ...related.map(([key]) => String(key[2]))])];
             await Promise.all([
               ...(identity ? [client.cancelQueries({ queryKey: changesKeys.remoteFiles(identity.repository) })] : []),
@@ -85,7 +101,9 @@ export async function refreshChanges(
               )),
             ]);
             if (signal.aborted) throw new Error("Changes refresh was cancelled.");
-            await rpc.call("invalidateChangesRemote", { repository: identity?.repository ?? null });
+            await rpc.call("invalidateChangesRemote", { repository: identity?.repository ?? null,
+              ...(identity ? {} : { threadId: target }),
+            });
             if (signal.aborted) throw new Error("Changes refresh was cancelled.");
             await invalidateChanges(client, target);
           } catch (error) { failure = error; }
@@ -107,9 +125,9 @@ export async function refreshChanges(
 
 export async function invalidateRemoteChangesForRepository(client: QueryClient, repository: string) {
   const normalized = repository.toLowerCase();
-  const summaries = client.getQueriesData({ queryKey: ["work-sidebar", "changes"] });
+  const summaries = cachedSummaries(client);
   const related = summaries.filter(([key, value]) => key[3] === "summary"
-    && remoteChangesIdentity(value as Parameters<typeof remoteChangesIdentity>[0])?.repository === normalized);
+    && remoteChangesIdentity(value)?.repository === normalized);
   const keys = [changesKeys.remoteFiles(normalized), ...related.flatMap(([key]) =>
     ["summary", "projection", "pull-request-file-diff"].map((stage) => ["work-sidebar", "changes", key[2], stage] as const))];
   await Promise.all(keys.map((queryKey) => client.cancelQueries({ queryKey })));
@@ -117,7 +135,7 @@ export async function invalidateRemoteChangesForRepository(client: QueryClient, 
 }
 
 export function changesShareRepository(client: QueryClient, firstThread: string, secondThread: string) {
-  const first = remoteChangesIdentity(client.getQueryData(changesKeys.summary(firstThread)));
-  const second = remoteChangesIdentity(client.getQueryData(changesKeys.summary(secondThread)));
+  const first = remoteChangesIdentity(client.getQueryData<ChangesSummary>(changesKeys.summary(firstThread)));
+  const second = remoteChangesIdentity(client.getQueryData<ChangesSummary>(changesKeys.summary(secondThread)));
   return Boolean(first && second && first.repository === second.repository);
 }

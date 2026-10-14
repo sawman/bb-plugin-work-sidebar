@@ -154,7 +154,7 @@ export type RemoteFilesInput = z.infer<typeof remoteFilesInputSchema>;
 export type RemoteFiles = z.infer<typeof remoteFilesSchema>;
 export const changesRpcSchemas = {
   getChangesRemoteFiles: { input: remoteFilesInputSchema, output: remoteFilesSchema },
-  invalidateChangesRemote: { input: z.object({ repository: z.string().nullable() }).strict(), output: z.object({ ok: z.boolean() }) },
+  invalidateChangesRemote: { input: z.object({ repository: z.string().nullable(), threadId: z.string().startsWith("thr_").optional() }).strict(), output: z.object({ ok: z.boolean() }) },
   getChanges: { input: threadInput, output: changesSchema },
   getChangesRepository: { input: threadInput, output: repositorySchema },
   getChangesPullRequests: { input: threadInput, output: changesPullRequestsSchema },

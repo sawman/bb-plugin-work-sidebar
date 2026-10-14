@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStore } from "zustand";
@@ -115,7 +116,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
       void Promise.all([
         refreshChanges(changesRpc, queryClient, event.threadId, payload as object),
         invalidateThreadPullRequestDirectory(queryClient),
-      ]);
+      ]).catch(() => { toast.error("Could not refresh Changes."); });
       return;
     }
     if (event.threadId !== scope.threadId) return;
@@ -159,7 +160,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
                 invalidateAgentDetails(queryClient),
                 invalidateGitHubApiHealth(queryClient),
                 invalidateThreadPullRequestDirectory(queryClient),
-              ])
+              ]).catch((error) => { toast.error("Could not refresh Changes."); throw error; })
             }
             disabled={tab === "work" && status.isPending}
           />
