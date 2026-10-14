@@ -247,3 +247,40 @@ describe("R41 initial authored projection retirement", () => {
     left.unmount(); client.clear();
   });
 });
+
+
+describe("R41 delayed authored hydration authority", () => {
+  it("keeps fresh detailed metadata in both panes when the new topology carries cached lightweight metadata", async () => {
+    const client = new QueryClient(); const delayed = deferred<any>(); let fresh = false;
+    const authored = { number: 1, title: "cached old title", url: currentPr(1).url, repository: "acme/repo", state: "open", draft: false,
+      head: "cached-head", base: "cached-base", checks: "passing", review: "approved", reviewCommentCount: 0, stack: null };
+    const rpc = { call: vi.fn(async (method: string) => {
+      if (method === "sidebarAuthoredPullRequests") return { available: true, pullRequests: [authored], error: null };
+      if (method === "sidebarAuthoredPullRequestStacks") return fresh ? delayed.promise : { available: true, pullRequests: [{ ...authored, stack: { number: 17, base: "main", pullRequests: [] } }], error: null };
+      if (method === "getChangesPullRequests" || method === "getChangesProjection") {
+        const data = summary(); const title = fresh ? "fresh canonical title" : "cached old title";
+        return { ...data, currentPullRequest: { ...data.currentPullRequest, title }, stack: { ...data.stack, number: fresh ? 18 : 17,
+          pullRequests: data.stack.pullRequests.map((entry) => ({ ...entry, title: entry.number === 1 ? title : entry.title })) }, githubStack: null };
+      }
+      if (method === "getChangesRepository") return repo("A");
+      if (method === "getChangesRemoteFiles") return { files: [] };
+      if (method === "invalidateChangesRemote") return { ok: true };
+      return { fingerprint: null };
+    }) };
+    const left = renderHook(() => useAuthoredPullRequests(rpc as never), { wrapper: wrapper(client) });
+    const right = renderHook(() => useChanges(rpc as never, "thr_a", polling), { wrapper: wrapper(client) });
+    await waitFor(() => expect(left.result.current.data?.[0].stack?.number).toBe(17));
+    await waitFor(() => expect(right.result.current.data?.currentPullRequest?.title).toBe("cached old title"));
+    fresh = true;
+    let refreshed!: Promise<void>;
+    act(() => { refreshed = right.result.current.refresh(); });
+    await waitFor(() => expect(client.getQueryData<any>(pullRequestKeys.factDirectory()).facts["acme/repo#1"].title).toBe("fresh canonical title"));
+    await act(async () => { delayed.resolve({ available: true, pullRequests: [{ ...authored, stack: { number: 18, base: "main", pullRequests: [] } }], error: null }); await refreshed; });
+    await waitFor(() => expect(left.result.current.data?.[0].stack?.number).toBe(18));
+    expect(client.getQueryData<any>(pullRequestKeys.factDirectory()).facts["acme/repo#1"].title).toBe("fresh canonical title");
+    expect(left.result.current.data?.[0].title).toBe("fresh canonical title");
+    expect(right.result.current.data?.currentPullRequest?.title).toBe("fresh canonical title");
+    expect(rpc.call.mock.calls.filter(([method]) => method === "sidebarAuthoredPullRequests")).toHaveLength(1);
+    left.unmount(); right.unmount(); client.clear();
+  });
+});

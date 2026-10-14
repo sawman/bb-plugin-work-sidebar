@@ -1032,6 +1032,11 @@ executable work queue.
   cold authored queries are canceled before server clear. The bounded explicit
   target/related thread scopes retire unconfirmed host reads while unrelated
   unknown reads remain active; the authored base-search cache is preserved.
+  A lightweight authored/stack envelope seeds absent facts but cannot replace
+  any metadata or signals of a detailed canonical fact (including title,
+  head/base, stable identity/url); detailed freshness stays unchanged until
+  the next detailed response. Ordered mounted hydration covers the delayed
+  cached author-search title after a fresh detailed Changes response.
 
 - **RED:** prove two distinct threads in one remote stack reuse topology and
   file reads while current/stash/rebase/extra local branches stay independent.

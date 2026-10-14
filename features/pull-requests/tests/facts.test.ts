@@ -180,3 +180,17 @@ it("carries host merge-queue attention through RPC schemas and normalized facts"
   expect(pullRequestSummaryPresentation(fact).label).toBe("Queued to merge");
   expect(() => pullRequestFact.parse({ ...fact, attention: "future-state" })).toThrow();
 });
+
+
+describe("R41 detailed metadata authority", () => {
+  it("retains authoritative title/head/base and freshness after a delayed lightweight projection", () => {
+    const detailed = factFromThreadPullRequest({ ...thread, title: "fresh title", head: "fresh head", base: "fresh base" });
+    const original = mergePullRequestFacts(undefined, [detailed], {}, 100);
+    const late = factFromAuthoredPullRequest({ ...authored, title: "cached old title", head: "cached head", base: "cached base" });
+    const merged = mergePullRequestFacts(original, [late], {}, 200);
+    expect(merged.facts[detailed.key]).toEqual(detailed);
+    expect(merged.observedAtByFact?.[detailed.key]).toBe(100);
+    const refreshed = factFromThreadPullRequest({ ...thread, title: "next detailed title" });
+    expect(mergePullRequestFacts(merged, [refreshed], {}, 300).facts[detailed.key].title).toBe("next detailed title");
+  });
+});

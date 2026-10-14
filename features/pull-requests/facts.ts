@@ -138,16 +138,11 @@ export function mergePullRequestFact(
   // Authored and stack envelopes intentionally carry only lightweight
   // signals. They can seed a fact, but must not erase a detailed current-PR
   // or thread-directory fact while the next shared refresh is in flight.
-  if (previousIsDetailed && !incomingIsDetailed)
-    return {
-      ...previous,
-      title: incoming.title,
-      url: incoming.url,
-      state: previous.state,
-      draft: previous.draft,
-      head: incoming.head || previous.head,
-      base: incoming.base || previous.base,
-    };
+  // The same authority rule covers metadata and signals. A lightweight
+  // projection can contain retained author-search title/head/base values;
+  // arrival after a detailed refresh does not make those values newer.
+  // Only a subsequent detailed record may replace this authoritative fact.
+  if (previousIsDetailed && !incomingIsDetailed) return previous;
   return {
     ...previous,
     ...incoming,
