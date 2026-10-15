@@ -32,8 +32,10 @@ describe("thread agent control style geometry budget", () => {
     const padding = edges(control.padding);
     expect(control["justify-items"]).toBe("center");
     expect(padding.left).toBe(padding.right);
-    // Retain the original horizontal footprint for single/double/capped counts.
-    expect(rem(control["min-width"]) + padding.left + padding.right).toBeCloseTo(1.22);
+    // Preserve the original minimum width and total inline padding. BB uses
+    // border-box sizing, so padding must not be added outside min-width.
+    expect(rem(control["min-width"])).toBeCloseTo(1.1);
+    expect(padding.left + padding.right).toBeCloseTo(0.12);
     const counter = declarations(".ws-thread-agent-control small");
     expect(counter["min-width"]).toBe("2ch");
     expect(counter["text-align"]).toBe("center");
@@ -52,13 +54,13 @@ describe("thread agent control style geometry budget", () => {
     // At least 0.04rem remains beyond the full animation travel on either side.
     expect(padding.top - travel).toBeGreaterThanOrEqual(0.04);
     const tracks = control["grid-template-rows"].split(/\s+/).map(rem);
-    const contentHeight = Math.max(
+    const paintedHeight = Math.max(
       rem(control["min-height"]),
-      tracks.reduce((total, track) => total + track, 0) + rem(control["row-gap"]),
+      tracks.reduce((total, track) => total + track, 0) + rem(control["row-gap"])
+        + padding.top + padding.bottom,
     );
-    const paintedHeight = contentHeight + padding.top + padding.bottom;
     const footprint = paintedHeight + margin.top + margin.bottom;
-    expect(footprint).toBeCloseTo(1.62); // previous control's outer height
+    expect(footprint).toBeCloseTo(1.6); // previous border-box outer height
     const leading = declarations(".ws-thread-leading");
     expect(footprint).toBeLessThanOrEqual(rem(leading["min-height"]));
     const row = declarations(".ws-sidebar-row");
