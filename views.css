@@ -1560,8 +1560,10 @@
   justify-items: center;
   min-width: 1.1rem;
   min-height: 1.56rem;
-  margin: 0;
-  padding: 0.04rem 0 0.02rem 0.12rem;
+  /* Grow the highlight around the bounce without growing the row footprint.
+     Equal inline padding centres the provider and count on the same axis. */
+  margin: -0.17rem 0;
+  padding: 0.2rem 0.06rem;
   border: 0;
   border-radius: 3px;
   background: transparent;

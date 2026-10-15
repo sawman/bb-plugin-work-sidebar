@@ -75,6 +75,7 @@ function renderRow({
   threadOverrides = {},
   children = 1,
   activeChildren = children,
+  childrenExpanded = false,
 }: {
   onSelect?: ThreadRowProps["onSelect"];
   groupId?: string | null;
@@ -82,6 +83,7 @@ function renderRow({
   threadOverrides?: Partial<PluginSidebarThread>;
   children?: number;
   activeChildren?: number;
+  childrenExpanded?: boolean;
 } = {}) {
   const renderedThread = { ...thread, ...threadOverrides };
   const props = {
@@ -106,7 +108,7 @@ function renderRow({
         children={children}
         childAgentCount={children}
         activeChildren={activeChildren}
-        childrenExpanded={false}
+        childrenExpanded={childrenExpanded}
         selected={false}
         groupId={groupId}
         groups={groups}
@@ -318,6 +320,32 @@ describe("R21D ThreadRow characterization", () => {
     });
     expect(control.querySelector("small")?.textContent).toBe("∞");
     expect(control.querySelector("small")?.dataset.saturated).toBe("true");
+  });
+
+  it.each([0, 1, 9, 10, 99, 100].flatMap((count) =>
+    [false, true].map((expanded) => ({ count, expanded })),
+  ))("keeps count $count and expanded=$expanded in one isolated toggle", ({ count, expanded }) => {
+    const view = renderRow({ children: count, childrenExpanded: expanded });
+    const control = view.getByRole("button", {
+      name: `${count === 0 ? "No child agents" : `${count} child agent${count === 1 ? "" : "s"}`}, ${expanded ? "expanded" : "collapsed"}`,
+    });
+    expect(control.getAttribute("aria-expanded")).toBe(String(expanded));
+    expect(control.classList.contains("ws-thread-agent-control-expanded")).toBe(expanded);
+    const counter = control.querySelector("small")!;
+    expect(counter.textContent).toBe(count === 0 ? "" : count > 99 ? "∞" : String(count));
+    expect(counter.hasAttribute("data-saturated")).toBe(count > 99);
+    expect(control.querySelector("[title]")).toBeNull();
+
+    control.focus();
+    expect(document.activeElement).toBe(control);
+    for (const target of [control.querySelector(".ws-thread-provider")!, counter]) {
+      fireEvent.pointerDown(target, { button: 0, pointerId: 9 });
+      fireEvent.click(target);
+    }
+    expect(view.onToggleChildren).toHaveBeenCalledTimes(2);
+    expect(view.onSelect).not.toHaveBeenCalled();
+    expect(host.actions.open).not.toHaveBeenCalled();
+    expect(view.onDragThreadChange).not.toHaveBeenCalled();
   });
 
   it("shows a durable host draft without selecting or visiting the thread", () => {
