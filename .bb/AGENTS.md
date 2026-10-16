@@ -26,8 +26,18 @@ decision appear different.
 
 - In BB, use the durable Work outcome and BB Tasks as the source of truth.
 - Do not create repository TODO files as an alternative task system.
-- Treat Human-assigned tasks as user-owned unless the user explicitly
-  delegates them. Agent-assigned tasks are eligible for agent work.
+- Queue is for Agent-owned execution. Keep unfinished Agent work assigned
+  Agent while blocked, waiting, or review-gated, even when a turn ends.
+  Provider limits/retries, CI, another agent, or a GitHub reviewer waiting
+  does not automatically create a user action.
+- Needs You is for Human-owned execution: set Human only for explicit, real
+  follow-up requiring a concrete decision or action from this user, and
+  describe that action. Do not hand unfinished Agent work back because it waits.
+- Existing Human-assigned tasks remain user-owned; do not work or reassign
+  them unless the user explicitly delegates them.
+- Keep statuses current independently of ownership. Ask questions through the
+  question tool and leave key async answers, blockers, and handoffs in Inbox;
+  do not manufacture Human tasks for communications or routine progress.
 - Keep execution work as direct children of the root outcome.
 - Move fully validated work directly from `in_progress` to `done`. Use
   `in_review` only while a named reviewer or concrete acceptance gate is

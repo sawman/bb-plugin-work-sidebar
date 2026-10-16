@@ -40,6 +40,33 @@ const owner = (
 });
 
 describe("task workflow projection", () => {
+  it.each(["backlog", "todo", "in_progress", "in_review"] as const)(
+    "keeps %s execution in its assignee's section regardless of owner runtime",
+    (status) => {
+      const ownerStates = ["starting", "working", "idle", "failed", "completed"] as const;
+      const tasks = (["agent", "human"] as const).flatMap((assignee) =>
+        [...ownerStates, "missing" as const, "archived" as const].map((runtime) =>
+          task(`${assignee}-${runtime}`, status, assignee),
+        ),
+      );
+      const owners = (["agent", "human"] as const).flatMap((assignee) => [
+        ...ownerStates.map((runtime) => owner(`${assignee}-${runtime}`, runtime)),
+        owner(`${assignee}-archived`, "working", { isArchived: true }),
+      ]);
+      const result = projectTaskWorkflow({ outcomeTaskId: null, tasks, owners });
+
+      // Waiting/blocked work is represented by task status and owner liveness;
+      // neither is a reason to transfer an Agent task to this user.
+      expect(result.queue.map((item) => item.task.id).sort()).toEqual(
+        tasks.filter((item) => item.assignee === "agent").map((item) => item.id).sort(),
+      );
+      expect(result.needsYou.map((item) => item.task.id).sort()).toEqual(
+        tasks.filter((item) => item.assignee === "human").map((item) => item.id).sort(),
+      );
+      expect(result.completed).toEqual([]);
+    },
+  );
+
   it("projects every non-outcome task into exactly one workflow section", () => {
     const result = projectTaskWorkflow({
       outcomeTaskId: "outcome",

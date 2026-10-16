@@ -58,6 +58,14 @@ authoritative guidance for agents changing the plugin. The short version:
 
 1. Track implementation in BB Tasks, not a repository TODO list. Create one
    durable outcome and direct execution tasks for distinct work.
+   Queue is Agent-owned execution, including blocked, waiting, and review-gated
+   work; ending a turn does not transfer ownership. Needs You is Human-owned
+   execution requiring a concrete decision or action from this user. Set Human
+   only for explicit, real user follow-up and describe the action. Waiting for
+   provider retries, CI, another agent, or a GitHub reviewer alone is not user
+   follow-up. Do not work or reassign existing Human tasks without delegation.
+   Keep statuses current, ask questions through the question tool, and use
+   Inbox for key async communications instead of manufacturing Human tasks.
 2. Delegate coding work through BB child threads, not a provider-native
    subagent tool. Use `bb thread spawn --parent-self --new-environment worktree`
    for an isolated code change.

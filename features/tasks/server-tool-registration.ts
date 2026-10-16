@@ -13,6 +13,12 @@ export function registerTasksTools(
   tasks: TaskAdapter,
   bindings: WorkBindingsService,
 ) {
+  const ownershipInstructions = [
+    "Queue is for Agent-owned execution; Needs You is for Human-owned execution requiring a concrete decision or action from this user.",
+    "Keep unfinished Agent work assigned Agent in Queue while blocked, waiting, or review-gated, including provider retries, CI, another agent, or a GitHub reviewer; a turn ending does not transfer ownership.",
+    "Set Human only for explicit, real user-owned follow-up and describe the required action. Do not work or reassign existing Human tasks without explicit user delegation.",
+    "Keep statuses current; use the question tool for questions and Inbox for key async communications instead of manufacturing Human tasks.",
+  ].join(" ");
   const taskKey = z.string().trim().min(1).max(40);
   const namedTask = async (task: Parameters<typeof summarizeTask>[0]) => {
     const projects = await tasks.projects();
@@ -59,7 +65,7 @@ export function registerTasksTools(
       assignee: z.enum(["agent", "human"]).optional(),
       priority: z.enum(["urgent", "high", "medium", "low", "none"]).optional(),
     }).strict(),
-    instructions: "Call get_work_context first. Outcomes are top-level only; execution units are direct children created with create_execution_task. Assign agent-owned work to Agent and explicit user follow-up to Human.",
+    instructions: `Call get_work_context first. Outcomes are top-level only; execution units are direct children created with create_execution_task. ${ownershipInstructions}`,
     async execute(params, context) {
       const root = await bindings.rootThread(context.threadId);
       const result = await bindings.outcome({
@@ -96,6 +102,7 @@ export function registerTasksTools(
   bb.agents.registerTool({
     name: "update_task",
     description: "Update safe fields or the Human/Agent assignment for one BB Task.",
+    instructions: ownershipInstructions,
     parameters: z.object({
       key: taskKey,
       title: z.string().trim().min(1).optional(),
@@ -167,7 +174,7 @@ export function registerTasksTools(
     instructions: [
       "Call get_work_context first.",
       "This creates only a direct child of the durable top-level outcome; never create nested Tasks subtasks.",
-      "Assign work the agent will execute to Agent; use Human when the task is waiting for user follow-up.",
+      ownershipInstructions,
     ].join(" "),
     async execute(params, context) {
       const root = await bindings.rootThread(params.rootThreadId ?? context.threadId);

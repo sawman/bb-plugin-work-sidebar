@@ -236,7 +236,7 @@ describe("agent-facing Tasks workflow tools", () => {
       "read_human_messages",
       "update_human_message",
     ]);
-    expect(host.harness.inspection.registrations.agentConfigurationProvider?.({
+    const configuration = host.harness.inspection.registrations.agentConfigurationProvider?.({
       pluginMetadata: {},
       thread: { id: THREAD_ID, title: "Task tools", parentThreadId: null, sourceThreadId: null },
       project: { id: "proj_root", kind: "standard", name: "bbplug", gitRemoteUrl: null },
@@ -244,7 +244,8 @@ describe("agent-facing Tasks workflow tools", () => {
       host: { id: "host_test", name: "Test" },
       provider: { id: "codex", model: "gpt-5.6", capabilities: { supportsNativeUserQuestion: false } },
       origin: { kind: null, pluginId: null },
-    }).tools).toEqual([
+    });
+    expect(configuration?.tools).toEqual([
       "get_sidebar_tasks",
       "get_task",
       "update_task",
@@ -261,6 +262,23 @@ describe("agent-facing Tasks workflow tools", () => {
     expect(WORK_AGENT_INSTRUCTIONS).toContain("Builtin Tasks 0.1.2 cannot preserve root parenting");
     expect(WORK_AGENT_INSTRUCTIONS).toContain("bb thread spawn --parent-self --new-environment worktree");
     expect(WORK_AGENT_INSTRUCTIONS).toContain("environment managed-worktree");
+    expect(configuration?.instructions).toContain(WORK_AGENT_INSTRUCTIONS);
+    for (const instructions of [
+      configuration?.instructions,
+      ...host.harness.inspection.registrations.agentTools
+        .filter((tool) => ["create_work_task", "create_execution_task", "update_task"].includes(tool.name))
+        .map((tool) => tool.instructions),
+    ]) {
+      expect(instructions).toContain("Queue is for Agent-owned execution");
+      expect(instructions).toContain("Needs You is for Human-owned execution");
+      expect(instructions).toContain("concrete decision or action from this user");
+      expect(instructions).toContain("blocked, waiting, or review-gated");
+      expect(instructions).toContain("GitHub reviewer");
+      expect(instructions).toContain("Set Human only for explicit, real user-owned follow-up");
+      expect(instructions).toContain("question tool for questions and Inbox");
+      expect(instructions?.toLowerCase()).toContain("do not work or reassign");
+      expect(instructions).toMatch(/Keep (task )?statuses current/);
+    }
   });
 
   it("reads one task with project, assignment, comments, and worker threads", async () => {
