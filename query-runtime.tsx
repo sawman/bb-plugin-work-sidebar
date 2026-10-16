@@ -41,12 +41,13 @@ export const queryKeys = {
   sidebar: {
     order: (): QueryKey => [...pluginQueryRoot, "sidebar", "order"],
     tasks: {
-      list: (projectId?: string | null): QueryKey => [
+      list: (projectId?: string | null, threadId?: string): QueryKey => [
         ...pluginQueryRoot,
         "sidebar",
         "tasks",
         "list",
         ...(projectId === undefined ? [] : [taskProjectScope(projectId)]),
+        ...(threadId === undefined ? [] : ["thread-history", threadId]),
       ],
       links: (projectId?: string | null): QueryKey => [
         ...pluginQueryRoot,

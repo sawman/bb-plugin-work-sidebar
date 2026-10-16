@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { rpcContract } from "../../../contracts";
 import { getPluginQueryClient, queryKeys, queryPolicies } from "../../../query-runtime";
 import type { TaskFactDirectory } from "../facts";
+import { invalidateTaskQueries } from "../mutations";
 
 type RpcHandlers = NonNullable<RenderSlotOptions<typeof rpcContract>["rpc"]>;
 type TasksResult = Awaited<ReturnType<RpcHandlers["sidebarTasks"]>>;
@@ -163,6 +164,71 @@ afterEach(() => {
 });
 
 describe("Tasks read slots", () => {
+  it("isolates bounded history loading, retry, references and lifecycle from the pending list", async () => {
+    const agent = { ...task, assignee: "agent" as const };
+    const human = { ...task, id: "human", key: "WORK-2", title: "User decision" };
+    const completed = { ...agent, id: "done", key: "WORK-3", title: "Finished work", status: "done" as const };
+    const other = { ...completed, id: "other-done", key: "WORK-4", title: "Other thread history", linkedThreadIds: ["thr_other"] };
+    let resolveHistory!: (response: TasksResult) => void;
+    const firstHistory = new Promise<TasksResult>((resolve) => { resolveHistory = resolve; });
+    let historyAttempts = 0;
+    const historyFailure = { ...emptyTasks, available: false, error: "History unavailable" };
+    const calls = vi.fn<RpcHandlers["sidebarTasks"]>((input) => {
+      if (!input) return { ...emptyTasks, tasks: [agent, human] };
+      if (input.threadId === "thr_other") return { ...emptyTasks, tasks: [other] };
+      historyAttempts += 1;
+      return historyAttempts === 1 ? firstHistory
+        : historyAttempts === 2 ? historyFailure
+          : { ...emptyTasks, tasks: [completed] };
+    });
+    const captured = await app();
+    const slot = renderSlot(captured.threadPanelActions[0]!,
+      { threadId: "thr_test", params: null }, { rpc: rpcFixtures(calls) },
+    );
+    await slot.findByText("Loading completed tasks…");
+    await slot.findByText(agent.title);
+    expect(slot.getByRole("switch", { name: "Agent assigned to WORK-1" }).hasAttribute("disabled")).toBe(false);
+    const queue = slot.getByRole("heading", { name: "Queue" }).closest("section")!;
+    const needsYou = slot.getByRole("heading", { name: "Needs you" }).closest("section")!;
+    expect(within(queue).getByText(agent.title)).toBeTruthy();
+    expect(within(needsYou).getByText(human.title)).toBeTruthy();
+    resolveHistory(historyFailure);
+    const retry = await slot.findByRole("button", { name: "Retry completed tasks" }, { timeout: 2_500 });
+    expect(within(queue).getByText(agent.title)).toBeTruthy();
+    expect(calls.mock.calls.filter(([input]) => input === null)).toHaveLength(1);
+    fireEvent.click(retry);
+    await slot.findByRole("button", { name: "Completed: 1 task" });
+    fireEvent.click(slot.getByRole("button", { name: "Completed: 1 task" }));
+    expect(slot.getByText(completed.title)).toBeTruthy();
+    expect(calls.mock.calls.filter(([input]) => input === null)).toHaveLength(1);
+
+    const client = getPluginQueryClient();
+    const historyKey = queryKeys.sidebar.tasks.list(null, "thr_test");
+    expect(client.getQueryData(historyKey)).toMatchObject({ taskIds: ["done"], relationships: [{ taskId: "done", linkedThreadIds: ["thr_test"] }] });
+    expect(client.getQueryData(historyKey)).not.toHaveProperty("tasks");
+    expect(client.getQueryData<TaskFactDirectory>(queryKeys.sidebar.tasks.facts(null))?.facts.done).toMatchObject({ assignee: "agent", status: "done" });
+    expect(client.getQueryCache().find({ queryKey: historyKey, exact: true })?.gcTime).toBe(queryPolicies.sidebarTasksList.gcTime);
+    const otherSlot = renderSlot(captured.threadPanelActions[0]!,
+      { threadId: "thr_other", params: null },
+      { rpc: rpcFixtures(calls), context: { threadId: "thr_other" } },
+    );
+    const otherView = within(otherSlot.container);
+    await otherView.findByRole("button", { name: "Completed: 1 task" });
+    fireEvent.click(otherView.getByRole("button", { name: "Completed: 1 task" }));
+    expect(otherView.getByText(other.title)).toBeTruthy();
+    expect(otherView.queryByText(completed.title)).toBeNull();
+
+    const before = calls.mock.calls.length;
+    await invalidateTaskQueries(client, ["list"], false, null);
+    expect(calls.mock.calls.length - before).toBe(3); // Global + both scoped histories.
+    vi.useFakeTimers();
+    slot.lifecycle.unmount();
+    otherSlot.lifecycle.unmount();
+    expect(client.getQueryCache().find({ queryKey: historyKey, exact: true })?.getObserversCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(queryPolicies.sidebarTasksList.gcTime + 1);
+    expect(client.getQueryData(historyKey)).toBeUndefined();
+  });
+
   it("refreshes list and link data once whenever the Tasks tab becomes active", async () => {
     const tasks = vi
       .fn<RpcHandlers["sidebarTasks"]>()
@@ -297,7 +363,7 @@ describe("Tasks read slots", () => {
     const retry = renderSlot(
       captured.threadPanelActions[0]!,
       { threadId: "thr_test", params: null },
-      { rpc: rpcFixtures(failing) },
+      { rpc: rpcFixtures((input) => input ? emptyTasks : failing(input)) },
     );
     await waitFor(
       () =>
@@ -344,23 +410,23 @@ describe("Tasks read slots", () => {
       { rpc },
     );
     await vi.advanceTimersByTimeAsync(0);
-    expect(tasks).toHaveBeenCalledTimes(1);
+    expect(tasks).toHaveBeenCalledTimes(2);
     expect(links).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1_000);
-    expect(tasks).toHaveBeenCalledTimes(1);
+    expect(tasks).toHaveBeenCalledTimes(2);
     expect(links).toHaveBeenCalledTimes(2);
     await left.behavior.emitRealtime("work-sidebar:changed", {
       family: "tasks",
       threadId: "thr_test",
     });
     await vi.advanceTimersByTimeAsync(1);
-    expect(tasks).toHaveBeenCalledTimes(2);
+    expect(tasks).toHaveBeenCalledTimes(4);
     expect(links).toHaveBeenCalledTimes(3);
     await vi.advanceTimersByTimeAsync(30_000);
     expect(links).toHaveBeenCalledTimes(4);
     // The visible Work tab is the only Tasks-list polling owner. The left
     // sidebar still owns the one realtime subscription above.
-    expect(tasks).toHaveBeenCalledTimes(3);
+    expect(tasks).toHaveBeenCalledTimes(6);
     right.lifecycle.unmount();
     left.lifecycle.unmount();
     expect(
@@ -440,7 +506,7 @@ describe("Tasks read slots", () => {
       },
     });
     await waitFor(() => expect(right.getByText("Ship mounted fixtures")).toBeTruthy());
-    expect(tasks).toHaveBeenCalledTimes(1);
+    expect(tasks.mock.calls.filter(([input]) => input === null)).toHaveLength(1);
 
     const directory = getPluginQueryClient().getQueryData<TaskFactDirectory>(
       queryKeys.sidebar.tasks.facts(projectId),

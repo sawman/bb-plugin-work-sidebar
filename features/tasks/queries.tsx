@@ -66,18 +66,20 @@ export function useSharedTaskFactDirectory(projectId: string | null) {
 export function useTasksRead({
   projectId = null,
   poll = false,
+  threadId,
 }: {
   projectId?: string | null;
   poll?: boolean;
+  threadId?: string;
 } = {}) {
   const rpc = useRpc<typeof rpcContract>();
   const queryClient = useQueryClient();
   const directory = useSharedTaskFactDirectory(projectId);
   const query = useQuery({
-    queryKey: queryKeys.sidebar.tasks.list(projectId),
+    queryKey: queryKeys.sidebar.tasks.list(projectId, threadId),
     queryFn: async () => {
       const revision = captureTaskFactHydrationRevision(queryClient);
-      const result = await rpc.call("sidebarTasks", null);
+      const result = await rpc.call("sidebarTasks", threadId ? { threadId } : null);
       if (!result.available)
         throw new Error(result.error ?? "Tasks are unavailable.");
       const adapted = adaptSidebarTaskResponse(projectId, result);

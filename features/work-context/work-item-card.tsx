@@ -394,6 +394,7 @@ export function WorkItemCard({
         </div>
       ) : (
         <TaskWorkflowContent
+          projectId={projectId}
           threadId={threadId}
           tasks={tasks}
           mutations={taskMutations}

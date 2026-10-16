@@ -282,13 +282,14 @@ describe("durable Work/Tasks binding parity", () => {
     await expect(host.bb.storage.kv.get(WORK_ITEM_QUEUE_KEY)).resolves.toBeUndefined();
     await expect(host.bb.storage.kv.get(TRACKER_LINKS_KEY)).resolves.toBeUndefined();
     await expect(host.bb.storage.kv.get(TASK_ASSIGNEES_KEY)).resolves.toBeUndefined();
+    // Absence from the sidebar's filtered read does not establish deletion.
     expect(
       database
         .prepare<[string], { assignee: string }>(
           "SELECT assignee FROM sidebar_task_assignee_state WHERE task_id = ?",
         )
         .get(CREATED_EXECUTION_TASK_ID),
-    ).toBeUndefined();
+    ).toEqual({ assignee: "human" });
   });
 
   it("migrates legacy bindings into SQLite and compacts terminal execution history there", async () => {

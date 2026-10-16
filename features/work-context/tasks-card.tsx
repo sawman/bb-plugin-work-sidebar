@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 import type { useTasksMutations } from "../tasks/mutations";
-import type { useTasksRead } from "../tasks/queries";
+import { useTasksRead } from "../tasks/queries";
 import { TaskWorkflowCard } from "../tasks/workflow-card";
 import { projectTaskWorkflow, type TaskWorkflowOwner } from "../tasks/workflow-model";
 import { useWorkOutcome, useWorkStatus } from "./queries";
@@ -14,6 +14,7 @@ type TasksMutations = ReturnType<typeof useTasksMutations>;
  */
 export function TaskWorkflowContent({
   threadId,
+  projectId,
   tasks,
   mutations,
   outcome,
@@ -22,6 +23,7 @@ export function TaskWorkflowContent({
   onMakeGoal,
 }: {
   threadId: string;
+  projectId: string | null;
   tasks: TasksRead;
   mutations: TasksMutations;
   outcome: ReturnType<typeof useWorkOutcome>;
@@ -29,7 +31,8 @@ export function TaskWorkflowContent({
   goalTaskIds?: ReadonlySet<string>;
   onMakeGoal?(taskId: string): void;
 }) {
-  const genericTasks = (tasks.data?.tasks ?? []).filter(
+  const history = useTasksRead({ projectId, threadId, poll: true });
+  const genericTasks = [...(tasks.data?.tasks ?? []), ...(history.data?.tasks ?? [])].filter(
     (task) => task.linkedThreadIds.includes(threadId) && !goalTaskIds?.has(task.id),
   );
   const executionTaskIds = new Set(outcome.data?.executionTasks.map((task) => task.id) ?? []);
@@ -98,6 +101,17 @@ export function TaskWorkflowContent({
     return <p className="ws-card-note" role="status">Loading tasks…</p>;
   }
   return <div className="ws-thread-task-card">
+    {history.isPending ? (
+      <p className="ws-card-note" role="status">Loading completed tasks…</p>
+    ) : null}
+    {history.isError ? (
+      <p className="ws-card-note" role="alert">
+        Could not load completed tasks.{" "}
+        <button type="button" onClick={() => void history.refetch()}>
+          Retry completed tasks
+        </button>
+      </p>
+    ) : null}
     <TaskWorkflowCard
       sections={workflow}
       busy={busy}

@@ -4,6 +4,7 @@ import { createPluginRpcCaller, type PluginRpcInput } from "../../shared/server-
 import { projectSidebarTask, summarizeTask } from "./server-model.js";
 import { readSidebarTasks } from "./server-read.js";
 import { pluginStorageDatabase } from "../../shared/server-storage.js";
+import { MAX_COMPLETED_TASK_PREVIEW } from "./workflow-model.js";
 
 const TASKS_PLUGIN_ID = "tasks";
 export const TASK_ASSIGNEES_KEY = "sidebar-task-assignees:v1";
@@ -128,7 +129,12 @@ export function createTasksPluginAdapter(bb: BbPluginApi) {
       return false;
     }
   };
-  const listAll = async (input: { activeOnly: boolean; sort: "manual" | "priority" | "due"; parentTaskId?: string }): Promise<Task[]> => {
+  const listAll = async (input: {
+    activeOnly: boolean;
+    sort: "manual" | "priority" | "due";
+    parentTaskId?: string;
+    statuses?: TaskStatus[];
+  }): Promise<Task[]> => {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const tasks = new Map<string, Task>();
       let cursor: string | undefined;
@@ -138,6 +144,7 @@ export function createTasksPluginAdapter(bb: BbPluginApi) {
             activeOnly: input.activeOnly,
             sort: input.sort,
             limit: 500,
+            ...(input.statuses ? { statuses: input.statuses } : {}),
             ...(input.parentTaskId ? { parentTaskId: input.parentTaskId } : {}),
             ...(cursor ? { cursor } : {}),
           }, taskPageSchema);
@@ -188,33 +195,36 @@ export function createTasksPluginAdapter(bb: BbPluginApi) {
       .run(taskId, assignee, new Date().toISOString());
     return { taskId, assignee };
   };
-  const pruneInactiveAssignees = async (activeTaskIds: ReadonlySet<string>) => {
-    await ensureAssigneeMigration();
-    const stale = database
-      .prepare<[], { task_id: string }>(
-        "SELECT task_id FROM sidebar_task_assignee_state",
-      )
-      .all()
-      .filter((row) => !activeTaskIds.has(row.task_id));
-    const remove = database.prepare<[string]>(
-      "DELETE FROM sidebar_task_assignee_state WHERE task_id = ?",
-    );
-    for (const row of stale) remove.run(row.task_id);
-  };
-  const sidebar = async () => {
-    const activeTasks = await listAll({ activeOnly: true, sort: "priority" });
-    await pruneInactiveAssignees(new Set(activeTasks.map((task) => task.id)));
+  const sidebar = async (threadId?: string) => {
+    // Native activeOnly means a starting/working thread, not unfinished work.
+    // A filtered read cannot prove deletion and must never remove ownership.
+    // Read only a bounded thread-local terminal preview for Work Completed.
+    const history = threadId
+      ? await call("listTasksForThread", {
+          threadId,
+          statuses: ["done", "canceled"],
+          includeCompleted: true,
+          limit: MAX_COMPLETED_TASK_PREVIEW,
+        }, z.object({ tasks: z.array(taskSchema), taskThreads: z.array(taskThreadSchema) }))
+      : null;
+    const sidebarTasks = history?.tasks ?? await listAll({
+      activeOnly: false,
+      statuses: ["backlog", "todo", "in_progress", "in_review"],
+      sort: "priority",
+    });
     return readSidebarTasks({
-    listTasks: async () => activeTasks,
-    readAssignees,
-    listProjects: projects,
-    listTaskThreads: async (taskId) => (await call("listTaskThreads", { taskId }, z.object({ taskThreads: z.array(taskThreadSchema) }))).taskThreads,
-    taskId: (task) => task.id,
-    projectId: (task) => task.projectId,
-    projectIdOf: (project) => project.id,
-    projectName: (project) => project.name,
-    threadId: (thread) => thread.threadId,
-    projectTask: projectSidebarTask,
+      listTasks: async () => sidebarTasks,
+      readAssignees,
+      listProjects: projects,
+      listTaskThreads: async (taskId) => history
+        ? history.taskThreads.filter((link) => link.taskId === taskId)
+        : threads(taskId),
+      taskId: (task) => task.id,
+      projectId: (task) => task.projectId,
+      projectIdOf: (project) => project.id,
+      projectName: (project) => project.name,
+      threadId: (thread) => thread.threadId,
+      projectTask: projectSidebarTask,
     });
   };
   const update = async (taskId: string, status: TaskStatus) => {

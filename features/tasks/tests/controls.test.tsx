@@ -285,6 +285,34 @@ beforeEach(() => {
 });
 
 describe("Tasks registered controls", () => {
+  it("keeps terminal history out of the left queue and available in Work Completed", async () => {
+    const agent = { ...task, assignee: "agent" as const, linkedThreadIds: ["thr_test"] };
+    const human = { ...taskTwo, linkedThreadIds: ["thr_test"] };
+    const done = { ...agent, id: "done", key: "WORK-3", title: "Finished work", status: "done" as const };
+    const canceled = { ...human, id: "canceled", key: "WORK-4", title: "Canceled work", status: "canceled" as const };
+    const records = [agent, human, done, canceled];
+    const { rendered: left } = await leftSlot(records);
+    expect.soft(left.getByText("2 active tasks")).toBeTruthy();
+    expect.soft(left.queryByText(done.title)).toBeNull();
+    expect.soft(left.queryByText(canceled.title)).toBeNull();
+
+    const captured = await app();
+    const right = renderSlot(captured.threadPanelActions[0]!,
+      { threadId: "thr_test", params: null },
+      { rpc: rpcFixtures((input) => tasks(input ? [done, canceled] : [agent, human])) },
+    );
+    await right.findByRole("button", { name: "Completed: 2 tasks" });
+    const queue = right.getByRole("heading", { name: "Queue" }).closest("section")!;
+    const needsYou = right.getByRole("heading", { name: "Needs you" }).closest("section")!;
+    expect(within(queue).getByText(agent.title)).toBeTruthy();
+    expect(within(needsYou).getByText(human.title)).toBeTruthy();
+    fireEvent.click(right.getByRole("button", { name: "Completed: 2 tasks" }));
+    expect(right.getByText(done.title)).toBeTruthy();
+    expect(right.getByText(canceled.title)).toBeTruthy();
+    left.lifecycle.unmount();
+    right.lifecycle.unmount();
+  });
+
   it("opens a task title in the host-owned Tasks detail view", async () => {
     const { rendered } = await leftSlot();
 

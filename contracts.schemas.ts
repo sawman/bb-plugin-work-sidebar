@@ -29,7 +29,7 @@ export const rpcSchemas = {
   ...changesRpcSchemas,
   ...threadPreferenceSchemas, ...threadHierarchySchemas,
   sidebarTasks: {
-    input: z.null(),
+    input: z.object({ threadId: z.string().startsWith("thr_") }).strict().nullable(),
     output: z.object({
       available: z.boolean(),
       tasks: z.array(sidebarTask),

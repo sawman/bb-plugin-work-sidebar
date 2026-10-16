@@ -74,7 +74,10 @@ export function TasksLeftSidebar({
   });
   useTasksRealtimeInvalidation();
   const mutations = useTasksMutations(rpc, factProjectId);
-  const tasks = data?.tasks ?? EMPTY_TASKS;
+  const tasks = useMemo(
+    () => data?.tasks.filter((task) => task.status !== "done" && task.status !== "canceled") ?? EMPTY_TASKS,
+    [data?.tasks],
+  );
   const projects = data?.projects ?? [];
   const [composerOpen, setComposerOpen] = useState(false);
   const [title, setTitle] = useState("");

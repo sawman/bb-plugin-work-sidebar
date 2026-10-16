@@ -98,10 +98,10 @@ export function createTasksService(
     return summarizeTask(task, projects.find((project) => project.id === task.projectId)?.name ?? "Work");
   };
   const handlers: TaskHandlers = {
-    async sidebarTasks() {
+    async sidebarTasks(input) {
       try {
         if (!(await adapter.available())) return { available: false, tasks: [], projects: [], error: null };
-        return { available: true, ...(await adapter.sidebar()), error: null };
+        return { available: true, ...(await adapter.sidebar(input?.threadId)), error: null };
       } catch (error) {
         return { available: false, tasks: [], projects: [], error: error instanceof Error ? error.message : String(error) };
       }
