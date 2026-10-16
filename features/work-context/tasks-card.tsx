@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { RefreshButton } from "../../components/ui/refresh-button";
 import type { useTasksMutations } from "../tasks/mutations";
 import { useTasksRead } from "../tasks/queries";
 import { TaskWorkflowCard } from "../tasks/workflow-card";
@@ -107,9 +108,11 @@ export function TaskWorkflowContent({
     {history.isError ? (
       <p className="ws-card-note" role="alert">
         Could not load completed tasks.{" "}
-        <button type="button" onClick={() => void history.refetch()}>
-          Retry completed tasks
-        </button>
+        <RefreshButton
+          label="Retry completed tasks"
+          refreshing={history.isFetching}
+          onRefresh={() => history.refetch()}
+        />
       </p>
     ) : null}
     <TaskWorkflowCard

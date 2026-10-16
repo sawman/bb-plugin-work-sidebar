@@ -171,6 +171,8 @@ describe("Tasks read slots", () => {
     const other = { ...completed, id: "other-done", key: "WORK-4", title: "Other thread history", linkedThreadIds: ["thr_other"] };
     let resolveHistory!: (response: TasksResult) => void;
     const firstHistory = new Promise<TasksResult>((resolve) => { resolveHistory = resolve; });
+    let resolveRetry!: (response: TasksResult) => void;
+    const retryHistory = new Promise<TasksResult>((resolve) => { resolveRetry = resolve; });
     let historyAttempts = 0;
     const historyFailure = { ...emptyTasks, available: false, error: "History unavailable" };
     const calls = vi.fn<RpcHandlers["sidebarTasks"]>((input) => {
@@ -179,7 +181,8 @@ describe("Tasks read slots", () => {
       historyAttempts += 1;
       return historyAttempts === 1 ? firstHistory
         : historyAttempts === 2 ? historyFailure
-          : { ...emptyTasks, tasks: [completed] };
+          : historyAttempts === 3 ? retryHistory
+            : { ...emptyTasks, tasks: [completed] };
     });
     const captured = await app();
     const slot = renderSlot(captured.threadPanelActions[0]!,
@@ -194,9 +197,15 @@ describe("Tasks read slots", () => {
     expect(within(needsYou).getByText(human.title)).toBeTruthy();
     resolveHistory(historyFailure);
     const retry = await slot.findByRole("button", { name: "Retry completed tasks" }, { timeout: 2_500 });
+    expect(retry.classList.contains("ws-icon-button")).toBe(true);
+    expect(retry.classList.contains("ws-refresh-button")).toBe(true);
     expect(within(queue).getByText(agent.title)).toBeTruthy();
     expect(calls.mock.calls.filter(([input]) => input === null)).toHaveLength(1);
     fireEvent.click(retry);
+    expect(retry.hasAttribute("disabled")).toBe(true);
+    expect(retry.getAttribute("aria-busy")).toBe("true");
+    expect(slot.getByRole("switch", { name: "Agent assigned to WORK-1" }).hasAttribute("disabled")).toBe(false);
+    resolveRetry({ ...emptyTasks, tasks: [completed] });
     await slot.findByRole("button", { name: "Completed: 1 task" });
     fireEvent.click(slot.getByRole("button", { name: "Completed: 1 task" }));
     expect(slot.getByText(completed.title)).toBeTruthy();
