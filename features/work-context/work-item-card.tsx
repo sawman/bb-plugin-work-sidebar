@@ -6,7 +6,6 @@ import { ActionTooltip } from "../../components/ui/action-tooltip";
 import { Icon } from "../../components/ui/icon";
 import { SearchCombobox } from "../../components/ui/combobox";
 import type { TaskStatus } from "../tasks/model";
-import { useOpenTask } from "../tasks/task-navigation";
 import {
   TaskStatusControl,
   TaskWorkflowSection,
@@ -79,7 +78,6 @@ export function WorkItemCard({
   const queueMutation = useWorkItemQueueMutation(threadId);
   const executionMutation = useMoveWorkItemToExecution(threadId);
   const rpc = useRpc<typeof rpcContract>();
-  const openTask = useOpenTask();
   const [trackerQuery, setTrackerQuery] = useState("");
   const trackerSearch = useTrackerSearch(threadId, useDebouncedValue(trackerQuery));
   const trackerMutations = useTrackerMutations(rpc, threadId);
@@ -283,7 +281,6 @@ export function WorkItemCard({
             "Could not update BB task",
           )
         }
-        onOpenTask={openTask}
         onAddToQueue={(reference) => {
           if (reference.source === "bb_task") {
             void report(
@@ -464,7 +461,6 @@ function WorkQueue({
   onAddToQueue,
   onMoveToExecution,
   onTaskStatus,
-  onOpenTask,
 }: {
   queue: WorkQueueValue;
   labelForReference(reference: WorkItemReference): string;
@@ -481,7 +477,6 @@ function WorkQueue({
   onAddToQueue(reference: WorkItemReference): void;
   onMoveToExecution(reference: WorkItemReference): void;
   onTaskStatus(taskId: string, status: TaskStatus): void;
-  onOpenTask(taskKey: string): void;
 }) {
   const idPrefix = useId();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -548,7 +543,6 @@ function WorkQueue({
                     onStatus={onTaskStatus}
                   />
                 }
-                onOpenTask={onOpenTask}
               />
             ) : null}
             {queue.backlog.map((reference) => (
@@ -566,7 +560,6 @@ function WorkQueue({
                     onMoveToTasks={() => onMoveToExecution(reference)}
                   />
                 }
-                onOpenTask={onOpenTask}
               />
             ))}
           </div>

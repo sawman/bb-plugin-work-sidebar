@@ -22,6 +22,7 @@ import type {
   TaskQueueNode,
   ThreadTaskLink,
 } from "../../work-model";
+import { TaskLink } from "./task-navigation";
 import { TaskPriorityIcon } from "./priority";
 import { AssigneePicker } from "./assignee-picker";
 import { ThreadAssignmentPicker } from "./thread-assignment-picker";
@@ -46,7 +47,6 @@ export type TaskRowProps = {
   ): void;
   onMoveTask(taskId: string, direction: -1 | 1): void;
   onOpenThread(threadId: string, split?: boolean): void;
-  onOpenTask(taskKey: string): void;
   onUpdateStatus(taskId: string, status: SidebarTask["status"]): Promise<void>;
   onDelete(task: SidebarTask): Promise<void>;
   activeThreadId: string | null;
@@ -68,7 +68,7 @@ export type TaskRowProps = {
   updatingAssigneeTaskId: string | null;
   updatingAttachmentTaskId: string | null;
   selectedTaskIds: ReadonlySet<string>;
-  onSelect(taskId: string, event: ReactMouseEvent<HTMLButtonElement>): void;
+  onSelect(taskId: string, event: ReactMouseEvent<HTMLAnchorElement>): void;
 };
 
 export function TaskRow(props: TaskRowProps) {
@@ -84,7 +84,6 @@ export function TaskRow(props: TaskRowProps) {
     onDropTask,
     onMoveTask,
     onOpenThread,
-    onOpenTask,
     onUpdateStatus,
     onDelete,
     activeThreadId,
@@ -209,23 +208,23 @@ export function TaskRow(props: TaskRowProps) {
           <div className="ws-sidebar-row-main">
             <div className="ws-task-title-line">
               <ActionTooltip label={task.title}>
-                {(tooltipId) => <button
+                {(tooltipId) => <TaskLink taskKey={task.key}
                   className={`ws-task-assign ${assigned ? "ws-task-assigned" : ""}`}
-                  type="button"
                   aria-describedby={[ownerState ? bindingDescriptionId : null, tooltipId].filter(Boolean).join(" ")}
                   aria-label={`Open ${task.key} in Tasks`}
                   onClick={(event) => {
                     if (event.shiftKey || event.ctrlKey || event.metaKey) {
+                      event.preventDefault();
+                      event.stopPropagation();
                       onSelect(task.id, event);
                       return;
                     }
-                    onOpenTask(task.key);
                   }}
                 >
                   <span className="ws-task-title ws-sidebar-row-title">
                     {task.title}
                   </span>
-                </button>}
+                </TaskLink>}
               </ActionTooltip>
             </div>
             <div className="ws-task-meta ws-sidebar-row-meta">

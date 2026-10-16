@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { TaskLink } from "../tasks/task-navigation";
 import { CopyBadge } from "../../components/ui/copy-badge";
 import type { TaskStatus } from "../tasks/model";
 import { TaskPriorityIcon } from "../tasks/priority";
@@ -17,13 +18,11 @@ export function WorkItemGoalRow({
   label,
   task,
   actions,
-  onOpenTask,
 }: {
   reference: WorkItemReference;
   label: string;
   task: GoalTask | undefined;
   actions: ReactNode;
-  onOpenTask(taskKey: string): void;
 }) {
   const copy = (
     <span className="ws-task-workflow-copy ws-work-item-reference">
@@ -39,9 +38,19 @@ export function WorkItemGoalRow({
         >
           {task?.key ?? reference.id}
         </CopyBadge>
-        <span className="ws-task-workflow-title ws-work-item-reference-title">
-          {task?.title ?? label}
-        </span>
+        {task ? (
+          <TaskLink
+            taskKey={task.key}
+            className="ws-task-workflow-open ws-task-workflow-title ws-work-item-reference-title"
+            aria-label={`Open ${task.key} in Tasks`}
+          >
+            {task.title}
+          </TaskLink>
+        ) : (
+          <span className="ws-task-workflow-title ws-work-item-reference-title">
+            {label}
+          </span>
+        )}
       </span>
     </span>
   );
@@ -51,18 +60,7 @@ export function WorkItemGoalRow({
       data-state={task?.status}
       aria-label={`${task?.key ?? reference.id}: ${task?.title ?? label}`}
     >
-      {task ? (
-        <button
-          type="button"
-          className="ws-task-workflow-open"
-          aria-label={`Open ${task.key} in Tasks`}
-          onClick={() => onOpenTask(task.key)}
-        >
-          {copy}
-        </button>
-      ) : (
-        copy
-      )}
+      {copy}
       {actions}
     </article>
   );

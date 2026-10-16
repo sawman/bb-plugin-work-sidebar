@@ -3761,6 +3761,7 @@ button.ws-provider-health:focus-visible {
   outline-offset: 1px;
 }
 .ws-task-assign {
+  text-decoration: none;
   display: block;
   width: 100%;
   max-width: 100%;
@@ -4053,6 +4054,7 @@ button.ws-provider-health:focus-visible {
   gap: 0.12rem;
 }
 .ws-task-workflow-open {
+  text-decoration: none;
   min-width: 0;
   padding: 0;
   border: 0;

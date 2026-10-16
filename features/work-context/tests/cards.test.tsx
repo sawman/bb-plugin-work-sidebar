@@ -1,3 +1,4 @@
+import { expectTaskDetailLink } from "../../../tests/fixtures/bb-task-navigation-contract";
 // @vitest-environment jsdom
 import { createElement } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -211,19 +212,30 @@ describe("registered Work context cards", () => {
       },
     );
 
-    await slot.findByRole("button", { name: "Open WORK-9 in Tasks" });
-    fireEvent.click(slot.getByRole("button", { name: "Open WORK-9 in Tasks" }));
-    fireEvent.click(slot.getByRole("button", { name: "Open WORK-10 in Tasks" }));
-    expect(slot.inspection.navigateCalls).toContainEqual({
-      method: "toPluginPanel",
-      path: "tasks",
-      options: { subPath: "task/WORK-9" },
+    await slot.findByRole("link", { name: "Open WORK-9 in Tasks" });
+    const goalLink = slot.getByRole("link", { name: "Open WORK-9 in Tasks" });
+    expect(goalLink.querySelector('a,button,input,select,textarea,[tabindex],[role="button"]')).toBeNull();
+    const copyControl = within(goalLink.closest("article")!).getByRole("button", {
+      name: "Copy current goal BB task WORK-9",
     });
-    expect(slot.inspection.navigateCalls).toContainEqual({
-      method: "toPluginPanel",
-      path: "tasks",
-      options: { subPath: "task/WORK-10" },
+    const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true, value: { writeText },
     });
+    try {
+      expect(goalLink.contains(copyControl)).toBe(false);
+      fireEvent.click(copyControl);
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith("WORK-9"));
+      expect(slot.inspection.navigateCalls).toEqual([]);
+    } finally {
+      if (clipboardDescriptor) Object.defineProperty(navigator, "clipboard", clipboardDescriptor);
+      else Reflect.deleteProperty(navigator, "clipboard");
+    }
+    fireEvent.click(slot.getByRole("link", { name: "Open WORK-9 in Tasks" }));
+    fireEvent.click(slot.getByRole("link", { name: "Open WORK-10 in Tasks" }));
+    expectTaskDetailLink(slot.getByRole("link", { name: "Open WORK-9 in Tasks" }), "WORK-9");
+    expectTaskDetailLink(slot.getByRole("link", { name: "Open WORK-10 in Tasks" }), "WORK-10");
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();
   });

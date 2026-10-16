@@ -1,3 +1,4 @@
+import { expectTaskDetailLink } from "../../../tests/fixtures/bb-task-navigation-contract";
 // @vitest-environment jsdom
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -288,14 +289,10 @@ describe("Tasks registered controls", () => {
     const { rendered } = await leftSlot();
 
     fireEvent.click(
-      rendered.getByRole("button", { name: "Open WORK-1 in Tasks" }),
+      rendered.getByRole("link", { name: "Open WORK-1 in Tasks" }),
     );
 
-    expect(rendered.inspection.navigateCalls).toContainEqual({
-      method: "toPluginPanel",
-      path: "tasks",
-      options: { subPath: "task/WORK-1" },
-    });
+    expectTaskDetailLink(rendered.getByRole("link", { name: "Open WORK-1 in Tasks" }), "WORK-1");
     rendered.lifecycle.unmount();
   });
 
@@ -682,7 +679,7 @@ describe("Tasks registered controls", () => {
     const copyThread = attached.rendered.getByRole("button", {
       name: "Copy assigned thread Fixture thread",
     });
-    const taskTitle = attached.rendered.getByRole("button", {
+    const taskTitle = attached.rendered.getByRole("link", {
       name: "Open WORK-1 in Tasks",
     });
     fireEvent.click(copyThread);
@@ -771,16 +768,14 @@ describe("Tasks registered controls", () => {
 
   it("keeps modified title clicks selectable while a primary click opens Tasks", async () => {
     const { rendered, call } = await leftSlot();
-    const title = rendered.getByRole("button", { name: "Open WORK-1 in Tasks" });
-    fireEvent.click(title, { ctrlKey: true });
-    fireEvent.click(title, { metaKey: true });
+    const title = rendered.getByRole("link", { name: "Open WORK-1 in Tasks" });
+    expect(fireEvent.click(title, { ctrlKey: true })).toBe(false);
+    expect(fireEvent.click(title, { metaKey: true })).toBe(false);
+    expect(fireEvent.click(title, { shiftKey: true })).toBe(false);
+    expect(rendered.inspection.navigateCalls).toEqual([]);
     fireEvent.click(title);
     expect(call).not.toHaveBeenCalled();
-    expect(rendered.inspection.navigateCalls).toContainEqual({
-      method: "toPluginPanel",
-      path: "tasks",
-      options: { subPath: "task/WORK-1" },
-    });
+    expectTaskDetailLink(rendered.getByRole("link", { name: "Open WORK-1 in Tasks" }), "WORK-1");
     rendered.lifecycle.unmount();
   });
 
@@ -917,7 +912,7 @@ describe("Tasks registered controls", () => {
         ],
       },
     );
-    const row = rendered.getByRole("button", { name: "Open WORK-1 in Tasks" });
+    const row = rendered.getByRole("link", { name: "Open WORK-1 in Tasks" });
     expect(rendered.getByText("Fixture thread")).toBeTruthy();
     expect(rendered.queryByText("Bound outcome task")).toBeNull();
     fireEvent.click(row);
@@ -1044,7 +1039,7 @@ describe("Tasks registered controls", () => {
         ],
       },
     );
-    const row = rendered.getByRole("button", { name: "Open WORK-1 in Tasks" });
+    const row = rendered.getByRole("link", { name: "Open WORK-1 in Tasks" });
     expect(rendered.getByText("Owner thread unavailable")).toBeTruthy();
     expect(row.getAttribute("aria-describedby")).toBeTruthy();
     fireEvent.contextMenu(rendered.getByText(task.title));
