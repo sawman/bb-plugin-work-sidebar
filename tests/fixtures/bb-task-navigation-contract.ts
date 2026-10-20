@@ -1,5 +1,5 @@
-// Executable contract excerpts from BB desktop-v0.46.0, commit
-// 4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62 (SDK 0.6.37).
+// Executable contract excerpts from BB desktop-v0.46.1, commit
+// 411eac54ac16d0a3cb57d1de8396d37564884a73 (SDK 0.6.49).
 // Host: packages/client-core/src/routes/route-paths.ts
 // Tasks: plugins/tasks/shell/routes.ts; app.tsx registers plugin tasks/path tasks.
 // Keep these excerpts aligned with the installed host at compatibility checkpoints.

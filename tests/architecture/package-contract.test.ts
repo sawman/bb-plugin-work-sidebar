@@ -12,7 +12,7 @@ const packageJson = JSON.parse(readFileSync(resolve(repositoryRoot, "package.jso
   engines?: Record<string, string>;
 };
 const packageLock = JSON.parse(readFileSync(resolve(repositoryRoot, "package-lock.json"), "utf8")) as {
-  packages: Record<string, { dependencies?: Record<string, string>; devDependencies?: Record<string, string>; engines?: Record<string, string> }>;
+  packages: Record<string, { version?: string; dependencies?: Record<string, string>; devDependencies?: Record<string, string>; engines?: Record<string, string> }>;
 };
 const rootLockPackage = packageLock.packages[""]!;
 
@@ -39,7 +39,7 @@ describe("R1 package and compile boundary", () => {
   it("pins the SDK and keeps host shims out of the plugin bundle", () => {
     expect(packageJson.engines?.bb).toBe(">=0.46.0");
     expect(packageJson.engines?.bbPluginSdk).toBe(">=0.6.37");
-    expect(packageJson.devDependencies?.["@get-bb/plugin-sdk"]).toBe("0.6.37");
+    expect(packageJson.devDependencies?.["@get-bb/plugin-sdk"]).toBe("0.6.49");
     expect(packageJson.dependencies?.["@get-bb/plugin-sdk"]).toBeUndefined();
     expect(rootLockPackage.engines).toEqual(packageJson.engines);
 
@@ -65,6 +65,8 @@ describe("R1 package and compile boundary", () => {
     expect(packageJson.devDependencies?.zustand).toBeUndefined();
 
     expect(rootLockPackage.devDependencies?.["@get-bb/plugin-sdk"]).toBe(packageJson.devDependencies?.["@get-bb/plugin-sdk"]);
+    expect(packageLock.packages["node_modules/@get-bb/plugin-sdk"]?.version)
+      .toBe(packageJson.devDependencies?.["@get-bb/plugin-sdk"]);
     expect(rootLockPackage.dependencies?.["@tanstack/react-query"]).toBe(packageJson.dependencies?.["@tanstack/react-query"]);
     expect(rootLockPackage.dependencies?.zustand).toBe(packageJson.dependencies?.zustand);
     expect(packageJson.dependencies?.["react-diff-view"]).toBeUndefined();
