@@ -38,6 +38,22 @@ reverse RPC. Questions source and the navigation host wiring are unchanged.
 The SDK sibling owns API consumption/pin changes and its SDK note. No speculative
 product feature, PR-status audit fix, Floating Ghostty work or new task is included.
 
+A concrete existing-request opportunity is host-rendered Inbox Mermaid, requiring
+a separate scoped live/adoption follow-up. Exact shipped
+[PluginMarkdown](https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/apps/app/src/lib/plugin-sdk-app-impl.tsx#L137) passes content
+to MarkdownPreview; [MarkdownPreview](https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/apps/app/src/components/ui/markdown-preview.tsx#L787)
+uses MarkdownMermaidDiagram for Mermaid fences when imagePolicy is render
+(the default at line 1763). The host
+[loader](https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/apps/app/src/components/ui/markdown-mermaid-loader.ts) dynamically
+imports Mermaid. Existing Inbox segmentation in `features/inbox/model.ts` and
+`features/inbox/views.tsx` intercepts these fences into source fallback, so native
+Markdown may fulfill the earlier diagram request without bundling Mermaid here.
+This is shipped-source evidence, not a live rendering certification or a claim
+that 0.46.1 introduced it. Host Mermaid diagram/loader files are unchanged from
+0.46.0. New codeFenceRenderer registration expressly excludes plugin Markdown
+and is not the enabling mechanism. Root owns the scoped follow-up; no feature
+implementation or new task was performed by this worker.
+
 ## Patch and artifact boundaries
 
 The two retained patches modify only `plugins/ask-user-question/**` and

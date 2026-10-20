@@ -25,8 +25,13 @@ rollback/stage metadata, validation and root-owned live limits are in the
 
 The SDK adds code-fence rendering, save-file downloads, session option forwarding
 and a thread-action state group; Tasks accepts provider-defined reasoning IDs.
-These are documented opportunities, not speculative product changes. #1978 is
-closed; #2200 and #2836 remain open. No new task or Human work is included.
+These are documented opportunities, not speculative product changes. Existing
+host Markdown also routes Mermaid fences through MarkdownPreview to a lazy
+host Mermaid renderer. Inbox currently intercepts those fences; a scoped
+root-owned follow-up can verify live rendering and adopt host Markdown without
+bundling Mermaid. This is not claimed as new in 0.46.1; codeFenceRenderer
+excludes plugin Markdown. Exact paths and immutable links are in the audit.
+#1978 is closed; #2200 and #2836 remain open. No Human work is included.
 
 ## BB 0.46.0 audit
 
