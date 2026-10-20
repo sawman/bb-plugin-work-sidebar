@@ -37,7 +37,7 @@ preflight; its HEAD must match the catalog's immutable source commit.
 | --- | --- | --- |
 | `ask-user-question` | [ACP answer continuation](ask-user-question/README.md) | BB 0.46.1 candidate; root deployment pending |
 | `automations` | [Personal-project availability](automations/README.md) | Retired; keep pristine built-in |
-| `tasks` | [Thread workflow](tasks/README.md) | BB 0.46.1 candidate; preserves terminal preview5 RPC |
+| `tasks` | [Thread workflow](tasks/README.md) | BB 0.46.1 candidate; preserves the preview of five completed tasks RPC |
 
 Deployment on 2026-10-09 reran the exact-source preflight (43 Questions, 136
 Automations, 412 Tasks tests, plus typechecks/builds). All installed artifacts

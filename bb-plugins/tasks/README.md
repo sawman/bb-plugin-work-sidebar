@@ -18,7 +18,7 @@ result size, and returns only the matching task links.
 existing delegation RPC to `threads.spawn`. A dispatch started from a thread
 therefore preserves its parent relationship; non-CLI delegation is unchanged.
 
-Work Sidebar now consumes this indexed RPC for terminal preview5. Preserve
+Work Sidebar now consumes this indexed RPC for the preview of five completed tasks. Preserve
 that contract, or coordinate an equivalent native migration before retirement.
 The project-wide Tasks pane remains a separate consumer.
 

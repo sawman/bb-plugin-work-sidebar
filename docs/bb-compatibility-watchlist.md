@@ -18,7 +18,7 @@ Audited immutable `desktop-v0.46.1` at
 remaining capabilities are still absent in shipped source. Questions and Tasks
 patches apply unchanged; Automations remains pristine with native personal
 project support. Work Sidebar now consumes patched `listTasksForThread` for
-terminal preview5, so preserve that RPC until an equivalent native migration.
+the preview of five completed tasks, so preserve that RPC until an equivalent native migration.
 Exact source links/hashes, release deltas, refreshed primary issue/PR searches,
 rollback/stage metadata, validation and root-owned live limits are in the
 [0.46.1 audit](compatibility/bb-0.46.1/README.md).
@@ -278,7 +278,7 @@ audit intentionally did not create speculative work.
   lacks a thread-scoped indexed read. The deployed local Tasks patch supplies
   `listTasksForThread({ threadId, statuses, includeCompleted, limit })` over
   the indexed `task_threads.thread_id` path, returning summaries and matching
-  links in one bounded operation. Work Sidebar consumes it for terminal preview5; keep that contract or
+  links in one bounded operation. Work Sidebar consumes it for the preview of five completed tasks; keep that contract or
   coordinate an equivalent native migration before retirement. Its project-wide
   Tasks pane remains a separate consumer.
   Remove the patch only after upstream exposes the equivalent. Open upstream

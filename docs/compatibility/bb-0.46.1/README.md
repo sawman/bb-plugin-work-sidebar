@@ -16,11 +16,18 @@ are primary evidence. No remote writes occurred.
 | Capability | Exact shipped evidence and disposition |
 | --- | --- |
 | ACP accumulating queue and nonblocking delivery | Retain `acp-continuation-v0.46.patch` unchanged. Shipped `plugins/ask-user-question/src/server.ts` is unchanged from 0.46.0: one awaited requestInput with ctx.signal, followed by one combined tool result. No ACP provider branch, queue, per-answer send or auto delivery exists. The retained patch preserves configurable timeouts, describeSubmission and the ordinary persisted host form. |
-| Indexed thread-task read | Retain `thread-workflow.patch` unchanged. Shipped Tasks contract still has project/global listTasks and task-to-thread listTaskThreads, with no reverse thread-scoped RPC. Existing DB thread index alone is not an exposed equivalent. The patch adds bounded listTasksForThread, filters live/status/completed tasks, and returns matching links. Work Sidebar now consumes this API for terminal preview5; preserve it through deployment. |
+| Indexed thread-task read | Retain `thread-workflow.patch` unchanged. Shipped Tasks contract still has project/global listTasks and task-to-thread listTaskThreads, with no reverse thread-scoped RPC. Existing DB thread index alone is not an exposed equivalent. The patch adds bounded listTasksForThread, filters live/status/completed tasks, and returns matching links. Work Sidebar now consumes this API for the preview of five completed tasks; preserve it through deployment. |
 | Tasks CLI parenting | Retain the same Tasks patch. Shipped dispatch run(input) sends taskId/presetId/extraInstructions only; delegate spawn omits parentThreadId. The patch forwards caller thread through the typed delegation contract to spawn. Issue #2836 remains open. |
 | Automations personal project | Keep pristine; retired patch remains historical. The exact service accepts kind personal, GET projects/:id uses requirePublicProject, and that helper rejects deleted projects but has no kind filter. 0.46.1 adds only cancellation signals in unrelated file-list routes; service behavior is unchanged. Read-only live `bb project show proj_personal --json` succeeds with kind personal (`personal-project.json`); no automation was created. |
 | Explicit inverse HTTP intent | Still absent. SDK app-contract keeps openUrl(url: string): boolean, without explicit in-app/external HTTP destination or effective browser-preference getter. New save-file API is a download path, not navigation. |
 | Browser-capable left URL host | Still absent. App.tsx still mounts AppNavigationUrlHost; routing browser context defaults null. Right panel supplies openBrowser through UrlOpenRoutingProvider. Both files are unchanged from 0.46.0. |
+
+Shipped `provider-acp-next` is default-disabled in
+`apps/server/src/services/plugins/builtin-registry.ts` and also remains covered by the retained Questions gate:
+`plugins/provider-acp-next/src/agents.ts` formats custom IDs as `acp-${slug}`,
+and `src/declaration.ts` declares `supportsNativeUserQuestion: false`.
+The patch's `acp-` provider prefix and non-native tool configuration therefore
+continue to select these providers; no ACP-next live Reply is certified here.
 
 No remaining watchlist item is fulfilled. Open issue and PR searches were
 refreshed separately for all five entries, including broader indexed Tasks
@@ -65,7 +72,7 @@ from the deployment plan. The sync script itself is unchanged.
 Retire Questions only after native ACP supports equivalent accumulating,
 bounded questions and immediate nonblocking answer delivery, with live Reply
 acceptance. Retire Tasks only after native indexed thread read and caller-parent
-forwarding both exist; coordinate terminal preview5 migration before removing
+forwarding both exist; coordinate the preview of five completed tasks migration before removing
 the RPC. Historical patch files and audits remain intact.
 
 Pristine matching rollback packages are tracked in
@@ -80,7 +87,11 @@ app/server BB 0.46.1 / SDK 0.6.49 metadata. No assertions or timeouts changed.
 The Tasks count follows upstream test restructuring (40→37 files;
 `tasks-test-inventory.json` lists exact added/deleted/changed release tests).
 The retained Tasks patch touches seven implementation/contract files and no
-tests, skips, assertions or timeouts. A separate typed harness probe passed
+tests, skips, assertions or timeouts. Current Tasks behavior coverage is the separate probe below; the historical
+0.43.3 README coverage description is not current catalog-gate evidence.
+The probe is evidence-only and is not part of `bb-plugins:sync`; future upgrades
+must explicitly repeat it or add a separately scoped regression gate.
+A separate typed harness probe passed
 8 checks for live/completed/status/limit reads, matching links, and CLI parent
 forwarding with/without a caller. Its source template and raw log are retained.
 Pristine Automations passed 11 files / 136 tests and typecheck, both raw exit 0;

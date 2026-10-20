@@ -82,6 +82,21 @@
       "path": "apps/server/src/services/lib/entity-lookup.ts",
       "url": "https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/apps/server/src/services/lib/entity-lookup.ts",
       "sha256": "53619effaed2cddec142c228cc969dc5892149809cb2bf074275f21c49218dc2"
+    },
+    {
+      "path": "plugins/provider-acp-next/src/agents.ts",
+      "url": "https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/plugins/provider-acp-next/src/agents.ts",
+      "sha256": "dd76e1c3b0c58dcb17386b17f571da6fded2ddb94c6111606b0a836e6af9a6e4"
+    },
+    {
+      "path": "plugins/provider-acp-next/src/declaration.ts",
+      "url": "https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/plugins/provider-acp-next/src/declaration.ts",
+      "sha256": "f57b6ac70540b2f22892d9bb16a132138ec1805cba6dc186a12e4ee5f63266af"
+    },
+    {
+      "path": "apps/server/src/services/plugins/builtin-registry.ts",
+      "url": "https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/apps/server/src/services/plugins/builtin-registry.ts",
+      "sha256": "29c470b762713dfcc3cad72752b5f74c4d88409e938b670c2ed191db37cb9d1a"
     }
   ]
 }
