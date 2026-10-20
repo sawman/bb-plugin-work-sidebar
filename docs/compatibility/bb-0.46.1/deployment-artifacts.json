@@ -1,0 +1,80 @@
+{
+  "stage": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.1-2026-10-20T08-16-46-219Z",
+  "bbVersion": "0.46.1",
+  "sdkVersion": "0.6.49",
+  "artifacts": [
+    {
+      "pluginId": "ask-user-question",
+      "file": "server.js",
+      "bytes": 219276,
+      "sha256": "978a9cd1e324600a47c1db979cb4b77cf94c8eadff54e0c07efbc616dde997ae"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "server.js.map",
+      "bytes": 335254,
+      "sha256": "5a6aa9af392422818c58da97261f10eafc6e886333a503d558ba8a1b9732ce63"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "server.meta.json",
+      "bytes": 221,
+      "sha256": "9f4d90fe9abf898de0d4f5029e19a882c33ae688e62bc0906fa825d7f96419c9"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "app.js",
+      "bytes": 223696,
+      "sha256": "1e8f57875899857cfa597ac639d331a733d2eab59a7ac22a02cc1a7e4f58d8c5"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "app.css",
+      "bytes": 39177,
+      "sha256": "153a2cc6a3b7218e97d6be9178a08a4652ffc1b75d8c1232df1affb4788a6d39"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "app.meta.json",
+      "bytes": 221,
+      "sha256": "9f4d90fe9abf898de0d4f5029e19a882c33ae688e62bc0906fa825d7f96419c9"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "server.js",
+      "bytes": 342339,
+      "sha256": "c2ac0524ac0034d0cb8deff5dcccecaa954ee0e8c5f08a756535d5d916ae9ccf"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "server.js.map",
+      "bytes": 468341,
+      "sha256": "79bfecda5a5bcdc72366aa4eaee882aaa5f00c931ee643ab7230807c9b677933"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "server.meta.json",
+      "bytes": 209,
+      "sha256": "76bd9871926531a2ef0917e5ff029c4d2f7c693165c20cd716102a085ecf763b"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "app.js",
+      "bytes": 1042931,
+      "sha256": "a692965f21722b7d97982390c167fff8d57c6d4fe303c10a6848a31b9699c326"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "app.css",
+      "bytes": 163724,
+      "sha256": "07029218f5ffaa303c49b7057a78266acbf3b3b1c5eae18eed8c0ee283f1c730"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "app.meta.json",
+      "bytes": 209,
+      "sha256": "76bd9871926531a2ef0917e5ff029c4d2f7c693165c20cd716102a085ecf763b"
+    }
+  ],
+  "automations": "pristine verified"
+}

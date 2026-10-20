@@ -1,5 +1,8 @@
 # BB 0.46.1 built-in/source/watchlist audit
 
+Root subsequently deployed; the current [deployment and bounded acceptance
+record](DEPLOYMENT.md) supplements this preserved worker preflight evidence.
+
 Date: 2026-10-20. Worker: BBPLUG-430. Canonical parent:
 `ff2588a730e6596ce9d3539d5785cbbfc3153e62` (clean managed worktree verified).
 Exact release: `desktop-v0.46.1` at

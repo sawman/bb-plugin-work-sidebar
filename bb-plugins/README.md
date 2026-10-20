@@ -1,7 +1,7 @@
 # Local BB plugin patches
 
-BB 0.46.0 deployment is recorded in
-[`docs/compatibility/bb-0.46.0/DEPLOYMENT.md`](../docs/compatibility/bb-0.46.0/DEPLOYMENT.md).
+BB 0.46.1 deployment is recorded in
+[`docs/compatibility/bb-0.46.1/DEPLOYMENT.md`](../docs/compatibility/bb-0.46.1/DEPLOYMENT.md).
 Questions and Tasks were deployed from checksum-verified artifacts;
 Automations now uses the native release implementation.
 
@@ -22,12 +22,13 @@ payloads for Questions/Automations and [0.45 packages for all three plugins](rol
 Other historical deployments have local backups only; never use a different
 BB version's rollback payload.
 
-BB 0.46.1 / SDK 0.6.49 Questions and Tasks candidates are cataloged for
-non-deploy verification in BBPLUG-430. Current exact-source evidence and gates:
-[0.46.1 audit](../docs/compatibility/bb-0.46.1/README.md). Automations remains
-retired and pristine. Root owns deployment and live acceptance; candidates
-must not be treated as active before that acceptance. Historical deployment
-records above and below retain their original versions and dates.
+BB 0.46.1 / SDK 0.6.49 Questions and Tasks patches were deployed by root on
+2026-10-20. Exact installed hashes and bounded live acceptance are recorded in
+[the deployment record](../docs/compatibility/bb-0.46.1/DEPLOYMENT.md).
+The [worker audit](../docs/compatibility/bb-0.46.1/README.md) preserves the prior
+non-deploy evidence. Automations remains retired and pristine. Live ACP Reply
+remains unverified because Cursor requires authentication; this is not a waiver.
+Historical deployment records below retain their original versions and dates.
 Pristine 0.46.1 rollback packages are tracked under
 [rollback/bb-0.46.1](rollback/bb-0.46.1/README.md).
 `BB_PATCH_SOURCE_ROOT` selects an already-fetched local release checkout for
@@ -35,9 +36,9 @@ preflight; its HEAD must match the catalog's immutable source commit.
 
 | Built-in plugin | Patch | Status |
 | --- | --- | --- |
-| `ask-user-question` | [ACP answer continuation](ask-user-question/README.md) | BB 0.46.1 candidate; root deployment pending |
+| `ask-user-question` | [ACP answer continuation](ask-user-question/README.md) | BB 0.46.1 deployed; live ACP Reply unverified |
 | `automations` | [Personal-project availability](automations/README.md) | Retired; keep pristine built-in |
-| `tasks` | [Thread workflow](tasks/README.md) | BB 0.46.1 candidate; preserves the preview of five completed tasks RPC |
+| `tasks` | [Thread workflow](tasks/README.md) | BB 0.46.1 deployed; live indexed read verified |
 
 Deployment on 2026-10-09 reran the exact-source preflight (43 Questions, 136
 Automations, 412 Tasks tests, plus typechecks/builds). All installed artifacts

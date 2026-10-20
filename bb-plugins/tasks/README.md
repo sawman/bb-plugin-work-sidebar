@@ -30,7 +30,11 @@ Retain the existing plugin-only patch unchanged.
 Evidence, source deltas, gates, staged hashes and root deployment instructions:
 [0.46.1 audit](../../docs/compatibility/bb-0.46.1/README.md).
 [Pristine rollback](../rollback/bb-0.46.1/README.md) is version-matched.
-Root owns deployment and live acceptance; this worker stages only.
+Historical worker preflight above staged only. Root subsequently deployed;
+see the [0.46.1 deployment and acceptance record](../../docs/compatibility/bb-0.46.1/DEPLOYMENT.md)
+for final installed hashes, repeated gates and live limits.
+The live reverse RPC now succeeds and supplies the scoped preview of five
+completed tasks; exhaustive interaction-state coverage remains incomplete.
 
 ## BB 0.46.0 compatibility preflight (2026-10-13)
 
