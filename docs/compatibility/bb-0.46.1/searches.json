@@ -1,0 +1,531 @@
+{
+  "checkedAt": "2026-10-20T08:06:31.869682+00:00",
+  "results": [
+    {
+      "label": "acp-queue",
+      "query": "repo:get-bb/bb is:open is:issue ACP question",
+      "total_count": 10,
+      "incomplete_results": false,
+      "items": [
+        {
+          "number": 5447,
+          "title": "ACP: fork at a checkpoint (mid-thread fork and edit-message) via an opt-in _meta extension",
+          "html_url": "https://github.com/get-bb/bb/issues/5447",
+          "state": "open",
+          "updated_at": "2026-10-19T16:15:00Z"
+        },
+        {
+          "number": 5691,
+          "title": "ACP: a model/reasoning change silently rebuilds a non-restorable agent session and drops its conversation",
+          "html_url": "https://github.com/get-bb/bb/issues/5691",
+          "state": "open",
+          "updated_at": "2026-10-17T07:51:12Z"
+        },
+        {
+          "number": 3911,
+          "title": "Pi fails to initialize with custom llama-server model URL (Hermes3.6-35B-A3B GGUF) - suspected acp-provider auth handshake issue",
+          "html_url": "https://github.com/get-bb/bb/issues/3911",
+          "state": "open",
+          "updated_at": "2026-09-18T18:59:10Z"
+        },
+        {
+          "number": 2471,
+          "title": "ACP agents receive an empty mcpServers list at session/new, so agent-side MCP servers never load under bb",
+          "html_url": "https://github.com/get-bb/bb/issues/2471",
+          "state": "open",
+          "updated_at": "2026-08-26T20:33:36Z"
+        },
+        {
+          "number": 3833,
+          "title": "`--plan` bypasses the provider plan capability gate: provider-pi accepts it silently and the agent looks for a nonexistent EnterPlanMode tool",
+          "html_url": "https://github.com/get-bb/bb/issues/3833",
+          "state": "open",
+          "updated_at": "2026-09-17T12:06:34Z"
+        },
+        {
+          "number": 5004,
+          "title": "Pi: injected AskUserQuestion interaction stays pending with no card, then times out after 30 minutes",
+          "html_url": "https://github.com/get-bb/bb/issues/5004",
+          "state": "open",
+          "updated_at": "2026-10-06T06:25:40Z"
+        },
+        {
+          "number": 3230,
+          "title": "Provider maintenance idle-shutdown timer is never scheduled when a maintenance request never settles",
+          "html_url": "https://github.com/get-bb/bb/issues/3230",
+          "state": "open",
+          "updated_at": "2026-09-08T19:14:14Z"
+        },
+        {
+          "number": 4463,
+          "title": "Plugin-form (AskUserQuestion) answers are never persisted to the interaction record, so the transcript loses every answered question",
+          "html_url": "https://github.com/get-bb/bb/issues/4463",
+          "state": "open",
+          "updated_at": "2026-09-30T04:47:53Z"
+        },
+        {
+          "number": 3020,
+          "title": "No visibility into a provider session's subagent mesh: live rosters and interaction attribution",
+          "html_url": "https://github.com/get-bb/bb/issues/3020",
+          "state": "open",
+          "updated_at": "2026-09-10T14:20:49Z"
+        },
+        {
+          "number": 4233,
+          "title": "Session context policy: let a plugin narrow what one agent session loads (BB plugins, skills, MCP, CLI plugins, instructions) \u2014 working prototype",
+          "html_url": "https://github.com/get-bb/bb/issues/4233",
+          "state": "open",
+          "updated_at": "2026-09-26T14:20:08Z"
+        }
+      ]
+    },
+    {
+      "label": "acp-queue",
+      "query": "repo:get-bb/bb is:open is:pr ACP question",
+      "total_count": 4,
+      "incomplete_results": false,
+      "items": [
+        {
+          "number": 5816,
+          "title": "fix(acp): enforce bb permission modes for OpenCode",
+          "html_url": "https://github.com/get-bb/bb/pull/5816",
+          "state": "open",
+          "updated_at": "2026-10-20T00:49:46Z"
+        },
+        {
+          "number": 5470,
+          "title": "Validate and prepare anonymous work telemetry",
+          "html_url": "https://github.com/get-bb/bb/pull/5470",
+          "state": "open",
+          "updated_at": "2026-10-16T03:27:09Z"
+        },
+        {
+          "number": 5471,
+          "title": "Capture applied thread and turn lifecycle transitions",
+          "html_url": "https://github.com/get-bb/bb/pull/5471",
+          "state": "open",
+          "updated_at": "2026-10-16T03:27:11Z"
+        },
+        {
+          "number": 5438,
+          "title": "Link anonymous thread and turn lifecycle events",
+          "html_url": "https://github.com/get-bb/bb/pull/5438",
+          "state": "open",
+          "updated_at": "2026-10-13T23:17:45Z"
+        }
+      ]
+    },
+    {
+      "label": "thread-tasks",
+      "query": "repo:get-bb/bb is:open is:issue \"listTasksForThread\"",
+      "total_count": 0,
+      "incomplete_results": false,
+      "items": []
+    },
+    {
+      "label": "thread-tasks",
+      "query": "repo:get-bb/bb is:open is:pr \"listTasksForThread\"",
+      "total_count": 0,
+      "incomplete_results": false,
+      "items": []
+    },
+    {
+      "label": "tasks-parent",
+      "query": "repo:get-bb/bb is:open is:issue tasks dispatch parent",
+      "total_count": 1,
+      "incomplete_results": false,
+      "items": [
+        {
+          "number": 1144,
+          "title": "Task dependencies: no way to express that one task blocks another",
+          "html_url": "https://github.com/get-bb/bb/issues/1144",
+          "state": "open",
+          "updated_at": "2026-10-08T07:02:48Z"
+        }
+      ]
+    },
+    {
+      "label": "tasks-parent",
+      "query": "repo:get-bb/bb is:open is:pr tasks dispatch parent",
+      "total_count": 0,
+      "incomplete_results": false,
+      "items": []
+    },
+    {
+      "label": "inverse-http",
+      "query": "repo:get-bb/bb is:open is:issue plugin browser openUrl",
+      "total_count": 2,
+      "incomplete_results": false,
+      "items": [
+        {
+          "number": 5740,
+          "title": "Mobile bridge: let pages switch to a saved server profile",
+          "html_url": "https://github.com/get-bb/bb/issues/5740",
+          "state": "open",
+          "updated_at": "2026-10-19T08:45:07Z"
+        },
+        {
+          "number": 5342,
+          "title": "Plugin-reachable way to open a thread in a new native application window (window placement + targeting in the SDK)",
+          "html_url": "https://github.com/get-bb/bb/issues/5342",
+          "state": "open",
+          "updated_at": "2026-10-15T04:07:41Z"
+        }
+      ]
+    },
+    {
+      "label": "inverse-http",
+      "query": "repo:get-bb/bb is:open is:pr plugin browser openUrl",
+      "total_count": 0,
+      "incomplete_results": false,
+      "items": []
+    },
+    {
+      "label": "left-browser",
+      "query": "repo:get-bb/bb is:open is:issue sidebar browser",
+      "total_count": 24,
+      "incomplete_results": false,
+      "items": [
+        {
+          "number": 5739,
+          "title": "Sidebar links can't be \"ctrl clicked\"",
+          "html_url": "https://github.com/get-bb/bb/issues/5739",
+          "state": "open",
+          "updated_at": "2026-10-19T08:47:08Z"
+        },
+        {
+          "number": 2525,
+          "title": "Browser-style tabs for open threads above the chat",
+          "html_url": "https://github.com/get-bb/bb/issues/2525",
+          "state": "open",
+          "updated_at": "2026-10-06T16:02:28Z"
+        },
+        {
+          "number": 3184,
+          "title": "Embedded Browser focus prevents app and plugin keyboard shortcuts",
+          "html_url": "https://github.com/get-bb/bb/issues/3184",
+          "state": "open",
+          "updated_at": "2026-09-06T16:34:16Z"
+        },
+        {
+          "number": 4234,
+          "title": "Native Browser view remains visible after switching threads through More",
+          "html_url": "https://github.com/get-bb/bb/issues/4234",
+          "state": "open",
+          "updated_at": "2026-09-24T02:26:04Z"
+        },
+        {
+          "number": 5810,
+          "title": "Collapsed sidebar sections show questions missing from their visible rows",
+          "html_url": "https://github.com/get-bb/bb/issues/5810",
+          "state": "open",
+          "updated_at": "2026-10-20T01:12:25Z"
+        },
+        {
+          "number": 1614,
+          "title": "Add recent activity ordering for sidebar projects",
+          "html_url": "https://github.com/get-bb/bb/issues/1614",
+          "state": "open",
+          "updated_at": "2026-09-10T02:53:58Z"
+        },
+        {
+          "number": 2298,
+          "title": "Archiving a thread leaves its native browser views alive",
+          "html_url": "https://github.com/get-bb/bb/issues/2298",
+          "state": "open",
+          "updated_at": "2026-09-30T21:42:26Z"
+        },
+        {
+          "number": 4407,
+          "title": "A hidden thread waiting on an approval or question stalls with nothing in the app pointing at it",
+          "html_url": "https://github.com/get-bb/bb/issues/4407",
+          "state": "open",
+          "updated_at": "2026-09-30T03:34:26Z"
+        },
+        {
+          "number": 1243,
+          "title": "Optionally show thread numbers in the sidebar",
+          "html_url": "https://github.com/get-bb/bb/issues/1243",
+          "state": "open",
+          "updated_at": "2026-08-18T04:03:09Z"
+        },
+        {
+          "number": 4944,
+          "title": "Plugin SDK: three small gaps in RPC and realtime \u2014 no non-500 status for handler-side refusals, `useRealtime` is own-plugin only, `experimental_discoverRpc` has no `signal`",
+          "html_url": "https://github.com/get-bb/bb/issues/4944",
+          "state": "open",
+          "updated_at": "2026-10-13T08:01:23Z"
+        },
+        {
+          "number": 1684,
+          "title": "Reveal the collapsed sidebar when hovering the left edge",
+          "html_url": "https://github.com/get-bb/bb/issues/1684",
+          "state": "open",
+          "updated_at": "2026-08-18T04:00:20Z"
+        },
+        {
+          "number": 3133,
+          "title": "Expose the Desktop server selector in the sidebar header",
+          "html_url": "https://github.com/get-bb/bb/issues/3133",
+          "state": "open",
+          "updated_at": "2026-09-05T16:36:56Z"
+        },
+        {
+          "number": 2731,
+          "title": "Optional per-project limit on visible sidebar thread rows",
+          "html_url": "https://github.com/get-bb/bb/issues/2731",
+          "state": "open",
+          "updated_at": "2026-08-30T15:41:59Z"
+        },
+        {
+          "number": 4167,
+          "title": "Plugin backdrop contract: let plugins show a background through bb's panes without targeting private DOM",
+          "html_url": "https://github.com/get-bb/bb/issues/4167",
+          "state": "open",
+          "updated_at": "2026-09-23T16:41:45Z"
+        },
+        {
+          "number": 1298,
+          "title": "Surface the dev build's git branch and commit in the UI",
+          "html_url": "https://github.com/get-bb/bb/issues/1298",
+          "state": "open",
+          "updated_at": "2026-08-18T04:03:03Z"
+        },
+        {
+          "number": 5740,
+          "title": "Mobile bridge: let pages switch to a saved server profile",
+          "html_url": "https://github.com/get-bb/bb/issues/5740",
+          "state": "open",
+          "updated_at": "2026-10-19T08:45:07Z"
+        },
+        {
+          "number": 4450,
+          "title": "Let a plugin offer a sort mode for the built-in sidebar thread list",
+          "html_url": "https://github.com/get-bb/bb/issues/4450",
+          "state": "open",
+          "updated_at": "2026-09-30T02:25:32Z"
+        },
+        {
+          "number": 2600,
+          "title": "Removing a freshly added thread-less project did nothing until a thread was created under it (0.40.0, could not reproduce)",
+          "html_url": "https://github.com/get-bb/bb/issues/2600",
+          "state": "open",
+          "updated_at": "2026-09-30T07:14:07Z"
+        },
+        {
+          "number": 2533,
+          "title": "Desktop cold start can leave the shell on a terminal \"Failed to load projects.\" until an unrelated realtime event refetches",
+          "html_url": "https://github.com/get-bb/bb/issues/2533",
+          "state": "open",
+          "updated_at": "2026-08-27T18:09:07Z"
+        },
+        {
+          "number": 4956,
+          "title": "Make the thread Info panel a bundled, forkable plugin (like thread-list)",
+          "html_url": "https://github.com/get-bb/bb/issues/4956",
+          "state": "open",
+          "updated_at": "2026-10-05T22:54:29Z"
+        },
+        {
+          "number": 4805,
+          "title": "\u041b\u043e\u043a\u0430\u043b\u044c\u043d\u044b\u0439 zoom \u0438 pan \u0432 preview \u0441 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u0435\u043c \u043c\u0430\u0441\u0448\u0442\u0430\u0431\u0430 \u0438 desktop Cmd+/\u2212/0",
+          "html_url": "https://github.com/get-bb/bb/issues/4805",
+          "state": "open",
+          "updated_at": "2026-10-03T09:29:24Z"
+        },
+        {
+          "number": 3967,
+          "title": "Keyboard shortcuts do not fire on non-latin layouts: key matching compares the layout character, not the physical key",
+          "html_url": "https://github.com/get-bb/bb/issues/3967",
+          "state": "open",
+          "updated_at": "2026-10-13T17:01:27Z"
+        },
+        {
+          "number": 3411,
+          "title": "Codex Plan mode: persistent planning with inline proposal review",
+          "html_url": "https://github.com/get-bb/bb/issues/3411",
+          "state": "open",
+          "updated_at": "2026-09-10T15:18:45Z"
+        },
+        {
+          "number": 2394,
+          "title": "Narrow side-chat composer collapses when opening the model picker",
+          "html_url": "https://github.com/get-bb/bb/issues/2394",
+          "state": "open",
+          "updated_at": "2026-09-06T02:14:05Z"
+        }
+      ]
+    },
+    {
+      "label": "left-browser",
+      "query": "repo:get-bb/bb is:open is:pr sidebar browser",
+      "total_count": 6,
+      "incomplete_results": false,
+      "items": [
+        {
+          "number": 5395,
+          "title": "Offer notifications from a dismissible sidebar card",
+          "html_url": "https://github.com/get-bb/bb/pull/5395",
+          "state": "open",
+          "updated_at": "2026-10-12T23:20:43Z"
+        },
+        {
+          "number": 5811,
+          "title": "Keep collapsed sidebar status glyphs consistent with their rows",
+          "html_url": "https://github.com/get-bb/bb/pull/5811",
+          "state": "open",
+          "updated_at": "2026-10-20T02:07:48Z"
+        },
+        {
+          "number": 4981,
+          "title": "Make What's new a built-in plugin with a sidebar card and an easy off switch",
+          "html_url": "https://github.com/get-bb/bb/pull/4981",
+          "state": "open",
+          "updated_at": "2026-10-12T21:35:16Z"
+        },
+        {
+          "number": 5666,
+          "title": "Move concurrency-limit and thread-list onto tagged live reads",
+          "html_url": "https://github.com/get-bb/bb/pull/5666",
+          "state": "open",
+          "updated_at": "2026-10-19T22:49:11Z"
+        },
+        {
+          "number": 4986,
+          "title": "Recommend existing plugins with inline plugin cards",
+          "html_url": "https://github.com/get-bb/bb/pull/4986",
+          "state": "open",
+          "updated_at": "2026-10-06T03:38:03Z"
+        },
+        {
+          "number": 5640,
+          "title": "Declare live-data tags on route contracts and refresh through tagged mutations",
+          "html_url": "https://github.com/get-bb/bb/pull/5640",
+          "state": "open",
+          "updated_at": "2026-10-17T04:51:49Z"
+        }
+      ]
+    },
+    {
+      "label": "acp-exact",
+      "query": "repo:get-bb/bb is:open is:issue \"ACP\" \"queue\"",
+      "total_count": 11,
+      "incomplete_results": false,
+      "items": [
+        {
+          "number": 5617,
+          "title": "System notices cancel a running ACP command and read as a user rejection",
+          "html_url": "https://github.com/get-bb/bb/issues/5617",
+          "state": "open",
+          "updated_at": "2026-10-16T11:31:42Z"
+        },
+        {
+          "number": 2461,
+          "title": "provider-acp: no consumption path for agent-wake notifications \u2014 ACP agents with settled background work can't be resumed (OMP async-job delivery)",
+          "html_url": "https://github.com/get-bb/bb/issues/2461",
+          "state": "open",
+          "updated_at": "2026-09-03T14:53:06Z"
+        },
+        {
+          "number": 4433,
+          "title": "Separate provider model state from selection intent, with native composer controls",
+          "html_url": "https://github.com/get-bb/bb/issues/4433",
+          "state": "open",
+          "updated_at": "2026-10-05T20:22:17Z"
+        },
+        {
+          "number": 2284,
+          "title": "Workflows plugin: finished unstructured worker threads are never stopped, leaking idle provider processes",
+          "html_url": "https://github.com/get-bb/bb/issues/2284",
+          "state": "open",
+          "updated_at": "2026-09-30T20:49:29Z"
+        },
+        {
+          "number": 3151,
+          "title": "Steering interrupts and cancels the previous request instead of add as a follow up",
+          "html_url": "https://github.com/get-bb/bb/issues/3151",
+          "state": "open",
+          "updated_at": "2026-09-05T21:38:21Z"
+        },
+        {
+          "number": 4811,
+          "title": "Hide a provider from thread pickers without disabling it (`hiddenProviders` general setting)",
+          "html_url": "https://github.com/get-bb/bb/issues/4811",
+          "state": "open",
+          "updated_at": "2026-10-03T12:22:01Z"
+        },
+        {
+          "number": 2328,
+          "title": "Automatic recovery storms a dead Codex thread with repeated no-active-session errors",
+          "html_url": "https://github.com/get-bb/bb/issues/2328",
+          "state": "open",
+          "updated_at": "2026-09-07T08:46:21Z"
+        },
+        {
+          "number": 1592,
+          "title": "Auto-restart thread after \"host daemon restarted\"",
+          "html_url": "https://github.com/get-bb/bb/issues/1592",
+          "state": "open",
+          "updated_at": "2026-08-22T12:27:28Z"
+        },
+        {
+          "number": 5254,
+          "title": "provider-pi: add background shell tasks with task cards and automatic completion delivery",
+          "html_url": "https://github.com/get-bb/bb/issues/5254",
+          "state": "open",
+          "updated_at": "2026-10-09T21:43:23Z"
+        },
+        {
+          "number": 2520,
+          "title": "Make durable-terminal exit observable by its owning thread and retain bounded post-exit output",
+          "html_url": "https://github.com/get-bb/bb/issues/2520",
+          "state": "open",
+          "updated_at": "2026-09-04T02:19:56Z"
+        },
+        {
+          "number": 2318,
+          "title": "Skill chip picked mid-message is serialized without trailing space and never reaches Claude Code as a skill",
+          "html_url": "https://github.com/get-bb/bb/issues/2318",
+          "state": "open",
+          "updated_at": "2026-10-01T23:44:14Z"
+        }
+      ]
+    },
+    {
+      "label": "acp-exact",
+      "query": "repo:get-bb/bb is:open is:pr \"ACP\" \"queue\"",
+      "total_count": 2,
+      "incomplete_results": false,
+      "items": [
+        {
+          "number": 5817,
+          "title": "fix(acp): new-file kinds, steered-away commands, retired plugin leftovers",
+          "html_url": "https://github.com/get-bb/bb/pull/5817",
+          "state": "open",
+          "updated_at": "2026-10-20T00:49:48Z"
+        },
+        {
+          "number": 5438,
+          "title": "Link anonymous thread and turn lifecycle events",
+          "html_url": "https://github.com/get-bb/bb/pull/5438",
+          "state": "open",
+          "updated_at": "2026-10-13T23:17:45Z"
+        }
+      ]
+    },
+    {
+      "label": "thread-tasks-broad",
+      "query": "repo:get-bb/bb is:open is:issue tasks thread indexed",
+      "total_count": 0,
+      "incomplete_results": false,
+      "items": []
+    },
+    {
+      "label": "thread-tasks-broad",
+      "query": "repo:get-bb/bb is:open is:pr tasks thread indexed",
+      "total_count": 0,
+      "incomplete_results": false,
+      "items": []
+    }
+  ]
+}

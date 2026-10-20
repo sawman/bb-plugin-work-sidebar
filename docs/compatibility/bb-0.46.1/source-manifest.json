@@ -1,0 +1,62 @@
+{
+  "sourceRef": "desktop-v0.46.1",
+  "sourceCommit": "411eac54ac16d0a3cb57d1de8396d37564884a73",
+  "retainedSource": "/Users/matthewsaw/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_9hz89cet59-1/bb-plugin-work-sidebar/.agents/memory/tasks/BBPLUG-430/source",
+  "files": [
+    {
+      "path": "plugins/ask-user-question/src/server.ts",
+      "url": "https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/plugins/ask-user-question/src/server.ts",
+      "sha256": "960920cb3fe0b55584cef4291c3991e62dde6218db0f8b032535a2d7cc91802c"
+    },
+    {
+      "path": "plugins/tasks/shared/contract.ts",
+      "url": "https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/plugins/tasks/shared/contract.ts",
+      "sha256": "5ced2d908b30395df942e71567b51da9e7a6fe83f8fb6fc2ee4030efd6616b43"
+    },
+    {
+      "path": "plugins/tasks/cli/index.ts",
+      "url": "https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/plugins/tasks/cli/index.ts",
+      "sha256": "6f6220b52539f040b769a65609c33319fe73c7e35035f7031c6dc8b0e4a8501f"
+    },
+    {
+      "path": "plugins/tasks/delegate/index.ts",
+      "url": "https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/plugins/tasks/delegate/index.ts",
+      "sha256": "518afc92b0d02235ebd3037371f01d854b27592369a77b75010d0dde339b8486"
+    },
+    {
+      "path": "plugins/tasks/delegate/contract.ts",
+      "url": "https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/plugins/tasks/delegate/contract.ts",
+      "sha256": "8e4002a6d812d1c0a6929653fe68125dec7704444e5b6c0c5eeb67be71d60da9"
+    },
+    {
+      "path": "plugins/automations/src/service.ts",
+      "url": "https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/plugins/automations/src/service.ts",
+      "sha256": "7afef81b0bda0543b71021417b8770a08d1cf05dd22db48387f35069bb8787c8"
+    },
+    {
+      "path": "apps/server/src/routes/projects.ts",
+      "url": "https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/apps/server/src/routes/projects.ts",
+      "sha256": "b7aea6edc38c1058da25d4004c44abb174f5c7eb2fa77ff70ad441aa1b956e64"
+    },
+    {
+      "path": "packages/plugin-sdk/src/app-contract.ts",
+      "url": "https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/packages/plugin-sdk/src/app-contract.ts",
+      "sha256": "dfb2c41e322cd1655d73fd27ad4103aadb592cb15a03874cbd23aa5bbeaf5a93"
+    },
+    {
+      "path": "apps/app/src/App.tsx",
+      "url": "https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/apps/app/src/App.tsx",
+      "sha256": "948cd8d63e67746a30df59a506a6825c911c32c66e4e0e8701e039c3b3a67266"
+    },
+    {
+      "path": "apps/app/src/lib/url-open-routing.tsx",
+      "url": "https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/apps/app/src/lib/url-open-routing.tsx",
+      "sha256": "7397657072374a092d25771df84da7582ba9fde85728874de70ca8f6201ad529"
+    },
+    {
+      "path": "apps/app/src/components/plugin/PluginPanelRightPanelHost.tsx",
+      "url": "https://github.com/get-bb/bb/blob/411eac54ac16d0a3cb57d1de8396d37564884a73/apps/app/src/components/plugin/PluginPanelRightPanelHost.tsx",
+      "sha256": "912a57c11d96ef9ea56d71c89c2f3ca11973943e4aabd5fed782d64443926136"
+    }
+  ]
+}

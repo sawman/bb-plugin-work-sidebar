@@ -1,0 +1,109 @@
+{
+  "stage": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.1-2026-10-20T08-06-01-087Z",
+  "patchedBuildSource": "/var/folders/2p/_p95gdmd3rv2qzzhs0h2y2th0000gn/T/bb-plugin-sync-0.46.1-RGesD8/bb",
+  "pristineSource": "/Users/matthewsaw/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_9hz89cet59-1/bb-plugin-work-sidebar/.agents/memory/tasks/BBPLUG-430/source",
+  "manifest": {
+    "version": "0.46.1",
+    "sdkVersion": "0.6.49",
+    "sourceRef": "desktop-v0.46.1",
+    "sourceCommit": "411eac54ac16d0a3cb57d1de8396d37564884a73",
+    "patches": [
+      {
+        "id": "ask-user-question-acp-continuation",
+        "pluginId": "ask-user-question",
+        "pluginPath": "plugins/ask-user-question",
+        "sourcePatch": "bb-plugins/ask-user-question/acp-continuation-v0.46.patch",
+        "turboFilter": "bb-plugin-ask-user-question"
+      },
+      {
+        "id": "tasks-thread-workflow",
+        "pluginId": "tasks",
+        "pluginPath": "plugins/tasks",
+        "sourcePatch": "bb-plugins/tasks/thread-workflow.patch",
+        "turboFilter": "bb-plugin-tasks"
+      }
+    ],
+    "retiredPatches": [
+      {
+        "id": "automations-personal-projects",
+        "reason": "Native projects.get still accepts the active personal project in exact 0.46.1 source; keep pristine Automations.",
+        "sourcePatch": "bb-plugins/automations/personal-projects.patch"
+      }
+    ],
+    "coreArtifacts": []
+  },
+  "artifacts": [
+    {
+      "pluginId": "ask-user-question",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.1-2026-10-20T08-06-01-087Z/ask-user-question/app.css",
+      "sha256": "153a2cc6a3b7218e97d6be9178a08a4652ffc1b75d8c1232df1affb4788a6d39",
+      "bytes": 39177
+    },
+    {
+      "pluginId": "ask-user-question",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.1-2026-10-20T08-06-01-087Z/ask-user-question/app.js",
+      "sha256": "1e8f57875899857cfa597ac639d331a733d2eab59a7ac22a02cc1a7e4f58d8c5",
+      "bytes": 223696
+    },
+    {
+      "pluginId": "ask-user-question",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.1-2026-10-20T08-06-01-087Z/ask-user-question/app.meta.json",
+      "sha256": "9f4d90fe9abf898de0d4f5029e19a882c33ae688e62bc0906fa825d7f96419c9",
+      "bytes": 221
+    },
+    {
+      "pluginId": "ask-user-question",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.1-2026-10-20T08-06-01-087Z/ask-user-question/server.js",
+      "sha256": "978a9cd1e324600a47c1db979cb4b77cf94c8eadff54e0c07efbc616dde997ae",
+      "bytes": 219276
+    },
+    {
+      "pluginId": "ask-user-question",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.1-2026-10-20T08-06-01-087Z/ask-user-question/server.js.map",
+      "sha256": "2357f9ad21df8df4744d47dc2cda23a48dd25d4813d0f94cf181818bae7357a1",
+      "bytes": 335254
+    },
+    {
+      "pluginId": "ask-user-question",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.1-2026-10-20T08-06-01-087Z/ask-user-question/server.meta.json",
+      "sha256": "9f4d90fe9abf898de0d4f5029e19a882c33ae688e62bc0906fa825d7f96419c9",
+      "bytes": 221
+    },
+    {
+      "pluginId": "tasks",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.1-2026-10-20T08-06-01-087Z/tasks/app.css",
+      "sha256": "07029218f5ffaa303c49b7057a78266acbf3b3b1c5eae18eed8c0ee283f1c730",
+      "bytes": 163724
+    },
+    {
+      "pluginId": "tasks",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.1-2026-10-20T08-06-01-087Z/tasks/app.js",
+      "sha256": "a692965f21722b7d97982390c167fff8d57c6d4fe303c10a6848a31b9699c326",
+      "bytes": 1042931
+    },
+    {
+      "pluginId": "tasks",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.1-2026-10-20T08-06-01-087Z/tasks/app.meta.json",
+      "sha256": "76bd9871926531a2ef0917e5ff029c4d2f7c693165c20cd716102a085ecf763b",
+      "bytes": 209
+    },
+    {
+      "pluginId": "tasks",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.1-2026-10-20T08-06-01-087Z/tasks/server.js",
+      "sha256": "c2ac0524ac0034d0cb8deff5dcccecaa954ee0e8c5f08a756535d5d916ae9ccf",
+      "bytes": 342339
+    },
+    {
+      "pluginId": "tasks",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.1-2026-10-20T08-06-01-087Z/tasks/server.js.map",
+      "sha256": "41315390c149dec3116e4a27f2294a53f1de0f032257327d97381a2582960da3",
+      "bytes": 468341
+    },
+    {
+      "pluginId": "tasks",
+      "path": "/Users/matthewsaw/.bb/patch-staging/bb-0.46.1-2026-10-20T08-06-01-087Z/tasks/server.meta.json",
+      "sha256": "76bd9871926531a2ef0917e5ff029c4d2f7c693165c20cd716102a085ecf763b",
+      "bytes": 209
+    }
+  ]
+}

@@ -9,7 +9,24 @@ removing any item below. Re-run the linked searches against the current open
 issues and pull requests, then confirm the shipped API through a typed plugin
 test—not just a changelog entry.
 
-Last checked: 2026-10-13 against BB 0.46.0 / SDK 0.6.37.
+Last checked: 2026-10-20 against BB 0.46.1 / SDK 0.6.49.
+
+## BB 0.46.1 audit
+
+Audited immutable `desktop-v0.46.1` at
+`411eac54ac16d0a3cb57d1de8396d37564884a73`, SDK 0.6.49. All five
+remaining capabilities are still absent in shipped source. Questions and Tasks
+patches apply unchanged; Automations remains pristine with native personal
+project support. Work Sidebar now consumes patched `listTasksForThread` for
+terminal preview5, so preserve that RPC until an equivalent native migration.
+Exact source links/hashes, release deltas, refreshed primary issue/PR searches,
+rollback/stage metadata, validation and root-owned live limits are in the
+[0.46.1 audit](compatibility/bb-0.46.1/README.md).
+
+The SDK adds code-fence rendering, save-file downloads, session option forwarding
+and a thread-action state group; Tasks accepts provider-defined reasoning IDs.
+These are documented opportunities, not speculative product changes. #1978 is
+closed; #2200 and #2836 remain open. No new task or Human work is included.
 
 ## BB 0.46.0 audit
 
@@ -245,7 +262,7 @@ audit intentionally did not create speculative work.
   multi-call queue that keeps unanswered questions visible while each submitted
   answer immediately reaches the agent. The local plugin-only patch supplies
   that queue (maximum 32 questions) and `threads.send({ mode: "auto" })`
-  follow-up. It is cataloged against BB 0.46.0 with an exact source ref,
+  follow-up. It is cataloged against BB 0.46.1 with an exact source ref,
   regression suite, and rollback artifacts in
   [`bb-plugins/ask-user-question/`](bb-plugins/ask-user-question/). On every
   BB release, run `npm run bb-plugins:sync`: remove this patch only when ACP
@@ -256,8 +273,9 @@ audit intentionally did not create speculative work.
   lacks a thread-scoped indexed read. The deployed local Tasks patch supplies
   `listTasksForThread({ threadId, statuses, includeCompleted, limit })` over
   the indexed `task_threads.thread_id` path, returning summaries and matching
-  links in one bounded operation. Work Sidebar has not yet migrated its
-  project-wide Tasks pane to use it; that requires a separate product decision.
+  links in one bounded operation. Work Sidebar consumes it for terminal preview5; keep that contract or
+  coordinate an equivalent native migration before retirement. Its project-wide
+  Tasks pane remains a separate consumer.
   Remove the patch only after upstream exposes the equivalent. Open upstream
   searches found no matching issue or PR on 2026-09-05:
   [issues](https://github.com/search?q=repo%3Aget-bb%2Fbb+is%3Aopen+%22listTasksForThread%22&type=issues)

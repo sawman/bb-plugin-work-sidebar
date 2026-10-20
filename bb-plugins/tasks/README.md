@@ -18,9 +18,19 @@ result size, and returns only the matching task links.
 existing delegation RPC to `threads.spawn`. A dispatch started from a thread
 therefore preserves its parent relationship; non-CLI delegation is unchanged.
 
-This adds the capability without changing Work Sidebar's project-wide Tasks
-pane. A future, separately reviewed migration can use the indexed RPC wherever
-the UI specifically needs a per-thread task list.
+Work Sidebar now consumes this indexed RPC for terminal preview5. Preserve
+that contract, or coordinate an equivalent native migration before retirement.
+The project-wide Tasks pane remains a separate consumer.
+
+## BB 0.46.1 compatibility preflight (2026-10-20)
+
+Exact release `desktop-v0.46.1` at
+`411eac54ac16d0a3cb57d1de8396d37564884a73`, target BB `0.46.1` / SDK `0.6.49`.
+Retain the existing plugin-only patch unchanged.
+Evidence, source deltas, gates, staged hashes and root deployment instructions:
+[0.46.1 audit](../../docs/compatibility/bb-0.46.1/README.md).
+[Pristine rollback](../rollback/bb-0.46.1/README.md) is version-matched.
+Root owns deployment and live acceptance; this worker stages only.
 
 ## BB 0.46.0 compatibility preflight (2026-10-13)
 

@@ -22,19 +22,22 @@ payloads for Questions/Automations and [0.45 packages for all three plugins](rol
 Other historical deployments have local backups only; never use a different
 BB version's rollback payload.
 
-BB 0.46.0 / SDK 0.6.37 Questions and Tasks candidates are cataloged for
-non-deploy verification in BBPLUG-418. Automations is retired for 0.46 by
-root decision: native personal-project reads now work. The 0.45 deployment remains historical; no 0.46
-candidate is active until root deploys it. Pristine 0.46 rollback packages are
-tracked under [rollback/bb-0.46.0](rollback/bb-0.46.0/README.md).
+BB 0.46.1 / SDK 0.6.49 Questions and Tasks candidates are cataloged for
+non-deploy verification in BBPLUG-430. Current exact-source evidence and gates:
+[0.46.1 audit](../docs/compatibility/bb-0.46.1/README.md). Automations remains
+retired and pristine. Root owns deployment and live acceptance; candidates
+must not be treated as active before that acceptance. Historical deployment
+records above and below retain their original versions and dates.
+Pristine 0.46.1 rollback packages are tracked under
+[rollback/bb-0.46.1](rollback/bb-0.46.1/README.md).
 `BB_PATCH_SOURCE_ROOT` selects an already-fetched local release checkout for
-preflight; its HEAD must still match the catalog's immutable source commit.
+preflight; its HEAD must match the catalog's immutable source commit.
 
 | Built-in plugin | Patch | Status |
 | --- | --- | --- |
-| `ask-user-question` | [ACP answer continuation](ask-user-question/README.md) | BB 0.46 candidate verified/staged; 0.45 deployment historical |
-| `automations` | [Personal-project availability](automations/README.md) | Retired for BB 0.46; keep pristine built-in |
-| `tasks` | [Thread workflow](tasks/README.md) | BB 0.46 candidate verified/staged; 0.45 deployment historical |
+| `ask-user-question` | [ACP answer continuation](ask-user-question/README.md) | BB 0.46.1 candidate; root deployment pending |
+| `automations` | [Personal-project availability](automations/README.md) | Retired; keep pristine built-in |
+| `tasks` | [Thread workflow](tasks/README.md) | BB 0.46.1 candidate; preserves terminal preview5 RPC |
 
 Deployment on 2026-10-09 reran the exact-source preflight (43 Questions, 136
 Automations, 412 Tasks tests, plus typechecks/builds). All installed artifacts

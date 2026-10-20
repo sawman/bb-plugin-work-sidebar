@@ -1,0 +1,307 @@
+diff --git a/apps/server/src/routes/projects.ts b/apps/server/src/routes/projects.ts
+index 503b775..5b189ce 100644
+--- a/apps/server/src/routes/projects.ts
++++ b/apps/server/src/routes/projects.ts
+@@ -681,6 +681,7 @@ export function registerProjectRoutes(app: Hono, deps: AppDeps): void {
+     });
+     const result = await callHostRetryableOnlineRpc(deps, {
+       hostId: target.hostId,
++      signal: context.req.raw.signal,
+       timeoutMs: COMMAND_TIMEOUT_MS,
+       command: {
+         type: "host.list_files",
+@@ -712,6 +713,7 @@ export function registerProjectRoutes(app: Hono, deps: AppDeps): void {
+     });
+     const result = await callHostRetryableOnlineRpc(deps, {
+       hostId: target.hostId,
++      signal: context.req.raw.signal,
+       timeoutMs: COMMAND_TIMEOUT_MS,
+       command: {
+         type: "host.list_paths",
+diff --git a/packages/plugin-sdk/src/app-contract.ts b/packages/plugin-sdk/src/app-contract.ts
+index b4409e9..461ae5d 100644
+--- a/packages/plugin-sdk/src/app-contract.ts
++++ b/packages/plugin-sdk/src/app-contract.ts
+@@ -11,6 +11,7 @@ import type {
+   ProviderInfo,
+   ReasoningLevel,
+   ServiceTier,
++  SessionOptionSelections,
+   EnvironmentWorkspaceDisplayKind,
+   ThreadQueuedWork,
+   ThreadRuntimeDisplayStatus,
+@@ -159,11 +160,10 @@ export interface ExperimentalQuestionFormHost {
+  * the host adds room for its microphone controls when voice input is
+  * available.
+  */
+-export interface ExperimentalVoiceInputTextareaProps
+-  extends Omit<
+-    ComponentPropsWithRef<"textarea">,
+-    "value" | "defaultValue" | "onChange" | "children"
+-  > {
++export interface ExperimentalVoiceInputTextareaProps extends Omit<
++  ComponentPropsWithRef<"textarea">,
++  "value" | "defaultValue" | "onChange" | "children"
++> {
+   value: string;
+   /**
+    * Receives typed edits and finished transcripts, which the host appends to
+@@ -493,6 +493,51 @@ export interface PluginMessageDirectiveProps {
+   openWorkspaceFile: PluginMessageDirectiveOpenWorkspaceFile | null;
+ }
+ 
++/**
++ * Where a fenced code block stands while its message is written.
++ *
++ * - `"streaming"`: the closing delimiter has not arrived and the message is
++ *   still being written; `code` is a prefix of the final body.
++ * - `"closed"`: the closing delimiter is present; `code` is final.
++ * - `"unclosed"`: the message ended without a closing delimiter (for example
++ *   an interrupted reply); `code` will not grow.
++ *
++ * @experimental Audit before relying on this as a stable contract.
++ */
++export type ExperimentalCodeFenceStatus = "streaming" | "closed" | "unclosed";
++
++/**
++ * Props passed to an `experimental_codeFenceRenderer` component — one fenced
++ * code block whose info-string language the plugin claimed, inside assistant
++ * (or nested agent) message Markdown. BB mounts the component once per fence
++ * and keeps that instance for as long as the message stays on screen, so
++ * component state survives the whole stream, including the moment the fence
++ * closes and the moment the reply finishes.
++ *
++ * @experimental Audit before relying on this as a stable contract.
++ */
++export interface ExperimentalCodeFenceRendererProps {
++  /** The fence body received so far, without the fence delimiters. */
++  code: string;
++  /** The matched lowercase info-string language (e.g. `"ui"`). */
++  language: string;
++  status: ExperimentalCodeFenceStatus;
++  /**
++   * Zero-based ordinal of this fence among the fences of the same language in
++   * the same message. It does not change while the message streams, so
++   * `${message.id}#${language}#${index}` keys state that must outlive the
++   * mounted component (a reload, or the message scrolling out of the rendered
++   * window).
++   */
++  index: number;
++  message: PluginMessageDirectiveMessage;
++  /**
++   * BB's own code block for this fence. Render it to show the source, for
++   * example while `status` is `"streaming"` or when `code` does not parse.
++   */
++  Original: ComponentType;
++}
++
+ // ---------------------------------------------------------------------------
+ // Slot registrations (the arguments to `app.slots.*`).
+ // ---------------------------------------------------------------------------
+@@ -1180,6 +1225,23 @@ export interface ExperimentalClipboardContent {
+   html?: string;
+ }
+ 
++/**
++ * What {@link PluginSdkApp.experimental_saveFile} saves: a URL on the bb
++ * server (such as one of the plugin's own HTTP routes), or bytes already in
++ * the page, plus the file name the user sees.
++ */
++export type ExperimentalSaveFileRequest =
++  | { fileName: string; url: string }
++  | { fileName: string; blob: Blob };
++
++/**
++ * How {@link PluginSdkApp.experimental_saveFile} started. `started` means
++ * the browser or native shell took over the download; completion and share
++ * cancellation are not reported to the page. `failed` means the download
++ * could not start; bb already showed an error toast.
++ */
++export type ExperimentalSaveFileOutcome = "started" | "failed";
++
+ /**
+  * The `threads` area of {@link PluginBrowserBbSdk}: bb's public thread API
+  * with the calling plugin's identity filled in. `spawn` and `fork` stamp
+@@ -1189,7 +1251,9 @@ export interface ExperimentalClipboardContent {
+  */
+ export type PluginBoundThreadsArea = Omit<
+   BbSdkAreas["threads"],
+-  "getPluginMetadata" | "updatePluginMetadata" | "experimental_listPluginMetadata"
++  | "getPluginMetadata"
++  | "updatePluginMetadata"
++  | "experimental_listPluginMetadata"
+ > & {
+   getPluginMetadata(
+     args: Omit<ThreadPluginMetadataArgs, "pluginId"> & { pluginId?: string },
+@@ -1452,8 +1516,9 @@ export interface PluginThreadActionRunInput {
+ export interface PluginThreadAction {
+   label: string;
+   /**
+-   * Short secondary text on a muted second line under the label, e.g. the
+-   * current value of a choice list.
++   * Short secondary text, e.g. the current value of a choice list. Shown on
++   * a muted second line under the label, except on rows with `choices`,
++   * where only tooltips and screen readers include it.
+    */
+   detail?: string;
+   icon: BbIconName;
+@@ -1499,7 +1564,7 @@ export interface PluginThreadActionItemInput<Data> {
+  * Add an action to every thread actions menu: the thread header's menu, the
+  * sidebar row's menu and right-click menu, the compact long-press drawer, and,
+  * when the user picks it, a sidebar row's quick-action buttons. bb's own
+- * actions (Open in split, Copy thread link, Mark read, Pin, Rename, Archive,
++ * actions (Open in split, Copy link, Mark read, Pin, Rename, Archive,
+  * Delete, …) are registrations of this same shape.
+  *
+  * `useData` is a React hook the host calls once for the whole app, never per
+@@ -1784,6 +1849,31 @@ export interface PluginMessageDirectiveRegistration {
+   component: ComponentType<PluginMessageDirectiveProps>;
+ }
+ 
++/**
++ * Render fenced code blocks of chosen languages inside assistant (and nested
++ * agent) message Markdown. ` ```ui ` matches a registration whose `languages`
++ * include `"ui"`. Fences elsewhere (user messages, file previews, plugin
++ * Markdown) keep BB's code block.
++ *
++ * BB's code block also renders when two plugins claim the same language (BB
++ * logs a warning naming them), when the plugin is disabled, and for a fence
++ * whose component throws. A throw affects that fence only, and BB tries the
++ * component again when the fence's `code` or `status` changes.
++ *
++ * @experimental Audit before relying on this as a stable contract.
++ */
++export interface ExperimentalCodeFenceRendererRegistration {
++  /** Unique within the plugin; letters, digits, `-`, `_`. */
++  id: string;
++  /**
++   * Lowercase info-string languages, e.g. `["ui", "app"]`. Each starts with a
++   * letter or digit and contains only `a-z`, `0-9`, `+`, `#`, `.`, `_`, `-`.
++   * A language may be claimed once per plugin.
++   */
++  languages: readonly string[];
++  component: ComponentType<ExperimentalCodeFenceRendererProps>;
++}
++
+ /**
+  * A narrow, stable reference to one rendered chat message — NOT an internal
+  * timeline row. `sourceSeqEnd` is the last source event sequence the message
+@@ -2208,6 +2298,14 @@ export interface PluginAppSlots {
+    */
+   experimental_diffRenderer(registration: PluginDiffRendererRegistration): void;
+   messageDirective(registration: PluginMessageDirectiveRegistration): void;
++  /**
++   * Render fenced code blocks of chosen languages in assistant messages (see
++   * {@link ExperimentalCodeFenceRendererRegistration}). Experimental: see
++   * docs/api_to_audit.md.
++   */
++  experimental_codeFenceRenderer(
++    registration: ExperimentalCodeFenceRendererRegistration,
++  ): void;
+   messageAction(registration: PluginMessageActionRegistration): void;
+   /**
+    * @deprecated Use `app.commands.register` with the same registration.
+@@ -3178,6 +3276,12 @@ export interface NewThreadRequest {
+   permissionMode: PermissionMode;
+   /** Omitted when the selected provider has no service tiers. */
+   serviceTier?: ServiceTier;
++  /**
++   * Agent options the user chose in the model picker or the mode menu, keyed
++   * by option id. Present only when the user changed at least one option the
++   * selected provider declares. Forward it to `threads.spawn` unchanged.
++   */
++  sessionOptions?: SessionOptionSelections;
+   /**
+    * Per-field provenance (caller-explicit vs. default) for the execution
+    * options above, forwarded to `spawn` so the server records what the user
+@@ -3630,11 +3734,13 @@ export interface PluginSdkApp {
+   experimental_ThreadActionsContextMenu: ComponentType<PluginThreadActionsContextMenuProps>;
+   /**
+    * bb's thread menu groups, for a registration that joins one:
+-   * `open` (split), `organize` (copy, read, pin, move, rename), `settings`,
+-   * and `lifecycle` (archive, delete). Experimental: see docs/api_to_audit.md.
++   * `open` (split, copy link, new thread in environment), `state` (pin,
++   * read, notifications), `organize` (rename, move), `settings`, and
++   * `lifecycle` (archive, delete). Experimental: see docs/api_to_audit.md.
+    */
+   experimental_THREAD_ACTION_GROUPS: {
+     readonly open: "1_open";
++    readonly state: "1_state";
+     readonly organize: "2_organize";
+     readonly settings: "3_settings";
+     readonly lifecycle: "4_lifecycle";
+@@ -3775,6 +3881,21 @@ export interface PluginSdkApp {
+   experimental_copyToClipboard(
+     content: ExperimentalClipboardContent,
+   ): Promise<boolean>;
++  /**
++   * Saves a file through bb's own download path, the one bb's file preview
++   * and attachment downloads use. Browsers and bb Desktop start an ordinary
++   * download. In the bb iOS app, where a download link would otherwise
++   * replace the app, the file goes to the system share sheet (Save to Files,
++   * AirDrop, other apps). A plain function: call it from a click handler and
++   * keep a real `href` on the link for copy-link and accessibility. Resolves
++   * with `started` or `failed` and never rejects. Completion and share-sheet
++   * cancellation are not reported. The native shell shows download errors;
++   * bb shows an error toast when the download cannot start.
++   * Experimental: see docs/api_to_audit.md.
++   */
++  experimental_saveFile(
++    request: ExperimentalSaveFileRequest,
++  ): Promise<ExperimentalSaveFileOutcome>;
+   /**
+    * The host-owned chat component (see {@link ThreadChatProps}). Together
+    * with `Markdown`, the only components the SDK ships — everything else
+diff --git a/plugins/tasks/cli/index.ts b/plugins/tasks/cli/index.ts
+index 45cb299..e81bd72 100644
+--- a/plugins/tasks/cli/index.ts
++++ b/plugins/tasks/cli/index.ts
+@@ -2332,10 +2332,10 @@ export function registerTasksCli(
+               description: "Model id as the provider spells it",
+             },
+             reasoning: {
+-              type: "enum",
+-              values: presetReasoningLevelSchema.options,
++              type: "string",
+               required: true,
+-              description: "Reasoning level the provider supports",
++              placeholder: "level",
++              description: "Reasoning level id the model lists",
+             },
+             permission: {
+               type: "enum",
+@@ -2441,9 +2441,9 @@ export function registerTasksCli(
+               description: "Model id as the provider spells it",
+             },
+             reasoning: {
+-              type: "enum",
+-              values: presetReasoningLevelSchema.options,
+-              description: "Reasoning level the provider supports",
++              type: "string",
++              placeholder: "level",
++              description: "Reasoning level id the model lists",
+             },
+             permission: {
+               type: "enum",
+diff --git a/plugins/tasks/shared/contract.ts b/plugins/tasks/shared/contract.ts
+index aac201b..ee4371b 100644
+--- a/plugins/tasks/shared/contract.ts
++++ b/plugins/tasks/shared/contract.ts
+@@ -42,16 +42,7 @@ export const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+ 
+ export const idSchema = z.string().regex(ULID_PATTERN, "must be a ULID");
+ const nonBlankStringSchema = z.string().trim().min(1, "must not be blank");
+-export const presetReasoningLevelSchema = z.enum([
+-  "none",
+-  "low",
+-  "medium",
+-  "high",
+-  "xhigh",
+-  "ultracode",
+-  "max",
+-  "ultra",
+-]);
++export const presetReasoningLevelSchema = nonBlankStringSchema;
+ export type PresetReasoningLevel = z.infer<typeof presetReasoningLevelSchema>;
+ export const presetServiceTierSchema = nonBlankStringSchema;
+ export type PresetServiceTier = z.infer<typeof presetServiceTierSchema>;

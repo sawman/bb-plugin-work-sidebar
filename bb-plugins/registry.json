@@ -299,6 +299,33 @@
           "sourcePatch": "bb-plugins/automations/personal-projects.patch"
         }
       ]
+    },
+    "0.46.1": {
+      "sourceRef": "desktop-v0.46.1",
+      "sourceCommit": "411eac54ac16d0a3cb57d1de8396d37564884a73",
+      "patches": [
+        {
+          "id": "ask-user-question-acp-continuation",
+          "pluginId": "ask-user-question",
+          "pluginPath": "plugins/ask-user-question",
+          "sourcePatch": "bb-plugins/ask-user-question/acp-continuation-v0.46.patch",
+          "turboFilter": "bb-plugin-ask-user-question"
+        },
+        {
+          "id": "tasks-thread-workflow",
+          "pluginId": "tasks",
+          "pluginPath": "plugins/tasks",
+          "sourcePatch": "bb-plugins/tasks/thread-workflow.patch",
+          "turboFilter": "bb-plugin-tasks"
+        }
+      ],
+      "retiredPatches": [
+        {
+          "id": "automations-personal-projects",
+          "reason": "Native projects.get still accepts the active personal project in exact 0.46.1 source; keep pristine Automations.",
+          "sourcePatch": "bb-plugins/automations/personal-projects.patch"
+        }
+      ]
     }
   }
 }

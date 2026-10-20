@@ -13,6 +13,16 @@ list for the same active ID. It preserves the original direct-lookup error for
 missing, deleted, or unreadable projects. The source patch is
 [personal-projects.patch](personal-projects.patch).
 
+## BB 0.46.1 compatibility preflight (2026-10-20)
+
+Exact release `desktop-v0.46.1` at
+`411eac54ac16d0a3cb57d1de8396d37564884a73`, target BB `0.46.1` / SDK `0.6.49`.
+Keep the pristine built-in; the personal-project patch remains retired.
+Evidence, source deltas, gates, staged hashes and root deployment instructions:
+[0.46.1 audit](../../docs/compatibility/bb-0.46.1/README.md).
+[Pristine rollback](../rollback/bb-0.46.1/README.md) is version-matched.
+Root owns deployment and live acceptance; this worker stages only.
+
 ## BB 0.46.0 compatibility preflight (2026-10-13)
 
 Exact release source: `desktop-v0.46.0` at
