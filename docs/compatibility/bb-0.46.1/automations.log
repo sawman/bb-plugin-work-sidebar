@@ -1,9 +1,0 @@
-
- RUN  v4.1.1 /private/var/folders/2p/_p95gdmd3rv2qzzhs0h2y2th0000gn/T/bb-plugin-sync-0.46.1-RGesD8/bb/plugins/automations
-
-
- Test Files  11 passed (11)
-      Tests  136 passed (136)
-   Start at  16:09:17
-   Duration  6.27s (transform 637ms, setup 0ms, import 1.64s, tests 2.73s, environment 662ms)
-

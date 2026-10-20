@@ -1,8 +1,8 @@
 {
   "command": "BB_PATCH_SOURCE_ROOT=<retained-pristine-source> npm run bb-plugins:sync -- --keep-workspace",
   "rawExit": 0,
-  "log": "preflight.log",
-  "logSha256": "a669c8a86f46ba2dff747fc1f0b2db1149fb8ea2cbe7db2106b2ae01ab5cb86a",
+  "log": "preflight.log.gz",
+  "logSha256": "e32c42f8c331d8a77f0c18c4b645a8563d7cf983668938b79fc0da835ae150ac",
   "questions": {
     "files": 5,
     "tests": 51,
@@ -34,8 +34,8 @@
     "tests": 136,
     "testExit": 0,
     "typecheckExit": 0,
-    "testLog": "automations.log",
-    "typecheckLog": "automations-typecheck.log"
+    "testLog": "automations.log.gz",
+    "typecheckLog": "automations-typecheck.log.gz"
   },
   "liveLimits": [
     "Worker did not deploy, reload, restart or install.",
@@ -51,9 +51,11 @@
   "tasksBehaviorProbe": {
     "checks": 8,
     "rawExit": 0,
-    "log": "tasks-behavior-probe.log",
+    "log": "tasks-behavior-probe.log.gz",
     "sourceTemplate": "tasks-behavior-probe.mts.txt",
     "initialProbeError": "Scratch fixture used empty presetName/title and was rejected by existing store validation; corrected only scratch fixture to valid nonblank values. No product change."
   },
-  "testInventoryEvidence": "tasks-test-inventory.json"
+  "testInventoryEvidence": "tasks-test-inventory.json",
+  "rawLogSha256": "a669c8a86f46ba2dff747fc1f0b2db1149fb8ea2cbe7db2106b2ae01ab5cb86a",
+  "compressedEvidenceManifest": "compressed-evidence.json"
 }

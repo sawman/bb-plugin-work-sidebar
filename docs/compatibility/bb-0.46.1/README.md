@@ -7,7 +7,7 @@ Exact release: `desktop-v0.46.1` at
 are both `0.6.49`; installed CLI is `0.46.1`.
 
 `source-manifest.json` records immutable source URLs, SHA-256 and the retained
-pristine checkout path shared with root and the SDK sibling. `release-delta.txt`
+pristine checkout path shared with root and the SDK sibling. `release-delta.txt.gz`
 records the relevant source diff from exact 0.46.0. GitHub reads used sawman;
 each remote window trapped restoration to matthew-se and verified `gh api user`
 on entry and exit. `tag.json`, `release.json`, `issue-*.json` and `searches.json`
@@ -97,7 +97,7 @@ forwarding with/without a caller. Its source template and raw log are retained.
 Pristine Automations passed 11 files / 136 tests and typecheck, both raw exit 0;
 no Automations patch was applied. Validation and staged
 SHA-256 metadata are recorded in `validation.json` and `artifacts.json`.
-`preflight.log` preserves the raw gate output. Rollback archive and member hashes
+`preflight.log.gz` preserves the raw gate output. Rollback archive and member hashes
 were independently verified. Root reports pristine Tasks reverse RPC404 and an
 active personal project; Cursor auth_required currently limits live ACP Reply. Raw logs and numeric
 exits are retained in this worktree's `.agents/memory/tasks/BBPLUG-430`.
@@ -118,3 +118,9 @@ The command reruns exact-source verification, tests, typechecks, dependency and
 target-CLI builds, metadata checks, then backups/deploys/reloads Questions and
 Tasks only. It requires no remote source clone. Root must inspect the resulting
 stage/installed hashes. No core restart is required by these plugin-only patches.
+
+Raw logs and release delta are stored as gzip to preserve exact bytes, including
+upstream trailing whitespace, without whitespace exceptions.
+`compressed-evidence.json` records each compressed SHA-256, original raw
+SHA-256/size and the original Git blob at `ba98928`. Decompression was compared
+byte-for-byte with that commit. Use `gzip -dc <file.gz>` to read the evidence.

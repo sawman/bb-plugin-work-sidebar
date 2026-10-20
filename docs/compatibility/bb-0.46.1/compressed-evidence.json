@@ -1,0 +1,55 @@
+{
+  "encoding": "gzip; raw bytes preserved exactly, including whitespace and line endings",
+  "files": [
+    {
+      "file": "automations-typecheck.log.gz",
+      "sha256": "867c49e04b700cb6296d88fb46a4dbad12d7ed96efc055fb87984c9f0f371a0b",
+      "bytes": 812,
+      "rawFile": "automations-typecheck.log",
+      "rawSha256": "7b8041302838b4c105cd50c68740ef6ae77b57a9c35d06000fbf57ff67b3777c",
+      "rawBytes": 4247,
+      "originalCommit": "ba98928e81a475ad228045a826fed7816a6a9a4e",
+      "originalGitBlob": "fc14d64f29e5d9db865c96cbd20d0557c0d7d301"
+    },
+    {
+      "file": "automations.log.gz",
+      "sha256": "16b5ef84bd21491063439505bc2d678881502a0f7371679039c7359e79d716a5",
+      "bytes": 241,
+      "rawFile": "automations.log",
+      "rawSha256": "82746c9399336f33f1ba4f5d95f96880b5eaf1cc17995fcefb005af5094ba817",
+      "rawBytes": 300,
+      "originalCommit": "ba98928e81a475ad228045a826fed7816a6a9a4e",
+      "originalGitBlob": "e28d090ba1347774a8d7e8b6d2b7a5a0721693d6"
+    },
+    {
+      "file": "preflight.log.gz",
+      "sha256": "e32c42f8c331d8a77f0c18c4b645a8563d7cf983668938b79fc0da835ae150ac",
+      "bytes": 3531,
+      "rawFile": "preflight.log",
+      "rawSha256": "a669c8a86f46ba2dff747fc1f0b2db1149fb8ea2cbe7db2106b2ae01ab5cb86a",
+      "rawBytes": 30823,
+      "originalCommit": "ba98928e81a475ad228045a826fed7816a6a9a4e",
+      "originalGitBlob": "f04e105bdbdd60414eabff8723a0d521cd9caf5d"
+    },
+    {
+      "file": "release-delta.txt.gz",
+      "sha256": "bf822927b08989fa2151f077de87637e7a957d57c296d0a3902eaf296a6df40c",
+      "bytes": 4724,
+      "rawFile": "release-delta.txt",
+      "rawSha256": "437891e33914d1be9467a56f3ea1cd8ef5574a5954dde1b72918c1a67a84ecee",
+      "rawBytes": 13518,
+      "originalCommit": "ba98928e81a475ad228045a826fed7816a6a9a4e",
+      "originalGitBlob": "886afbb99d360ac3238159e571bcb9ac9ae567cc"
+    },
+    {
+      "file": "tasks-behavior-probe.log.gz",
+      "sha256": "3483596647e1850c8a5d26abd9b93bd753cbd0ce996b4470bfb0d52b9424af93",
+      "bytes": 144,
+      "rawFile": "tasks-behavior-probe.log",
+      "rawSha256": "f567ce82ee74a113271af78ebcb6feac68647267730deae40912ecec03290f53",
+      "rawBytes": 163,
+      "originalCommit": "ba98928e81a475ad228045a826fed7816a6a9a4e",
+      "originalGitBlob": "f9b2b69fba08d2352464c494e76b1072d6dba994"
+    }
+  ]
+}
