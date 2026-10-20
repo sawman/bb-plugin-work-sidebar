@@ -22,7 +22,8 @@ answer is sent immediately while unanswered questions remain visible. The final
 answer closes the display-only interaction without producing a duplicate
 follow-up.
 
-The source patch is [acp-continuation.patch](acp-continuation.patch). It adds
+The current source patch is [acp-continuation-v0.46.patch](acp-continuation-v0.46.patch).
+Historical release patches are retained below. It adds
 coverage for Cursor, OpenCode, and a custom ACP provider, plus dismissal.
 The versioned release criteria and live smoke matrix are in
 [TEST-PLAN.md](TEST-PLAN.md).

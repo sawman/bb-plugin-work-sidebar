@@ -264,7 +264,7 @@ audit intentionally did not create speculative work.
   that queue (maximum 32 questions) and `threads.send({ mode: "auto" })`
   follow-up. It is cataloged against BB 0.46.1 with an exact source ref,
   regression suite, and rollback artifacts in
-  [`bb-plugins/ask-user-question/`](bb-plugins/ask-user-question/). On every
+  [`bb-plugins/ask-user-question/`](../bb-plugins/ask-user-question/). On every
   BB release, run `npm run bb-plugins:sync`: remove this patch only when ACP
   provides equivalent queueing and auto-follow-up behavior, otherwise rebase
   it and retain its cross-provider test matrix.

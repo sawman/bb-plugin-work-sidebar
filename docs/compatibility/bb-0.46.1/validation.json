@@ -28,7 +28,15 @@
   },
   "rollbackArchiveAndMemberHashes": "verified",
   "patchScope": "plugin-only; no core artifacts",
-  "automations": "pristine retained; extra focused gate pending",
+  "automations": {
+    "disposition": "pristine; no patch applied",
+    "files": 11,
+    "tests": 136,
+    "testExit": 0,
+    "typecheckExit": 0,
+    "testLog": "automations.log",
+    "typecheckLog": "automations-typecheck.log"
+  },
   "liveLimits": [
     "Worker did not deploy, reload, restart or install.",
     "Root owns combined Sidebar suite/build and live acceptance.",
@@ -39,5 +47,13 @@
     "Existing Node DEP0205 deprecation warning during plugin builds."
   ],
   "assertionsAndTimeouts": "unchanged",
-  "notes": "Tasks shipped suite changed from 0.46.0; count409 is actual raw run, no local test edits."
+  "notes": "Tasks shipped suite changed from 0.46.0; count409 is actual raw run, no local test edits.",
+  "tasksBehaviorProbe": {
+    "checks": 8,
+    "rawExit": 0,
+    "log": "tasks-behavior-probe.log",
+    "sourceTemplate": "tasks-behavior-probe.mts.txt",
+    "initialProbeError": "Scratch fixture used empty presetName/title and was rejected by existing store validation; corrected only scratch fixture to valid nonblank values. No product change."
+  },
+  "testInventoryEvidence": "tasks-test-inventory.json"
 }

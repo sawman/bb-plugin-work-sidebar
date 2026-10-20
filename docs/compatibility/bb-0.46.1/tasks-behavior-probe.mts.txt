@@ -1,0 +1,26 @@
+import assert from "node:assert/strict";
+import { createFakePluginHost, makeThreadResponse } from "RETAINED_PATCHED_BUILD_ROOT/packages/plugin-sdk/dist/testing/index.js";
+import {createStore,registerTasksApi} from "RETAINED_PATCHED_BUILD_ROOT/plugins/tasks/api/index.ts";
+import {registerTasksCli} from "RETAINED_PATCHED_BUILD_ROOT/plugins/tasks/cli/index.ts";
+import {tasksRpcContract} from "RETAINED_PATCHED_BUILD_ROOT/plugins/tasks/shared/contract.ts";
+const {bb,harness}=createFakePluginHost({pluginId:"tasks",sdk:{threads:{spawn:async()=>({id:"thr_probe_child"}),get:async({threadId})=>makeThreadResponse({id:threadId,status:"starting"})}}});
+const store=createStore(bb);registerTasksApi(bb,store);registerTasksCli(bb,store);
+const project=store.tasks.createProject({name:"Audit",prefix:"AUD",color:"blue",linkedBbProjectId:"proj_probe"});
+const live=store.tasks.createTask({projectId:project.id,title:"Live",status:"todo"});
+const done=store.tasks.createTask({projectId:project.id,title:"Done",status:"done"});
+const other=store.tasks.createTask({projectId:project.id,title:"Other",status:"todo"});
+for(const [taskId,threadId] of [[live.id,"thr_probe"],[done.id,"thr_probe"],[other.id,"thr_other"],[live.id,"thr_other"]])store.tasks.upsertTaskThread({taskId,threadId,presetName:"Probe",title:"Probe",liveStatus:"idle"});
+let checks=0;
+async function read(input){return tasksRpcContract.listTasksForThread.output.parse(await harness.callRpc("listTasksForThread",input));}
+try {
+const normal=await read({threadId:"thr_probe"});assert.deepEqual(normal.tasks.map(task=>task.id),[live.id]);assert.deepEqual(normal.taskThreads.map(link=>link.threadId),["thr_probe"]);checks++;
+const completed=await read({threadId:"thr_probe",includeCompleted:true});assert.equal(completed.tasks.length,2);assert.equal(completed.taskThreads.length,2);checks++;
+const filtered=await read({threadId:"thr_probe",statuses:["done"],includeCompleted:true});assert.deepEqual(filtered.tasks.map(task=>task.id),[done.id]);checks++;
+assert.equal((await read({threadId:"thr_probe",includeCompleted:true,limit:1})).tasks.length,1);checks++;
+assert.deepEqual(await read({threadId:"thr_probe",statuses:[]}),{tasks:[],taskThreads:[]});checks++;
+await assert.rejects(()=>read({threadId:"thr_probe",limit:501}));checks++;
+const preset=store.tasks.createPreset({name:"Probe worker",providerId:"codex",modelId:"test-model",reasoningLevel:"test-level",serviceTier:null,permissionMode:"full",environmentKind:"project-default",baseBranch:null,machineId:null,instructions:"",builtin:false});
+const dispatched=await harness.runCli(["dispatch",live.key,"--preset",preset.name],{threadId:"thr_probe_parent"});assert.equal(dispatched.exitCode,0,dispatched.stderr);assert.equal(harness.sdk.callsTo("threads.spawn").at(-1)[0].parentThreadId,"thr_probe_parent");checks++;
+const direct=await harness.runCli(["dispatch",other.key,"--preset",preset.name]);assert.equal(direct.exitCode,0,direct.stderr);assert.equal(harness.sdk.callsTo("threads.spawn").at(-1)[0].parentThreadId,undefined);checks++;
+console.log(`Tasks behavior probe: ${checks} checks passed (typed indexed reverse read, scoped links, live/completed/status/limit validation, CLI caller forwarding and absent caller).`);
+} finally {await harness.dispose();}

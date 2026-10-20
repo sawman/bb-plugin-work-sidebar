@@ -1,0 +1,47 @@
+{
+  "priorExactSource": "4c87fdec7b7effc022ff2ee31ec95c0a09c9ee62",
+  "currentExactSource": "411eac54ac16d0a3cb57d1de8396d37564884a73",
+  "priorTestFiles": 40,
+  "currentTestFiles": 37,
+  "upstreamTestFileChanges": [
+    "M\tplugins/tasks/api/api.test.ts",
+    "M\tplugins/tasks/editor/editor.test.tsx",
+    "D\tplugins/tasks/shell/incremental-api.test.tsx",
+    "A\tplugins/tasks/shell/incremental.test.ts",
+    "D\tplugins/tasks/shell/incremental.test.tsx",
+    "D\tplugins/tasks/shell/query-signals.test.tsx",
+    "M\tplugins/tasks/shell/shell.test.tsx",
+    "A\tplugins/tasks/shell/signal-scheduler.test.ts",
+    "M\tplugins/tasks/shell/view-preference.test.ts",
+    "M\tplugins/tasks/views/activity/activity.test.ts",
+    "D\tplugins/tasks/views/activity/comment-author.test.tsx",
+    "M\tplugins/tasks/views/activity/task-activity.test.tsx",
+    "M\tplugins/tasks/views/embed/embed.test.tsx",
+    "M\tplugins/tasks/views/list/lib.test.ts",
+    "M\tplugins/tasks/views/list/list-preference.test.ts",
+    "M\tplugins/tasks/views/list/mobile-layout.test.tsx",
+    "M\tplugins/tasks/views/list/property-menus.test.ts",
+    "D\tplugins/tasks/views/list/row-metadata.test.tsx"
+  ],
+  "patchTouchedFiles": [
+    "plugins/tasks/api/index.ts",
+    "plugins/tasks/cli/index.ts",
+    "plugins/tasks/db/store.ts",
+    "plugins/tasks/db/types.ts",
+    "plugins/tasks/delegate/contract.ts",
+    "plugins/tasks/delegate/index.ts",
+    "plugins/tasks/shared/contract.ts"
+  ],
+  "patchTouchesTests": false,
+  "patchChangesAssertionsOrTimeoutsOrSkips": false,
+  "priorRecordedRun": {
+    "tests": 412,
+    "source": "docs/compatibility/bb-0.46.0/preflight log and validation evidence"
+  },
+  "currentRawRun": {
+    "files": 37,
+    "tests": 409,
+    "exit": 0
+  },
+  "classification": "Upstream test inventory restructuring; retained patch changes only seven implementation/contract files and neither removes nor ignores tests. Test declaration parameterization means source-text counts alone cannot derive expanded case totals."
+}

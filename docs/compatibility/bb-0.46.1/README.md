@@ -61,7 +61,14 @@ older rollback artifacts were not relabelled.
 Catalog non-deploy preflight passed raw exit 0: Questions 5 files / 51 tests,
 Tasks 37 files / 409 tests, both typechecks, dependency/standalone builds and
 app/server BB 0.46.1 / SDK 0.6.49 metadata. No assertions or timeouts changed.
-The Tasks count follows upstream test restructuring. Validation and staged
+The Tasks count follows upstream test restructuring (40→37 files;
+`tasks-test-inventory.json` lists exact added/deleted/changed release tests).
+The retained Tasks patch touches seven implementation/contract files and no
+tests, skips, assertions or timeouts. A separate typed harness probe passed
+8 checks for live/completed/status/limit reads, matching links, and CLI parent
+forwarding with/without a caller. Its source template and raw log are retained.
+Pristine Automations passed 11 files / 136 tests and typecheck, both raw exit 0;
+no Automations patch was applied. Validation and staged
 SHA-256 metadata are recorded in `validation.json` and `artifacts.json`.
 `preflight.log` preserves the raw gate output. Rollback archive and member hashes
 were independently verified. Root reports pristine Tasks reverse RPC404 and an
