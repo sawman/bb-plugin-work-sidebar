@@ -1,5 +1,5 @@
 node_modules
 dist/
 
-# BBPLUG-423 private implementation evidence
-.agents/memory/tasks/BBPLUG-423/
+# Local agent scratch state
+/.agents/memory/
