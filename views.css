@@ -2197,6 +2197,80 @@ button.ws-change-file-row:hover {
   font: var(--ws-text-subtext);
   line-height: 1.35;
 }
+.ws-storage-heading {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.3rem;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  text-align: left;
+  font: var(--ws-text-title);
+}
+.ws-storage-heading > svg {
+  width: 0.7rem;
+  height: 0.7rem;
+  flex: 0 0 auto;
+}
+.ws-storage-content {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  max-height: 18rem;
+  overflow: auto;
+}
+.ws-storage-list {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ws-storage-list .ws-storage-list {
+  margin-left: 0.65rem;
+  padding-left: 0.25rem;
+  border-left: 1px solid var(--border);
+}
+.ws-storage-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 0.25rem;
+  padding: 0.2rem 0.15rem;
+  background: transparent;
+  color: var(--foreground);
+  font: var(--ws-text-subtext);
+  line-height: 1.35;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ws-storage-row:hover {
+  background: var(--accent);
+}
+.ws-storage-row:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+.ws-storage-row > svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  flex: 0 0 auto;
+  color: var(--muted-foreground);
+}
+.ws-storage-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .ws-work-section {
   display: grid;
   min-width: 0;

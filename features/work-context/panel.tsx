@@ -29,6 +29,7 @@ import {
 } from "./queries";
 import { parseWorkSidebarRealtimeEvent } from "../../shared/work-realtime";
 import { WorkContextCards } from "./views";
+import { refreshThreadStorage } from "./thread-storage-queries";
 import {
   DEFAULT_TEXT_SCALE,
   DEFAULT_WORKING_PROVIDER_ANIMATION,
@@ -150,6 +151,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
             label="Refresh work context"
             onRefresh={() =>
               Promise.all([
+                refreshThreadStorage(queryClient, threadId),
                 invalidateWorkContextCards(queryClient, threadId),
                 invalidateWorkProviderHealth(
                   queryClient,

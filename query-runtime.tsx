@@ -66,6 +66,12 @@ export const queryKeys = {
     },
   },
   work: {
+    storage: (threadId: string): QueryKey => [
+      ...pluginQueryRoot,
+      "work",
+      "storage",
+      threadId,
+    ],
     itemQueue: (threadId: string): QueryKey => [
       ...pluginQueryRoot,
       "work",
@@ -129,6 +135,13 @@ export const queryKeys = {
 } as const;
 
 export const queryPolicies = {
+  threadStorage: {
+    staleTime: 0,
+    gcTime: 2 * 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  },
   providerLogo: {
     // Provider identity and its logo route are immutable for one frontend
     // bundle generation. The host route is `no-store`, so retain the decoded

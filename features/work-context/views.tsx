@@ -9,6 +9,7 @@ import { PlanCard } from "./plan-card";
 import { StatusCard } from "./status-card";
 import { WorkItemCard } from "./work-item-card";
 import { InboxCard } from "../inbox/views";
+import { ThreadStorageCard } from "./thread-storage-card";
 
 export function WorkContextCards({
   threadId,
@@ -38,6 +39,7 @@ export function WorkContextCards({
       <GoalCard threadId={threadId} />
       <PlanCard threadId={threadId} />
       <BackgroundJobsCard threadId={threadId} />
+      <ThreadStorageCard threadId={threadId} />
     </section>
   );
 }

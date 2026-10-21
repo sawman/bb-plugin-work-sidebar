@@ -1078,6 +1078,39 @@ executable work queue.
   regressions. Root owns integration/live themes, reload and deployment.
   Exact rollback base: `4322f9124d580a4c2410b29492d60fc768486af1`.
 
+#### Loop R42 — read-only Thread storage in Work (BBPLUG-438)
+
+- **RED:** add registered Work composition and focused storage tests before
+  implementation. Prove collapsed laziness and independent sibling readiness,
+  empty/populated/nested/long-name rows, safe native file targets, A→B→A late
+  replies, loading/error/retry with stale rows, explicit-refresh initial-fetch
+  races, inactive/unmount cleanup, keyboard/modifiers/axe, and cache bounds.
+  Record the actual failing output before changing product code.
+- **GREEN:** use the exact SDK 0.6.49 `threads.storagePaths` transport inside
+  one centrally keyed Query, lazy on card open. The host has no reactive
+  storage hook or directory parameter; root approved one bounded 200-entry
+  projection with local folder disclosures and an explicit truncated notice.
+  Keep the card collapsed initially and isolate local expansion with keyed
+  thread boundaries and prune absent folders after successful reads.
+  Open files only through a narrow host FileLink
+  adapter with explicit thread-storage targets. No bodies, filesystem proxy,
+  storage paths, editing, or second preview renderer.
+- **Refactor:** reuse the Work surface and compact RefreshButton, retain
+  metadata only in Query with finite GC, directories-first deterministic
+  ordering and bounded rendering. Target explicit refresh to the current
+  thread and cancel before invalidating so an initial pending read restarts.
+  Unmount open-content observers when collapsed or off Work. Exact host source
+  confirms storage realtime and its reactive hook are internal, unavailable
+  through plugin APIs. Root approved reopen/manual refresh only, with no
+  polling or backend republisher. Host listing caching may return stale data
+  for up to 30 seconds; make no freshness promise. Keep storage outside generic
+  Work realtime invalidation.
+- **Evidence/checkpoint:** focused RED then GREEN, typecheck, exact SDK check,
+  build and diff checks precede an immutable local commit. Root/reviewer own
+  final combined serial suite, real themes/narrow/native preview/context-menu
+  acceptance and reload/deployment. Do not claim those checks here. Rollback
+  base: `8eb61e05d63ea585dd348dc7b1f601da3066d5f4`.
+
 ### BB child execution protocol
 
 G0 is complete. Each new code-editing loop receives one direct BB execution
