@@ -285,7 +285,7 @@ describe("registered Work context cards", () => {
     getPluginQueryClient().clear();
   });
 
-  it("orders Work items, Goal, Plan, then Background below Status", async () => {
+  it("orders Work items, Goal, Plan, Background, then Thread storage below Status", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
@@ -295,7 +295,7 @@ describe("registered Work context cards", () => {
     );
 
     await waitFor(() =>
-      expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(6),
+      expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(7),
     );
     const cardOrder = Array.from(
       slot.container.querySelectorAll("[data-card]"),
@@ -310,6 +310,7 @@ describe("registered Work context cards", () => {
       "goal",
       "plan",
       "background",
+      "thread storage",
     ]);
   });
 
@@ -330,7 +331,7 @@ describe("registered Work context cards", () => {
     );
     for (const name of ["Status", "Background", "Goal", "Plan"])
       expect(slot.getAllByText(name).length).toBeGreaterThan(0);
-    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(6);
+    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(7);
     slot.lifecycle.unmount();
     getPluginQueryClient().clear();
   });
@@ -698,7 +699,7 @@ describe("registered Work context cards", () => {
     );
     await waitFor(() => expect(slot.getByText("Attached task")).toBeTruthy());
     expect(slot.getByText("Ship cards")).toBeTruthy();
-    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(6);
+    expect(slot.container.querySelectorAll("[data-card]")).toHaveLength(7);
     expect(slot.container.querySelector(".ws-thread-task-card")).toBeTruthy();
     expect(slot.getByRole("heading", { name: "Needs you" })).toBeTruthy();
     const priority = slot.getByRole("img", { name: "High priority" });

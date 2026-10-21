@@ -2209,6 +2209,7 @@ button.ws-change-file-row:hover {
   cursor: pointer;
   text-align: left;
   font: var(--ws-text-title);
+  line-height: 1;
 }
 .ws-storage-heading > svg {
   width: 0.7rem;
