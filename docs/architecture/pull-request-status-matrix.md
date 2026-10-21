@@ -1,9 +1,13 @@
 # Pull-request status matrix
 
-All PR badges and main status icons resolve through
-`pullRequestSummaryPresentation` in `features/pull-requests/presentation.ts`.
-The authored PR list, thread rows, and Changes panel must use that resolver;
-individual views may still render separate checks and reviewer detail.
+This is the intended shared precedence, implemented centrally by
+`pullRequestSummaryPresentation` in
+[`presentation.ts`](../../features/pull-requests/presentation.ts). The authored
+PR list, thread rows, and Changes panel must use that resolver; individual
+views may render separate checks and reviewer detail. Current source and
+hydration gaps mean this matrix is not proof of cross-surface parity: see
+[unresolved findings](changes-and-prs.md#unresolved-correctness-and-coverage)
+from BBPLUG-426/427 before relying on displayed status.
 
 ## Inputs and precedence
 

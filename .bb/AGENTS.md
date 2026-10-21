@@ -8,13 +8,15 @@ across both surfaces when changing shared domain concepts.
 
 Before structural or state-management work, read:
 
-- `docs/architecture/implementation-handoff.md`
-- `docs/architecture/refactor-plan.md`
+- `docs/architecture/README.md`
+- The relevant current feature contract linked from that reference
 - `docs/adr/0001-vertical-slice-architecture.md`
 - `docs/adr/0002-state-ownership.md`
-- `docs/adr/0003-atomic-ui-and-styling.md`
 - `docs/adr/0004-incremental-migration-and-verification.md`
 - `docs/adr/0005-plugin-local-atomic-css.md`
+
+Use the [ADR index](../docs/adr/README.md) for decision history, including
+superseded ADR 0003.
 
 Clarify an accepted ADR in place only when its decision is unchanged. When a
 decision is reversed or materially narrowed, preserve the old body, mark its
@@ -140,21 +142,25 @@ decision appear different.
 
 ## Change discipline
 
-- The pre-G0 dirty-tree inventory in `docs/architecture/implementation-handoff.md`
-  is historical recovery context, not a current protection boundary. The
-  recovered implementation has a reviewed committed baseline; preserve
-  unrelated changes in the checkout being worked on.
 - New code-editing worktree children may be created when explicitly assigned
   in BB Tasks. Branch them from the verified canonical base for that task and
-  inspect their diffs before integration; there is no active pre-checkpoint
-  prohibition.
-- Migrate one vertical slice at a time and remove that slice's legacy code in
+  inspect their diffs before integration.
+- Change one vertical slice at a time and remove that slice's replaced code in
   the same change. Do not leave parallel old/new styling systems behind.
 - Preserve unrelated dirty worktree changes.
 - Keep query keys centralized and use targeted invalidation after mutations.
 - Prefer pure model/presentation functions and test them without mounting BB.
 - Avoid one-line JSX components and deeply nested conditional markup; extract
   named components with one responsibility.
+- For behavior changes and bug fixes, first add a meaningful regression or
+  characterization that fails at the owning production boundary. Record the
+  observed red failure in the BB execution task, make the smallest green
+  change, then refactor while green. Review findings follow the same rule.
+  Do not replace behavioral assertions with source-string checks or weaken
+  existing assertions/timeouts to make a gate pass.
+- Record focused/full validation, live limits and a concrete Git rollback
+  boundary in the owning BB Task. Update current contracts when behavior
+  changes; no migration-plan diary or recurring recovery checkpoint is needed.
 
 ### BB upgrade protocol
 
@@ -187,6 +193,17 @@ checkpoint before relying on the upgraded host:
   switch.
 
 ## Verification
+
+Verification is proportional to risk. Pure models, query/store policies and
+parsers need focused unit checks; registration, RPC, mutation and lifecycle
+changes need the relevant host harness checks; layout and native interaction
+need live acceptance. A passing pure test does not certify mounted parity or
+host layout. Preserve explicit acceptance gaps in task evidence.
+
+For documentation-only changes, check local Markdown paths/fragments and
+incoming references to removed files, inspect the exact deletion inventory,
+and run `git diff --check`. Run bounded existing tests only if they depend on
+changed document contracts. No install/build/reload or full suite is needed.
 
 For implementation changes, run:
 

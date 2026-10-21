@@ -18,7 +18,9 @@ Then reload it after updating configuration or source:
 bb plugin reload work-sidebar
 ```
 
-The plugin requires BB `>=0.38` with plugin SDK `>=0.4.21`.
+The plugin requires BB `>=0.46.0` with plugin SDK `>=0.6.37`, as declared
+in [package.json](package.json). The exact development SDK pin is separate
+from these minimums.
 
 ## BB integration dependencies
 
@@ -50,6 +52,24 @@ GitHub user's open pull requests instead.
   backlog of Goals.
 - Thread organization, archived-thread recovery, provider status, PR review
   state, and GitHub health presentation.
+- A read-only Thread storage card in Work, with bounded folder/file listings
+  and native file opening. Reopen/manual refresh can still return host-cached
+  listings up to 30 seconds old; it has no upload/edit/delete controls.
+
+## Architecture and contracts
+
+Start with the [current architecture](docs/architecture/README.md), then the
+relevant contract for [Work/Tasks/Threads](docs/architecture/work-management.md),
+[Inbox](docs/architecture/inbox.md), or
+[Changes/PR data](docs/architecture/changes-and-prs.md). The
+[PR status matrix](docs/architecture/pull-request-status-matrix.md) records
+intended precedence alongside known unresolved audit findings. Accepted and
+superseded decisions remain in the [ADR index](docs/adr/README.md).
+
+Operational references are the [built-in patch catalog](bb-plugins/README.md)
+and [compatibility watchlist](docs/bb-compatibility-watchlist.md), which link
+versioned source, validation, deployment and rollback evidence. Current work
+and acceptance gaps live in BB Tasks.
 
 ## Agent workflow
 
@@ -112,7 +132,8 @@ restores the original preference afterward.
 
 ## Contributing
 
-Read [`.bb/AGENTS.md`](.bb/AGENTS.md) and the architecture records in
-[`docs/adr`](docs/adr) before structural changes. Keep `app.tsx` and
+Read [`.bb/AGENTS.md`](.bb/AGENTS.md), the
+[architecture reference](docs/architecture/README.md) and its ADR links before
+structural changes. Keep `app.tsx` and
 `server.ts` as composition entry points, make changes by feature slice, and
 remove replaced legacy code in the same change.
