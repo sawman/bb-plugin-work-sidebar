@@ -1094,7 +1094,7 @@ executable work queue.
   thread boundaries and prune absent folders after successful reads.
   Open files only through a narrow host FileLink
   adapter with explicit thread-storage targets. No bodies, filesystem proxy,
-  storage paths, editing, or second preview renderer.
+  absolute host paths, editing, or second preview renderer.
 - **Refactor:** reuse the Work surface and compact RefreshButton, retain
   metadata only in Query with finite GC, directories-first deterministic
   ordering and bounded rendering. Target explicit refresh to the current
@@ -1110,6 +1110,20 @@ executable work queue.
   final combined serial suite, real themes/narrow/native preview/context-menu
   acceptance and reload/deployment. Do not claim those checks here. Rollback
   base: `8eb61e05d63ea585dd348dc7b1f601da3066d5f4`.
+- **Root acceptance (2026-10-21):** integrated the reviewed exact tree at
+  `cbb5f342b96d096955f8adbcf6908ab35121b318`. Final serial suite passed
+  913 tests across 119 files; independent affected checks passed 55 tests.
+  Canonical typecheck, SDK 0.6.49 check, build and reload passed. Live background
+  checks exercised collapsed/populated/truncated listings, nested folders,
+  native Markdown preview, light/dark themes and a narrower 1600-wide window.
+  The original window geometry and system theme preference were restored.
+  The desktop was locked: live keyboard/modifier/context-menu and naturally
+  unavailable empty/error states were not certified; their automated coverage
+  remains separate from the live evidence. Selected-thread navigation changed
+  during the check, so further GUI input stopped rather than overriding it.
+  No file contents or storage records were modified. The initial full-suite
+  typography/inventory failures and the corrected passing run remain attached
+  to BBPLUG-438.
 
 ### BB child execution protocol
 
