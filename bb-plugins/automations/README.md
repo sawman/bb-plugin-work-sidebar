@@ -13,6 +13,14 @@ list for the same active ID. It preserves the original direct-lookup error for
 missing, deleted, or unreadable projects. The source patch is
 [personal-projects.patch](personal-projects.patch).
 
+## BB 0.47.1 compatibility preflight (2026-10-26)
+
+Exact `desktop-v0.47.1`, SHA `5e1acd765039e874643f34c4d35409e58484e408`,
+BB 0.47.1 / SDK 0.6.79. Keep pristine; native personal-project support remains.
+[Audit, gates and root deployment command](../../docs/compatibility/bb-0.47.1/README.md).
+[Exact pristine rollback](../rollback/bb-0.47.1/README.md). Worker staged only;
+root owns review, deployment and live acceptance. No core artifacts.
+
 ## BB 0.46.1 compatibility preflight (2026-10-20)
 
 Exact release `desktop-v0.46.1` at

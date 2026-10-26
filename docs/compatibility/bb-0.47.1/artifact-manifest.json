@@ -1,0 +1,91 @@
+{
+  "bbVersion": "0.47.1",
+  "sdkVersion": "0.6.79",
+  "sourceCommit": "5e1acd765039e874643f34c4d35409e58484e408",
+  "candidateCommit": "1fc4416bdc02a36372f9293f056b86364a5fde3b",
+  "stageRoot": "/Users/matthewsaw/.bb/patch-staging/bb-0.47.1-2026-10-26T04-30-59-533Z",
+  "appRoot": "/Applications/bb.app/Contents/Resources/app.asar.unpacked/node_modules/bb-app",
+  "requiredFiles": [
+    "server.js",
+    "server.js.map",
+    "server.meta.json",
+    "app.js",
+    "app.css",
+    "app.meta.json"
+  ],
+  "rollbackManifest": "../../../bb-plugins/rollback/bb-0.47.1/manifest.json",
+  "plugins": [
+    {
+      "pluginId": "ask-user-question",
+      "installedPath": "server/dist/builtin-plugins/ask-user-question/dist",
+      "artifacts": [
+        {
+          "file": "server.js",
+          "size": 219276,
+          "sha256": "978a9cd1e324600a47c1db979cb4b77cf94c8eadff54e0c07efbc616dde997ae"
+        },
+        {
+          "file": "server.js.map",
+          "size": 335254,
+          "sha256": "041d9572605577647e0842d9f77212e5c684d0998e89aaa08143ec8cc4a816d8"
+        },
+        {
+          "file": "server.meta.json",
+          "size": 221,
+          "sha256": "918895a35b8721a3d7eddd2e7ce0c27d5cbd88a86ebc6419b2567fe6e0defbbe"
+        },
+        {
+          "file": "app.js",
+          "size": 224852,
+          "sha256": "1aa4220c1162ca09ecfe4498238c3db85a43d1bb03c6535716935ee1d3fb50e6"
+        },
+        {
+          "file": "app.css",
+          "size": 39177,
+          "sha256": "153a2cc6a3b7218e97d6be9178a08a4652ffc1b75d8c1232df1affb4788a6d39"
+        },
+        {
+          "file": "app.meta.json",
+          "size": 221,
+          "sha256": "918895a35b8721a3d7eddd2e7ce0c27d5cbd88a86ebc6419b2567fe6e0defbbe"
+        }
+      ]
+    },
+    {
+      "pluginId": "tasks",
+      "installedPath": "server/dist/builtin-plugins/tasks/dist",
+      "artifacts": [
+        {
+          "file": "server.js",
+          "size": 342611,
+          "sha256": "fd1fd2008de323ef2cfcef585daf85f731440b89935d6bb1e04fc19351420bfd"
+        },
+        {
+          "file": "server.js.map",
+          "size": 468713,
+          "sha256": "a728d57fbbc6a625fa04f175da97467d4d59048769b6463048feae98d7bc655c"
+        },
+        {
+          "file": "server.meta.json",
+          "size": 209,
+          "sha256": "803adee5eb6a0347ac234883d77732485865c0348b5cbc38b505583580c41b93"
+        },
+        {
+          "file": "app.js",
+          "size": 1045981,
+          "sha256": "8339345688b9d61881ba016bbf44dd3531061c9e3333a2a19520e55ee048abe4"
+        },
+        {
+          "file": "app.css",
+          "size": 165303,
+          "sha256": "855a54ecb9df9457e6d96997d9bfabc663cf366063717bc994116b774c07bc79"
+        },
+        {
+          "file": "app.meta.json",
+          "size": 209,
+          "sha256": "803adee5eb6a0347ac234883d77732485865c0348b5cbc38b505583580c41b93"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,240 @@
+{
+  "archiveSha256": "b299d6bf8eb8855b5696e60bc4b77a50fd42d0cb2fc472b7f41af42fe33fd66f",
+  "archiveBytes": 307604,
+  "members": [
+    {
+      "file": "artifact-verifier-tests.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "file": "artifact-verifier-tests.log",
+      "size": 297,
+      "sha256": "120514563968b0e885c30e568c4f1f03258c021d60a73d0e4ab4e5f280a4409a"
+    },
+    {
+      "file": "artifact-verifier.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "file": "artifact-verifier.log",
+      "size": 76,
+      "sha256": "95910895a76c82079b779815a26344689072f82bb945b9142c565c7e0422c713"
+    },
+    {
+      "file": "automations-build.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "file": "automations-build.log",
+      "size": 411,
+      "sha256": "da33f6ba2559efe5e37f59b68cbecf1db51b21b1aa0715820eacc125f6c05394"
+    },
+    {
+      "file": "automations-typecheck.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "file": "automations-typecheck.log",
+      "size": 4909,
+      "sha256": "f6ce376e9cbb41479545b50a245eb8df05e0367b4b5c047b639102c687601425"
+    },
+    {
+      "file": "automations.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "file": "automations.log",
+      "size": 303,
+      "sha256": "9f1a3d796538b43b24c939200c2fbecca1c7d17e89348922e9b5dfaeab9ea7de"
+    },
+    {
+      "file": "candidate-clone.log",
+      "size": 631,
+      "sha256": "7a3330f972b7adb8dcc32bead2f29ec177a6d3f817cbda647a4916e70479953b"
+    },
+    {
+      "file": "core.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "file": "core.log",
+      "size": 292,
+      "sha256": "188f8aa1152e2f786c1ba843a0059082222a0c79d7f2ca1dc3cc891fd3ad4238"
+    },
+    {
+      "file": "guide-threads.txt",
+      "size": 13239,
+      "sha256": "0141551571b189b404a5c0cd41b54d0114b99a15d63645aa7b3d0bbb6133c93d"
+    },
+    {
+      "file": "personal-project.json",
+      "size": 173,
+      "sha256": "a90feffd4678d4a7d26f4c0ffe2c101b7ab48b70b994f99cbcc1b2d1e61ca2a1"
+    },
+    {
+      "file": "plugins.json",
+      "size": 87259,
+      "sha256": "9e8b60c8975b42283d4af732f081172d959ef4ad763478b5820167e49688872e"
+    },
+    {
+      "file": "preflight-1.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "file": "preflight-1.log",
+      "size": 33550,
+      "sha256": "354e2d144a9faaaf6a629231dd60b4f65930bf4325716b7e0b93294cabc61faf"
+    },
+    {
+      "file": "preflight-final.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "file": "preflight-final.log",
+      "size": 33691,
+      "sha256": "d3d939ebf33278d2a996d100c6c5e1b4ffe6f08253ba53d7e2a3dc16c503025e"
+    },
+    {
+      "file": "source-filelist.txt.gz",
+      "size": 280157,
+      "sha256": "8949a88cc015847025b72ff730c598a9266f1280a86d94be403778f9644b05ba"
+    },
+    {
+      "file": "tasks-behavior-probe.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "file": "tasks-behavior-probe.log",
+      "size": 163,
+      "sha256": "f567ce82ee74a113271af78ebcb6feac68647267730deae40912ecec03290f53"
+    },
+    {
+      "file": "tasks-behavior-probe.mts",
+      "size": 3484,
+      "sha256": "40cc66b29487e5dd220f516ee7c2096c8ed78e6fff04aab05f642b95db083d17"
+    },
+    {
+      "file": "tasks-final-probe.exit",
+      "size": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "file": "tasks-final-probe.log",
+      "size": 163,
+      "sha256": "f567ce82ee74a113271af78ebcb6feac68647267730deae40912ecec03290f53"
+    },
+    {
+      "file": "tasks-final-probe.mts",
+      "size": 3484,
+      "sha256": "4aa769caf81d4842838ad6c4a3279784254f736fcc335893f908c332fe9708bf"
+    },
+    {
+      "file": "tasks-probe-strip-only.exit",
+      "size": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "file": "tasks-probe-strip-only.log",
+      "size": 1268,
+      "sha256": "7aa9056dc08f7931b31804efb889da35f986ce49ad97d719b33218b3d02cf9cf"
+    }
+  ],
+  "retainedRawRoot": "/Users/matthewsaw/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_bkksrf64hy-1/bb-plugin-work-sidebar/.agents/memory/tasks/BBPLUG-443",
+  "taskAttachmentId": "01M5V7XRN5GYCDXWMB462H79WG",
+  "filelistAttachmentId": "01M5V7XRVP9AH7HZWVR0Y3781S",
+  "sourceCandidate": "1fc4416bdc02a36372f9293f056b86364a5fde3b",
+  "canonicalPreflight": {
+    "command": "BB_PATCH_SOURCE_ROOT=/tmp/bb-0471-443-source npm run bb-plugins:sync -- --keep-workspace",
+    "log": "preflight-final.log",
+    "exit": 0,
+    "questions": {
+      "files": 5,
+      "tests": 141
+    },
+    "tasks": {
+      "files": 37,
+      "tests": 410
+    },
+    "typechecks": "Questions and Tasks exit 0",
+    "builds": "dependency closure and target CLI standalone exit 0",
+    "keptWorkspace": "/var/folders/2p/_p95gdmd3rv2qzzhs0h2y2th0000gn/T/bb-plugin-sync-0.47.1-9pwOAh/bb"
+  },
+  "additionalChecks": [
+    {
+      "command": "pnpm --filter @bb/server exec vitest run --no-file-parallelism test/services/pending-interactions.test.ts test/threads/thread-send-dispatch.test.ts test/threads/thread-create-parent-execution.test.ts",
+      "files": 3,
+      "tests": 78,
+      "exit": 0,
+      "log": "core.log"
+    },
+    {
+      "command": "pnpm --filter bb-plugin-automations exec vitest run --no-file-parallelism",
+      "files": 12,
+      "tests": 143,
+      "exit": 0,
+      "log": "automations.log"
+    },
+    {
+      "command": "node_modules/.bin/turbo run typecheck --filter=bb-plugin-automations --force",
+      "exit": 0,
+      "log": "automations-typecheck.log"
+    },
+    {
+      "command": "env -u BB_CLI <installed-cli> plugin build plugins/automations",
+      "exit": 0,
+      "log": "automations-build.log"
+    },
+    {
+      "command": "<final-workspace>/node_modules/.bin/tsx tasks-final-probe.mts",
+      "checks": 8,
+      "exit": 0,
+      "log": "tasks-final-probe.log",
+      "code": "tasks-final-probe.mts"
+    },
+    {
+      "command": "python3 bb-plugins/verify-artifacts.test.py",
+      "tests": 4,
+      "exit": 0,
+      "log": "artifact-verifier-tests.log"
+    },
+    {
+      "command": "python3 bb-plugins/verify-artifacts.py docs/compatibility/bb-0.47.1/artifact-manifest.json",
+      "exit": 0,
+      "log": "artifact-verifier.log"
+    }
+  ],
+  "earlierAttempts": [
+    {
+      "log": "preflight-1.log",
+      "exit": 0,
+      "note": "Unchanged0.46 patch before adding90 acceptance cases; final candidate rerun supersedes."
+    },
+    {
+      "log": "tasks-probe-strip-only.log",
+      "exit": 1,
+      "note": "Node strip-only cannot execute TypeScript parameter properties; no assertions ran. Checkout tsx passes."
+    }
+  ],
+  "assertionsAndTimeouts": "Existing assertions, skips and timeout values unchanged; 90 registered queue cases added. No production behavior changed.",
+  "limits": [
+    "No deployment, reload, installation, push or Work Sidebar full suite.",
+    "Live ACP Reply remains BBPLUG-430; not waived.",
+    "BBPLUG-433 Mermaid, 414 restore and 434 mandatory Tasks pipeline remain separate.",
+    "SDK/Sidebar migration is BBPLUG-444; both-sidebar live acceptance is root-owned."
+  ],
+  "rollbackVerification": {
+    "archives": 3,
+    "members": 21,
+    "hashesSizesAndMembership": "verified"
+  },
+  "markdownLocalPathsChecked": 54
+}

@@ -22,11 +22,19 @@ answer is sent immediately while unanswered questions remain visible. The final
 answer closes the display-only interaction without producing a duplicate
 follow-up.
 
-The current source patch is [acp-continuation-v0.46.patch](acp-continuation-v0.46.patch).
+The current source patch is [acp-continuation-v0.47.patch](acp-continuation-v0.47.patch).
 Historical release patches are retained below. It adds
 coverage for Cursor, OpenCode, and a custom ACP provider, plus dismissal.
 The versioned release criteria and live smoke matrix are in
 [TEST-PLAN.md](TEST-PLAN.md).
+
+## BB 0.47.1 compatibility preflight (2026-10-26)
+
+Exact `desktop-v0.47.1`, SHA `5e1acd765039e874643f34c4d35409e58484e408`,
+BB 0.47.1 / SDK 0.6.79. Retain implementation; expand registered queue gates.
+[Audit, gates and root deployment command](../../docs/compatibility/bb-0.47.1/README.md).
+[Exact pristine rollback](../rollback/bb-0.47.1/README.md). Worker staged only;
+root owns review, deployment and live acceptance. No core artifacts.
 
 ## BB 0.46.1 compatibility preflight (2026-10-20)
 

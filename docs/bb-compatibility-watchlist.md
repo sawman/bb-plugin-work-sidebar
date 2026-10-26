@@ -9,7 +9,30 @@ removing any item below. Re-run the linked searches against the current open
 issues and pull requests, then confirm the shipped API through a typed plugin
 test—not just a changelog entry.
 
-Last checked: 2026-10-20 against BB 0.46.1 / SDK 0.6.49.
+Last checked: 2026-10-26 against BB 0.47.1 / SDK 0.6.79.
+
+## BB 0.47.1 audit
+
+Audited immutable `desktop-v0.47.1` at
+`5e1acd765039e874643f34c4d35409e58484e408` and independently installed SDK
+0.6.79 declarations. All five remaining gaps below are still absent. Retain
+Questions and Tasks; preserve the Sidebar indexed-read consumer until an
+equivalent native migration. Automations stays retired and pristine. Exact
+source, refreshed primary issue/PR searches, rollback/staged hashes, strict
+artifact verifier and compressed raw evidence are in the
+[0.47.1 audit](compatibility/bb-0.47.1/README.md). Worker staged only.
+
+Catalog preflight passes Questions141/Tasks410 plus typechecks/builds; actual
+registered Tasks eight-check probe passes separately. Pristine Automations143
+and actual core interaction/dispatch/parent-default78 tests pass. These counts
+do not waive live ACP Reply (430), mandatory Tasks pipeline (434), Mermaid
+(433), restore (414), or root's Sidebar/live gates.
+
+Parent provider/model/reasoning inheritance is now implemented; the generic
+guide wording already existed in 0.46.1 despite its older implementation.
+Parent service tier is not copied: project/product defaults still supply it.
+Environment PR status now belongs to `bb--github-pr-status` keyed RPC; 444 owns
+Sidebar migration. No speculative feature or Human task reassignment.
 
 ## BB 0.46.1 audit
 
@@ -267,7 +290,7 @@ audit intentionally did not create speculative work.
   multi-call queue that keeps unanswered questions visible while each submitted
   answer immediately reaches the agent. The local plugin-only patch supplies
   that queue (maximum 32 questions) and `threads.send({ mode: "auto" })`
-  follow-up. It is cataloged against BB 0.46.1 with an exact source ref,
+  follow-up. It is cataloged against BB 0.47.1 with an exact source ref,
   regression suite, and rollback artifacts in
   [`bb-plugins/ask-user-question/`](../bb-plugins/ask-user-question/). On every
   BB release, run `npm run bb-plugins:sync`: remove this patch only when ACP

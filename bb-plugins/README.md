@@ -1,5 +1,14 @@
 # Local BB plugin patches
 
+BB 0.47.1 / SDK 0.6.79 is audited and staged, **not deployed by this worker**.
+See the [exact-source audit](../docs/compatibility/bb-0.47.1/README.md),
+[pristine rollback](rollback/bb-0.47.1/README.md), and
+[mandatory artifact verifier](verify-artifacts.py). Root must rerun nondeploy
+preflight and verify the accepted stage, complete pristine backup and installed
+readback before reloading. Historical sync swallows missing artifact files;
+use the audit's verified-stage deployment command instead of its unchecked
+`--deploy` copy path. Automations remains retired.
+
 BB 0.46.1 deployment is recorded in
 [`docs/compatibility/bb-0.46.1/DEPLOYMENT.md`](../docs/compatibility/bb-0.46.1/DEPLOYMENT.md).
 Questions and Tasks were deployed from checksum-verified artifacts;

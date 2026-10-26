@@ -9,10 +9,11 @@
   "canonicalWorkerBase": "c7dce156f30c4ac84472e6b52b102a3e5469f8c6",
   "checkedAt": "2026-10-26T04:30:31.235701+00:00",
   "sourceFilelist": {
-    "file": "source-filelist.txt.gz",
+    "file": "task attachment: source-filelist.txt.gz",
     "rawSha256": "5a9a703bef55b56dda1b1c33e9dbd9b057a672f250f94423401ae9de02908a56",
     "rawBytes": 867902,
-    "entries": 8257
+    "entries": 8257,
+    "taskAttachmentId": "01M5V7XRVP9AH7HZWVR0Y3781S"
   },
   "files": [
     {
@@ -122,7 +123,211 @@
       "sha256": "79ad3f7ac263ecc1dfa5d61aa7fa9e0b51fbb4fca0ad1eacde86ab753b04b6cd",
       "size": 40749,
       "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/apps/app/src/components/plugin/PluginPanelRightPanelHost.tsx"
+    },
+    {
+      "path": "apps/server/src/services/lib/entity-lookup.ts",
+      "sha256": "53619effaed2cddec142c228cc969dc5892149809cb2bf074275f21c49218dc2",
+      "size": 8239,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/apps/server/src/services/lib/entity-lookup.ts"
+    },
+    {
+      "path": "apps/server/src/routes/projects.ts",
+      "sha256": "fc6b3f4b69a3b668528b4cb1ccba2fd32f839d0f87172a01ae43a29418031ab3",
+      "size": 31052,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/apps/server/src/routes/projects.ts"
+    },
+    {
+      "path": "apps/server/src/services/threads/thread-execution-plan.ts",
+      "sha256": "f70015e8a53377d465133db5bce66c1038ea19e3a99e2fb32ff09fce3000fe3d",
+      "size": 13043,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/apps/server/src/services/threads/thread-execution-plan.ts"
+    },
+    {
+      "path": "plugins/provider-acp/src/agents.ts",
+      "sha256": "ede117ec074b39c003e86a1929766dfed6ac6dc2e1cccd7c7c5efbd43e8cc043",
+      "size": 5153,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/plugins/provider-acp/src/agents.ts"
+    },
+    {
+      "path": "plugins/provider-acp/src/declaration.ts",
+      "sha256": "f57b6ac70540b2f22892d9bb16a132138ec1805cba6dc186a12e4ee5f63266af",
+      "size": 3453,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/plugins/provider-acp/src/declaration.ts"
     }
   ],
-  "remoteIdentityDeviation": "Initial read-only clone began before sawman switch. Exact tag fetch and all subsequent GitHub reads used sawman with trapped verified restore to matthew-se. No remote writes."
+  "remoteIdentityDeviation": "Initial read-only clone began before sawman switch. Exact tag fetch and all subsequent GitHub reads used sawman with trapped verified restore to matthew-se. No remote writes.",
+  "liveSdk": {
+    "root": "/Users/matthewsaw/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_6b3jancqd6-1/bb-plugin-work-sidebar/node_modules/@get-bb/plugin-sdk",
+    "files": [
+      {
+        "file": "/Users/matthewsaw/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_6b3jancqd6-1/bb-plugin-work-sidebar/node_modules/@get-bb/plugin-sdk/bundled-types/bb-plugin-sdk.d.ts",
+        "sha256": "7e9d7dbd1b0f2f88cf576559c6d90b367a636121346f8bc30cea0a19d4b2a50e"
+      },
+      {
+        "file": "/Users/matthewsaw/.bb/plugins/environment-git-worktree/host-data/worktrees/thr_6b3jancqd6-1/bb-plugin-work-sidebar/node_modules/@get-bb/plugin-sdk/bundled-types/bb-plugin-sdk-app.d.ts",
+        "sha256": "32eea61bf7e34f3308cb8cb7eaf5a553e4c71b5904a3ba9ef351c9bb2adaaaae"
+      }
+    ]
+  },
+  "upstreamSearches": [
+    {
+      "key": "acp-queue-issue",
+      "query": "repo:get-bb/bb is:open is:issue ACP question queue",
+      "totalCount": 0,
+      "matches": []
+    },
+    {
+      "key": "acp-queue-pr",
+      "query": "repo:get-bb/bb is:open is:pr ACP question queue",
+      "totalCount": 1,
+      "matches": [
+        {
+          "number": 5438,
+          "title": "Link anonymous thread and turn lifecycle events",
+          "url": "https://github.com/get-bb/bb/pull/5438"
+        }
+      ]
+    },
+    {
+      "key": "acp-continuation-issue",
+      "query": "repo:get-bb/bb is:open is:issue AskUserQuestion ACP",
+      "totalCount": 4,
+      "matches": [
+        {
+          "number": 5004,
+          "title": "Pi: injected AskUserQuestion interaction stays pending with no card, then times out after 30 minutes",
+          "url": "https://github.com/get-bb/bb/issues/5004"
+        },
+        {
+          "number": 6031,
+          "title": "ACP question forms split an 'Other' free-text field into a separate required question",
+          "url": "https://github.com/get-bb/bb/issues/6031"
+        },
+        {
+          "number": 4463,
+          "title": "Plugin-form (AskUserQuestion) answers are never persisted to the interaction record, so the transcript loses every answered question",
+          "url": "https://github.com/get-bb/bb/issues/4463"
+        },
+        {
+          "number": 3833,
+          "title": "`--plan` bypasses the provider plan capability gate: provider-pi accepts it silently and the agent looks for a nonexistent EnterPlanMode tool",
+          "url": "https://github.com/get-bb/bb/issues/3833"
+        }
+      ]
+    },
+    {
+      "key": "acp-continuation-pr",
+      "query": "repo:get-bb/bb is:open is:pr AskUserQuestion ACP",
+      "totalCount": 0,
+      "matches": []
+    },
+    {
+      "key": "thread-task-exact-issue",
+      "query": "repo:get-bb/bb is:open is:issue \"listTasksForThread\"",
+      "totalCount": 0,
+      "matches": []
+    },
+    {
+      "key": "thread-task-exact-pr",
+      "query": "repo:get-bb/bb is:open is:pr \"listTasksForThread\"",
+      "totalCount": 0,
+      "matches": []
+    },
+    {
+      "key": "thread-task-indexed-issue",
+      "query": "repo:get-bb/bb is:open is:issue tasks thread indexed",
+      "totalCount": 0,
+      "matches": []
+    },
+    {
+      "key": "thread-task-indexed-pr",
+      "query": "repo:get-bb/bb is:open is:pr tasks thread indexed",
+      "totalCount": 0,
+      "matches": []
+    },
+    {
+      "key": "tasks-parent-issue",
+      "query": "repo:get-bb/bb is:open is:issue tasks dispatch parent",
+      "totalCount": 1,
+      "matches": [
+        {
+          "number": 1144,
+          "title": "Task dependencies: no way to express that one task blocks another",
+          "url": "https://github.com/get-bb/bb/issues/1144"
+        }
+      ]
+    },
+    {
+      "key": "tasks-parent-pr",
+      "query": "repo:get-bb/bb is:open is:pr tasks dispatch parent",
+      "totalCount": 0,
+      "matches": []
+    },
+    {
+      "key": "inverse-http-issue",
+      "query": "repo:get-bb/bb is:open is:issue openUrl browser preference",
+      "totalCount": 0,
+      "matches": []
+    },
+    {
+      "key": "inverse-http-pr",
+      "query": "repo:get-bb/bb is:open is:pr openUrl browser preference",
+      "totalCount": 0,
+      "matches": []
+    },
+    {
+      "key": "sidebar-browser-issue",
+      "query": "repo:get-bb/bb is:open is:issue sidebar UrlLink browser",
+      "totalCount": 0,
+      "matches": []
+    },
+    {
+      "key": "sidebar-browser-pr",
+      "query": "repo:get-bb/bb is:open is:pr sidebar UrlLink browser",
+      "totalCount": 0,
+      "matches": []
+    }
+  ],
+  "upstreamEvidence": {
+    "archiveSha256": "646f051baf382a4a307c23d89e338a7f0e9d49ef7ed6ba8a75313c3a900871d1",
+    "archiveBytes": 127854,
+    "members": [
+      {
+        "file": "tag.json",
+        "size": 349,
+        "sha256": "7362ff2a3e64e3e65034627216b49296eb359f2f44ed652c066aa54bd085731d"
+      },
+      {
+        "file": "release.json",
+        "size": 23183,
+        "sha256": "4cd140eb1da843b2c75befd06b2ccc0eea7c3bc86285accead07da93fc35f68e"
+      },
+      {
+        "file": "issue-1978.json",
+        "size": 6233,
+        "sha256": "8ee1fca02f751b36235f32e3f7451dbc97e4f836c816c7d04a583da6bf3f9a3f"
+      },
+      {
+        "file": "issue-2200.json",
+        "size": 6377,
+        "sha256": "80388e1627ec25ac7fb9ee3801734fdf60a2c45574e66d41a8e2d9250aad2524"
+      },
+      {
+        "file": "issue-2836.json",
+        "size": 6383,
+        "sha256": "017bb289fedd1f038356af46506bee3b3f1d880168fe6d670fd50943418d0c11"
+      },
+      {
+        "file": "searches.json",
+        "size": 63600,
+        "sha256": "e6b9483a67e6b7c4e9673a049b83313c55a6452adb1ea8cb531c71ab7859051b"
+      },
+      {
+        "file": "release-delta.txt.gz",
+        "size": 104640,
+        "sha256": "9eda3bd10f7aa0539faf7107942b359c057f88b02f0dfd08033da26796afbe45"
+      }
+    ],
+    "taskAttachmentId": "01M5V7Z7VRTZ261XCZ1743RS4H"
+  }
 }
