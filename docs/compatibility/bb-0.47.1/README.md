@@ -79,7 +79,7 @@ Frozen patch candidate `1fc4416bdc02a36372f9293f056b86364a5fde3b` passed:
 | Actual core interaction/dispatch/parent defaults | exit 0; 3 files/78 tests, including idle question card, active/background dispatch and normal provider approvals |
 | Pristine Automations | exit 0; 12 files/143 tests, typecheck and target-CLI build |
 | Actual patched Tasks service/CLI probe | exit 0; 8 checks, repeated in the final retained build root |
-| Artifact verifier | exit 0; required stage/baseline checks and 4 isolated filesystem regression tests |
+| Artifact verifier | exit 0; required stage/baseline checks and 7 isolated filesystem regression tests |
 
 Existing assertions, skips and timeouts were not changed. Questions production
 code equals the retained 0.46 patch: configurable timeout, submission summary,
@@ -95,7 +95,12 @@ tsx passes. Source and full raw failure/success logs are retained.
 files, hash/size/version mismatch or incomplete pristine installation; deployment
 backs up all three exact plugin sets before writing, verifies backup and every
 installed byte, and restores/verifies pristine artifacts on copy/readback failure.
-Its four regression tests use temporary fixtures only. No real deployment ran.
+Its seven regression tests use temporary fixtures only. The full-set amendment
+first recorded three red failures: unexpected installed files before writes,
+unexpected files after copying, and corruption of an untouched app.js.map.
+Baseline, backup and postcopy verification now require exact directory membership;
+postcopy hashes cover every pristine entry with only the twelve staged overrides.
+No real deployment ran.
 F2 is addressed by the actual registered eight-check probe above. BBPLUG-434
 still owns integrating that behavior gate into the build pipeline.
 
@@ -135,7 +140,7 @@ Rerun exact preflight after source acceptance, without a GitHub window:
 
 ```sh
 BB_PATCH_SOURCE_ROOT=/tmp/bb-0471-443-source npm run bb-plugins:sync -- --keep-workspace
-python3 bb-plugins/verify-artifacts.py docs/compatibility/bb-0.47.1/artifact-manifest.json
+PYTHONDONTWRITEBYTECODE=1 python3 bb-plugins/verify-artifacts.py docs/compatibility/bb-0.47.1/artifact-manifest.json
 ```
 
 The verifier checks the accepted stage at
@@ -145,8 +150,8 @@ hashes; a difference fails and needs review. Do not use sync's unchecked deploy
 copy path. After root acceptance, deploy the accepted stage with a fresh backup:
 
 ```sh
-python3 bb-plugins/verify-artifacts.py docs/compatibility/bb-0.47.1/artifact-manifest.json --deploy --backup-root "$HOME/.bb/patch-backups/bb-0.47.1-reviewed-443"
-python3 bb-plugins/verify-artifacts.py docs/compatibility/bb-0.47.1/artifact-manifest.json --verify-installed
+PYTHONDONTWRITEBYTECODE=1 python3 bb-plugins/verify-artifacts.py docs/compatibility/bb-0.47.1/artifact-manifest.json --deploy --backup-root "$HOME/.bb/patch-backups/bb-0.47.1-reviewed-443"
+PYTHONDONTWRITEBYTECODE=1 python3 bb-plugins/verify-artifacts.py docs/compatibility/bb-0.47.1/artifact-manifest.json --verify-installed
 bb plugin reload ask-user-question
 bb plugin reload tasks
 ```

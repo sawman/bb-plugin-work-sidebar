@@ -53,28 +53,42 @@ def verify_stage(manifest, stage):
         verify_metadata(stage / plugin["pluginId"], plugin["pluginId"], manifest)
 
 
+def pristine_entries(manifest, baseline, plugin):
+    entries = [entry for entry in baseline["artifacts"] if entry["pluginId"] == plugin]
+    names = {entry["file"] for entry in entries}
+    if not set(manifest["requiredFiles"]).issubset(names) or len(names) != len(entries):
+        raise ValueError(f"Incomplete or duplicate pristine manifest: {plugin}")
+    return {entry["file"]: entry for entry in entries}
+
+
+def verify_directory(manifest, app, plugin, entries):
+    folder = app / "server/dist/builtin-plugins" / plugin / "dist"
+    # Validate missing files first so callers retain a precise missing-file error.
+    for name, entry in entries.items():
+        verify_file(folder / name, entry)
+    actual = {entry.name for entry in folder.iterdir()}
+    expected = set(entries)
+    if actual != expected:
+        raise ValueError(f"Artifact file set mismatch: {folder}; unexpected={sorted(actual - expected)}")
+    verify_metadata(folder, plugin, manifest)
+
+
 def verify_baseline(manifest, baseline, app):
     for plugin in ("ask-user-question", "tasks", "automations"):
-        entries = [entry for entry in baseline["artifacts"] if entry["pluginId"] == plugin]
-        if not set(manifest["requiredFiles"]).issubset({entry["file"] for entry in entries}):
-            raise ValueError(f"Incomplete pristine manifest: {plugin}")
-        folder = app / "server/dist/builtin-plugins" / plugin / "dist"
-        for entry in entries:
-            verify_file(folder / entry["file"], entry)
-        verify_metadata(folder, plugin, manifest)
+        verify_directory(manifest, app, plugin, pristine_entries(manifest, baseline, plugin))
 
 
 def verify_installed(manifest, baseline, app):
-    for plugin in manifest["plugins"]:
-        folder = app / plugin["installedPath"]
-        for entry in plugin["artifacts"]:
-            verify_file(folder / entry["file"], entry)
-        verify_metadata(folder, plugin["pluginId"], manifest)
-    # Retirement means Automations must remain byte-for-byte pristine.
-    for entry in baseline["artifacts"]:
-        if entry["pluginId"] == "automations":
-            verify_file(app / "server/dist/builtin-plugins/automations/dist" / entry["file"], entry)
-    verify_metadata(app / "server/dist/builtin-plugins/automations/dist", "automations", manifest)
+    overrides = {plugin["pluginId"]: plugin["artifacts"] for plugin in manifest["plugins"]}
+    for plugin in ("ask-user-question", "tasks", "automations"):
+        entries = pristine_entries(manifest, baseline, plugin)
+        for entry in overrides.get(plugin, []):
+            if entry["file"] not in entries:
+                raise ValueError(f"Staged artifact absent from pristine file set: {plugin}/{entry['file']}")
+            entries[entry["file"]] = entry
+        # Baseline plus twelve overrides preserves every untouched file too.
+        # Automations has no overrides and must remain entirely pristine.
+        verify_directory(manifest, app, plugin, entries)
 
 
 def deploy(manifest, baseline, stage, app, backup):

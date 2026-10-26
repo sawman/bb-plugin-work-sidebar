@@ -236,5 +236,27 @@
     "members": 21,
     "hashesSizesAndMembership": "verified"
   },
-  "markdownLocalPathsChecked": 54
+  "markdownLocalPathsChecked": 54,
+  "verifierFullSetAmendment": {
+    "attachmentId": "01M5V8JE1W4B8J7JA7TYWTBDZ3",
+    "archiveSha256": "8ba5f6645b7e600f441f42ee02cd110369be243028d6c655205081a8f4a3eb56",
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 bb-plugins/verify-artifacts.test.py",
+    "red": {
+      "exit": 1,
+      "tests": 7,
+      "failures": 3,
+      "log": "verifier-fullset-red.log"
+    },
+    "green": {
+      "exit": 0,
+      "tests": 7,
+      "log": "verifier-fullset-green.log"
+    },
+    "actualReadOnly": {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 bb-plugins/verify-artifacts.py docs/compatibility/bb-0.47.1/artifact-manifest.json",
+      "exit": 0,
+      "log": "verifier-fullset-live-read.log"
+    },
+    "scope": "Helper/tests/docs only; source patches, stage, artifact manifest and rollback hashes unchanged."
+  }
 }

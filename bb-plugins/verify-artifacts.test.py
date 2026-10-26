@@ -26,14 +26,14 @@ class ArtifactVerificationTests(unittest.TestCase):
             metadata = json.dumps({"pluginId": plugin, "sdkVersion": "0.6.79", "builtWith": {
                 "bbVersion": "0.47.1", "pluginSdkVersion": "0.6.79"}}).encode()
             entries = []
-            for name in self.manifest["requiredFiles"]:
+            for name in [*self.manifest["requiredFiles"], "app.js.map"]:
                 payload = metadata if name.endswith("meta.json") else b"pristine"
                 target = self.app / relative / name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(payload)
                 self.baseline["artifacts"].append({"pluginId": plugin, "file": name,
                     "size": len(payload), "sha256": hashlib.sha256(payload).hexdigest()})
-                if plugin != "automations":
+                if plugin != "automations" and name in self.manifest["requiredFiles"]:
                     staged = self.stage / plugin / name
                     staged.parent.mkdir(parents=True, exist_ok=True)
                     payload = metadata if name.endswith("meta.json") else b"patched"
@@ -63,6 +63,37 @@ class ArtifactVerificationTests(unittest.TestCase):
         verifier.deploy(self.manifest, self.baseline, self.stage, self.app, self.backup)
         verifier.verify_installed(self.manifest, self.baseline, self.app)
         verifier.verify_baseline(self.manifest, self.baseline, self.backup)
+
+    def test_unexpected_installed_file_blocks_before_backup_or_writes(self):
+        (self.app / "server/dist/builtin-plugins/tasks/dist/unexpected.js").write_bytes(b"extra")
+        with self.assertRaisesRegex(ValueError, "file set mismatch"):
+            verifier.deploy(self.manifest, self.baseline, self.stage, self.app, self.backup)
+        self.assertFalse(self.backup.exists())
+        self.assertEqual((self.app / "server/dist/builtin-plugins/tasks/dist/server.js").read_bytes(), b"pristine")
+
+    def test_postcopy_readback_rejects_unexpected_file(self):
+        verifier.deploy(self.manifest, self.baseline, self.stage, self.app, self.backup)
+        (self.app / "server/dist/builtin-plugins/ask-user-question/dist/unexpected.js").write_bytes(b"extra")
+        with self.assertRaisesRegex(ValueError, "file set mismatch"):
+            verifier.verify_installed(self.manifest, self.baseline, self.app)
+
+    def test_altered_untouched_file_during_copy_restores_complete_baseline(self):
+        original_copy = verifier.shutil.copy2
+        corrupted = False
+
+        def copy_with_untouched_corruption(source, destination):
+            nonlocal corrupted
+            result = original_copy(source, destination)
+            if not corrupted and Path(destination) == self.app / "server/dist/builtin-plugins/tasks/dist/server.js":
+                (self.app / "server/dist/builtin-plugins/tasks/dist/app.js.map").write_bytes(b"corrupted")
+                corrupted = True
+            return result
+
+        with patch.object(verifier.shutil, "copy2", side_effect=copy_with_untouched_corruption):
+            with self.assertRaisesRegex(ValueError, "size/hash mismatch"):
+                verifier.deploy(self.manifest, self.baseline, self.stage, self.app, self.backup)
+        verifier.verify_baseline(self.manifest, self.baseline, self.app)
+        self.assertEqual((self.app / "server/dist/builtin-plugins/tasks/dist/app.js.map").read_bytes(), b"pristine")
 
     def test_corrupt_readback_restores_all_pristine_artifacts(self):
         original_copy = verifier.shutil.copy2
