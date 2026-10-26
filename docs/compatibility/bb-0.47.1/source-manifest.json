@@ -1,0 +1,128 @@
+{
+  "sourceRef": "desktop-v0.47.1",
+  "sourceCommit": "5e1acd765039e874643f34c4d35409e58484e408",
+  "sourceParent": "b17bfc8fddaa99140e00317b2dd36fdc0e833d05",
+  "sourceRoot": "/tmp/bb-0471-443-source",
+  "pristine": true,
+  "bbVersion": "0.47.1",
+  "sdkVersion": "0.6.79",
+  "canonicalWorkerBase": "c7dce156f30c4ac84472e6b52b102a3e5469f8c6",
+  "checkedAt": "2026-10-26T04:30:31.235701+00:00",
+  "sourceFilelist": {
+    "file": "source-filelist.txt.gz",
+    "rawSha256": "5a9a703bef55b56dda1b1c33e9dbd9b057a672f250f94423401ae9de02908a56",
+    "rawBytes": 867902,
+    "entries": 8257
+  },
+  "files": [
+    {
+      "path": "plugins/ask-user-question/src/server.ts",
+      "sha256": "960920cb3fe0b55584cef4291c3991e62dde6218db0f8b032535a2d7cc91802c",
+      "size": 4446,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/plugins/ask-user-question/src/server.ts"
+    },
+    {
+      "path": "plugins/ask-user-question/app.tsx",
+      "sha256": "5bc64cf8cdcede62acce1b7d759dae1ae0761ef87238166fa206c76479ad69cf",
+      "size": 1561,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/plugins/ask-user-question/app.tsx"
+    },
+    {
+      "path": "plugins/tasks/shared/contract.ts",
+      "sha256": "5ced2d908b30395df942e71567b51da9e7a6fe83f8fb6fc2ee4030efd6616b43",
+      "size": 21817,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/plugins/tasks/shared/contract.ts"
+    },
+    {
+      "path": "plugins/tasks/cli/index.ts",
+      "sha256": "6f6220b52539f040b769a65609c33319fe73c7e35035f7031c6dc8b0e4a8501f",
+      "size": 97732,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/plugins/tasks/cli/index.ts"
+    },
+    {
+      "path": "plugins/tasks/delegate/index.ts",
+      "sha256": "518afc92b0d02235ebd3037371f01d854b27592369a77b75010d0dde339b8486",
+      "size": 13074,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/plugins/tasks/delegate/index.ts"
+    },
+    {
+      "path": "plugins/automations/src/service.ts",
+      "sha256": "a348a3a9f952d139ebba809b946002b5fe70f2de7ec5ec91e5f9658d8378bd98",
+      "size": 29077,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/plugins/automations/src/service.ts"
+    },
+    {
+      "path": "plugins/github-pr-status/contract.ts",
+      "sha256": "17a55d3fdab8167a3b0cd50b54eceb1a75a685e9085106652471eeeb1663dac2",
+      "size": 8635,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/plugins/github-pr-status/contract.ts"
+    },
+    {
+      "path": "plugins/github-pr-status/server.ts",
+      "sha256": "cec95e5162891df997957d3bfd3147943b3bd41f4dad6ed18c55ab04e0724016",
+      "size": 16883,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/plugins/github-pr-status/server.ts"
+    },
+    {
+      "path": "packages/plugin-sdk/src/app-contract.ts",
+      "sha256": "a4cb52f5c4dbc7d4d2ea9e867b8f9fedf7aff175cd82cb3b0283cf46c7561ed3",
+      "size": 227537,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/packages/plugin-sdk/src/app-contract.ts"
+    },
+    {
+      "path": "packages/plugin-sdk/package.json",
+      "sha256": "e3f09c5806f9ab0d302ce429e9e0d1056a252c503c30b95ac4b0bf68879e4028",
+      "size": 7757,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/packages/plugin-sdk/package.json"
+    },
+    {
+      "path": "apps/server/src/services/plugins/builtin-registry.ts",
+      "sha256": "b9406b6f19c36fdc3a116012de503bb9aeca2649b31bd1a3d1ca8dc5bbf9a1b0",
+      "size": 7554,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/apps/server/src/services/plugins/builtin-registry.ts"
+    },
+    {
+      "path": "packages/templates/src/templates/bb-guide-threads.md",
+      "sha256": "caa4db30bc00494c1be15b7a0d9ad2905492cb9ff9b822bd28bc5f7b344ca87f",
+      "size": 13580,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/packages/templates/src/templates/bb-guide-threads.md"
+    },
+    {
+      "path": "apps/server/src/services/threads/project-execution-defaults.ts",
+      "sha256": "4dfcce04aa6b541d1b9bf03d8fe6c7d890a66057d5d54eca4f4a1d40223e8a26",
+      "size": 5618,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/apps/server/src/services/threads/project-execution-defaults.ts"
+    },
+    {
+      "path": "apps/server/test/threads/thread-create-parent-execution.test.ts",
+      "sha256": "f1bb817b58ca0d1cf3adf1e95b9265c1f3a252cb2eee4633d3edf559bf79e2b4",
+      "size": 6242,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/apps/server/test/threads/thread-create-parent-execution.test.ts"
+    },
+    {
+      "path": "apps/server/src/services/threads/thread-default-policy.ts",
+      "sha256": "f2b38004da36bc85771017214d879db3b91be3643204c9acef5b5a58ad04b123",
+      "size": 15521,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/apps/server/src/services/threads/thread-default-policy.ts"
+    },
+    {
+      "path": "apps/app/src/App.tsx",
+      "sha256": "7a3c8949fe522f6791627c7af4ad5c5c3d620e4b6d72573da7970d9aff859806",
+      "size": 16627,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/apps/app/src/App.tsx"
+    },
+    {
+      "path": "apps/app/src/lib/url-open-routing.tsx",
+      "sha256": "7397657072374a092d25771df84da7582ba9fde85728874de70ca8f6201ad529",
+      "size": 2951,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/apps/app/src/lib/url-open-routing.tsx"
+    },
+    {
+      "path": "apps/app/src/components/plugin/PluginPanelRightPanelHost.tsx",
+      "sha256": "79ad3f7ac263ecc1dfa5d61aa7fa9e0b51fbb4fca0ad1eacde86ab753b04b6cd",
+      "size": 40749,
+      "url": "https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/apps/app/src/components/plugin/PluginPanelRightPanelHost.tsx"
+    }
+  ],
+  "remoteIdentityDeviation": "Initial read-only clone began before sawman switch. Exact tag fetch and all subsequent GitHub reads used sawman with trapped verified restore to matthew-se. No remote writes."
+}

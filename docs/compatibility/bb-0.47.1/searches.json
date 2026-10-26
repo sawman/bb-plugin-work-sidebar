@@ -1,0 +1,899 @@
+{
+  "acp-queue-issue": {
+    "query": "repo:get-bb/bb is:open is:issue ACP question queue",
+    "response": {
+      "total_count": 0,
+      "incomplete_results": false,
+      "items": [],
+      "search_type": "lexical"
+    }
+  },
+  "acp-queue-pr": {
+    "query": "repo:get-bb/bb is:open is:pr ACP question queue",
+    "response": {
+      "total_count": 1,
+      "incomplete_results": false,
+      "items": [
+        {
+          "url": "https://api.github.com/repos/get-bb/bb/issues/5438",
+          "repository_url": "https://api.github.com/repos/get-bb/bb",
+          "labels_url": "https://api.github.com/repos/get-bb/bb/issues/5438/labels{/name}",
+          "comments_url": "https://api.github.com/repos/get-bb/bb/issues/5438/comments",
+          "events_url": "https://api.github.com/repos/get-bb/bb/issues/5438/events",
+          "html_url": "https://github.com/get-bb/bb/pull/5438",
+          "id": 5834978216,
+          "node_id": "PR_kwDORYGSE88AAAABIOnLYA",
+          "number": 5438,
+          "title": "Link anonymous thread and turn lifecycle events",
+          "user": {
+            "login": "brsbl",
+            "id": 57682038,
+            "node_id": "MDQ6VXNlcjU3NjgyMDM4",
+            "avatar_url": "https://avatars.githubusercontent.com/u/57682038?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/brsbl",
+            "html_url": "https://github.com/brsbl",
+            "followers_url": "https://api.github.com/users/brsbl/followers",
+            "following_url": "https://api.github.com/users/brsbl/following{/other_user}",
+            "gists_url": "https://api.github.com/users/brsbl/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/brsbl/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/brsbl/subscriptions",
+            "organizations_url": "https://api.github.com/users/brsbl/orgs",
+            "repos_url": "https://api.github.com/users/brsbl/repos",
+            "events_url": "https://api.github.com/users/brsbl/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/brsbl/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "labels": [],
+          "state": "open",
+          "locked": false,
+          "assignees": [],
+          "milestone": null,
+          "comments": 1,
+          "created_at": "2026-10-13T17:43:38Z",
+          "updated_at": "2026-10-21T06:59:39Z",
+          "closed_at": null,
+          "assignee": null,
+          "author_association": "COLLABORATOR",
+          "issue_field_values": [],
+          "type": null,
+          "active_lock_reason": null,
+          "draft": false,
+          "pull_request": {
+            "url": "https://api.github.com/repos/get-bb/bb/pulls/5438",
+            "html_url": "https://github.com/get-bb/bb/pull/5438",
+            "diff_url": "https://github.com/get-bb/bb/pull/5438.diff",
+            "patch_url": "https://github.com/get-bb/bb/pull/5438.patch",
+            "merged_at": null
+          },
+          "body": "## Human comments\n\n## What was wrong\n\nWork events cannot reliably connect an accepted message to its turn, especially after queueing or retry.\n\n## What changed\n\n- Persist random analytics-only thread, parent, and message IDs separately from content and public thread records.\n- Report applied lifecycle transitions and coarse turn outcomes after commit, retaining queue groups and original acceptance timestamps.\n- Reuse retry provenance, exclude steering from turn origins, and report unavailable links without guessing.\n- Restrict new turn outcome provider values to shipped declarations, including after custom providers are disabled.\n\n## How you verified\n\n- [Remote CI passed](https://github.com/get-bb/bb/actions/runs/38452449814) at `a96641c3e8`.\n- ACP-next ran uncached in the sequential Windows host shard; its original tests and timeouts are unchanged.\n- Real Codex root, child, follow-up, and grouped queued turns completed through the branch app/server/daemon.\n- Thread, parent, and request IDs joined correctly; archiving emitted the expected lifecycle transition.\n- A real Claude rejection using an isolated invalid OAuth token emitted `failed/auth`.\n- A due one-shot automation completed with `trigger: schedule`, using the same turn events as other work.\n- Production-sender payloads were captured locally and screened for identifying content; no production PostHog delivery occurred.\n- The older Claude error path without an HTTP status remains a separate categorization limitation.\n- Cumulative verification used `207404a8b7`; the later #5439 fix changes only plugin RPC request metadata.\n\n<details>\n<summary>Prior implementation verification and review history</summary>\n\n- [Remote CI passed](https://github.com/get-bb/bb/actions/runs/38394027310) at `41e9b51b`.\n- [Privacy regressions failed before the fix](https://github.com/get-bb/bb/actions/runs/38393587802) and passed afterward on Linux and Windows.\n- Cumulative review covered the stack at `654570f7`; its provider privacy finding is fixed and validated without repeating the review.\n- Exact-head app/server/daemon \u2192 deterministic ACP process \u2192 local capture verified root/child IDs, continuation, queued sends, stop, opt-out, restart persistence, and a disabled custom provider mapping to `other`.\n- A grouped queued send on the unchanged descendant `40972c58` emitted both accepted message IDs on `turn_started` and `turn_finished`. The original QA request used an incomplete expected queue prefix; correcting that fixture request completed the check.\n- Retry, steer, permission, and failure variants are covered in remote CI rather than every variant in the live pass.\n\n<details>\n<summary>Recorded P2 follow-ups</summary>\n\n- Soft deletion can clear analytics state before final runtime settlement; startup cancellation can lose the pending request link.\n- Retained-turn reconciliation can count another start; host interruption can be categorized as `start_failed`.\n- `first_turn` uses current root-thread count rather than historical first completion.\n- Request-origin lookup scans historical request JSON.\n\n</details>\n\n</details>\n\nOriginal implementation thread: [Retention measurement](https://brsbl.getbb.app/projects/proj_khiw2za95v/threads/thr_gqshddt6w2)\n\nBB-Thread: [Growth analytics](https://brsbl.getbb.app/projects/proj_khiw2za95v/threads/thr_a4mhd93zji)\n\nBB-Thread-ID: thr_a4mhd93zji\n\n> AGENT GENERATED\n\n",
+          "reactions": {
+            "url": "https://api.github.com/repos/get-bb/bb/issues/5438/reactions",
+            "total_count": 0,
+            "+1": 0,
+            "-1": 0,
+            "laugh": 0,
+            "hooray": 0,
+            "confused": 0,
+            "heart": 0,
+            "rocket": 0,
+            "eyes": 0
+          },
+          "timeline_url": "https://api.github.com/repos/get-bb/bb/issues/5438/timeline",
+          "performed_via_github_app": null,
+          "state_reason": null,
+          "score": 1.0
+        }
+      ],
+      "search_type": "lexical"
+    }
+  },
+  "acp-continuation-issue": {
+    "query": "repo:get-bb/bb is:open is:issue AskUserQuestion ACP",
+    "response": {
+      "total_count": 4,
+      "incomplete_results": false,
+      "items": [
+        {
+          "url": "https://api.github.com/repos/get-bb/bb/issues/5004",
+          "repository_url": "https://api.github.com/repos/get-bb/bb",
+          "labels_url": "https://api.github.com/repos/get-bb/bb/issues/5004/labels{/name}",
+          "comments_url": "https://api.github.com/repos/get-bb/bb/issues/5004/comments",
+          "events_url": "https://api.github.com/repos/get-bb/bb/issues/5004/events",
+          "html_url": "https://github.com/get-bb/bb/issues/5004",
+          "id": 5723825837,
+          "node_id": "I_kwDORYGSE88AAAABVSqmrQ",
+          "number": 5004,
+          "title": "Pi: injected AskUserQuestion interaction stays pending with no card, then times out after 30 minutes",
+          "user": {
+            "login": "dxmann73",
+            "id": 2052453,
+            "node_id": "MDQ6VXNlcjIwNTI0NTM=",
+            "avatar_url": "https://avatars.githubusercontent.com/u/2052453?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/dxmann73",
+            "html_url": "https://github.com/dxmann73",
+            "followers_url": "https://api.github.com/users/dxmann73/followers",
+            "following_url": "https://api.github.com/users/dxmann73/following{/other_user}",
+            "gists_url": "https://api.github.com/users/dxmann73/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/dxmann73/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/dxmann73/subscriptions",
+            "organizations_url": "https://api.github.com/users/dxmann73/orgs",
+            "repos_url": "https://api.github.com/users/dxmann73/repos",
+            "events_url": "https://api.github.com/users/dxmann73/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/dxmann73/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "labels": [
+            {
+              "id": 11870411017,
+              "node_id": "LA_kwDORYGSE88AAAACw4gZCQ",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/ask-user-question",
+              "name": "ask-user-question",
+              "color": "5319e7",
+              "default": false,
+              "description": "Built-in plugin: ask-user-question",
+              "archived_at": null,
+              "archived_by": null
+            },
+            {
+              "id": 11870411140,
+              "node_id": "LA_kwDORYGSE88AAAACw4gZhA",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/ui",
+              "name": "ui",
+              "color": "c5def5",
+              "default": false,
+              "description": "App shell, sidebar, composer, rendering",
+              "archived_at": null,
+              "archived_by": null
+            },
+            {
+              "id": 11870411413,
+              "node_id": "LA_kwDORYGSE88AAAACw4galQ",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/plugins",
+              "name": "plugins",
+              "color": "5319e7",
+              "default": false,
+              "description": "Plugin SDK, runtime, marketplace",
+              "archived_at": null,
+              "archived_by": null
+            },
+            {
+              "id": 11870411437,
+              "node_id": "LA_kwDORYGSE88AAAACw4garQ",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/provider-pi",
+              "name": "provider-pi",
+              "color": "1d76db",
+              "default": false,
+              "description": "Built-in plugin: provider-pi",
+              "archived_at": null,
+              "archived_by": null
+            },
+            {
+              "id": 11871968312,
+              "node_id": "LA_kwDORYGSE88AAAACw5_cOA",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/no-repro",
+              "name": "no-repro",
+              "color": "6a737d",
+              "default": false,
+              "description": "Could not reproduce as reported (or already fixed); see linked report",
+              "archived_at": null,
+              "archived_by": null
+            }
+          ],
+          "state": "open",
+          "locked": false,
+          "assignees": [],
+          "milestone": null,
+          "comments": 1,
+          "created_at": "2026-10-06T06:09:50Z",
+          "updated_at": "2026-10-06T06:25:40Z",
+          "closed_at": null,
+          "assignee": null,
+          "author_association": "NONE",
+          "issue_field_values": [],
+          "type": {
+            "id": 35759628,
+            "node_id": "IT_kwDOEqoxNs4CIaYM",
+            "name": "Bug",
+            "description": "An unexpected problem or behavior",
+            "color": "red",
+            "created_at": "2026-08-04T20:40:49Z",
+            "updated_at": "2026-08-04T20:40:49Z",
+            "is_enabled": true
+          },
+          "active_lock_reason": null,
+          "sub_issues_summary": {
+            "total": 0,
+            "completed": 0,
+            "percent_completed": 0
+          },
+          "issue_dependencies_summary": {
+            "blocked_by": 0,
+            "total_blocked_by": 0,
+            "blocking": 0,
+            "total_blocking": 0
+          },
+          "body": "### Summary\n\nOn a visible Pi thread, BB's injected `AskUserQuestion` registered a plugin interaction and the\nagent's turn ended normally, but no question card ever appeared in the desktop app. The interaction\nsat `pending` for exactly 30 minutes, then became `interrupted` with `statusReason: timeout`. The\nuser saw only the collapsed `Worked for` row and the agent's \"Waiting on your pick\" line, and said\nlater there was nothing to pick.\n\n### Versions and environment\n\n- bb 0.45.0 (desktop AppImage), Ubuntu 26.04.1 LTS, kernel 7.0.0-38-generic\n- provider `pi`, Pi CLI 1.0.2\n- builtin plugin `ask-user-question@0.1.0` (running)\n- visible project thread `thr_7c3mgdad3s`; the desktop app was open on that thread\n- the host runs the BB control plane; the thread ran on the default execution machine\n\n### Steps to reproduce\n\n1. In a Pi thread on bb 0.45.0, have the agent call BB's injected `AskUserQuestion` (the builtin\n   `ask-user-question` plugin) with one or more options.\n2. Leave the thread open in the desktop app.\n3. No question card appears. The agent's turn completes a few seconds later and ends with a line\n   like \"Waiting on your pick\".\n4. Wait. After 30 minutes the interaction is interrupted.\n\nI could not run a clean fresh repro thread; this is one observed production occurrence.\n`bb thread interactions list thr_7c3mgdad3s` now returns no interactions, so the record survives\nonly in the event log.\n\n### Expected vs actual\n\nActual, from `bb thread log thr_7c3mgdad3s --json --all`:\n\n- seq 1325 `item/started` \u2014 `AskUserQuestion` tool call, status `pending`, createdAt 1791235924407\n- seq 1326 `system/interaction/lifecycle` \u2014 interaction `pint_zntmatbjq2` `pending`, origin\n  `{\"kind\":\"plugin\",\"pluginId\":\"ask-user-question\",\"rendererId\":\"ask-user-question\"}`,\n  createdAt 1791235924413\n- seq 1327 `item/completed` \u2014 tool result: \"The request is shown to the user. A successful result\n  will arrive separately. ...\"\n- seq 1335 `turn/completed` \u2014 +7.16 s, status `completed`\n- seq 1336 `system/interaction/lifecycle` \u2014 same interaction `interrupted`,\n  `statusReason: \"timeout\"`, createdAt 1791237724417 \u2192 exactly 1 800 004 ms after `pending`\n- seq 1337 `client/turn/requested` \u2014 the user, 8 hours later: \"LOL that's exactly it. I don't see\n  anything to pick\"\n\nThe `turn/completed` at +7 s is expected: this injected tool is non-blocking and the answer is meant\nto arrive as a follow-up message. The bug is that the interaction never surfaced in the app.\n\nThe user's screenshot of the thread afterwards shows only the collapsed `Worked for 5m 38s` summary\nrow and the final \"Waiting on your pick...\" text, with no question form. The crop may not include the\nwhole footer region, so I cannot fully exclude that a card rendered somewhere off-screen.\n\nExpected: the question card renders in the thread, stays visible until answered or dismissed, and the\nselected answer arrives as a follow-up user message to the agent.\n\n### Evidence\n\n- Event log and timestamps above, read from the live thread with `bb thread log`.\n- `bb plugin list` reports `ask-user-question@0.1.0  running`, source `builtin:ask-user-question`.\n- Thread id `thr_7c3mgdad3s`; the interaction id was `pint_zntmatbjq2`.\n\n### What you ruled out\n\n- Not #4407: that is about hidden threads with nothing surfacing them app-wide; this thread is\n  visible and was open in the app.\n- Not #4530: that is OpenCode's native `question` tool over ACP; that issue explicitly says the\n  builtin plugin's `AskUserQuestion` renders and resolves correctly under ACP.\n- Not #3408 or #1944: those forms were visible; the answer was lost after an MCP-side timeout while\n  the form stayed open.\n- Not #4463: that is about persistence after a successfully answered plugin form, not a card that\n  never rendered.\n- Not #4990: that is Codex async choice prompts rendering as plain text; here no prompt text or card\n  appeared at all, and the provider is `provider-pi`.\n\n### Suggested priority and effort (optional)\n\nMedium-high \u2014 a question silently disappears and the agent waits on it until the interaction expires,\nwith no in-app indication. Workaround: ask in plain text. Effort unknown. I did not isolate whether\nthis is Pi-specific or a general plugin-interaction rendering failure; there is one occurrence and no\nclean repro yet.\n\n### Checks\n\n- [x] I reproduced this on the latest release or on `main`, or I say above that I could not.\n- [x] I searched open and closed issues for the same problem.\n- [x] If an agent wrote this, the body ends with `> AGENT GENERATED` and links the thread or report.\n\n> AGENT GENERATED \u2014 thread `thr_7c3mgdad3s`\n",
+          "reactions": {
+            "url": "https://api.github.com/repos/get-bb/bb/issues/5004/reactions",
+            "total_count": 0,
+            "+1": 0,
+            "-1": 0,
+            "laugh": 0,
+            "hooray": 0,
+            "confused": 0,
+            "heart": 0,
+            "rocket": 0,
+            "eyes": 0
+          },
+          "timeline_url": "https://api.github.com/repos/get-bb/bb/issues/5004/timeline",
+          "performed_via_github_app": null,
+          "state_reason": null,
+          "pinned_comment": null,
+          "score": 1.0
+        },
+        {
+          "url": "https://api.github.com/repos/get-bb/bb/issues/6031",
+          "repository_url": "https://api.github.com/repos/get-bb/bb",
+          "labels_url": "https://api.github.com/repos/get-bb/bb/issues/6031/labels{/name}",
+          "comments_url": "https://api.github.com/repos/get-bb/bb/issues/6031/comments",
+          "events_url": "https://api.github.com/repos/get-bb/bb/issues/6031/events",
+          "html_url": "https://github.com/get-bb/bb/issues/6031",
+          "id": 5961819593,
+          "node_id": "I_kwDORYGSE88AAAABY1olyQ",
+          "number": 6031,
+          "title": "ACP question forms split an 'Other' free-text field into a separate required question",
+          "user": {
+            "login": "VinSpee",
+            "id": 582828,
+            "node_id": "MDQ6VXNlcjU4MjgyOA==",
+            "avatar_url": "https://avatars.githubusercontent.com/u/582828?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/VinSpee",
+            "html_url": "https://github.com/VinSpee",
+            "followers_url": "https://api.github.com/users/VinSpee/followers",
+            "following_url": "https://api.github.com/users/VinSpee/following{/other_user}",
+            "gists_url": "https://api.github.com/users/VinSpee/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/VinSpee/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/VinSpee/subscriptions",
+            "organizations_url": "https://api.github.com/users/VinSpee/orgs",
+            "repos_url": "https://api.github.com/users/VinSpee/repos",
+            "events_url": "https://api.github.com/users/VinSpee/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/VinSpee/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "labels": [
+            {
+              "id": 11870410046,
+              "node_id": "LA_kwDORYGSE88AAAACw4gVPg",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/providers",
+              "name": "providers",
+              "color": "1d76db",
+              "default": false,
+              "description": "Cross-provider bridges, models, login",
+              "archived_at": null,
+              "archived_by": null
+            },
+            {
+              "id": 11870411078,
+              "node_id": "LA_kwDORYGSE88AAAACw4gZRg",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/provider-acp",
+              "name": "provider-acp",
+              "color": "1d76db",
+              "default": false,
+              "description": "Built-in plugin: provider-acp",
+              "archived_at": null,
+              "archived_by": null
+            },
+            {
+              "id": 11871968249,
+              "node_id": "LA_kwDORYGSE88AAAACw5_b-Q",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/partial-repro",
+              "name": "partial-repro",
+              "color": "dbab09",
+              "default": false,
+              "description": "Bug partially reproduced; some claims unverified; see linked report",
+              "archived_at": null,
+              "archived_by": null
+            }
+          ],
+          "state": "open",
+          "locked": false,
+          "assignees": [],
+          "milestone": null,
+          "comments": 2,
+          "created_at": "2026-10-21T13:49:26Z",
+          "updated_at": "2026-10-24T14:15:26Z",
+          "closed_at": null,
+          "assignee": null,
+          "author_association": "NONE",
+          "issue_field_values": [],
+          "type": {
+            "id": 35759628,
+            "node_id": "IT_kwDOEqoxNs4CIaYM",
+            "name": "Bug",
+            "description": "An unexpected problem or behavior",
+            "color": "red",
+            "created_at": "2026-08-04T20:40:49Z",
+            "updated_at": "2026-08-04T20:40:49Z",
+            "is_enabled": true
+          },
+          "active_lock_reason": null,
+          "sub_issues_summary": {
+            "total": 0,
+            "completed": 0,
+            "percent_completed": 0
+          },
+          "issue_dependencies_summary": {
+            "blocked_by": 0,
+            "total_blocked_by": 0,
+            "blocking": 0,
+            "total_blocking": 0
+          },
+          "body": "### Summary\n\nWhen an ACP agent (omp) asks a multiple-choice question with an \"Other (type your own)\" option, bb's question tool shows the free-text answer as a second question. That second question must also be answered. Expected: one question with the choices, and free text as part of that same question.\n\n### Versions and environment\n\n- bb: source commit `b143a22` (main). Desktop app 0.46.1 is installed locally; I did not test the live UI on it.\n- macOS 26 (darwin 25.2.0, arm64).\n- Provider: omp over ACP. Installed omp is 18.12.5. The `<name>__other` field naming was checked against omp 18.10.4 source, not the installed binary.\n\n### Steps to reproduce\n\nNot reproduced in the live UI. Closest faithful repro, at the exact code path, on `b143a22`:\n\n1. Check out `b143a22` and open `packages/provider-bridge-acp`.\n2. Call `planAcpElicitation` from `src/elicitation.ts` with:\n\n```json\n{\"mode\":\"form\",\"message\":\"Which branch?\",\"requestedSchema\":{\"type\":\"object\",\"properties\":{\"branch\":{\"type\":\"string\",\"title\":\"Branch\",\"enum\":[\"alpha\",\"beta\"]},\"branch__other\":{\"type\":\"string\",\"title\":\"Other\"}}}}\n```\n\n3. Observe two questions.\n\nDid not reproduce with: a text-only `__other` field. That case is planned as its own question on purpose.\n\n### Expected vs actual\n\nActual (abbreviated from the repro output):\n\n```\nquestions: [\n  { id: \"branch\", options: [alpha, beta], allowFreeText: false },\n  { id: \"branch__other\", prompt: \"Other\", allowFreeText: true }\n]\n```\n\nExpected: one question `branch` with options `alpha` and `beta`, `allowFreeText: true`, and the typed \"Other\" answer returned as that question's value.\n\n### Evidence\n\n- The code at the base commit plans one question per form field and has no `__other` folding: https://github.com/get-bb/bb/blob/b143a22/packages/provider-bridge-acp/src/elicitation.ts#L288-L297\n- The base `toResponse` declines the whole form when a planned field's answer does not decode (`elicitation.ts` L312-L320 at `b143a22`), so the separate text question is effectively required.\n- Investigation thread: `thr_qwsifvk3dw`.\n\n### What you ruled out\n\n- Not a duplicate: no open or closed issue or PR for `__other` or Other free text was found when filed.\n- Not provider-agnostic as far as I checked: only omp was examined.\n- Not verified in the live bb UI. The repro above is unit-level.\n\n### Suggested priority and effort\n\nMedium. Every omp choice question with an Other option is split. Workaround: answer both questions. Effort: low, a small change in `elicitation.ts` with tests.\n\n### Checks\n\n- [x] I could not reproduce in the live UI; the unit-level repro above is the closest available.\n- [x] I searched open and closed issues for the same problem.\n- [x] This body ends with `> AGENT GENERATED` and links the investigation thread.\n\n> AGENT GENERATED\n",
+          "reactions": {
+            "url": "https://api.github.com/repos/get-bb/bb/issues/6031/reactions",
+            "total_count": 0,
+            "+1": 0,
+            "-1": 0,
+            "laugh": 0,
+            "hooray": 0,
+            "confused": 0,
+            "heart": 0,
+            "rocket": 0,
+            "eyes": 0
+          },
+          "timeline_url": "https://api.github.com/repos/get-bb/bb/issues/6031/timeline",
+          "performed_via_github_app": null,
+          "state_reason": null,
+          "pinned_comment": null,
+          "score": 1.0
+        },
+        {
+          "url": "https://api.github.com/repos/get-bb/bb/issues/4463",
+          "repository_url": "https://api.github.com/repos/get-bb/bb",
+          "labels_url": "https://api.github.com/repos/get-bb/bb/issues/4463/labels{/name}",
+          "comments_url": "https://api.github.com/repos/get-bb/bb/issues/4463/comments",
+          "events_url": "https://api.github.com/repos/get-bb/bb/issues/4463/events",
+          "html_url": "https://github.com/get-bb/bb/issues/4463",
+          "id": 5619655031,
+          "node_id": "I_kwDORYGSE88AAAABTvUhdw",
+          "number": 4463,
+          "title": "Plugin-form (AskUserQuestion) answers are never persisted to the interaction record, so the transcript loses every answered question",
+          "user": {
+            "login": "cristoslc",
+            "id": 1724064,
+            "node_id": "MDQ6VXNlcjE3MjQwNjQ=",
+            "avatar_url": "https://avatars.githubusercontent.com/u/1724064?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/cristoslc",
+            "html_url": "https://github.com/cristoslc",
+            "followers_url": "https://api.github.com/users/cristoslc/followers",
+            "following_url": "https://api.github.com/users/cristoslc/following{/other_user}",
+            "gists_url": "https://api.github.com/users/cristoslc/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/cristoslc/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/cristoslc/subscriptions",
+            "organizations_url": "https://api.github.com/users/cristoslc/orgs",
+            "repos_url": "https://api.github.com/users/cristoslc/repos",
+            "events_url": "https://api.github.com/users/cristoslc/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/cristoslc/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "labels": [
+            {
+              "id": 11870410234,
+              "node_id": "LA_kwDORYGSE88AAAACw4gV-g",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/threads",
+              "name": "threads",
+              "color": "0e8a16",
+              "default": false,
+              "description": "Turns, timeline, messaging, forks",
+              "archived_at": null,
+              "archived_by": null
+            },
+            {
+              "id": 11870411017,
+              "node_id": "LA_kwDORYGSE88AAAACw4gZCQ",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/ask-user-question",
+              "name": "ask-user-question",
+              "color": "5319e7",
+              "default": false,
+              "description": "Built-in plugin: ask-user-question",
+              "archived_at": null,
+              "archived_by": null
+            },
+            {
+              "id": 11870411413,
+              "node_id": "LA_kwDORYGSE88AAAACw4galQ",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/plugins",
+              "name": "plugins",
+              "color": "5319e7",
+              "default": false,
+              "description": "Plugin SDK, runtime, marketplace",
+              "archived_at": null,
+              "archived_by": null
+            },
+            {
+              "id": 11871968312,
+              "node_id": "LA_kwDORYGSE88AAAACw5_cOA",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/no-repro",
+              "name": "no-repro",
+              "color": "6a737d",
+              "default": false,
+              "description": "Could not reproduce as reported (or already fixed); see linked report",
+              "archived_at": null,
+              "archived_by": null
+            }
+          ],
+          "state": "open",
+          "locked": false,
+          "assignees": [],
+          "milestone": null,
+          "comments": 1,
+          "created_at": "2026-09-28T18:55:32Z",
+          "updated_at": "2026-09-30T04:47:53Z",
+          "closed_at": null,
+          "assignee": null,
+          "author_association": "NONE",
+          "issue_field_values": [],
+          "type": {
+            "id": 35759628,
+            "node_id": "IT_kwDOEqoxNs4CIaYM",
+            "name": "Bug",
+            "description": "An unexpected problem or behavior",
+            "color": "red",
+            "created_at": "2026-08-04T20:40:49Z",
+            "updated_at": "2026-08-04T20:40:49Z",
+            "is_enabled": true
+          },
+          "active_lock_reason": null,
+          "sub_issues_summary": {
+            "total": 0,
+            "completed": 0,
+            "percent_completed": 0
+          },
+          "issue_dependencies_summary": {
+            "blocked_by": 0,
+            "total_blocked_by": 0,
+            "blocking": 0,
+            "total_blocking": 0
+          },
+          "body": "### Summary\n\nAnswering a plugin-registered AskUserQuestion form loses the answer from every transcript view: the stored resolution records only `{ \"kind\": \"plugin_submitted\" }`, and the timeline drops both the tool call and the delivered-result system message. What the user decided is invisible everywhere the thread renders. Expected: the questions and chosen answers stay visible, the way the native provider `user_question` path already persists them.\n\n### Versions and environment\n\n- bb 0.44.0 (desktop app), macOS (Darwin 24.x)\n- Built-in plugin: ask-user-question (origin kind `plugin`, rendererId `ask-user-question`)\n- Evidence via `bb thread log` / `bb thread interactions show` against the data the app renders\n\n### Steps to reproduce\n\n1. Answer an AskUserQuestion plugin form through the host question form.\n2. `bb thread interactions show <id> <thread> --json` \u2014 inspect `resolution`.\n3. `bb thread log <thread> --json --all` \u2014 find the `client/turn/requested` row with `systemMessageKind: \"tool-result-delivered\"`.\n4. Open the thread: main view and any plugin pane show nothing about it.\n\nVerified against a real production thread; no isolated fresh-repro thread was run.\n\n### Expected vs actual\n\nActual, verbatim \u2014 the resolution stores no answers, no submitted value:\n\n```json\n\"resolution\": { \"kind\": \"plugin_submitted\" }\n```\n\nThe only other trace is the delivery event, marked suppressed (verbatim, trimmed):\n\n```json\n{\"seq\":7014,\"type\":\"client/turn/requested\",\"systemMessageKind\":\"tool-result-delivered\",\"systemMessageSubject\":{\"kind\":\"tool-call\",\"toolName\":\"AskUserQuestion\",\"suppress\":true}}\n```\n\nIts text carries the full result \u2014 how the agent gets the answer \u2014 but no renderer reads the raw log. Expected: the transcript shows the answered prompt and chosen label, like provider `user_question` lifecycle rows, which persist questions and answers.\n\n### Evidence\n\n- Two answered plugin-form interactions in a production thread: a question titled \"Close UAT gap\" answered with the option \"Redeploy + full UAT (Recommended)\", and another answered \"Authorizing now (last time)\". Both interactions store exactly `{\"kind\":\"plugin_submitted\"}` \u2014 no answers, no submitted value.\n- In the installed 0.44.0 bundle (builtin-plugins/ask-user-question/dist/server.js), `describeSubmission` already computes `{ title: \"Answered <prompt> \u2014 <label>\", detail: \"- <prompt> \u2014 <answer>\" }` at submit time; it is never persisted. Cited from the installed bundle, not a repo permalink.\n- Same bundle, start-server.js: `isSuppressedSystemMessage` \u2192 `convertMessage` drops the delivered message; low-value tool-call suppression drops the `presentation.suppress` call item.\n\n### What you ruled out\n\n- Not #3408 (ACP MCP timeout loss): here the answer reaches the agent fine; it is just never stored for rendering.\n- Not the provider path: `user_question` interactions persist questions and answers; only plugin forms lose them.\n- Not pane-specific: the main view drops the same traces.\n\n### Suggested priority and effort (optional)\n\nMedium \u2014 every plugin-form question vanishes from history; no core workaround (plugins can only re-parse the raw log). Effort probably Low: persist `describeSubmission`'s title/detail on the resolution, or render it in the plugin-form-lifecycle chip.\n\n### Checks\n\n- [x] Reproduced on the latest release (0.44.0) via `bb thread log` / `interactions show` on a live thread; no fresh-repro thread (noted above).\n- [x] Searched open and closed issues; no duplicate (closest: #3408, different cause).\n- [x] Agent-generated body.\n\n> AGENT GENERATED",
+          "reactions": {
+            "url": "https://api.github.com/repos/get-bb/bb/issues/4463/reactions",
+            "total_count": 0,
+            "+1": 0,
+            "-1": 0,
+            "laugh": 0,
+            "hooray": 0,
+            "confused": 0,
+            "heart": 0,
+            "rocket": 0,
+            "eyes": 0
+          },
+          "timeline_url": "https://api.github.com/repos/get-bb/bb/issues/4463/timeline",
+          "performed_via_github_app": {
+            "id": 1144995,
+            "client_id": "Iv23liVemv8A9if9v0F2",
+            "slug": "chatgpt-codex-connector",
+            "node_id": "A_kwHOAOQ6Gs4AEXij",
+            "owner": {
+              "login": "openai",
+              "id": 14957082,
+              "node_id": "MDEyOk9yZ2FuaXphdGlvbjE0OTU3MDgy",
+              "avatar_url": "https://avatars.githubusercontent.com/u/14957082?v=4",
+              "gravatar_id": "",
+              "url": "https://api.github.com/users/openai",
+              "html_url": "https://github.com/openai",
+              "followers_url": "https://api.github.com/users/openai/followers",
+              "following_url": "https://api.github.com/users/openai/following{/other_user}",
+              "gists_url": "https://api.github.com/users/openai/gists{/gist_id}",
+              "starred_url": "https://api.github.com/users/openai/starred{/owner}{/repo}",
+              "subscriptions_url": "https://api.github.com/users/openai/subscriptions",
+              "organizations_url": "https://api.github.com/users/openai/orgs",
+              "repos_url": "https://api.github.com/users/openai/repos",
+              "events_url": "https://api.github.com/users/openai/events{/privacy}",
+              "received_events_url": "https://api.github.com/users/openai/received_events",
+              "type": "Organization",
+              "user_view_type": "public",
+              "site_admin": false
+            },
+            "name": "ChatGPT Codex Connector",
+            "description": "Bring ChatGPT and Codex to your GitHub repositories.",
+            "external_url": "https://www.chatgpt.com",
+            "html_url": "https://github.com/apps/chatgpt-codex-connector",
+            "created_at": "2025-02-14T01:37:05Z",
+            "updated_at": "2026-09-23T18:52:59Z",
+            "permissions": {
+              "actions": "write",
+              "checks": "read",
+              "contents": "write",
+              "emails": "read",
+              "issues": "write",
+              "metadata": "read",
+              "pull_requests": "write",
+              "statuses": "read",
+              "workflows": "write"
+            },
+            "events": [
+              "check_run",
+              "check_suite",
+              "commit_comment",
+              "issues",
+              "issue_comment",
+              "pull_request",
+              "pull_request_review",
+              "pull_request_review_comment",
+              "pull_request_review_thread",
+              "repository",
+              "status",
+              "sub_issues"
+            ]
+          },
+          "state_reason": null,
+          "pinned_comment": null,
+          "score": 1.0
+        },
+        {
+          "url": "https://api.github.com/repos/get-bb/bb/issues/3833",
+          "repository_url": "https://api.github.com/repos/get-bb/bb",
+          "labels_url": "https://api.github.com/repos/get-bb/bb/issues/3833/labels{/name}",
+          "comments_url": "https://api.github.com/repos/get-bb/bb/issues/3833/comments",
+          "events_url": "https://api.github.com/repos/get-bb/bb/issues/3833/events",
+          "html_url": "https://github.com/get-bb/bb/issues/3833",
+          "id": 5486987658,
+          "node_id": "I_kwDORYGSE88AAAABRwzJig",
+          "number": 3833,
+          "title": "`--plan` bypasses the provider plan capability gate: provider-pi accepts it silently and the agent looks for a nonexistent EnterPlanMode tool",
+          "user": {
+            "login": "skillet07",
+            "id": 80631836,
+            "node_id": "MDQ6VXNlcjgwNjMxODM2",
+            "avatar_url": "https://avatars.githubusercontent.com/u/80631836?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/skillet07",
+            "html_url": "https://github.com/skillet07",
+            "followers_url": "https://api.github.com/users/skillet07/followers",
+            "following_url": "https://api.github.com/users/skillet07/following{/other_user}",
+            "gists_url": "https://api.github.com/users/skillet07/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/skillet07/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/skillet07/subscriptions",
+            "organizations_url": "https://api.github.com/users/skillet07/orgs",
+            "repos_url": "https://api.github.com/users/skillet07/repos",
+            "events_url": "https://api.github.com/users/skillet07/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/skillet07/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "labels": [
+            {
+              "id": 11870410046,
+              "node_id": "LA_kwDORYGSE88AAAACw4gVPg",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/providers",
+              "name": "providers",
+              "color": "1d76db",
+              "default": false,
+              "description": "Cross-provider bridges, models, login",
+              "archived_at": null,
+              "archived_by": null
+            },
+            {
+              "id": 11870410261,
+              "node_id": "LA_kwDORYGSE88AAAACw4gWFQ",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/cli",
+              "name": "cli",
+              "color": "bfd4f2",
+              "default": false,
+              "description": "bb CLI",
+              "archived_at": null,
+              "archived_by": null
+            },
+            {
+              "id": 11870411078,
+              "node_id": "LA_kwDORYGSE88AAAACw4gZRg",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/provider-acp",
+              "name": "provider-acp",
+              "color": "1d76db",
+              "default": false,
+              "description": "Built-in plugin: provider-acp",
+              "archived_at": null,
+              "archived_by": null
+            },
+            {
+              "id": 11870411437,
+              "node_id": "LA_kwDORYGSE88AAAACw4garQ",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/provider-pi",
+              "name": "provider-pi",
+              "color": "1d76db",
+              "default": false,
+              "description": "Built-in plugin: provider-pi",
+              "archived_at": null,
+              "archived_by": null
+            },
+            {
+              "id": 11871968201,
+              "node_id": "LA_kwDORYGSE88AAAACw5_byQ",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/confirmed-repro",
+              "name": "confirmed-repro",
+              "color": "0e8a16",
+              "default": false,
+              "description": "Bug reproduced again from a clean trusted checkout; see linked report",
+              "archived_at": null,
+              "archived_by": null
+            }
+          ],
+          "state": "open",
+          "locked": false,
+          "assignees": [],
+          "milestone": null,
+          "comments": 1,
+          "created_at": "2026-09-17T11:54:25Z",
+          "updated_at": "2026-09-17T12:06:34Z",
+          "closed_at": null,
+          "assignee": null,
+          "author_association": "NONE",
+          "issue_field_values": [],
+          "type": {
+            "id": 35759628,
+            "node_id": "IT_kwDOEqoxNs4CIaYM",
+            "name": "Bug",
+            "description": "An unexpected problem or behavior",
+            "color": "red",
+            "created_at": "2026-08-04T20:40:49Z",
+            "updated_at": "2026-08-04T20:40:49Z",
+            "is_enabled": true
+          },
+          "active_lock_reason": null,
+          "sub_issues_summary": {
+            "total": 0,
+            "completed": 0,
+            "percent_completed": 0
+          },
+          "issue_dependencies_summary": {
+            "blocked_by": 0,
+            "total_blocked_by": 0,
+            "blocking": 0,
+            "total_blocking": 0
+          },
+          "body": "### Summary\n\n`bb thread spawn --plan` (and `bb thread tell --plan`) prefixes the message with the builtin `/plan` command for every provider, without consulting the provider's declared plan composer action. For a provider that declares no plan support \u2014 `provider-pi` declares `composerActions: []` \u2014 the flag is accepted, no plan mode is entered, no plan approval card appears, and nothing tells the user. The message simply reaches the agent as the literal text `/plan \u2026`. The UI path is gated correctly; only the CLI path is not.\n\n### Versions and environment\n\n- bb 0.43.1 desktop app (`desktop-v0.43.1`), macOS 26.5.2 (25F84)\n- pi 0.85.1 (`provider-pi`)\n- claude 2.1.274 (`provider-claude-code`, used as the positive control)\n- codex 0.154.0 installed, **not tested** \u2014 the account hit its weekly Codex limit mid-investigation (`provider/rate-limit`, resets 2026-09-19)\n- Default personal workspace environment, local host, no Connect, no worktree\n\n### Steps to reproduce\n\n1. `bb thread spawn --project <id> --provider pi --plan --prompt \"Plan adding HELLO.md to the working directory. Create nothing until I approve.\"`\n2. `bb thread log <thread-id> --json` and look for a `system/interaction/lifecycle` event with `payload.subject.kind == \"plan\"`.\n3. Repeat step 1 with `--provider claude-code` as a control.\n4. Repeat step 1 with the `ask-user-question` plugin disabled (`bb plugin disable ask-user-question`) to rule the AskUserQuestion tool description in or out.\n\nI ran all four. The provider-pi case produces no plan interaction; the claude-code case produces one; disabling the plugin changes neither.\n\nDid **not** reproduce with: `--provider claude-code`, which enters plan mode and calls `ExitPlanMode` as expected.\n\n### Expected vs actual\n\n**provider-pi \u2014 actual.** `bb thread show` reports the thread as started normally and the thread title falls back to the raw command text:\n\n```json\n\"titleFallback\": \"/plan \u0421\u043f\u043b\u0430\u043d\u0438\u0440\u0443\u0439 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u0444\u0430\u0439\u043b\u0430 HELLO.md \u0432 \u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u0440\u0430\u0431\u043e\u0447\u0438\u0439 \u043a\u0430\u0442\u0430\u043b\u043e\u0433. \u041d\u0438\u0447\u0435\u0433\u043e \u043d\u0435 \u043d...\"\n```\n\nThe turn completes with no plan interaction at all (`bb thread interactions list <id>` \u2192 empty) and no error anywhere. The agent's own reasoning shows the flag landed as text it could not act on:\n\n```\nPlan mode? The command /plan suggests plan mode. But I don't have EnterPlanMode tool listed.\nJust respond with one paragraph.\n```\n\nRun with the `ask-user-question` plugin disabled, the same flag produces a different and equally non-plan outcome \u2014 the agent reads it as prose:\n\n```\nThe /plan command is likely a prompt template.\n```\n\n**provider-claude-code \u2014 control, same flag.** Real plan mode: a pending approval interaction with the plan text and CC's own plan file, driven by two tool calls.\n\n```\nsystem/interaction/lifecycle\n  status=pending  kind=approval  subject=plan\n  planFilePath=/Users/lennox/.claude/plans/hello-md-elegant-cook.md\n  origin.providerId=claude-code\n\ntoolCall: ToolSearch query=\"select:ExitPlanMode\" \u2192 \"Matched tools: ExitPlanMode\"\ntoolCall: ExitPlanMode { plan: \"# \u041f\u043b\u0430\u043d: \u0434\u043e\u0431\u0430\u0432\u0438\u0442\u044c HELLO.md\u2026\" }\n```\n\n**Expected.** Either the flag is refused for a provider that cannot plan (\"`provider-pi` does not support plan mode\" and a non-zero exit), or the plan request is emulated. What should not happen is accepting `--plan` and producing neither a plan nor a diagnostic.\n\n### Evidence\n\nThreads (all archived; artifacts kept):\n\n- `thr_wjwduagtvj` \u2014 pi, `--plan`, ask-user-question enabled \u2192 no plan interaction\n- `thr_8vwu9e79id` \u2014 pi, `--plan`, ask-user-question disabled \u2192 no plan interaction\n- `thr_dqkz5ijm5e` \u2014 claude-code, `--plan` \u2192 `ExitPlanMode`, plan approval pending\n- `thr_pmky8bmv76` \u2014 claude-code, `--plan`, ask-user-question disabled \u2192 `ExitPlanMode`, plan approval pending\n\nAll four in project `proj_personal` on host `host_e9rkkmpe25`. No file was created in any of the four workspaces (`HELLO.md` never existed; the plan was denied or never proposed).\n\nCode on `main` at `3e9bef842539d5a1dd83d648fe9d5a7a20de4397`:\n\n- `provider-pi` declares no plan support: https://github.com/get-bb/bb/blob/3e9bef842539d5a1dd83d648fe9d5a7a20de4397/plugins/provider-pi/src/declaration.ts \u2014 `composerActions: []` (same for `plugins/provider-acp/src/declaration.ts`), against `composerActions: [\"plan\"]` in `plugins/provider-claude-code/server.ts` and `[\"plan\", \"goal\"]` in `plugins/provider-codex/server.ts`.\n- The server side gates correctly: `resolvePromptMode` returns `undefined` when the provider has no plan composer action \u2014 https://github.com/get-bb/bb/blob/3e9bef842539d5a1dd83d648fe9d5a7a20de4397/apps/server/src/services/threads/thread-commands.ts (`resolvePromptMode`, via `resolveProviderPlanCommand` in `apps/server/src/services/providers/provider-plan-command.ts`). So no `promptMode` is ever sent to the pi bridge \u2014 which is why the run is a silent no-op rather than a broken plan.\n- The CLI never asks: `--plan` is defined in `apps/cli/src/commands/thread/spawn.ts` and `apps/cli/src/commands/thread/actions.ts`, and `apps/cli/src/commands/thread/helpers.ts` turns it into command text unconditionally \u2014 `args.plan ? createBuiltinPlanCommandTextInput(args.message)`, next to the help string `\"Send the message as the provider's /plan action so the agent proposes a plan for approval before executing\"`.\n- The UI is gated: `packages/client-core/src/prompt/effective-prompt-mode.ts` requires `planModeCopy !== undefined`, which `provider-pi` does not declare, and the composer typeahead is built from `composerActions` (`packages/client-core/src/prompt/mentions/command-trigger.ts`). That asymmetry is the whole report: the same flag that the composer hides for `provider-pi` is accepted from the CLI.\n\nUpstream pi has no plan mode to translate to: pi's README states \"No plan mode.\" (`README.md` in `@earendil-works/pi-coding-agent`, both in its feature list and its \"what pi skips\" section). `provider-pi`'s host bundle reads `promptMode` nowhere; the identifier appears only in the shared protocol schema it re-exports.\n\nInvestigation thread: `thr_uee6xpjqgp`. Raw `bb thread log --json` dumps for all four runs are attached to this report locally at `$BB_THREAD_STORAGE/planmode-test/` (`piA.json`, `piB.json`, `ccA.json`, `ccB.json`).\n\n### What you ruled out\n\n- Not a duplicate of #3019: that one asks for paintable ACP providers (`acp-omp`) to be un-gated so `/plan` works. This is the opposite direction \u2014 a provider with no plan mode at all should not accept a plan request silently. Both could be closed by the same capability check, but the symptoms and the fix surface differ (CLI flag validation vs ACP session-mode translation).\n- Not a duplicate of #3411 (codex plan mode persistence) \u2014 unrelated provider and unrelated symptom.\n- Not a model failure: no plan interaction is ever created for `provider-pi`, regardless of model behavior, because `promptMode` is never set for a provider with `composerActions: []`.\n- Not the `ask-user-question` tool description: disabling that plugin entirely leaves both outcomes unchanged.\n- Verified on the latest release (`desktop-v0.43.1`). Not run on `main` \u2014 no source checkout on this machine, desktop build only.\n\n### Suggested priority and effort\n\nLow\u2013Medium. No work lost and no crash; the failure is silence, which is the expensive part: a script or automation that starts threads with `--plan` against `provider-pi` (or any ACP provider) gets a thread that looks fine and never asks for approval. Workaround: check the provider's `composerActions` before passing `--plan`. Effort: Low \u2014 the server already resolves the plan command per provider, so the check just has to reach the CLI flag.\n\n> AGENT GENERATED\n",
+          "reactions": {
+            "url": "https://api.github.com/repos/get-bb/bb/issues/3833/reactions",
+            "total_count": 0,
+            "+1": 0,
+            "-1": 0,
+            "laugh": 0,
+            "hooray": 0,
+            "confused": 0,
+            "heart": 0,
+            "rocket": 0,
+            "eyes": 0
+          },
+          "timeline_url": "https://api.github.com/repos/get-bb/bb/issues/3833/timeline",
+          "performed_via_github_app": null,
+          "state_reason": null,
+          "pinned_comment": null,
+          "score": 1.0
+        }
+      ],
+      "search_type": "lexical"
+    }
+  },
+  "acp-continuation-pr": {
+    "query": "repo:get-bb/bb is:open is:pr AskUserQuestion ACP",
+    "response": {
+      "total_count": 0,
+      "incomplete_results": false,
+      "items": [],
+      "search_type": "lexical"
+    }
+  },
+  "thread-task-exact-issue": {
+    "query": "repo:get-bb/bb is:open is:issue \"listTasksForThread\"",
+    "response": {
+      "total_count": 0,
+      "incomplete_results": false,
+      "items": [],
+      "search_type": "lexical"
+    }
+  },
+  "thread-task-exact-pr": {
+    "query": "repo:get-bb/bb is:open is:pr \"listTasksForThread\"",
+    "response": {
+      "total_count": 0,
+      "incomplete_results": false,
+      "items": [],
+      "search_type": "lexical"
+    }
+  },
+  "thread-task-indexed-issue": {
+    "query": "repo:get-bb/bb is:open is:issue tasks thread indexed",
+    "response": {
+      "total_count": 0,
+      "incomplete_results": false,
+      "items": [],
+      "search_type": "lexical"
+    }
+  },
+  "thread-task-indexed-pr": {
+    "query": "repo:get-bb/bb is:open is:pr tasks thread indexed",
+    "response": {
+      "total_count": 0,
+      "incomplete_results": false,
+      "items": [],
+      "search_type": "lexical"
+    }
+  },
+  "tasks-parent-issue": {
+    "query": "repo:get-bb/bb is:open is:issue tasks dispatch parent",
+    "response": {
+      "total_count": 1,
+      "incomplete_results": false,
+      "items": [
+        {
+          "url": "https://api.github.com/repos/get-bb/bb/issues/1144",
+          "repository_url": "https://api.github.com/repos/get-bb/bb",
+          "labels_url": "https://api.github.com/repos/get-bb/bb/issues/1144/labels{/name}",
+          "comments_url": "https://api.github.com/repos/get-bb/bb/issues/1144/comments",
+          "events_url": "https://api.github.com/repos/get-bb/bb/issues/1144/events",
+          "html_url": "https://github.com/get-bb/bb/issues/1144",
+          "id": 5092107330,
+          "node_id": "I_kwDORYGSE88AAAABL4NkQg",
+          "number": 1144,
+          "title": "Task dependencies: no way to express that one task blocks another",
+          "user": {
+            "login": "dbrekelmans",
+            "id": 9531344,
+            "node_id": "MDQ6VXNlcjk1MzEzNDQ=",
+            "avatar_url": "https://avatars.githubusercontent.com/u/9531344?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/dbrekelmans",
+            "html_url": "https://github.com/dbrekelmans",
+            "followers_url": "https://api.github.com/users/dbrekelmans/followers",
+            "following_url": "https://api.github.com/users/dbrekelmans/following{/other_user}",
+            "gists_url": "https://api.github.com/users/dbrekelmans/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/dbrekelmans/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/dbrekelmans/subscriptions",
+            "organizations_url": "https://api.github.com/users/dbrekelmans/orgs",
+            "repos_url": "https://api.github.com/users/dbrekelmans/repos",
+            "events_url": "https://api.github.com/users/dbrekelmans/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/dbrekelmans/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "labels": [
+            {
+              "id": 11870410334,
+              "node_id": "LA_kwDORYGSE88AAAACw4gWXg",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/tasks",
+              "name": "tasks",
+              "color": "5319e7",
+              "default": false,
+              "description": "Built-in plugin: tasks",
+              "archived_at": null,
+              "archived_by": null
+            },
+            {
+              "id": 11870411140,
+              "node_id": "LA_kwDORYGSE88AAAACw4gZhA",
+              "url": "https://api.github.com/repos/get-bb/bb/labels/ui",
+              "name": "ui",
+              "color": "c5def5",
+              "default": false,
+              "description": "App shell, sidebar, composer, rendering",
+              "archived_at": null,
+              "archived_by": null
+            }
+          ],
+          "state": "open",
+          "locked": false,
+          "assignees": [],
+          "milestone": null,
+          "comments": 3,
+          "created_at": "2026-08-07T16:31:20Z",
+          "updated_at": "2026-10-08T07:02:48Z",
+          "closed_at": null,
+          "assignee": null,
+          "author_association": "NONE",
+          "issue_field_values": [],
+          "type": {
+            "id": 35759629,
+            "node_id": "IT_kwDOEqoxNs4CIaYN",
+            "name": "Feature",
+            "description": "A request, idea, or new functionality",
+            "color": "blue",
+            "created_at": "2026-08-04T20:40:49Z",
+            "updated_at": "2026-08-04T20:40:49Z",
+            "is_enabled": true
+          },
+          "active_lock_reason": null,
+          "sub_issues_summary": {
+            "total": 0,
+            "completed": 0,
+            "percent_completed": 0
+          },
+          "issue_dependencies_summary": {
+            "blocked_by": 0,
+            "total_blocked_by": 0,
+            "blocking": 0,
+            "total_blocking": 0
+          },
+          "body": "# Task dependencies\n\n## What I was trying to do\n\nRun a thread as an orchestrator that decomposes a plan into Tasks and dispatches each piece to its own agent. Tasks already covers most of this well: presets carry provider/model/reasoning correctly, `dispatch` seeds the worker with project context and a report-back contract, the thread is auto-attached, and status flips to `in_progress`.\n\nWhat I can't express is that a task must not start until other tasks have finished.\n\n## Why this needs a relation, not a convention\n\nThe obvious workaround is to have the orchestrator chain dispatches \u2014 wait for a worker to finish, then dispatch the next task. That covers a two-task handoff, and for the common \"implement, then review\" case Tasks arguably models it already with the `in_review` status. Those are not the cases I'm stuck on.\n\nThe cases where chaining doesn't work:\n\n**Fan-in.** Five tasks run in parallel, each in its own worktree on its own branch. A sixth task integrates the branches. It depends on *all five*, and the orchestrator has no single \"previous worker\" to chain from \u2014 it has to know that the fifth one landing is the one that matters. Today it can only poll every attached thread and diff the set itself. This is the shape `dispatch` actively encourages, since worktree isolation is the default and integration is always left over at the end.\n\n**Hard preconditions.** A task that consumes an artifact another task produces \u2014 the migration before the code that queries the new column, the endpoint before the client that calls it. Dispatching early doesn't produce a worse result, it produces a wasted agent run against a repo where the thing doesn't exist yet. That cost is why the constraint needs to be enforced rather than remembered.\n\n**Blockers that aren't agents.** \"Design sign-off\" or \"credentials provisioned\" can block three implementation tasks. There is no thread, so there is no completion event to chain from \u2014 the only way to model it is a task whose blockers resolve when a human closes it.\n\n**Plans that outlive the thread that made them.** A twenty-task plan is executed over days, across orchestrator restarts and several different threads. The ordering has to live somewhere durable and queryable. A context window is neither.\n\n## What exists today\n\n`tasks` has `parent_task_id`, but that is containment, not sequencing \u2014 a subtask is part of its parent, not blocked by a sibling. There is no dependency relation in the schema, so the constraint ends up in a label naming convention or in an external scheduler's private storage, where it is invisible in the UI and unvalidated against the tasks it references.\n\n## Proposal\n\n```sql\nCREATE TABLE IF NOT EXISTS task_dependencies (\n  blocker_task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,\n  blocked_task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,\n  created_at TEXT NOT NULL,\n  PRIMARY KEY (blocker_task_id, blocked_task_id),\n  CHECK (blocker_task_id <> blocked_task_id)\n);\n```\n\nAppended as a new migration statement, not an edit to an existing one, since the statement index is the migration id.\n\nRules:\n\n- Both tasks must belong to the same project.\n- Cycles are rejected at write time.\n- A task is **ready** when its status is `todo` and every blocker is `done` or `canceled`.\n\n### CLI surface\n\n```sh\nbb tasks update ABC-12 --blocked-by ABC-11     # repeatable\nbb tasks update ABC-12 --unblock ABC-11        # repeatable\nbb tasks list --ready                          # todo with all blockers resolved\nbb tasks show ABC-12                           # renders Blocked by / Blocks\n```\n\n`--json` on `show` and `list` would carry `blockedBy` and `blocks` as arrays of task keys, so a scheduler can walk the graph without scraping human output.\n\n`--ready` is the important one: it answers \"what can start now\" in a single query, which is exactly what fan-in and human-gated blockers make expensive to compute any other way.\n\n### UI\n\nBlocked-by and blocks rows in the task detail pane, and a badge on blocked tasks in the list so it's obvious why something isn't being picked up.\n\n## Why in Tasks rather than in a plugin on top\n\nA scheduler can keep the graph in its own storage keyed by task key \u2014 that's what I'm doing for now \u2014 but it means the dependency is invisible in the Tasks UI, unvalidated against task existence, orphaned when a task is deleted, and not shared between two tools that both want to reason about ordering. The relation constrains task data and belongs next to it.\n\n## Deliberately out of scope\n\nNo auto-dispatch on unblock. Deciding *what* to run when a task becomes ready is policy and belongs to whatever is orchestrating; this proposal is only about being able to state the constraint and query it.",
+          "reactions": {
+            "url": "https://api.github.com/repos/get-bb/bb/issues/1144/reactions",
+            "total_count": 1,
+            "+1": 1,
+            "-1": 0,
+            "laugh": 0,
+            "hooray": 0,
+            "confused": 0,
+            "heart": 0,
+            "rocket": 0,
+            "eyes": 0
+          },
+          "timeline_url": "https://api.github.com/repos/get-bb/bb/issues/1144/timeline",
+          "performed_via_github_app": null,
+          "state_reason": null,
+          "pinned_comment": null,
+          "score": 1.0
+        }
+      ],
+      "search_type": "lexical"
+    }
+  },
+  "tasks-parent-pr": {
+    "query": "repo:get-bb/bb is:open is:pr tasks dispatch parent",
+    "response": {
+      "total_count": 0,
+      "incomplete_results": false,
+      "items": [],
+      "search_type": "lexical"
+    }
+  },
+  "inverse-http-issue": {
+    "query": "repo:get-bb/bb is:open is:issue openUrl browser preference",
+    "response": {
+      "total_count": 0,
+      "incomplete_results": false,
+      "items": [],
+      "search_type": "lexical"
+    }
+  },
+  "inverse-http-pr": {
+    "query": "repo:get-bb/bb is:open is:pr openUrl browser preference",
+    "response": {
+      "total_count": 0,
+      "incomplete_results": false,
+      "items": [],
+      "search_type": "lexical"
+    }
+  },
+  "sidebar-browser-issue": {
+    "query": "repo:get-bb/bb is:open is:issue sidebar UrlLink browser",
+    "response": {
+      "total_count": 0,
+      "incomplete_results": false,
+      "items": [],
+      "search_type": "lexical"
+    }
+  },
+  "sidebar-browser-pr": {
+    "query": "repo:get-bb/bb is:open is:pr sidebar UrlLink browser",
+    "response": {
+      "total_count": 0,
+      "incomplete_results": false,
+      "items": [],
+      "search_type": "lexical"
+    }
+  }
+}

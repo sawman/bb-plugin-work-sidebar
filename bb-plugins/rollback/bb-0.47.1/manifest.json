@@ -1,0 +1,153 @@
+{
+  "bbVersion": "0.47.1",
+  "pluginSdkVersion": "0.6.79",
+  "sourceCommit": "5e1acd765039e874643f34c4d35409e58484e408",
+  "capturedAt": "2026-10-26T04:27:59.008080+00:00",
+  "kind": "pristine-installed-release-artifacts",
+  "appRoot": "/Applications/bb.app/Contents/Resources/app.asar.unpacked/node_modules/bb-app",
+  "archives": [
+    {
+      "pluginId": "ask-user-question",
+      "file": "ask-user-question.tar.gz",
+      "sha256": "6567a147bdf5434469dff232afd1e948832fa3774c4c4953d67f84de540d515d"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "tasks.tar.gz",
+      "sha256": "b9acd21be0d53df9878ef54e7ea494482480bc0f7651105adc4cc7f9c33287db"
+    },
+    {
+      "pluginId": "automations",
+      "file": "automations.tar.gz",
+      "sha256": "ce445ec2a0ffe625bf58eceadea65244f80347fb813020c2cc0fa7443521db74"
+    }
+  ],
+  "artifacts": [
+    {
+      "pluginId": "ask-user-question",
+      "file": "app.css",
+      "size": 37652,
+      "sha256": "823471874a4b3e75060be3cfa00cf0d9caf380c0a1eb55db9e46a537e10541fc"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "app.js",
+      "size": 216689,
+      "sha256": "8fe161e25a9c581178f2744d6e23eb300b63f3d178676122e65dec8bdea969d9"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "app.meta.json",
+      "size": 221,
+      "sha256": "918895a35b8721a3d7eddd2e7ce0c27d5cbd88a86ebc6419b2567fe6e0defbbe"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "package.json",
+      "size": 18,
+      "sha256": "1239d4d885dcad42201a27ed9324f8f0f760b78700d8db9ced39a511cffe7eae"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "server.js",
+      "size": 10142,
+      "sha256": "bf3a1efc7513e03cb9a6c595de1d4984bd12c9ebc4de69ba2a39752f4c30a0be"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "server.js.map",
+      "size": 9670,
+      "sha256": "d8f03241265c4fbb7d7b532fae266b143773facff7eaef01fa8e4c4e674dbce2"
+    },
+    {
+      "pluginId": "ask-user-question",
+      "file": "server.meta.json",
+      "size": 221,
+      "sha256": "918895a35b8721a3d7eddd2e7ce0c27d5cbd88a86ebc6419b2567fe6e0defbbe"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "app.css",
+      "size": 165303,
+      "sha256": "855a54ecb9df9457e6d96997d9bfabc663cf366063717bc994116b774c07bc79"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "app.js",
+      "size": 1045699,
+      "sha256": "3e2aaaaab3336c22f53c4f34f6030cc43f433674614ed4fa2e6e6167ba073822"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "app.meta.json",
+      "size": 209,
+      "sha256": "803adee5eb6a0347ac234883d77732485865c0348b5cbc38b505583580c41b93"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "package.json",
+      "size": 18,
+      "sha256": "1239d4d885dcad42201a27ed9324f8f0f760b78700d8db9ced39a511cffe7eae"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "server.js",
+      "size": 136365,
+      "sha256": "4c26604bce60db560e68ed3e99231f61e773f344dbc1bbd3ab00c3c13b8bd74e"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "server.js.map",
+      "size": 147033,
+      "sha256": "41724eb0e860b8cdcf659d87afaad647dd9d44dbb493f225b3bdca4f5efc9e0f"
+    },
+    {
+      "pluginId": "tasks",
+      "file": "server.meta.json",
+      "size": 209,
+      "sha256": "803adee5eb6a0347ac234883d77732485865c0348b5cbc38b505583580c41b93"
+    },
+    {
+      "pluginId": "automations",
+      "file": "app.css",
+      "size": 157266,
+      "sha256": "d52bcbe32e0dbe3f97597e7c4c494a4c6bb55a2182f1af5c8b45264d9c445406"
+    },
+    {
+      "pluginId": "automations",
+      "file": "app.js",
+      "size": 178018,
+      "sha256": "b7e9904eae9807f5c601bd293c5ce7439b155c56de132a15be7ca81209b3d276"
+    },
+    {
+      "pluginId": "automations",
+      "file": "app.meta.json",
+      "size": 215,
+      "sha256": "c3545397fc3d579884a3af30fa54e8a46b7254fc236dbeca38ad1335fc656211"
+    },
+    {
+      "pluginId": "automations",
+      "file": "package.json",
+      "size": 18,
+      "sha256": "1239d4d885dcad42201a27ed9324f8f0f760b78700d8db9ced39a511cffe7eae"
+    },
+    {
+      "pluginId": "automations",
+      "file": "server.js",
+      "size": 190177,
+      "sha256": "0d88b991bcedd1a17059d7056d31996d97673bcd827bbf3a34bddfc33976649c"
+    },
+    {
+      "pluginId": "automations",
+      "file": "server.js.map",
+      "size": 265863,
+      "sha256": "ed2826dcab049e41a52fae3529927fbe9ee776be2479c1a9e85f7225cea369e6"
+    },
+    {
+      "pluginId": "automations",
+      "file": "server.meta.json",
+      "size": 215,
+      "sha256": "c3545397fc3d579884a3af30fa54e8a46b7254fc236dbeca38ad1335fc656211"
+    }
+  ]
+}
