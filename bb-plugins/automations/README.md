@@ -18,8 +18,10 @@ missing, deleted, or unreadable projects. The source patch is
 Exact `desktop-v0.47.1`, SHA `5e1acd765039e874643f34c4d35409e58484e408`,
 BB 0.47.1 / SDK 0.6.79. Keep pristine; native personal-project support remains.
 [Audit, gates and root deployment command](../../docs/compatibility/bb-0.47.1/README.md).
-[Exact pristine rollback](../rollback/bb-0.47.1/README.md). Worker staged only;
-root owns review, deployment and live acceptance. No core artifacts.
+[Exact pristine rollback](../rollback/bb-0.47.1/README.md). Worker preflight
+staged only; root subsequently deployed Questions/Tasks with pristine Automations.
+See the [current deployment and acceptance record](../../docs/compatibility/bb-0.47.1/DEPLOYMENT.md).
+No core artifacts; deployment reproduction requires a pristine installation.
 
 ## BB 0.46.1 compatibility preflight (2026-10-20)
 

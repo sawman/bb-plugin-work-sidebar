@@ -1,5 +1,8 @@
 # BB 0.47.1 compatibility audit
 
+Root subsequently deployed. The [deployment and bounded acceptance record](DEPLOYMENT.md)
+supplements this preserved worker preflight/source evidence.
+
 2026-10-26, BBPLUG-443. Clean managed worker base:
 `c7dce156f30c4ac84472e6b52b102a3e5469f8c6`. Exact `desktop-v0.47.1`:
 `5e1acd765039e874643f34c4d35409e58484e408`, parent
@@ -100,7 +103,7 @@ first recorded three red failures: unexpected installed files before writes,
 unexpected files after copying, and corruption of an untouched app.js.map.
 Baseline, backup and postcopy verification now require exact directory membership;
 postcopy hashes cover every pristine entry with only the twelve staged overrides.
-No real deployment ran.
+No real deployment ran in this worker; root deployment is recorded separately.
 F2 is addressed by the actual registered eight-check probe above. BBPLUG-434
 still owns integrating that behavior gate into the build pipeline.
 
@@ -136,7 +139,12 @@ both Questions and Tasks and therefore assumes this root-owned gate has passed;
 the artifact verifier itself does not inspect live interactions. No new live
 question or destructive disposal probe is required to establish this hazard.
 
-Rerun exact preflight after source acceptance, without a GitHub window:
+The following commands reproduce the original **pristine-installation-only**
+preflight/deployment procedure, without a GitHub window. Current Questions/Tasks
+are already patched: default pristine verification and `--deploy` intentionally
+fail closed. Use the [deployment record](DEPLOYMENT.md#future-reproduction)
+for current read-only installed verification. Source preflight itself remains
+non-mutating:
 
 ```sh
 BB_PATCH_SOURCE_ROOT=/tmp/bb-0471-443-source npm run bb-plugins:sync -- --keep-workspace
@@ -147,7 +155,8 @@ The verifier checks the accepted stage at
 `/Users/matthewsaw/.bb/patch-staging/bb-0.47.1-2026-10-26T04-30-59-533Z`.
 Use `--stage-root <new-stage>` to compare a fresh stage against the accepted
 hashes; a difference fails and needs review. Do not use sync's unchecked deploy
-copy path. After root acceptance, deploy the accepted stage with a fresh backup:
+copy path. For a pristine matching installation only, after root acceptance and the
+zero-form gate, the original deployment command is:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 bb-plugins/verify-artifacts.py docs/compatibility/bb-0.47.1/artifact-manifest.json --deploy --backup-root "$HOME/.bb/patch-backups/bb-0.47.1-reviewed-443"
@@ -156,14 +165,18 @@ bb plugin reload ask-user-question
 bb plugin reload tasks
 ```
 
-The backup path must not exist. These are root-only future commands. No core
-artifacts or restart are required. Rollback payloads and member hashes remain
+The backup path must not exist. These are root-only reproduction commands for
+a pristine matching installation. No core artifacts or restart are required.
+Rollback payloads and member hashes remain
 available in Git and the verified pre-write backup. Git rollback boundary is
 the worker base above; revert the 443 commits to remove this catalog/audit
 candidate. Restoring Git does not restore installed artifacts.
 
 Root owns integration, full Sidebar gates, deployment/reload, both-sidebar
 light/dark interaction acceptance, push, task completion and archiving.
-Live ACP Reply remains BBPLUG-430; Mermaid 433, restore 414 and mandatory
-pipeline 434 remain separate. No unresolved acceptance is waived, no speculative
-feature task or Human reassignment was made, and no Ghostty work was performed.
+Root subsequently passed live ACP delivery in 446; historical 430 was cancelled
+as superseded, not retrospectively passed. The [deployment record](DEPLOYMENT.md)
+is authoritative for current acceptance and GUI limits. Mermaid 433, restore
+414 and mandatory pipeline 434 remain separate. No unresolved acceptance is
+waived, no speculative feature task or Human reassignment was made, and no
+Ghostty work was performed.

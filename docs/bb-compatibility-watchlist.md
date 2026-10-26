@@ -20,19 +20,24 @@ Questions and Tasks; preserve the Sidebar indexed-read consumer until an
 equivalent native migration. Automations stays retired and pristine. Exact
 source, refreshed primary issue/PR searches, rollback/staged hashes, strict
 artifact verifier and compressed raw evidence are in the
-[0.47.1 audit](compatibility/bb-0.47.1/README.md). Worker staged only.
+[0.47.1 audit](compatibility/bb-0.47.1/README.md). Root subsequently deployed;
+see the [deployment record](compatibility/bb-0.47.1/DEPLOYMENT.md) for current
+installed and bounded acceptance evidence.
 
 Catalog preflight passes Questions141/Tasks410 plus typechecks/builds; actual
 registered Tasks eight-check probe passes separately. Pristine Automations143
-and actual core interaction/dispatch/parent-default78 tests pass. These counts
-do not waive live ACP Reply (430), mandatory Tasks pipeline (434), Mermaid
-(433), restore (414), or root's Sidebar/live gates.
+and actual core interaction/dispatch/parent-default78 tests pass. Root's final
+combined Sidebar suite passed 121 files/929 tests. Live ACP delivery
+passed in 446; 430 was superseded, not retrospectively passed. Rendered-form
+pointer/keyboard submission and other explicit live limits remain unverified;
+mandatory Tasks pipeline (434), Mermaid (433) and restore (414) remain separate.
 
 Parent provider/model/reasoning inheritance is now implemented; the generic
 guide wording already existed in 0.46.1 despite its older implementation.
 Parent service tier is not copied: project/product defaults still supply it.
-Environment PR status now belongs to `bb--github-pr-status` keyed RPC; 444 owns
-Sidebar migration. No speculative feature or Human task reassignment.
+Environment PR status now belongs to `bb--github-pr-status` keyed RPC; the
+reviewed Sidebar migration is deployed. No speculative feature or Human task
+reassignment.
 
 ## BB 0.46.1 audit
 
