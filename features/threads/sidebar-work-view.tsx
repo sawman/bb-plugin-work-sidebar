@@ -6,7 +6,6 @@ import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import type { RecycleBinEntry } from "./recycle-bin";
 import type { QueuedMessage } from "./schemas";
 import type { GroupActivityPriority } from "./group-activity-priority";
-import type { ThreadPullRequestDirectory } from "../pull-requests/queries";
 import type { SidebarBranchDivergenceDirectory } from "./queries";
 
 type SidebarWorkViewProps = {
@@ -26,8 +25,6 @@ type SidebarWorkViewProps = {
   disclosures: Readonly<Record<string, boolean>>;
   onDisclosureChange(id: string, open: boolean): void;
   disclosuresReady: boolean;
-  pullRequestsByThread?: ThreadPullRequestDirectory;
-  pullRequestsLoading: boolean;
   branchDivergences?: SidebarBranchDivergenceDirectory;
 };
 
@@ -62,8 +59,6 @@ export function SidebarWorkView({
   disclosures,
   onDisclosureChange,
   disclosuresReady,
-  pullRequestsByThread,
-  pullRequestsLoading,
   branchDivergences,
 }: SidebarWorkViewProps) {
   const queuedMessageNow = useQueuedMessageClock(queuedMessagesByThread);
@@ -88,8 +83,6 @@ export function SidebarWorkView({
           disclosures={disclosures}
           onDisclosureChange={onDisclosureChange}
           disclosuresReady={disclosuresReady}
-          pullRequestsByThread={pullRequestsByThread}
-          pullRequestsLoading={pullRequestsLoading}
           branchDivergences={branchDivergences}
         />
       </div>

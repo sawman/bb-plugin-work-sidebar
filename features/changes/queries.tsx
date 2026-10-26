@@ -110,7 +110,16 @@ export function useChanges(
     refetchInterval: visible ? polling.visiblePollMs : polling.backgroundPollMs,
   });
   const data = useMemo(() => {
-    if (!summary.data) return undefined;
+    if (!summary.data) {
+      // Native PR failure cannot hide independently available local Stack work.
+      // Do not promote enrichment's remote identity or PR facts to summary authority.
+      return summary.isError && projection.data ? {
+        currentPullRequest: null,
+        stack: null,
+        stackUnavailableReason: summary.error.message,
+        githubStack: projection.data.githubStack,
+      } : undefined;
+    }
     const enriched = projection.data;
     const sameIdentity = remoteChangesIdentity(enriched)?.content === remoteChangesIdentity(summary.data)?.content
       && enriched?.currentPullRequest?.url === summary.data.currentPullRequest?.url;
@@ -122,7 +131,7 @@ export function useChanges(
       })),
     } } : local;
     return { ...summary.data, githubStack: withRemoteFiles ?? remoteFilesProjection(summary.data, remoteFiles.data) };
-  }, [summary.data, projection.data, remoteFiles.data]);
+  }, [summary.data, summary.isError, summary.error, projection.data, remoteFiles.data]);
   return {
     ...summary,
     // Enrichment never publishes PR facts. Its potentially late response may

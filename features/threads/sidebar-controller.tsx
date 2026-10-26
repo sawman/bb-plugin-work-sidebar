@@ -1,3 +1,4 @@
+import { useNativePullRequestRefresh } from "../pull-requests/native-status-queries";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useBbNavigate, experimental_useSidebarThreads, experimental_useProviders, type PluginThreadListProps, useSettings } from "@get-bb/plugin-sdk/app";
@@ -9,8 +10,7 @@ import { TasksLeftSidebar } from "@/features/tasks/left-sidebar";
 import { invalidateTaskQueries } from "@/features/tasks/mutations";
 import { useTaskLinksRead } from "@/features/tasks/queries";
 import { PullRequestsLeftSidebar } from "@/features/pull-requests/left-sidebar";
-import { invalidateThreadPullRequestDirectory } from "@/features/pull-requests/queries";
-import { useSidebarThreadPullRequestDirectory } from "@/features/pull-requests/sidebar-directory";
+import { useSharedThreadPullRequestDirectory, invalidateThreadPullRequestDirectory } from "@/features/pull-requests/queries";
 import type { PullRequestThreadReference } from "@/features/pull-requests/thread-link";
 import {
   DEFAULT_SIDEBAR_ROW_HEIGHT,
@@ -54,8 +54,10 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
   const providerDirectory = experimental_useProviders();
   const pluginSettings = useSettings();
   const actions = useBbNavigate();
+  const refreshNativePullRequests = useNativePullRequestRefresh();
   const queryClient = useQueryClient();
   const threadPreferences = useThreadPreferences();
+  const threadPullRequests = useSharedThreadPullRequestDirectory();
   const [view, setView] = useState<SidebarView>("work");
   const queuedMessagesByThread = useSidebarQueuedMessages(view === "work");
   const recycleBin = useRecycleBin();
@@ -68,13 +70,6 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
     data: branchDivergences,
     refetch: refetchBranchDivergences,
   } = useSidebarThreadBranchDivergence(liveThreads, view === "work");
-  // One project-roster read owns the normalized PR facts for the entire
-  // frontend generation. Consumers only observe this cache; none issue
-  // per-row PR reads.
-  const threadPullRequests = useSidebarThreadPullRequestDirectory(
-    liveThreads.map((thread) => thread.id),
-    status === "ready",
-  );
   // Sole task-links observer, including native mode: Agents and WorkThreadTree share one
   // cache and polling owner rather than creating per-consumer intervals.
   const { data: taskLinksData, refetch: refetchTaskLinks } = useTaskLinksRead({
@@ -183,6 +178,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
       threadPreferences.order.refetch(),
       threadPreferences.groups.refetch(),
       refetchTaskLinks(),
+      refreshNativePullRequests(),
       invalidateThreadPullRequestDirectory(queryClient),
       queryClient.invalidateQueries({
         queryKey: threadQueryKeys.archived(),
@@ -193,6 +189,7 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
       refetchBranchDivergences(),
     ]);
   }, [
+    refreshNativePullRequests,
     queryClient,
     refetchTaskLinks,
     threadPreferences.groups,
@@ -333,8 +330,6 @@ export function ThreadsSidebarController(props: PluginThreadListProps) {
           disclosures={groupPreferences.disclosures ?? {}}
           onDisclosureChange={saveGroupDisclosure}
           disclosuresReady={threadPreferences.groups.isSuccess}
-          pullRequestsByThread={threadPullRequests.data}
-          pullRequestsLoading={threadPullRequests.isPending}
           branchDivergences={branchDivergences}
         />
             <ThreadHierarchyPickerHost />

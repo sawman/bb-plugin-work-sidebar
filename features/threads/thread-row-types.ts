@@ -10,7 +10,6 @@ import type { QueuedMessage, SidebarBranchDivergence } from "./schemas";
 import type { ThreadAgentRollup } from "./thread-agent-rollup";
 import type {
   ThreadPullRequest,
-  ThreadPullRequestDirectory,
 } from "../pull-requests/queries";
 export type { ThreadDropTarget } from "./store";
 
@@ -41,6 +40,8 @@ export type ThreadRowProps = {
   provider?: ThreadProvider;
   pullRequest?: ThreadPullRequest | null;
   pullRequestLoading?: boolean;
+  pullRequestError?: string | null;
+  onRetryPullRequest?(): void;
   branchDivergence?: SidebarBranchDivergence | null;
   onNavigate(): void;
   reorderDisabled: boolean;
@@ -81,8 +82,7 @@ export type WorkThreadTreeProps = Omit<
   subtextRefreshKey: number;
   staleWorkingMinutes: number;
   depth?: number;
+  observePullRequest?: boolean;
   queuedMessagesByThread?: ReadonlyMap<string, QueuedMessage>;
-  pullRequestsByThread?: ThreadPullRequestDirectory;
-  pullRequestsLoading?: boolean;
   branchDivergences?: Readonly<Record<string, SidebarBranchDivergence | null>>;
 };

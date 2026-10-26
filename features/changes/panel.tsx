@@ -1,3 +1,8 @@
+import { PullRequestReadError } from "../pull-requests/status-error";
+import { useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useNativeThreadPullRequest } from "../pull-requests/native-status-queries";
+import { changesKeys } from "./model";
 import { useSettings, useRpc } from "@get-bb/plugin-sdk/app";
 import { useStore } from "zustand";
 import { toast } from "sonner";
@@ -38,8 +43,19 @@ import {
   ChangesWorkingTreePreview,
 } from "./views";
 
-export function ChangesPanel({ threadId }: { threadId: string }) {
+export function ChangesPanel({ threadId, environmentId }: { threadId: string; environmentId?: string | null }) {
   const rpc = useRpc<typeof rpcContract>();
+  const client = useQueryClient();
+  const native = useNativeThreadPullRequest(threadId, environmentId);
+  const previousNative = useRef<{ threadId: string; row: typeof native.row }>({ threadId, row: undefined });
+  useEffect(() => {
+    const previous = previousNative.current;
+    previousNative.current = { threadId, row: native.row };
+    if (native.row && previous.threadId === threadId && previous.row && native.row !== previous.row) {
+      void client.invalidateQueries({ queryKey: changesKeys.summary(threadId) });
+      void client.invalidateQueries({ queryKey: changesKeys.projection(threadId) });
+    }
+  }, [client, threadId, native.row]);
   const { values: pluginSettings } = useSettings();
   const changesQuery = useChanges(rpc, threadId, {
     visiblePollMs:
@@ -107,10 +123,10 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
     changesQuery.data?.stack || (githubStack?.branches.length ?? 0) > 1
       ? githubStack
       : null;
-  const projectedPullRequest = changesQuery.data?.currentPullRequest ?? null;
+  const projectedPullRequest = native.row?.outcome === "absent" ? null : native.pullRequest ?? changesQuery.data?.currentPullRequest ?? null;
   const currentPullRequest = projectedPullRequest
     ? resolvePullRequestFact(projectedPullRequest, pullRequestFacts.data)
-    : changesQuery.data ? null : (() => {
+    : changesQuery.data || native.row?.outcome === "absent" ? null : (() => {
         const fact = pullRequestFactForThread(pullRequestFacts.data, threadId);
         return fact ? pullRequestFromFact(fact) : null;
       })();
@@ -199,6 +215,9 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
           selectedPullRequestNumber === null ? selectedDiffPreview : null
         }
       />
+      {native.error && <PullRequestReadError message={native.error} onRetry={() => {
+        void native.refetch().then(() => Promise.all([changesQuery.refetch(), changesQuery.enrichment.refetch()]));
+      }} />}
       {(changesQuery.isError || changesQuery.repository.isError || changesQuery.enrichment.isError || changesQuery.remoteFiles.isError) && (
         <ChangesError
           error={changesQuery.error ?? changesQuery.repository.error ?? changesQuery.enrichment.error ?? changesQuery.remoteFiles.error ?? new Error("Changes are unavailable.")}
@@ -265,7 +284,7 @@ export function ChangesPanel({ threadId }: { threadId: string }) {
                 : null
             }
           />
-        ) : !changesQuery.isPending && !changesQuery.isError ? (
+        ) : !changesQuery.isPending && !changesQuery.isError && !native.error ? (
           <div className="ws-empty">
             No pull request is linked to this thread.
           </div>

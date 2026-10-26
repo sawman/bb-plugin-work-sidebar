@@ -12,7 +12,6 @@ import { threadTreeGroupActivity } from "./thread-attention";
 import { SidebarThreadTree } from "./sidebar-thread-tree";
 import { ThreadGroupSummary } from "./thread-group-summary";
 import type { GroupActivityPriority } from "./group-activity-priority";
-import type { ThreadPullRequestDirectory } from "../pull-requests/queries";
 import type { SidebarBranchDivergenceDirectory } from "./queries";
 type SidebarGroupTreeProps = {
   organization: SidebarThreadOrganization;
@@ -29,8 +28,6 @@ type SidebarGroupTreeProps = {
   recycleBinEntries: readonly RecycleBinEntry[];
   allThreads: readonly PluginSidebarThread[];
   disclosures: Readonly<Record<string, boolean>>; onDisclosureChange(id: string, open: boolean): void; disclosuresReady: boolean;
-  pullRequestsByThread?: ThreadPullRequestDirectory;
-  pullRequestsLoading: boolean;
   branchDivergences?: SidebarBranchDivergenceDirectory;
 };
 
@@ -51,14 +48,12 @@ export function SidebarThreadGroups({
   recycleBinEntries,
   allThreads,
   disclosures, onDisclosureChange, disclosuresReady,
-  pullRequestsByThread, pullRequestsLoading,
   branchDivergences,
 }: SidebarGroupTreeProps) {
   const draftThreadIds = useSidebarThreadDraftIds();
   const sharedTreeProps = {
     organization, activeThreadId, providersById, onNavigate, subtextRefreshKey,
     staleWorkingMinutes, queuedMessagesByThread, queuedMessageNow,
-    pullRequestsByThread, pullRequestsLoading,
     branchDivergences,
   };
   const dropTargetId =
@@ -133,6 +128,7 @@ export function SidebarThreadGroups({
                   roots={organization.activeRoots}
                   childrenByThread={organization.activeChildren}
                   label="Work threads"
+                  observePullRequest={disclosuresReady && (searching || disclosures.active !== false)}
                 />
               </details>
             );
@@ -172,6 +168,7 @@ export function SidebarThreadGroups({
                   roots={roots}
                   childrenByThread={tree?.children ?? new Map()}
                   label={`${group.name} threads`}
+                  observePullRequest={disclosuresReady && (searching || disclosures[group.id] !== false)}
                 />
               ) : (
                 <div className="ws-thread-group-empty">

@@ -1,3 +1,4 @@
+import { useNativePullRequestRefresh } from "../pull-requests/native-status-queries";
 import { toast } from "sonner";
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -6,7 +7,6 @@ import {
   useRealtime,
   useRpc,
   useBbContext,
-  type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
 import { RefreshButton } from "../../components/ui/refresh-button";
 import { TabSelector } from "../../components/ui/tab-selector";
@@ -60,7 +60,7 @@ function queueRootEvent(scope: WorkPanelScope, rootThreadId: string) {
   scope.queuedRootThreadIds.push(rootThreadId);
 }
 
-export function WorkPanel({ threadId }: PluginThreadPanelProps) {
+export function WorkPanel({ threadId }: { threadId: string; params: import("@get-bb/plugin-sdk/app").JsonValue | null }) {
   const queryClient = useQueryClient();
   const changesRpc = useRpc<typeof rpcContract>();
   const { projectId } = useBbContext();
@@ -72,6 +72,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
   // The status query establishes root-scoped realtime matching.
   // Poll it only while the Work tab is visible; the other tab panels keep the
   // warm cache and still receive targeted realtime invalidation.
+  const refreshNativePullRequests = useNativePullRequestRefresh();
   const status = useWorkStatus(threadId, { poll: tab === "work" });
   const workScopeRef = useRef<WorkPanelScope>({
     threadId,
@@ -161,6 +162,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
                 refreshChanges(changesRpc, queryClient, threadId),
                 invalidateAgentDetails(queryClient),
                 invalidateGitHubApiHealth(queryClient),
+                refreshNativePullRequests(),
                 invalidateThreadPullRequestDirectory(queryClient),
               ]).catch((error) => { toast.error("Could not refresh sidebar."); throw error; })
             }
@@ -187,7 +189,7 @@ export function WorkPanel({ threadId }: PluginThreadPanelProps) {
           hidden={tab !== "changes"}
           tabIndex={0}
         >
-          {tab === "changes" && <ChangesPanel threadId={threadId} />}
+          {tab === "changes" && <ChangesPanel threadId={threadId} environmentId={status.data?.currentThread.environmentId} />}
         </div>
         <div
           className="ws-panel-body"

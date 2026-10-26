@@ -17,42 +17,46 @@ const packageLock = JSON.parse(readFileSync(resolve(repositoryRoot, "package-loc
 const rootLockPackage = packageLock.packages[""]!;
 
 const hostShims = {
-  "@pierre/diffs": "^1.2.9",
-  "@radix-ui/react-alert-dialog": "^1.1.19",
-  "@radix-ui/react-context-menu": "^2.3.3",
-  "@radix-ui/react-dialog": "^1.1.19",
-  "@radix-ui/react-dropdown-menu": "^2.1.20",
-  "@radix-ui/react-hover-card": "^1.1.19",
-  "@radix-ui/react-menubar": "^1.1.20",
-  "@radix-ui/react-navigation-menu": "^1.2.18",
-  "@radix-ui/react-popover": "^1.1.19",
-  "@radix-ui/react-select": "^2.3.3",
-  "@radix-ui/react-tooltip": "^1.2.12",
-  "class-variance-authority": "^0.7.1",
-  clsx: "^2.1.1",
-  sonner: "^1.7.4",
-  "tailwind-merge": "^3.4.0",
-  vaul: "^1.1.2",
+  "@pierre/diffs": "1.2.9",
+  "@radix-ui/react-alert-dialog": "1.1.19",
+  "@radix-ui/react-context-menu": "2.3.3",
+  "@radix-ui/react-dialog": "1.1.19",
+  "@radix-ui/react-dropdown-menu": "2.1.20",
+  "@radix-ui/react-hover-card": "1.1.19",
+  "@radix-ui/react-menubar": "1.1.20",
+  "@radix-ui/react-navigation-menu": "1.2.18",
+  "@radix-ui/react-popover": "1.1.19",
+  "@radix-ui/react-select": "2.3.3",
+  "@radix-ui/react-tooltip": "1.2.12",
+  "class-variance-authority": "0.7.1",
+  clsx: "2.1.1",
+  sonner: "1.7.4",
+  "tailwind-merge": "3.4.0",
+  vaul: "1.1.2",
+  react: "19.2.4",
+  "react-dom": "19.2.4",
 } as const;
 
 describe("R1 package and compile boundary", () => {
   it("pins the SDK and keeps host shims out of the plugin bundle", () => {
-    expect(packageJson.engines?.bb).toBe(">=0.46.0");
-    expect(packageJson.engines?.bbPluginSdk).toBe(">=0.6.37");
-    expect(packageJson.devDependencies?.["@get-bb/plugin-sdk"]).toBe("0.6.49");
+    expect(packageJson.engines?.bb).toBe(">=0.47.1");
+    expect(packageJson.engines?.bbPluginSdk).toBe(">=0.6.79");
+    expect(packageJson.devDependencies?.["@get-bb/plugin-sdk"]).toBe("0.6.79");
     expect(packageJson.dependencies?.["@get-bb/plugin-sdk"]).toBeUndefined();
     expect(rootLockPackage.engines).toEqual(packageJson.engines);
 
     for (const [name, version] of Object.entries(hostShims)) {
-      expect(packageJson.devDependencies?.[name], `${name} must be a host-aligned devDependency`).toBe(version);
+      const specifier = name === "react" || name === "react-dom" ? version : `^${version}`;
+      expect(packageJson.devDependencies?.[name], `${name} must use the host's required devDependency specifier`).toBe(specifier);
       expect(packageJson.dependencies?.[name], `${name} must not be bundled`).toBeUndefined();
-      expect(rootLockPackage.devDependencies?.[name]).toBe(version);
+      expect(rootLockPackage.devDependencies?.[name]).toBe(specifier);
       expect(rootLockPackage.dependencies?.[name]).toBeUndefined();
+      expect(packageLock.packages[`node_modules/${name}`]?.version).toBe(version);
     }
 
-    expect(packageJson.devDependencies?.react).toBeDefined();
+    expect(packageJson.devDependencies?.react).toBe("19.2.4");
     expect(packageJson.dependencies?.react).toBeUndefined();
-    expect(packageJson.devDependencies?.["react-dom"]).toBeDefined();
+    expect(packageJson.devDependencies?.["react-dom"]).toBe("19.2.4");
     expect(packageJson.dependencies?.["react-dom"]).toBeUndefined();
     expect(packageJson.devDependencies?.["@testing-library/react"]).toBeDefined();
     expect(packageJson.devDependencies?.["better-sqlite3"]).toBeDefined();

@@ -41,6 +41,8 @@ export function ThreadRow({
   provider,
   pullRequest = null,
   pullRequestLoading = false,
+  pullRequestError,
+  onRetryPullRequest,
   branchDivergence,
   onNavigate,
   reorderDisabled,
@@ -218,6 +220,8 @@ export function ThreadRow({
                   }
                   pullRequest={pullRequest}
                   pullRequestLoading={pullRequestLoading}
+                  pullRequestError={pullRequestError}
+                  onRetryPullRequest={onRetryPullRequest}
                   branchDivergence={branchDivergence}
                 />
               }

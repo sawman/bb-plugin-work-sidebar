@@ -18,10 +18,6 @@ vi.mock("@get-bb/plugin-sdk/app", async () => {
       isAvailable: true,
       layout: null,
     }),
-    experimental_useSidebarThreadPullRequest: () => ({
-      pullRequest: null,
-      isLoading: false,
-    }),
     useSidebarThreadDraft: () => ({ hasUnsubmittedDraft: false }),
   };
 });

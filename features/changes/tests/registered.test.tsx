@@ -102,6 +102,7 @@ type ChangesFixture = {
   getChangesFingerprint?: () => unknown;
   getWorkContext?: () => typeof context;
   getWorkStatus?: () => unknown;
+  pullRequests?: (input: { keys: string[] }) => unknown;
   getGitHubApiHealth?: () => unknown;
   githubHealth?: "available" | "rate_limited";
   checkoutStackBranch?: (input: {
@@ -132,6 +133,7 @@ function rpc({
     currentThread: context.currentThread,
     children: [],
   }),
+  pullRequests,
   githubHealth = "available",
   getGitHubApiHealth,
   checkoutStackBranch = () => ({
@@ -185,6 +187,7 @@ function rpc({
       items: [],
     }),
     getWorkStatus,
+    ...(pullRequests ? { pullRequests } : {}),
     getLatestActivity: () => ({
       currentThread: { status: "idle", runtimeStatus: "idle" },
       latest: null,
@@ -252,6 +255,61 @@ afterEach(() => {
 });
 
 describe("R13 registered Changes Work slot", () => {
+  it("keeps local Stack branches usable while native PR summary fails, then retries both status and summary", async () => {
+    let retry = false;
+    const projection = changesResult(repository("available"), { githubStack: { stack: {
+      trunk: "main", currentBranch: "local-a", trunkBehind: 0, prunableBranchCount: 0,
+      branches: ["local-a", "local-b"].map((name) => ({ name, isCurrent: name === "local-a", isMerged: false,
+        isQueued: false, needsRebase: false, hasStash: false, stashCount: 0, pr: null, diff: null,
+        aheadOfRemote: 0, behindRemote: 0 })),
+    }, pending: null, error: null } });
+    const slot = await changesSlot({
+      getChanges: () => projection,
+      getChangesPullRequests: () => {
+        if (!retry) throw new Error("Native PR plugin unavailable");
+        return { currentPullRequest: null, stack: null, stackUnavailableReason: "No PR" };
+      },
+      getWorkStatus: () => ({ currentThread: { ...context.currentThread, environmentId: "env_changes_local" }, children: [] }),
+      pullRequests: () => ({ env_changes_local: retry ? { outcome: "absent" } : { outcome: "unavailable", message: "Native PR plugin unavailable" } }),
+    });
+    try {
+      await waitFor(() => expect(slot.getAllByRole("alert").length).toBeGreaterThan(0));
+      expect(slot.getByRole("button", { name: "Check out local-b" })).toBeTruthy();
+      retry = true;
+      fireEvent.click(slot.getByRole("button", { name: "Retry pull request status" }));
+      await waitFor(() => expect(slot.queryAllByRole("alert")).toHaveLength(0));
+      expect(slot.getByRole("button", { name: "Check out local-b" })).toBeTruthy();
+    } finally { slot.lifecycle.unmount(); }
+  });
+
+  it.each(["unavailable", "missing", "malformed", "disabled"])("keeps repository and Work controls usable when native status is %s", async (kind) => {
+    let retry = false;
+    const pullRequests = vi.fn(({ keys }: { keys: string[] }) => {
+      if (!retry && kind === "disabled") throw new Error("Native plugin disabled");
+      return retry ? { [keys[0]]: { outcome: "absent" } }
+        : kind === "missing" ? {}
+        : { [keys[0]]: kind === "malformed" ? { outcome: "absent", extra: true }
+          : { outcome: "unavailable", message: "Host offline" } };
+    });
+    const slot = await changesSlot({
+      getChanges: () => changesResult(repository("available", true)),
+      getWorkStatus: () => ({ currentThread: { ...context.currentThread, environmentId: `env_changes_${kind}` }, children: [] }),
+      pullRequests,
+    });
+    try {
+      await waitFor(() => expect(slot.getByRole("alert").textContent).toMatch(/offline|omitted|invalid|disabled/i));
+      expect(slot.getByRole("button", { name: "Refresh work context" })).toBeTruthy();
+      fireEvent.click(slot.getByRole("button", { name: "Show 3 working-tree files" }));
+      expect(slot.getByRole("button", { name: "Hide 3 working-tree files" }).getAttribute("aria-expanded")).toBe("true");
+      expect(slot.queryByText("No pull request is linked to this thread.")).toBeNull();
+      retry = true;
+      fireEvent.click(slot.getByRole("button", { name: "Retry pull request status" }));
+      await waitFor(() => expect(slot.queryByRole("alert")).toBeNull());
+      expect(pullRequests).toHaveBeenCalledTimes(2);
+      expect(slot.getByText("No pull request is linked to this thread.")).toBeTruthy();
+    } finally { slot.lifecycle.unmount(); }
+  });
+
   it("paints local repository before deferred remote PR and stack enrichment", async () => {
     const slowRemote = deferred<ChangesResult>();
     const slot = await changesSlot({

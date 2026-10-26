@@ -12,6 +12,7 @@ import {
   factFromThreadPullRequest,
   mergePullRequestFacts,
   pullRequestFactKey,
+  pullRequestFromFact,
   reconcileThreadPullRequestFactReferences,
   resolvePullRequestFact,
   type PullRequestFactDirectory,
@@ -28,7 +29,6 @@ export type ThreadPullRequest = z.infer<typeof threadPullRequest>;
 export type ThreadPullRequestDirectory = Record<string, ThreadPullRequest | null>;
 
 const root = ["work-sidebar", "pull-requests"] as const;
-const THREAD_DIRECTORY_BATCH_SIZE = 200;
 
 export const pullRequestKeys = {
   authored: (authoredLogin?: string): QueryKey => [
@@ -69,9 +69,8 @@ export const pullRequestPolicies = {
     refetchOnWindowFocus: false,
   },
   threadDirectory: {
-    // One directory can contain an entire active project roster. Retain it
-    // only long enough to bridge a brief slot remount; the owner compacts it
-    // synchronously whenever that roster changes or disappears.
+    // Scoped enrichment belongs to mounted thread rows. Retain it briefly
+    // across remounts; host keyed rows own native status freshness.
     staleTime: 60_000,
     gcTime: 5 * 60_000,
     retry: false,
@@ -115,32 +114,6 @@ export function hydratePullRequestFacts(
         ? merged
         : reconcileThreadPullRequestFactReferences(merged, threadFactKeys);
     },
-  );
-}
-
-function resolveThreadPullRequestDirectory(
-  threadDirectory: ThreadPullRequestDirectory | undefined,
-  facts: PullRequestFactDirectory | undefined,
-): ThreadPullRequestDirectory | undefined {
-  if (!threadDirectory) return threadDirectory;
-  return Object.fromEntries(
-    Object.entries(threadDirectory).map(([threadId, pullRequest]) => {
-      if (!pullRequest) return [threadId, null];
-      const fact = resolvePullRequestFact(pullRequest, facts);
-      return [
-        threadId,
-        {
-          ...pullRequest,
-          state: fact.state,
-          title: fact.title,
-          url: fact.url,
-          head: fact.head,
-          base: fact.base,
-          attention: fact.attention ?? pullRequest.attention,
-          signal: fact.signal,
-        },
-      ];
-    }),
   );
 }
 
@@ -212,45 +185,6 @@ async function authoredPullRequestStacks(rpc: PullRequestRpc) {
   return stacks.pullRequests;
 }
 
-async function sidebarThreadPullRequests(
-  rpc: PullRequestRpc,
-  threadIds: readonly string[],
-): Promise<ThreadPullRequestDirectory> {
-  const directory: ThreadPullRequestDirectory = {};
-  // The server contract validates one bounded roster chunk. Keep one client
-  // cache entry while covering every project thread instead of truncating
-  // large rosters at the transport boundary.
-  for (
-    let start = 0;
-    start < threadIds.length;
-    start += THREAD_DIRECTORY_BATCH_SIZE
-  ) {
-    const result = await rpc.call("sidebarThreadPullRequests", {
-      threadIds: threadIds.slice(start, start + THREAD_DIRECTORY_BATCH_SIZE),
-    });
-    if (!result.available)
-      throw new Error(
-        result.error ?? "GitHub thread pull requests are unavailable.",
-      );
-    Object.assign(directory, result.pullRequests);
-  }
-  return directory;
-}
-
-function compactThreadPullRequestDirectory(
-  directory: ThreadPullRequestDirectory | undefined,
-  threadIds: readonly string[],
-): ThreadPullRequestDirectory {
-  if (!directory) return {};
-  return Object.fromEntries(
-    threadIds.flatMap((threadId) =>
-      Object.hasOwn(directory, threadId)
-        ? [[threadId, directory[threadId]] as const]
-        : [],
-    ),
-  );
-}
-
 async function pullRequestReviewers(
   rpc: PullRequestRpc,
   repository: string,
@@ -288,92 +222,6 @@ async function refreshLoadedReviewerDirectories(
   );
 }
 
-/**
- * One roster-wide PR fact directory feeds thread rows and the other PR
- * surfaces through the shared QueryClient. Roster changes refetch in place so
- * consumers retain one stable project-scoped cache key.
- */
-export function useThreadPullRequestDirectory(
-  rpc: PullRequestRpc,
-  threadIds: readonly string[],
-  enabled: boolean,
-) {
-  const queryClient = useQueryClient();
-  const facts = useSharedPullRequestFactDirectory();
-  const unorderedThreadIds = [...new Set(threadIds)].sort();
-  const fingerprint = unorderedThreadIds.join("|");
-  // Sidebar callers often create a fresh roster array while rendering. Keep
-  // the effect's roster identity stable unless its actual membership changed.
-  const normalizedThreadIds = useMemo(
-    () => unorderedThreadIds,
-    [fingerprint],
-  );
-  const active = enabled && normalizedThreadIds.length > 0;
-  const previousFingerprint = useRef<string | null>(null);
-  const query = useQuery({
-    queryKey: pullRequestKeys.threadDirectory(),
-    queryFn: () => sidebarThreadPullRequests(rpc, normalizedThreadIds),
-    ...pullRequestPolicies.threadDirectory,
-    enabled: active,
-  });
-  const { refetch } = query;
-  const rawDirectory = query.data;
-  useEffect(() => {
-    if (!rawDirectory) return;
-    hydratePullRequestFacts(
-      queryClient,
-      Object.values(rawDirectory)
-        .filter((pullRequest): pullRequest is ThreadPullRequest => Boolean(pullRequest))
-        .map(factFromThreadPullRequest),
-      Object.fromEntries(
-        Object.entries(rawDirectory).flatMap(([threadId, pullRequest]) =>
-          pullRequest
-            ? [[threadId, pullRequestFactKey(pullRequest)] as const]
-            : [],
-        ),
-      ),
-    );
-  }, [queryClient, rawDirectory]);
-  useEffect(() => {
-    if (!active) {
-      previousFingerprint.current = null;
-      void queryClient.cancelQueries({
-        queryKey: pullRequestKeys.threadDirectory(),
-      });
-      queryClient.setQueryData<ThreadPullRequestDirectory>(
-        pullRequestKeys.threadDirectory(),
-        {},
-      );
-      hydratePullRequestFacts(queryClient, [], {});
-      return;
-    }
-    if (previousFingerprint.current === null) {
-      previousFingerprint.current = fingerprint;
-      return;
-    }
-    if (previousFingerprint.current === fingerprint) return;
-    previousFingerprint.current = fingerprint;
-    void (async () => {
-      // The transport does not expose an AbortSignal. Cancel Query ownership
-      // first so a late prior-roster response cannot publish over this
-      // generation, then retain only facts that still belong to the roster.
-      await queryClient.cancelQueries({
-        queryKey: pullRequestKeys.threadDirectory(),
-      });
-      queryClient.setQueryData<ThreadPullRequestDirectory>(
-        pullRequestKeys.threadDirectory(),
-        (current) =>
-          compactThreadPullRequestDirectory(current, normalizedThreadIds),
-      );
-      void refetch();
-    })();
-  }, [active, fingerprint, normalizedThreadIds, queryClient, refetch]);
-  return {
-    ...query,
-    data: resolveThreadPullRequestDirectory(rawDirectory, facts.data),
-  };
-}
-
 /** Passive observer of the canonical project-scoped fact directory. */
 export function useSharedPullRequestFactDirectory() {
   return useQuery<PullRequestFactDirectory>({
@@ -387,12 +235,14 @@ export function useSharedPullRequestFactDirectory() {
   });
 }
 
-/** Subscribes to the global directory without issuing a second roster read. */
+/** Passive projection of observed thread associations; never requests a roster. */
 export function useSharedThreadPullRequestDirectory() {
-  return useQuery<ThreadPullRequestDirectory>({
-    queryKey: pullRequestKeys.threadDirectory(),
-    enabled: false,
-  });
+  const facts = useSharedPullRequestFactDirectory();
+  const data = useMemo(() => Object.fromEntries(Object.entries(facts.data?.threadFactKeys ?? {}).flatMap(([threadId, key]) => {
+    const fact = facts.data?.facts[key];
+    return fact ? [[threadId, { ...pullRequestFromFact(fact), stackNumber: null }]] : [];
+  })), [facts.data]);
+  return { ...facts, data };
 }
 
 export function invalidateThreadPullRequestDirectory(client: {

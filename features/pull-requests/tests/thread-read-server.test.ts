@@ -1,3 +1,4 @@
+import { withNativeStatusRpc } from "../../../tests/fixtures/native-status-rpc";
 import { describe, expect, it, vi } from "vitest";
 import { createThreadReadService } from "../thread-read-server";
 import { createThreadStackService } from "../server-thread-stack";
@@ -63,17 +64,17 @@ describe("thread PR in-flight ownership", () => {
   });
 
   it("summary, enrichment, directory and file resolver share one host PR lookup; gh-stack starts before host completion", async () => {
-    const remote = deferred<{ outcome: "not_applicable"; message: string }>();
+    const remote = deferred<{ outcome: "absent" }>();
     const pullRequest = vi.fn(() => remote.promise);
     const callRpc = vi.fn(async () => ({ stack: null, pending: null, error: null, fetchedAt: 1 }));
-    const bb = { sdk: { threads: { get: vi.fn(async () => ({ environmentId: "env_a" })) }, environments: { pullRequest }, plugins: { callRpc } } };
+    const bb = { sdk: { threads: { get: vi.fn(async () => ({ environmentId: "env_a" })) }, nativeStatus: { read: pullRequest }, plugins: { callRpc } } };
     const lifecycle = createServerLifecycle();
-    const service = createThreadStackService(bb as never, lifecycle, vi.fn(async () => "[]"));
+    const service = createThreadStackService(withNativeStatusRpc(bb) as never, lifecycle, vi.fn(async () => "[]"));
     const reads = [service.summary("thr_a"), service.projection("thr_a"), service.sidebarThreadPullRequests({ threadIds: ["thr_a"] }), service.fileDiff("thr_a", 1, "a.ts")];
     await Promise.resolve(); await Promise.resolve();
     expect(callRpc).toHaveBeenCalledTimes(1);
     expect(pullRequest).toHaveBeenCalledTimes(1);
-    remote.resolve({ outcome: "not_applicable", message: "No PR" });
+    remote.resolve({ outcome: "absent" });
     await Promise.all(reads);
     await service.summary("thr_a");
     expect(pullRequest).toHaveBeenCalledTimes(2);

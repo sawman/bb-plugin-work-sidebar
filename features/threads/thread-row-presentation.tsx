@@ -1,3 +1,4 @@
+import { PullRequestReadError } from "../pull-requests/status-error";
 import type { ReactNode } from "react";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@/components/ui/icon";
@@ -66,6 +67,8 @@ export function ThreadMetadata({
   stackNumber,
   pullRequest,
   pullRequestLoading,
+  pullRequestError,
+  onRetryPullRequest,
   branchDivergence,
 }: {
   thread: PluginSidebarThread;
@@ -74,6 +77,8 @@ export function ThreadMetadata({
   stackNumber?: ReactNode;
   pullRequest: ThreadPullRequest | null;
   pullRequestLoading: boolean;
+  pullRequestError?: string | null;
+  onRetryPullRequest?(): void;
   branchDivergence?: SidebarBranchDivergence | null;
 }) {
   const pullRequestStatus = pullRequest
@@ -104,6 +109,7 @@ export function ThreadMetadata({
         projectLabel={projectLabel}
         divergence={branchDivergence}
       />
+      {pullRequestError && <PullRequestReadError compact message={pullRequestError} onRetry={onRetryPullRequest} />}
       {pullRequestLoading && (
         <span
           className="ws-pr-meta"

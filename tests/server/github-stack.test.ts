@@ -1,3 +1,4 @@
+import { withNativeStatusRpc } from "../fixtures/native-status-rpc";
 import { describe, expect, it, vi } from "vitest";
 import {
   fetchGitHubStack,
@@ -506,8 +507,8 @@ describe("GitHub Stack enrichment ownership", () => {
         threads: {
           get: vi.fn(async () => ({ environmentId: "env_pulumi" })),
         },
-        environments: {
-          pullRequest: vi.fn(async () => ({
+        nativeStatus: {
+          read: vi.fn(async () => ({
             outcome: "available",
             pullRequest: {
               number: 1279,
@@ -565,7 +566,7 @@ describe("GitHub Stack enrichment ownership", () => {
           ]),
     );
     const service = createThreadStackService(
-      bb as never,
+      withNativeStatusRpc(bb) as never,
       createServerLifecycle(),
       read,
     );
@@ -606,8 +607,8 @@ describe("GitHub Stack enrichment ownership", () => {
     const bb = {
       sdk: {
         threads: { get: vi.fn(async () => ({ environmentId: "env_current" })) },
-        environments: {
-          pullRequest: vi.fn(async () => ({
+        nativeStatus: {
+          read: vi.fn(async () => ({
             outcome: "available",
             pullRequest: {
               number: 1402,
@@ -644,7 +645,7 @@ describe("GitHub Stack enrichment ownership", () => {
       }
       throw new Error(`Unexpected GitHub request: ${args.join(" ")}`);
     });
-    const service = createThreadStackService(bb as never, createServerLifecycle(), read);
+    const service = createThreadStackService(withNativeStatusRpc(bb) as never, createServerLifecycle(), read);
 
     const result = await service.sidebarThreadPullRequests({ threadIds: ["thr_current"] });
 
@@ -664,8 +665,8 @@ describe("GitHub Stack enrichment ownership", () => {
     const bb = {
       sdk: {
         threads: { get: vi.fn(async () => ({ environmentId: "env_recovery" })) },
-        environments: {
-          pullRequest: vi.fn(async () => ({
+        nativeStatus: {
+          read: vi.fn(async () => ({
             outcome: "available",
             pullRequest: {
               number: 1280,
@@ -731,7 +732,7 @@ describe("GitHub Stack enrichment ownership", () => {
         review_comments: 3,
       });
     });
-    const service = createThreadStackService(bb as never, createServerLifecycle(), read);
+    const service = createThreadStackService(withNativeStatusRpc(bb) as never, createServerLifecycle(), read);
 
     const result = await service.projection("thr_recovery");
 

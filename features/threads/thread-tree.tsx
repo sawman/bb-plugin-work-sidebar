@@ -1,6 +1,7 @@
 import { useStore } from "zustand";
 import { threadInteractionStore } from "./store";
 import { ThreadRow } from "./thread-row";
+import { useObservedThreadPullRequest } from "../pull-requests/native-status-queries";
 import type { WorkThreadTreeProps } from "./thread-row-types";
 
 export function WorkThreadTree({
@@ -29,11 +30,11 @@ export function WorkThreadTree({
   staleWorkingMinutes,
   queuedMessagesByThread,
   queuedMessageNow,
-  pullRequestsByThread,
-  pullRequestsLoading,
   branchDivergences,
   depth = 0,
+  observePullRequest = true,
 }: WorkThreadTreeProps) {
+  const pr = useObservedThreadPullRequest(thread.id, observePullRequest ? thread.environment?.id ?? null : undefined);
   const children = childrenByThread.get(thread.id) ?? [];
   const rollup = agentRollups.get(thread.id) ?? {
     childCount: children.length,
@@ -47,6 +48,10 @@ export function WorkThreadTree({
       <ThreadRow
         key={`${thread.id}:${subtextRefreshKey}`}
         thread={thread}
+        pullRequest={pr.pullRequest}
+        pullRequestLoading={pr.isLoading}
+        pullRequestError={pr.error}
+        onRetryPullRequest={pr.retry}
         active={thread.id === activeThreadId}
         children={children.length}
         childAgentCount={rollup.childCount}
@@ -67,8 +72,6 @@ export function WorkThreadTree({
         onDropToRecycleBin={onDropToRecycleBin}
         project={projectsById.get(thread.projectId)}
         provider={providersById.get(thread.providerId)}
-        pullRequest={pullRequestsByThread?.[thread.id] ?? null}
-        pullRequestLoading={pullRequestsLoading}
         branchDivergence={branchDivergences?.[thread.id]}
         onNavigate={onNavigate}
         reorderDisabled={reorderDisabled}
@@ -89,6 +92,7 @@ export function WorkThreadTree({
           >
             <WorkThreadTree
               thread={child}
+              observePullRequest={observePullRequest}
               childrenByThread={childrenByThread}
               agentRollups={agentRollups}
               activeThreadId={activeThreadId}
@@ -113,8 +117,6 @@ export function WorkThreadTree({
               staleWorkingMinutes={staleWorkingMinutes}
               queuedMessagesByThread={queuedMessagesByThread}
               queuedMessageNow={queuedMessageNow}
-              pullRequestsByThread={pullRequestsByThread}
-              pullRequestsLoading={pullRequestsLoading}
               branchDivergences={branchDivergences}
               depth={depth + 1}
             />

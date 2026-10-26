@@ -115,7 +115,9 @@ export default definePluginApp((app) => {
     description: "Global outcome and execution task queue.",
     component: withPluginProviders(WorkThreadList),
   });
-  app.slots.threadPanelAction({
+  app.slots.experimental_tab({
+    context: { kind: "thread" },
+    availability: "action",
     id: "work-context",
     title: "Work",
     icon: "ListTodo",

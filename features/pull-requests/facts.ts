@@ -194,10 +194,9 @@ export function mergePullRequestFacts(
 }
 
 /**
- * A thread directory is a complete active-roster snapshot, unlike an
- * authored/Changes payload. Replace its relationships atomically so a thread
- * that leaves a project cannot retain a stale PR association in the shared
- * directory. Facts remain bounded and reusable until Query garbage collection.
+ * Replace an explicit set of retained thread relationships atomically. Native
+ * observers preserve unrelated references and remove only confirmed absence.
+ * Facts and warm relationships remain bounded until Query garbage collection.
  */
 export function reconcileThreadPullRequestFactReferences(
   directory: PullRequestFactDirectory,

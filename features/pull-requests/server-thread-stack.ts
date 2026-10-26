@@ -1,5 +1,6 @@
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { GITHUB_PR_STATUS_PLUGIN_ID, nativeStatusContract } from "./native-status-schemas.js";
 import { rpcContract, type GitHubStackBranch } from "../../contracts.js";
 import type { ServerLifecycle } from "../../server-lifecycle.js";
 import type { PullRequestChangesAdapter } from "../../shared/server-composition-dependencies.js";
@@ -291,7 +292,14 @@ export function createThreadStackService(
     if (lifecycle.isDisposed) throw new Error("PR service is disposed.");
     if (!thread.environmentId) return { currentPullRequest: null, stack: null, reason: "This thread has no workspace branch." };
     try {
-      const result = await bb.sdk.environments.pullRequest({ environmentId: thread.environmentId });
+      const rows = await bb.sdk.plugins.callRpc({
+        pluginId: GITHUB_PR_STATUS_PLUGIN_ID,
+        method: "pullRequests",
+        input: { keys: [thread.environmentId] },
+        outputSchema: nativeStatusContract.pullRequests.output,
+      });
+      const result = rows[thread.environmentId];
+      if (!result) throw new Error("The PR status provider omitted this environment. Retry the operation.");
       if (result.outcome !== "available") {
         return { currentPullRequest: null, stack: null, failed: result.outcome === "unavailable", reason: result.outcome === "unavailable" ? result.message : "No GitHub pull request is linked to this branch." };
       }
@@ -465,6 +473,7 @@ export function createThreadStackService(
           const entries = await Promise.all(
             uniqueThreadIds.slice(start, start + 8).map(async (threadId) => {
               const stack = await stackForThread(threadId);
+              if ("failed" in stack && stack.failed) throw new Error(stack.reason ?? "Pull request unavailable.");
               return [
                 threadId,
                 stack.currentPullRequest

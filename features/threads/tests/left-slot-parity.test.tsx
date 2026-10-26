@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
-import type { PluginSidebarPullRequest, PluginSidebarThread } from "@get-bb/plugin-sdk/app";
+import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getPluginQueryClient } from "../../../query-runtime";
 import { dispatchHrefClickWithoutJsdomNavigation } from "../../../tests/utils/dispatch-href-click";
@@ -87,7 +87,6 @@ async function leftSlot({
   groups = [{ id: "group_later", name: "Later", threadIds: [] as string[] }],
   activeProjectId = null,
   hostSearchQuery = "",
-  sidebarPullRequests = {},
   sidebarDraftThreadIds = [],
   providers = [],
   settings,
@@ -97,7 +96,6 @@ async function leftSlot({
   groups?: { id: string; name: string; threadIds: string[] }[];
   activeProjectId?: string | null;
   hostSearchQuery?: string;
-  sidebarPullRequests?: Record<string, PluginSidebarPullRequest>;
   sidebarDraftThreadIds?: readonly string[];
   providers?: unknown[];
   settings?: Record<string, string | boolean>;
@@ -162,7 +160,6 @@ async function leftSlot({
       sidebarThreads: { status: "ready", projects: [project], threads },
       providers: { status: "ready", providers: providers as never },
       settings,
-      sidebarPullRequests,
       sidebarDraftThreadIds,
       rpc: defaults as never,
     },
@@ -867,7 +864,19 @@ describe("R18 registered left sidebar parity", () => {
       error: null,
     }));
     const slot = await leftSlot({
-      rpc: { sidebarThreadPullRequests: directory },
+      threads: [
+        { ...thread("thr_one", "One"), environment: { id: "env_stack_parity", name: null, branchName: "feature/stacked", path: null, isWorktree: true, providerId: "git-worktree", workspaceDisplayKind: "managed-worktree" } },
+        thread("thr_two", "Two"),
+      ],
+      rpc: {
+        pullRequests: () => ({ env_stack_parity: { outcome: "available", pullRequest: {
+          number: 17, title: "Stacked pull request", url: "https://github.com/acme/repo/pull/17", state: "open",
+          checks: directory().pullRequests.thr_one.checks, review: directory().pullRequests.thr_one.review,
+          mergeability: directory().pullRequests.thr_one.mergeability, attention: "ready_to_merge", headRefName: "feature/stacked", baseRefName: "main",
+          updatedAt: "2026-10-26T00:00:00Z", autoMerge: false, inMergeQueue: null,
+        } } }),
+        sidebarThreadPullRequests: directory,
+      },
     });
 
     await waitFor(() =>
@@ -875,11 +884,50 @@ describe("R18 registered left sidebar parity", () => {
         "#17",
       ),
     );
-    expect(directory).toHaveBeenCalledWith({ threadIds: ["thr_one", "thr_two"] });
+    expect(directory).toHaveBeenCalledWith({ threadIds: ["thr_one"] });
     expect(
       slot.getByRole("link", { name: /Two/ }).querySelector(".ws-stack-number"),
     ).toBeNull();
     slot.lifecycle.unmount();
+  });
+
+  it("observes only disclosed thread rows and releases watches on leaving Threads", async () => {
+    const environment = (id: string) => ({ id, name: null, branchName: "feature", path: null, isWorktree: true, providerId: "git-worktree", workspaceDisplayKind: "managed-worktree" as const });
+    const read = vi.fn(async ({ keys }: { keys: string[] }) => Object.fromEntries(keys.map((key) => [key, { outcome: "absent" }])));
+    const enrich = vi.fn();
+    const slot = await leftSlot({
+      threads: [
+        { ...thread("thr_parent", "Parent"), environment: environment("env_parent") },
+        { ...thread("thr_child", "Child", "thr_parent"), environment: environment("env_child") },
+      ],
+      rpc: { pullRequests: read, sidebarThreadPullRequests: enrich },
+    });
+    try {
+      await waitFor(() => expect(read).toHaveBeenCalledWith({ keys: ["env_parent"] }));
+      expect(read.mock.calls.flatMap(([input]) => input.keys)).not.toContain("env_child");
+      fireEvent.click(slot.getByRole("button", { name: "1 child agent, collapsed" }));
+      await waitFor(() => expect(read.mock.calls.flatMap(([input]) => input.keys)).toContain("env_child"));
+      expect(enrich).not.toHaveBeenCalled();
+      fireEvent.click(slot.getByRole("button", { name: "Tasks" }));
+      const count = read.mock.calls.length;
+      await slot.behavior.experimental_invalidateRpc(null, "bb--github-pr-status");
+      expect(read).toHaveBeenCalledTimes(count);
+    } finally { slot.lifecycle.unmount(); }
+  });
+
+  it("does not observe a persisted collapsed group during cold preference loading", async () => {
+    const read = vi.fn();
+    const groups = deferred<unknown>();
+    const slot = await leftSlot({
+      threads: [{ ...thread("thr_closed", "Closed"), environment: { id: "env_closed", name: null, branchName: "feature", path: null, isWorktree: true, providerId: "git-worktree", workspaceDisplayKind: "managed-worktree" } }],
+      rpc: { pullRequests: read, getThreadGroups: () => groups.promise },
+    });
+    try {
+      expect(read).not.toHaveBeenCalled();
+      groups.resolve({ groups: [], disclosures: { active: false } });
+      await waitFor(() => expect(slot.container.querySelector<HTMLDetailsElement>(".ws-active-threads")?.open).toBe(false));
+      expect(read).not.toHaveBeenCalled();
+    } finally { slot.lifecycle.unmount(); }
   });
 
   it("keeps settings flow-safe and gives dialog dismissal the correct focus semantics", async () => {

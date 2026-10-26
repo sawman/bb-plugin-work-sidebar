@@ -1,0 +1,398 @@
+[
+  {
+    "pluginId": "bb--github-pr-status",
+    "displayName": "GitHub PR Status",
+    "method": "markDraft",
+    "registrationDescription": "GitHub pull request status and actions for bb environments.",
+    "methodDescription": "Convert the environment's open pull request back to a draft.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "environmentId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "environmentId"
+      ],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "pluginId": "bb--github-pr-status",
+    "displayName": "GitHub PR Status",
+    "method": "markReady",
+    "registrationDescription": "GitHub pull request status and actions for bb environments.",
+    "methodDescription": "Mark the environment's draft pull request ready for review.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "environmentId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "environmentId"
+      ],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "pluginId": "bb--github-pr-status",
+    "displayName": "GitHub PR Status",
+    "method": "merge",
+    "registrationDescription": "GitHub pull request status and actions for bb environments.",
+    "methodDescription": "Merge the environment's pull request with the given method.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "environmentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "merge",
+            "squash",
+            "rebase"
+          ]
+        }
+      },
+      "required": [
+        "environmentId",
+        "method"
+      ],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "pluginId": "bb--github-pr-status",
+    "displayName": "GitHub PR Status",
+    "method": "pullRequests",
+    "registrationDescription": "GitHub pull request status and actions for bb environments.",
+    "methodDescription": "The GitHub pull request for each environment's current branch, keyed by environment id.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "keys": {
+          "minItems": 1,
+          "maxItems": 200,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "keys"
+      ],
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "outcome": {
+                "type": "string",
+                "const": "available"
+              },
+              "pullRequest": {
+                "type": "object",
+                "properties": {
+                  "number": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "draft",
+                      "open",
+                      "merged",
+                      "closed"
+                    ]
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "baseRefName": {
+                    "type": "string"
+                  },
+                  "headRefName": {
+                    "type": "string"
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  "autoMerge": {
+                    "type": "boolean"
+                  },
+                  "inMergeQueue": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "checks": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "passing",
+                          "failing",
+                          "pending",
+                          "no_checks",
+                          "unknown"
+                        ]
+                      },
+                      "totalCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "passedCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "failedCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "pendingCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "totalCount",
+                      "passedCount",
+                      "failedCount",
+                      "pendingCount"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "review": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "approved",
+                          "changes_requested",
+                          "review_required",
+                          "review_requested",
+                          "none"
+                        ]
+                      },
+                      "reviewRequestCount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "reviewRequestCount"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "mergeability": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "mergeable",
+                          "conflicts",
+                          "blocked",
+                          "draft",
+                          "unknown"
+                        ]
+                      },
+                      "mergeStateStatus": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "BEHIND",
+                              "BLOCKED",
+                              "CLEAN",
+                              "DIRTY",
+                              "DRAFT",
+                              "HAS_HOOKS",
+                              "UNKNOWN",
+                              "UNSTABLE"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "mergeable": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "CONFLICTING",
+                              "MERGEABLE",
+                              "UNKNOWN"
+                            ]
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "mergeStateStatus",
+                      "mergeable"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "attention": {
+                    "type": "string",
+                    "enum": [
+                      "checks_failed",
+                      "checks_pending",
+                      "changes_requested",
+                      "review_requested",
+                      "conflicts",
+                      "blocked",
+                      "draft",
+                      "queued",
+                      "ready_to_merge",
+                      "merged",
+                      "closed",
+                      "none"
+                    ]
+                  }
+                },
+                "required": [
+                  "number",
+                  "title",
+                  "state",
+                  "url",
+                  "baseRefName",
+                  "headRefName",
+                  "updatedAt",
+                  "autoMerge",
+                  "inMergeQueue",
+                  "checks",
+                  "review",
+                  "mergeability",
+                  "attention"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "outcome",
+              "pullRequest"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "outcome": {
+                "type": "string",
+                "const": "absent"
+              }
+            },
+            "required": [
+              "outcome"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "outcome": {
+                "type": "string",
+                "const": "unavailable"
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "outcome",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  }
+]

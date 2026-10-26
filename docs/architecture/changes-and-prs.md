@@ -7,8 +7,21 @@ boundaries when changing loading or refresh behavior.
 
 ## Authorities and readiness
 
-- BB owns thread-to-environment discovery. Concurrent host PR reads coalesce
-  only while pending; there is no settled duplicate host projection cache.
+- BB owns thread-to-environment discovery. Native `bb--github-pr-status`
+  keyed rows own branch PR discovery, reactive freshness and host API-budget
+  caches. Only disclosed thread rows and the active Changes environment opt in;
+  there is no eager all-thread PR request. Concurrent server enrichment reads
+  coalesce only while pending; there is no settled duplicate host projection
+  cache. Thread-local Stack overlays retain their existing authority.
+- Native frontend rows pass the browser-safe provider schema before canonical
+  fact hydration. Confirmed `absent` clears that thread's association;
+  unavailable, malformed, missing and disabled-plugin results remain explicit
+  errors with retry and retain known associations. SDK 0.6.79 rejects an entire
+  keyed batch when a key is omitted, so that case reports a shared native read
+  error; malformed present rows are isolated individually. Repository, thread
+  controls and Work/Tasks cards remain independent. A failed PR summary may
+  expose the local Stack projection with the error still visible; it never
+  promotes enrichment to remote PR identity authority.
 - Repository readiness, PR summary and enrichment are independent queries.
   Local changes can paint before remote enrichment. A truly cold PR summary
   still needs host/remote discovery; cached paint requires a known association.

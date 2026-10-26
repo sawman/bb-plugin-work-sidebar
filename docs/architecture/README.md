@@ -32,7 +32,8 @@ gate or appending loops to a migration plan.
 | Data | Authority |
 | --- | --- |
 | Threads, projects, drafts, navigation, native actions, declared BB settings | BB SDK hooks and APIs |
-| RPC results, async mutations, deduplication, polling, invalidation | TanStack Query |
+| Plugin-owned RPC results, async mutations, deduplication, polling, invalidation | TanStack Query |
+| Native PR provider keyed rows and watches | BB SDK keyed hooks; normalized shared facts remain in Query |
 | Shared selection, expansion, drag targets, plugin tabs | Zustand, presentation only |
 | Text drafts, focus, local disclosure state | React |
 | Durable Work bindings, goal references, plugin preferences, Inbox | Server-owned storage and typed adapters |
@@ -107,8 +108,8 @@ the unverified live keyboard/modifier/context-menu and empty/error states.
 
 ## Compatibility and verification
 
-The package declares minimum BB 0.46.0 and SDK 0.6.37; the exact development
-SDK pin is a separate compatibility fact. Use the
+The package declares minimum BB 0.47.1 and SDK 0.6.79; the exact development
+SDK pin is 0.6.79. The [BB 0.47.1 note](../compatibility/bb-0.47.1/SIDEBAR-SDK.md) records the used API migration. Use the
 [compatibility watchlist](../bb-compatibility-watchlist.md),
 [patch catalog](../../bb-plugins/README.md) and versioned deployment evidence
 for upgrades. Preserve their source/artifact manifests and rollback runbooks.

@@ -1,5 +1,5 @@
+import type { ThreadPullRequestContract } from "./features/pull-requests/schemas";
 import type {
-  PluginSidebarPullRequest,
   PluginSidebarThread,
   PluginSidebarThreadIndicator,
 } from "@get-bb/plugin-sdk/app";
@@ -277,7 +277,7 @@ export function projectTaskQueue(tasks: readonly SidebarTask[]): TaskQueueNode[]
 }
 
 type SidebarPullRequestSummary = Pick<
-  PluginSidebarPullRequest,
+  ThreadPullRequestContract,
   "number" | "title" | "url" | "state" | "attention"
 >;
 
@@ -524,7 +524,7 @@ function pullRequestFromStackLayer(layer: StackLayer): SidebarPullRequestSummary
   const state = layer.draft ? "draft" : ["open", "draft", "merged", "closed"].includes(layer.state.toLocaleLowerCase())
     ? layer.state.toLocaleLowerCase()
     : "open";
-  return { number: layer.number, title: layer.title, url: layer.url, state: state as PluginSidebarPullRequest["state"], attention: (layer.attention ?? "none") as PluginSidebarPullRequest["attention"] };
+  return { number: layer.number, title: layer.title, url: layer.url, state: state as ThreadPullRequestContract["state"], attention: (layer.attention ?? "none") as ThreadPullRequestContract["attention"] };
 }
 
 /** Project per-thread PRs into one ordinary row per PR and one row per Stack. */

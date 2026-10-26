@@ -1,3 +1,4 @@
+import { withNativeStatusRpc } from "../../../tests/fixtures/native-status-rpc";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { createPullRequestRegistration } from "../server-registration";
 import { createChangesRegistration } from "../../changes/server-registration";
@@ -108,19 +109,19 @@ describe("R41 bounded remote snapshots", () => {
     const branch = (name: string, current: boolean) => ({ name, isCurrent: current, isMerged: false, isQueued: current, needsRebase: current,
       hasStash: current, stashCount: current ? 2 : 0, pr: null, diff: null, aheadOfRemote: 3, behindRemote: 1 });
     const bb = { sdk: { threads: { get: vi.fn(async ({ threadId }: { threadId: string }) => ({ environmentId: threadId })) },
-      environments: { pullRequest: vi.fn(async ({ environmentId }: { environmentId: string }) => ({ outcome: "available", pullRequest: {
+      nativeStatus: { read: vi.fn(async ({ environmentId }: { environmentId: string }) => ({ outcome: "available", pullRequest: {
         ...currentPr(environmentId === "thr_a" ? 1 : 2), headRefName: `feature/${environmentId === "thr_a" ? 1 : 2}`, baseRefName: "main",
       } })) }, plugins: { callRpc: vi.fn(async ({ input }: { input: { threadId: string } }) => ({
         stack: { trunk: "main", currentBranch: input.threadId, branches: [branch(input.threadId, true), branch(`local-only-${input.threadId}`, false)], trunkBehind: 4, prunableBranchCount: 2 },
         pending: null, error: null, fetchedAt: 1,
       })) } } };
-    const service = createThreadStackService(bb as never, lifecycle, read);
+    const service = createThreadStackService(withNativeStatusRpc(bb) as never, lifecycle, read);
     const first = await service.summary("thr_a");
     const second = await service.summary("thr_b");
     expect(first.stack?.number).toBe(17); expect(second.stack?.number).toBe(17);
     expect(first.stack?.currentPullRequest).toBe(1); expect(second.stack?.currentPullRequest).toBe(2);
     expect(read.mock.calls.filter(([args]) => args[3]?.includes("stacks"))).toHaveLength(1);
-    expect(bb.sdk.environments.pullRequest).toHaveBeenCalledTimes(2);
+    expect(bb.sdk.nativeStatus.read).toHaveBeenCalledTimes(2);
     const [localA, localB] = await Promise.all([service.projection("thr_a"), service.projection("thr_b")]);
     expect(localA.githubStack?.stack?.currentBranch).toBe("thr_a");
     expect(localB.githubStack?.stack?.currentBranch).toBe("thr_b");
@@ -161,10 +162,10 @@ describe("R41 topology upstream deadline", () => {
       : JSON.stringify({ data: { repository: { p0: { reviewDecision: "APPROVED", reviewRequests: { nodes: [] }, reviews: { nodes: [] }, commits: { nodes: [] } } } } }));
     const read = (args: readonly string[], buffer: number, ttlMs = 120_000) => readGitHub(lifecycle, command,
       () => ({ state: "unavailable", scope: "rest", message: null, retryAt: null }), args, buffer, ttlMs);
-    const bb = { sdk: { threads: { get: async () => ({ environmentId: "env" }) }, environments: { pullRequest: async () => ({
+    const bb = { sdk: { threads: { get: async () => ({ environmentId: "env" }) }, nativeStatus: { read: async () => ({
       outcome: "available", pullRequest: { ...currentPr(1), headRefName: "feature/1", baseRefName: "main" },
     }) } } };
-    const service = createThreadStackService(bb as never, lifecycle, read);
+    const service = createThreadStackService(withNativeStatusRpc(bb) as never, lifecycle, read);
     expect((await service.summary("thr_a")).stack?.pullRequests[0].title).toBe("old");
     title = "new"; vi.setSystemTime(219_000);
     expect((await service.summary("thr_b")).stack?.pullRequests[0].title).toBe("old");
@@ -214,9 +215,9 @@ describe("R41 registered common topology", () => {
     });
     const bb = { ...host.bb, sdk: { ...host.bb.sdk,
       threads: { get: vi.fn(async () => ({ environmentId: "env" })) },
-      environments: { pullRequest: vi.fn(async () => ({ outcome: "available", pullRequest: { ...currentPr(1), headRefName: "feature/1", baseRefName: "main" } })) },
+      nativeStatus: { read: vi.fn(async () => ({ outcome: "available", pullRequest: { ...currentPr(1), headRefName: "feature/1", baseRefName: "main" } })) },
     } };
-    const pullRequests = createPullRequestRegistration(bb as never, lifecycle, { read, execute: vi.fn() });
+    const pullRequests = createPullRequestRegistration(withNativeStatusRpc(bb) as never, lifecycle, { read, execute: vi.fn() });
     const changes = createChangesRegistration({ bb, pullRequests } as never);
     const loadLeft = () => pullRequests.sidebarAuthoredPullRequestStacks(null);
     const loadRight = () => changes.getChangesPullRequests({ threadId: "thr_a" });
@@ -277,12 +278,12 @@ describe("R41 immutable pending identity", () => {
 describe("R41 unknown thread read retirement", () => {
   it("repository invalidation leaves an unrelated not-yet-discovered host association alive", async () => {
     const pending = deferred<any>(); const lifecycle = createServerLifecycle();
-    const bb = { sdk: { threads: { get: async () => ({ environmentId: "env_unknown" }) }, environments: { pullRequest: () => pending.promise } } };
-    const service = createThreadStackService(bb as never, lifecycle, vi.fn(async () => "[]"));
+    const bb = { sdk: { threads: { get: async () => ({ environmentId: "env_unknown" }) }, nativeStatus: { read: () => pending.promise } } };
+    const service = createThreadStackService(withNativeStatusRpc(bb) as never, lifecycle, vi.fn(async () => "[]"));
     const unknown = service.summary("thr_unknown");
     await Promise.resolve(); await Promise.resolve();
     service.invalidateRemote("acme/repo");
-    pending.resolve({ outcome: "not_applicable" });
+    pending.resolve({ outcome: "absent" });
     await expect(unknown).resolves.toMatchObject({ currentPullRequest: null, stack: null });
     lifecycle.dispose();
   });
@@ -296,13 +297,13 @@ describe("R41 explicit unconfirmed related scope retirement", () => {
     const counts = new Map<string, number>();
     const bb = { ...host.bb, sdk: { ...host.bb.sdk,
       threads: { get: async ({ threadId }: { threadId: string }) => ({ environmentId: threadId }) },
-      environments: { pullRequest: async ({ environmentId }: { environmentId: string }) => {
+      nativeStatus: { read: async ({ environmentId }: { environmentId: string }) => {
         const count = (counts.get(environmentId) ?? 0) + 1; counts.set(environmentId, count);
         if (count === 1) return gates.get(environmentId)!.promise;
         return { outcome: "available", pullRequest: { ...currentPr(environmentId === "thr_a" ? 2 : 3), headRefName: "feature/2", baseRefName: "main" } };
       } },
     } };
-    const services = createPullRequestRegistration(bb as never, lifecycle, { read: vi.fn(async () => "[]"), execute: vi.fn() });
+    const services = createPullRequestRegistration(withNativeStatusRpc(bb) as never, lifecycle, { read: vi.fn(async () => "[]"), execute: vi.fn() });
     const a = services.summary("thr_a"); const a2 = services.summary("thr_a2"); const b = services.summary("thr_b");
     await vi.waitFor(() => expect(counts.size).toBe(3));
     const retiredA = expect(a).rejects.toThrow("Thread PR changed");
@@ -311,7 +312,7 @@ describe("R41 explicit unconfirmed related scope retirement", () => {
     const freshA = services.summary("thr_a"); const freshA2 = services.summary("thr_a2");
     await expect(freshA).resolves.toMatchObject({ currentPullRequest: { number: 2 } });
     await expect(freshA2).resolves.toMatchObject({ currentPullRequest: { number: 3 } });
-    for (const gate of gates.values()) gate.resolve({ outcome: "not_applicable" });
+    for (const gate of gates.values()) gate.resolve({ outcome: "absent" });
     await retiredA; await retiredA2;
     await expect(b).resolves.toMatchObject({ currentPullRequest: null });
     expect(Object.fromEntries(counts)).toEqual({ thr_a: 2, thr_a2: 2, thr_b: 1 });

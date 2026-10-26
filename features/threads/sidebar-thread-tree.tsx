@@ -6,7 +6,6 @@ import type { SidebarThreadOrganization } from "./sidebar-organization";
 import { WorkThreadTree } from "./thread-tree";
 import { threadAgentRollups } from "./thread-agent-rollup";
 import type { QueuedMessage } from "./schemas";
-import type { ThreadPullRequestDirectory } from "../pull-requests/queries";
 import type { SidebarBranchDivergenceDirectory } from "./queries";
 
 type SidebarThreadTreeProps = {
@@ -21,8 +20,7 @@ type SidebarThreadTreeProps = {
   queuedMessagesByThread: ReadonlyMap<string, QueuedMessage>;
   queuedMessageNow: number;
   label: string;
-  pullRequestsByThread?: ThreadPullRequestDirectory;
-  pullRequestsLoading: boolean;
+  observePullRequest: boolean;
   branchDivergences?: SidebarBranchDivergenceDirectory;
 };
 
@@ -39,8 +37,7 @@ export function SidebarThreadTree({
   queuedMessagesByThread,
   queuedMessageNow,
   label,
-  pullRequestsByThread,
-  pullRequestsLoading,
+  observePullRequest,
   branchDivergences,
 }: SidebarThreadTreeProps) {
   const agentRollups = useMemo(
@@ -54,6 +51,7 @@ export function SidebarThreadTree({
           <WorkThreadTree
             key={thread.id}
             thread={thread}
+            observePullRequest={observePullRequest}
             childrenByThread={childrenByThread}
             agentRollups={agentRollups}
             activeThreadId={activeThreadId}
@@ -78,8 +76,6 @@ export function SidebarThreadTree({
             staleWorkingMinutes={staleWorkingMinutes}
             queuedMessagesByThread={queuedMessagesByThread}
             queuedMessageNow={queuedMessageNow}
-            pullRequestsByThread={pullRequestsByThread}
-            pullRequestsLoading={pullRequestsLoading}
             branchDivergences={branchDivergences}
           />
         ))}
