@@ -1,10 +1,16 @@
 import { SidebarListIconButton } from "../../components/ui/sidebar-list-actions";
 import { Icon } from "../../components/ui/icon";
+import { Status, type StatusPresentation } from "../../components/ui/status";
 
-export function PullRequestReadError({ message, onRetry, compact = false }: {
+const unavailablePresentation: StatusPresentation = {
+  icon: "AlertCircle",
+  label: "Pull request unavailable",
+  tone: "warning",
+};
+
+export function PullRequestReadError({ message, onRetry }: {
   message: string;
   onRetry?(): void;
-  compact?: boolean;
 }) {
   const retry = onRetry ? (
     <SidebarListIconButton title="Retry PR status" aria-label="Retry pull request status"
@@ -12,11 +18,10 @@ export function PullRequestReadError({ message, onRetry, compact = false }: {
       <Icon name="RefreshCw" aria-hidden />
     </SidebarListIconButton>
   ) : null;
-  return compact ? (
-    <span className="ws-pr-meta" role="status" aria-label={`Pull request unavailable: ${message}`}>
-      PR unavailable {retry}
-    </span>
-  ) : (
-    <div className="ws-callout" role="alert">Pull request unavailable: {message} {retry}</div>
-  );
+  return <div className="ws-callout" role="alert">Pull request unavailable: {message} {retry}</div>;
+}
+
+/** Thread rows only mark the failure; the Threads toolbar refresh is the retry. */
+export function PullRequestUnavailableStatus() {
+  return <Status presentation={unavailablePresentation} size="metadata" />;
 }

@@ -41,7 +41,6 @@ export type ThreadRowProps = {
   pullRequest?: ThreadPullRequest | null;
   pullRequestLoading?: boolean;
   pullRequestError?: string | null;
-  onRetryPullRequest?(): void;
   branchDivergence?: SidebarBranchDivergence | null;
   onNavigate(): void;
   reorderDisabled: boolean;

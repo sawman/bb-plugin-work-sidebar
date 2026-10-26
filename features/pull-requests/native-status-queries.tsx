@@ -103,6 +103,5 @@ export function useObservedThreadPullRequest(threadId: string, environmentId: st
     pullRequest: displayed ? { ...displayed, stackNumber: detail?.stackNumber ?? null } : null,
     isLoading: native.isLoading,
     error: native.error ?? enrichment.error?.message ?? null,
-    retry() { void native.refetch(); if (pullRequest && !native.error) void enrichment.refetch(); },
   };
 }

@@ -51,7 +51,6 @@ export function WorkThreadTree({
         pullRequest={pr.pullRequest}
         pullRequestLoading={pr.isLoading}
         pullRequestError={pr.error}
-        onRetryPullRequest={pr.retry}
         active={thread.id === activeThreadId}
         children={children.length}
         childAgentCount={rollup.childCount}

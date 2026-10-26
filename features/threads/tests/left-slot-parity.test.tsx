@@ -891,6 +891,35 @@ describe("R18 registered left sidebar parity", () => {
     slot.lifecycle.unmount();
   });
 
+  it("marks an unavailable native PR with one row glyph and leaves retry to the toolbar", async () => {
+    let available = false;
+    const read = vi.fn(async ({ keys }: { keys: string[] }) => Object.fromEntries(keys.map((key) => [key,
+      available ? { outcome: "absent" } : { outcome: "unavailable", message: "Host offline" }])));
+    const slot = await leftSlot({
+      threads: [{ ...thread("thr_one", "One"), environment: { id: "env_unavailable", name: null, branchName: "feature", path: null, isWorktree: true, providerId: "git-worktree", workspaceDisplayKind: "managed-worktree" } }],
+      rpc: { pullRequests: read },
+    });
+    try {
+      const link = await waitFor(() => slot.getByRole("link", { name: /One/ }));
+      const glyph = await waitFor(() => within(link).getByRole("img", { name: "Pull request unavailable" }));
+      expect(glyph.getAttribute("data-tone")).toBe("warning");
+      expect(glyph.querySelector('[data-icon="AlertCircle"]')).toBeTruthy();
+      expect(link.textContent).not.toMatch(/PR unavailable/);
+      expect(link.querySelector(".ws-thread-meta")?.contains(glyph)).toBe(true);
+      expect(document.getElementById(glyph.getAttribute("aria-describedby")!)?.getAttribute("data-tooltip-label")).toBe("Pull request unavailable");
+      expect(glyph.closest("button, [tabindex]")).toBeNull();
+      expect(glyph.querySelectorAll("button, [tabindex]")).toHaveLength(0);
+      expect(slot.queryByRole("button", { name: "Retry pull request status" })).toBeNull();
+      fireEvent.click(glyph);
+      expect(slot.inspection.navigateCalls).toContainEqual({ method: "toThread", threadId: "thr_one", options: { split: false } });
+      const reads = read.mock.calls.length;
+      available = true;
+      fireEvent.click(slot.getByRole("button", { name: "Refresh threads" }));
+      await waitFor(() => expect(read.mock.calls.length).toBeGreaterThan(reads));
+      await waitFor(() => expect(slot.queryByRole("img", { name: "Pull request unavailable" })).toBeNull());
+    } finally { slot.lifecycle.unmount(); }
+  });
+
   it("observes only disclosed thread rows and releases watches on leaving Threads", async () => {
     const environment = (id: string) => ({ id, name: null, branchName: "feature", path: null, isWorktree: true, providerId: "git-worktree", workspaceDisplayKind: "managed-worktree" as const });
     const read = vi.fn(async ({ keys }: { keys: string[] }) => Object.fromEntries(keys.map((key) => [key, { outcome: "absent" }])));

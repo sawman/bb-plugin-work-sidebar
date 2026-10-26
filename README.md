@@ -34,7 +34,7 @@ fall into three categories:
 | **Taskboard** (`taskboard`, optional) | Linear issue search, linking, primary Linear goals, and Linear status updates | Everything else keeps working. The Work card stays BB-Tasks-only, without an install prompt or Linear controls. Existing Linear links are retained for when Taskboard returns. |
 | **Provider retry** (built in, optional) | Enqueues provider retries alongside ordinary queued messages | The queue indicator still represents messages BB has queued; no provider-retry-specific reason appears. |
 | Provider plugins (Codex, Claude, etc.) | Starting and running threads | No static dependency: Work Sidebar discovers host providers and renders whatever is available. |
-| **GitHub PR Status** (`bb--github-pr-status`, native) | Branch PR status for thread rows and Changes | PR status reports unavailable with retry; repository, thread, Tasks and Work UI remain usable. |
+| **GitHub PR Status** (`bb--github-pr-status`, native) | Branch PR status for thread rows and Changes | Thread rows show an unavailable glyph (retry via Threads refresh); Changes reports unavailable with retry. Repository, thread, Tasks and Work UI remain usable. |
 | GitHub CLI authentication | Pull-request, Stack, review, and GitHub-health enrichment | Thread, Tasks, Work, and Agents surfaces continue to work; PR data reports its own unavailable/limited state. |
 
 To enable Linear, install and configure Taskboard, then select Linear for the
