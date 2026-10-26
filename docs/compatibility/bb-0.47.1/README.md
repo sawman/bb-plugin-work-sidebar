@@ -101,6 +101,36 @@ still owns integrating that behavior gate into the build pipeline.
 
 ## Root reproduction and deployment boundary
 
+**Questions deployment requires zero pending/resolving Questions forms.**
+Shipped [plugin disposal](https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/apps/server/src/services/plugins/plugin-runtime.ts#L1996)
+interrupts the plugin's interactions; the
+[DB update](https://github.com/get-bb/bb/blob/5e1acd765039e874643f34c4d35409e58484e408/packages/db/src/data/pending-interactions.ts#L368)
+includes both `pending` and `resolving`. The patched ACP queue lives in plugin
+memory and disappears on disposal, without automatically re-asking unanswered
+questions. A verified artifact copy/rollback does not preserve these forms.
+
+Before any Questions artifact writes and again immediately before its reload,
+root must enumerate **all unarchived threads across all projects, including
+hidden threads**, then read each thread's interactions through the exact shipped
+read-only CLI/API:
+
+```sh
+bb thread list --include-hidden --json
+bb thread interactions list <thread-id> --json
+```
+
+The second command uses `GET /threads/:id/interactions` and returns an array.
+Retain only metadata needed for the gate: thread ID, interaction ID, status,
+`origin.kind`, `origin.pluginId`, and `origin.rendererId`. Require zero rows
+where `origin.kind == "plugin"`, `origin.pluginId == "ask-user-question"`,
+and status is `pending` or `resolving`; any missing/failed thread read blocks
+the gate. Do not auto-answer, cancel, dismiss, or re-ask forms to manufacture
+zero. If forms remain, defer Questions writes/reload while independently scoped
+Sidebar/Tasks work may continue. The combined deployment command below writes
+both Questions and Tasks and therefore assumes this root-owned gate has passed;
+the artifact verifier itself does not inspect live interactions. No new live
+question or destructive disposal probe is required to establish this hazard.
+
 Rerun exact preflight after source acceptance, without a GitHub window:
 
 ```sh
