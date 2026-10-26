@@ -92,6 +92,15 @@ tabs with correct selection, then restored Work and the original route; these
 were not pointer/keyboard tests. A scratch selector quoting error was corrected
 without product changes or another suite run.
 
+Root also captured and viewed the actual left sidebar in light/dark at 239 CSS
+pixels: existing PR/Stack badges and the selected root highlight rendered.
+Two PR-unavailable rows were confirmed by accessible labels as native missing
+workspace states, not migration failures; workspace paths are omitted here.
+The right panel remained 835 pixels and the original theme was restored.
+Current BBPLUG-444 captures: light Changes `01M5VA3ZZXAT5J2HVJB03J8BEW`,
+dark Work `01M5VA40GMYQ1GCEDV1ZBAP6NT`. These visual observations do not certify
+native keyboard/drag behavior or broader narrow-width interaction coverage.
+
 Native `pullRequests` for `env_kx2zih2swg` returned absent; Sidebar PR projection
 returned no PR/stack, and repository projection returned available/main/zero
 files. Repository availability remained usable independently of PR absence.
