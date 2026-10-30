@@ -20,6 +20,7 @@ import { linkedThreadForStack, uniqueThreadsByBranch } from "../thread-link";
 import type { SidebarStack } from "../../../work-model";
 import { dispatchHrefClickWithoutJsdomNavigation } from "../../../tests/utils/dispatch-href-click";
 import { renderPluginComponent as render } from "../../../tests/utils/render-plugin-component";
+import { currentPr } from "../../changes/tests/latency-fixtures";
 
 const stack = {
   id: "github-stack:acme/repo:17",
@@ -73,6 +74,56 @@ describe("pull-request stack number presentation", () => {
     const stackNumber = screen.getByLabelText("Copy stack number #17");
     expect(stackNumber.textContent).toBe("#17");
     expect(stackNumber.querySelector("svg")).toBeTruthy();
+  });
+
+  it.each([
+    ["merged", "Merged", "merged", "GitMerge"],
+    ["closed", "Closed", "closed", "X"],
+  ] as const)("preserves %s lifecycle in authored Stack rows with historical approval", (state, label, tone, icon) => {
+    render(
+      <AuthoredPullRequestStack
+        stack={{ ...stack, pullRequests: [{ ...stack.pullRequests[0], state }] }}
+        changingDraftUrl={null}
+        onToggleDraft={vi.fn()}
+      />,
+    );
+
+    const badge = screen.getByRole("button", { name: "Copy PR number #42" });
+    expect(tooltipLabel(badge)).toBe(label);
+    expect(badge.getAttribute("data-tone")).toBe(tone);
+    expect(badge.querySelector("svg")?.getAttribute("data-icon")).toBe(icon);
+  });
+
+  it("keeps merged authored lifecycle above a stale same-PR OPEN thread overlay", () => {
+    render(<AuthoredPullRequestRow
+      pullRequest={{ ...stack.pullRequests[0], repository: "acme/repo", state: "merged" }}
+      threadPullRequest={{ ...currentPr(42), stackNumber: 17 }}
+      changingDraft={false} onToggleDraft={vi.fn()}
+    />);
+    const badge = screen.getByRole("button", { name: "Copy PR number #42" });
+    expect(tooltipLabel(badge)).toBe("Merged");
+    expect(badge.getAttribute("data-tone")).toBe("merged");
+  });
+
+  it.each(["merged", "closed"] as const)("disables draft conversion for a retained %s authored layer", (state) => {
+    const toggleDraft = vi.fn();
+    render(<AuthoredPullRequestRow
+      pullRequest={{ ...stack.pullRequests[0], repository: "acme/repo", state }}
+      changingDraft={false} onToggleDraft={toggleDraft}
+    />);
+    fireEvent.contextMenu(screen.getByRole("article"));
+    const action = screen.getByRole("menuitem", { name: "Mark draft" }) as HTMLButtonElement;
+    expect(action.disabled).toBe(true);
+    fireEvent.click(action);
+    expect(toggleDraft).not.toHaveBeenCalled();
+  });
+
+  it.each(["different-number", "different-repository"])("ignores a %s thread lifecycle for an authored PR", (shape) => {
+    const different = { ...currentPr(shape === "different-number" ? 43 : 42), state: "merged" as const, stackNumber: 17,
+      ...(shape === "different-repository" ? { url: "https://github.com/other/repo/pull/42" } : {}) };
+    render(<AuthoredPullRequestRow pullRequest={{ ...stack.pullRequests[0], repository: "acme/repo", state: "open" }}
+      threadPullRequest={different} changingDraft={false} onToggleDraft={vi.fn()} />);
+    expect(tooltipLabel(screen.getByRole("button", { name: "Copy PR number #42" }))).toBe("Ready to merge");
   });
 
   it("places the PR badge before the stack badge in row metadata", () => {

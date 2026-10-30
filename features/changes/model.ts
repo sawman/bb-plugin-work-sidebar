@@ -2,6 +2,8 @@ import type { GitHubStackBranch, GitHubStackSignal } from "../../contracts.js";
 import type { Changes, Repository, RemoteFiles, RemoteFilesInput } from "./schemas.js";
 import {
   pullRequestFactKey,
+  factFromSidebarStackLayer,
+  mergePullRequestFact,
   type PullRequestFactDirectory,
 } from "../pull-requests/facts";
 
@@ -26,9 +28,17 @@ export function mergeStackBranchSignals(
   currentPullRequest = changes.currentPullRequest,
   facts?: PullRequestFactDirectory,
 ): StackBranchSignals | undefined {
-  const sharedFact = branch.pr
+  const stackPullRequest = changes.stack?.pullRequests.find(
+    (pullRequest) => branch.pr
+      ? pullRequestFactKey(pullRequest) === pullRequestFactKey(branch.pr)
+      : pullRequest.head === branch.name,
+  );
+  const cachedFact = branch.pr
     ? facts?.facts[pullRequestFactKey(branch.pr)]
     : undefined;
+  const sharedFact = cachedFact && stackPullRequest?.state === "merged"
+    ? mergePullRequestFact(cachedFact, factFromSidebarStackLayer(stackPullRequest))
+    : cachedFact;
   if (sharedFact)
     return {
       state: sharedFact.state,
@@ -38,11 +48,6 @@ export function mergeStackBranchSignals(
       attention: sharedFact.attention,
       ...sharedFact.signal,
     };
-  const stackPullRequest = changes.stack?.pullRequests.find(
-    (pullRequest) =>
-      pullRequest.number === branch.pr?.number ||
-      pullRequest.head === branch.name,
-  );
   const current =
     branch.pr?.number === currentPullRequest?.number
       ? currentPullRequest

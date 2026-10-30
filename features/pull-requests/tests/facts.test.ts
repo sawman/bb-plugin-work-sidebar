@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   factFromAuthoredPullRequest,
   factFromThreadPullRequest,
+  factFromSidebarStackLayer,
   MAX_PULL_REQUEST_FACTS,
   mergePullRequestFacts,
   pullRequestFactKey,
@@ -59,6 +60,29 @@ const thread = {
 };
 
 describe("pull-request fact directory", () => {
+  it("promotes merged lifecycle from a light Stack without replacing detailed metadata or its observation time", () => {
+    const detailed = factFromThreadPullRequest(thread);
+    const first = mergePullRequestFacts(undefined, [detailed], {}, 100);
+    const layer = { ...authored, title: "Older topology title", head: "old/head", base: "old/base", state: "merged", draft: false };
+    const light = factFromSidebarStackLayer(layer);
+    const promoted = mergePullRequestFacts(first, [light], {}, 200);
+    expect(promoted.facts[detailed.key]).toEqual({ ...detailed, state: "merged", draft: false, attention: "merged" });
+    expect(promoted.observedAtByFact?.[detailed.key]).toBe(100);
+    expect(resolvePullRequestFact({ ...authored, state: "merged" as const }, first).state).toBe("merged");
+    const staleOpen = mergePullRequestFacts(promoted, [detailed], {}, 300);
+    expect(staleOpen.facts[detailed.key].state).toBe("merged");
+    expect(staleOpen.facts[detailed.key].draft).toBe(false);
+  });
+
+  it("allows authoritative closed PRs to reopen and open PRs to toggle draft", () => {
+    const closed = factFromThreadPullRequest({ ...thread, state: "closed" });
+    const first = mergePullRequestFacts(undefined, [closed]);
+    const reopened = mergePullRequestFacts(first, [factFromThreadPullRequest(thread)]);
+    expect(reopened.facts[closed.key].state).toBe("open");
+    const drafted = mergePullRequestFacts(reopened, [factFromThreadPullRequest({ ...thread, state: "draft" })]);
+    expect(drafted.facts[closed.key]).toMatchObject({ state: "draft", draft: true });
+    expect(mergePullRequestFacts(drafted, [factFromThreadPullRequest(thread)]).facts[closed.key]).toMatchObject({ state: "open", draft: false });
+  });
   it("normalizes one fact identity across authored and thread envelopes", () => {
     expect(pullRequestFactKey(authored)).toBe("example-org/example-repo#1402");
     const facts = mergePullRequestFacts(undefined, [

@@ -141,8 +141,12 @@ export function mergePullRequestFact(
   // The same authority rule covers metadata and signals. A lightweight
   // projection can contain retained author-search title/head/base values;
   // arrival after a detailed refresh does not make those values newer.
-  // Only a subsequent detailed record may replace this authoritative fact.
-  if (previousIsDetailed && !incomingIsDetailed) return previous;
+  // Merged is irreversible for this repository/PR identity. A lightweight
+  // Stack can establish that lifecycle without replacing detailed metadata
+  // or refreshing its observation time. Closed/draft remain reversible.
+  const merged = previous.state === "merged" || incoming.state === "merged";
+  const lifecycle = merged ? { state: "merged" as const, draft: false, attention: "merged" as const } : {};
+  if (previousIsDetailed && !incomingIsDetailed) return merged ? { ...previous, ...lifecycle } : previous;
   return {
     ...previous,
     ...incoming,
@@ -156,6 +160,7 @@ export function mergePullRequestFact(
     checks: incoming.checks ?? previous.checks,
     review: incoming.review ?? previous.review,
     mergeability: incoming.mergeability ?? previous.mergeability,
+    ...lifecycle,
   };
 }
 
@@ -252,7 +257,9 @@ export function resolvePullRequestFact<T extends {
   url: string;
   number: number;
   state: PullRequestFact["state"];
-}>(fallback: T, facts: PullRequestFactDirectory | undefined): T & {
+}>(fallback: T, facts: PullRequestFactDirectory | undefined): Omit<T, "state" | "draft"> & {
+  state: PullRequestFact["state"];
+  draft: boolean;
   signal: PullRequestFact["signal"];
   attention: string | null;
 } {
@@ -263,6 +270,7 @@ export function resolvePullRequestFact<T extends {
       : normalizePullRequestSignal(fallback as never);
     return {
       ...fallback,
+      draft: fallback.state === "draft",
       signal,
       attention: ("attention" in fallback
         ? (fallback.attention as string | null | undefined)
@@ -271,7 +279,10 @@ export function resolvePullRequestFact<T extends {
   }
   return {
     ...fallback,
-    state: fact.state as T["state"],
+    // A known merged fallback must survive even before its summary hydrates
+    // the shared directory; a stale detailed OPEN fact cannot reopen a PR.
+    state: fallback.state === "merged" ? "merged" : fact.state,
+    draft: fallback.state === "merged" ? false : fact.draft,
     title: fact.title,
     url: fact.url,
     head: fact.head,

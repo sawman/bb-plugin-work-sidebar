@@ -15,6 +15,7 @@ import {
   pullRequestSignalPresentation,
   pullRequestReviewDetail,
   type PullRequestSignal,
+  type PullRequestState,
 } from "./presentation";
 import { orderStackLayers, type SidebarStack } from "../../work-model";
 import { PullRequestIdentifierBadge } from "./identifier-badge";
@@ -27,6 +28,7 @@ import {
 } from "./thread-link";
 import { PullRequestReviewerPicker } from "./reviewer-picker";
 import { PullRequestUrlLink } from "./pull-request-url-link";
+import { factFromSidebarStackLayer, factFromThreadPullRequest, mergePullRequestFact, pullRequestFactKey } from "./facts";
 import type {
   PullRequestRpc,
   ThreadPullRequest,
@@ -54,7 +56,8 @@ export type AuthoredPullRequest = {
   };
   stack: SidebarStack | null;
 };
-type AuthoredRow = Omit<AuthoredPullRequest, "stack"> & {
+type AuthoredRow = Omit<AuthoredPullRequest, "stack" | "state"> & {
+  state: PullRequestState;
   attention?: string | null;
 };
 
@@ -85,20 +88,24 @@ export function AuthoredPullRequestRow({
 }) {
   const reviewerTriggerRef = useRef<HTMLButtonElement>(null);
   const [reviewerPickerOpen, setReviewerPickerOpen] = useState(false);
-  const signalSource = threadPullRequest?.signal ?? pullRequest;
+  const matchingThread = threadPullRequest && pullRequestFactKey(threadPullRequest) === pullRequestFactKey(pullRequest)
+    ? threadPullRequest : null;
+  const layerFact = factFromSidebarStackLayer(pullRequest);
+  const resolvedFact = matchingThread
+    ? mergePullRequestFact(layerFact, factFromThreadPullRequest(matchingThread))
+    : layerFact;
+  const signalSource = resolvedFact.signal;
   const signal = pullRequestSignalPresentation(signalSource);
   const reviewDetail = pullRequestReviewDetail(signalSource);
   const state = pullRequestSummaryPresentation({
-    state: threadPullRequest?.state ?? pullRequest.state,
-    draft:
-      threadPullRequest?.state === "draft" ||
-      (!threadPullRequest && pullRequest.draft),
-    attention: threadPullRequest?.attention ?? pullRequest.attention,
+    state: resolvedFact.state,
+    draft: resolvedFact.draft,
+    attention: resolvedFact.attention,
     signal: signalSource,
   });
-  const stateAction = pullRequest.draft ? "Mark open" : "Mark draft";
+  const stateAction = resolvedFact.draft ? "Mark open" : "Mark draft";
   const reviewers =
-    threadPullRequest?.signal.requestedReviewers?.filter(Boolean) ??
+    matchingThread?.signal.requestedReviewers?.filter(Boolean) ??
     pullRequest.requestedReviewers?.filter(Boolean) ??
     [];
   return (
@@ -188,8 +195,8 @@ export function AuthoredPullRequestRow({
           </ContextMenuItem>
         ) : null}
         <ContextMenuItem
-          disabled={changingDraft}
-          onSelect={() => onToggleDraft(pullRequest)}
+          disabled={changingDraft || resolvedFact.state === "merged" || resolvedFact.state === "closed"}
+          onSelect={() => onToggleDraft({ ...pullRequest, state: resolvedFact.state, draft: resolvedFact.draft })}
         >
           {changingDraft ? "Updating…" : stateAction}
         </ContextMenuItem>
@@ -279,7 +286,8 @@ export function AuthoredPullRequestStack({
       pullRequest={{
         ...layer,
         repository,
-        state: layer.draft ? "draft" : "open",
+        state: layer.state === "merged" || layer.state === "closed"
+          ? layer.state : layer.draft ? "draft" : "open",
         checks: layer.checks ?? "unknown",
         review: layer.review ?? "none",
         requestedReviewers: layer.requestedReviewers,

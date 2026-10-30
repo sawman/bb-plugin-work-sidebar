@@ -29,6 +29,16 @@ boundaries when changing loading or refresh behavior.
   checks/review and per-record observation time. Detailed facts take precedence
   over lightweight authored/stack envelopes for metadata and signals; light
   reads can seed absent facts but must not refresh detailed observation time.
+  Merged lifecycle is irreversible for the same repository/PR identity: a
+  merged Stack member promotes an older open fact without replacing detailed
+  metadata, signals or their observation time. Later stale open reads cannot
+  reopen it. Closed and draft remain reversible through detailed updates.
+  Rendering preserves that merged lifecycle even before fact hydration. The
+  authored open roster removes known merged/closed roots while retained Stack
+  members keep their lifecycle and resolve the same shared facts.
+  Thread/Stack overlays must match the repository/PR fact key before affecting
+  another PR's status. Retained merged/closed authored rows disable draft
+  conversion, using the same resolved lifecycle as their status badge.
   Confirmed no-PR clears stale associations. Keys use repository/PR identity
   with URL fallback; the directory caps facts at 500 and roster references at
   1,000. Do not copy this data into Zustand or another projection cache.
@@ -95,7 +105,8 @@ recorded findings remain unresolved by this documentation change:
   hydration.
 - Changes branch rows bypass common conflict/queue/rebase precedence.
 - Detailed authority lacks an age cutoff when its producer stops observing a
-  PR and can suppress fresher lightweight facts.
+  PR and can suppress fresher lightweight facts, except for the merged
+  lifecycle promotion above.
 - REST check reads omit later pages and legacy commit statuses.
 
 Existing passing tests do not prove all-three-surface icon/tone/tooltip

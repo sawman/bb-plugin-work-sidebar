@@ -3,6 +3,8 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type PropsWithChildren } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { factFromPullRequest, type PullRequestFactDirectory } from "../facts";
+import { hydratePullRequestFacts } from "../queries";
 import {
   pullRequestKeys,
   pullRequestPolicies,
@@ -50,6 +52,30 @@ function deferred<T>() {
 
 describe("R5 pull-request queries", () => {
   afterEach(() => vi.useRealTimers());
+
+  it.each(["merged", "closed"] as const)("removes a canonically %s authored root while preserving its lifecycle inside an open Stack", async (state) => {
+    const terminal = authored[0]!;
+    const open = { ...terminal, number: 13, url: "https://github.com/acme/sidebar/pull/13", head: "r6", base: "r5" };
+    const stack = { id: "stack", number: 7, base: "main", currentPullRequest: 13,
+      pullRequests: [terminal, open] };
+    const cached = [{ ...terminal, stack }, { ...open, stack }];
+    const rpc = { call: vi.fn(async () => ({ available: true, pullRequests: cached, error: null })) } as unknown as PullRequestRpc;
+    const client = new QueryClient();
+    const view = renderHook(() => useAuthoredPullRequests(rpc), { wrapper: wrapper(client) });
+    try {
+      await waitFor(() => expect(view.result.current.data).toHaveLength(2));
+      const fact = factFromPullRequest({ ...terminal, state, attention: state,
+        checks: { state: "passing", totalCount: 1, passedCount: 1, failedCount: 0, pendingCount: 0 },
+        review: { state: "approved", reviewRequestCount: 0 },
+        mergeability: { state: "mergeable", mergeable: "MERGEABLE", mergeStateStatus: "CLEAN" },
+        signal: { checks: "passing", review: "approved", reviewCommentCount: 0 } });
+      act(() => hydratePullRequestFacts(client, [fact]));
+      await waitFor(() => expect(view.result.current.data?.map((pr) => pr.number)).toEqual([13]));
+      expect(view.result.current.data?.[0]?.stack?.pullRequests[0]).toMatchObject({ number: 12, state, draft: false });
+      expect(client.getQueryData<PullRequestFactDirectory>(pullRequestKeys.factDirectory())?.facts[fact.key]).toEqual(fact);
+      expect(rpc.call).toHaveBeenCalledTimes(2);
+    } finally { view.unmount(); client.clear(); }
+  });
 
   it("scopes authored query state to the configured GitHub login", async () => {
     const call = vi.fn(async (method: string) => {

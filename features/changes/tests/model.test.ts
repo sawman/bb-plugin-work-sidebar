@@ -8,8 +8,42 @@ import {
   factFromThreadPullRequest,
   mergePullRequestFacts,
 } from "../../pull-requests/facts";
+import { currentPr } from "./latency-fixtures";
 
 describe("R13 Changes model", () => {
+  it.each(["same-head-different-number", "same-number-different-repository"])("does not promote a different merged PR identity: %s", (shape) => {
+    const sibling = currentPr(2518);
+    const current = currentPr(2531);
+    const layer = { ...sibling, number: shape === "same-head-different-number" ? 2500 : sibling.number,
+      url: shape === "same-head-different-number" ? "https://github.com/acme/repo/pull/2500" : "https://github.com/other/repo/pull/2518",
+      state: "merged", draft: false, checks: "passing" as const, review: "approved" as const, reviewCommentCount: 0 };
+    const branch = { name: sibling.head, isCurrent: false, isMerged: false, isQueued: false, needsRebase: false,
+      hasStash: false, stashCount: null, diff: null, aheadOfRemote: 0, behindRemote: 0,
+      pr: { number: sibling.number, url: sibling.url, state: sibling.state, title: sibling.title, isDraft: false, metadataStale: false } };
+    const facts = mergePullRequestFacts(undefined, [factFromThreadPullRequest({ ...sibling, stackNumber: 7 })]);
+    const resolved = mergeStackBranchSignals(branch, { currentPullRequest: current,
+      stack: { number: 7, base: "main", currentPullRequest: 2531, pullRequests: [layer] }, stackUnavailableReason: null, githubStack: null }, current, facts);
+    expect(resolved?.state).toBe("open");
+  });
+
+  it("resolves a merged sibling summary before an older detailed OPEN fact without changing local flags", () => {
+    const sibling = currentPr(2518, "Detailed title");
+    const current = currentPr(2531);
+    const facts = mergePullRequestFacts(undefined, [factFromThreadPullRequest({ ...sibling, stackNumber: 7 })]);
+    const branch = {
+      name: sibling.head, isCurrent: false, isMerged: false, isQueued: true, needsRebase: false,
+      hasStash: true, stashCount: 2, diff: null, aheadOfRemote: 3, behindRemote: 0,
+      pr: { number: sibling.number, url: sibling.url, title: sibling.title, state: "open", isDraft: false, metadataStale: false },
+    };
+    const layer = { ...sibling, title: "Old topology title", state: "merged", draft: false,
+      checks: "passing" as const, review: "approved" as const, reviewCommentCount: 0 };
+    const resolved = mergeStackBranchSignals(branch, { currentPullRequest: current,
+      stack: { number: 7, base: "main", currentPullRequest: 2531, pullRequests: [layer] }, stackUnavailableReason: null, githubStack: null }, current, facts);
+    expect(resolved).toMatchObject({ state: "merged", draft: false, title: "Detailed title", checks: "passing", review: "approved" });
+    expect(branch).toMatchObject({ isCurrent: false, isMerged: false, isQueued: true, hasStash: true, stashCount: 2, aheadOfRemote: 3 });
+    expect(current.number).toBe(2531);
+  });
+
   it("distinguishes clean, dirty, absent, and unavailable repositories and retains renamed, untracked, and deleted files", () => {
     const base = {
       outcome: "available" as const,
@@ -94,6 +128,9 @@ describe("R13 Changes model", () => {
     const changes = {
       currentPullRequest: {
         number: 7,
+        url: "https://github.com/acme/repo/pull/7",
+        title: "One",
+        attention: "checks_failed",
         state: "open",
         signal: {
           checks: "failed",
@@ -105,6 +142,7 @@ describe("R13 Changes model", () => {
         pullRequests: [
           {
             number: 7,
+            url: "https://github.com/acme/repo/pull/7",
             head: "feature/one",
             state: "open",
             draft: false,
@@ -120,6 +158,9 @@ describe("R13 Changes model", () => {
     };
     expect(mergeStackBranchSignals(branch, changes as never)).toEqual({
       number: 7,
+      url: "https://github.com/acme/repo/pull/7",
+      title: "One",
+      attention: "checks_failed",
       head: "feature/one",
       state: "open",
       draft: false,

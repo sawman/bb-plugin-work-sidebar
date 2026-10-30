@@ -60,7 +60,11 @@ export function useChanges(
         // A newer directory/manual read can settle while this RPC is pending.
         // Only publish facts whose canonical record has not changed meanwhile.
         hydratePullRequestFacts(client, facts.filter((fact) =>
-          current?.facts[fact.key] === before?.facts[fact.key]
+          // Immutable merged lifecycle from a Stack may promote an OPEN fact
+          // even during warm paint/racing reads. The fact merger preserves
+          // detailed metadata and its observation time for this light input.
+          (fact.state === "merged" && !fact.checks && !fact.review && !fact.mergeability)
+          || current?.facts[fact.key] === before?.facts[fact.key]
             && !(coldMount && before?.facts[fact.key]
               && Date.now() - (before.observedAtByFact?.[fact.key] ?? 0) < changesPolicies.projection.staleTime),
         ));

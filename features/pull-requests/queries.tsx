@@ -6,10 +6,12 @@ import type { PluginRpcClient } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../../contracts";
 import { queryPolicies } from "../../query-runtime";
-import type { PullRequestReviewerContract, threadPullRequest } from "./schemas";
+import type { AuthoredPullRequestContract, PullRequestReviewerContract, threadPullRequest } from "./schemas";
 import {
   factFromAuthoredPullRequest,
   factFromThreadPullRequest,
+  factFromSidebarStackLayer,
+  mergePullRequestFact,
   mergePullRequestFacts,
   pullRequestFactKey,
   pullRequestFromFact,
@@ -132,20 +134,33 @@ function resolveAuthoredPullRequests<T extends {
   requestedReviewers?: string[];
   reviewCommentCount: number;
   reviewCommentCounts?: ReturnType<typeof factFromAuthoredPullRequest>["signal"]["reviewCommentCounts"];
+  stack?: AuthoredPullRequestContract["stack"];
 }>(
   pullRequests: readonly T[] | undefined,
   directory: PullRequestFactDirectory | undefined,
 ): T[] | undefined {
   if (!pullRequests) return pullRequests as T[] | undefined;
-  return pullRequests.map((pullRequest) => {
+  return pullRequests.flatMap((pullRequest): T[] => {
     const fact = resolvePullRequestFact(pullRequest, directory);
+    // The authored roster contains open PRs; retained Stack membership can
+    // still include the merged PR and must preserve its canonical lifecycle.
+    if (fact.state === "merged" || fact.state === "closed") return [];
+    const stack = pullRequest.stack ? { ...pullRequest.stack,
+      pullRequests: pullRequest.stack.pullRequests.map((layer) => {
+        const resolvedLayer = mergePullRequestFact(directory?.facts[pullRequestFactKey(layer)], factFromSidebarStackLayer(layer));
+        return { ...layer, state: resolvedLayer.state, draft: resolvedLayer.draft,
+          title: resolvedLayer.title, head: resolvedLayer.head, base: resolvedLayer.base,
+          attention: resolvedLayer.attention, ...resolvedLayer.signal };
+      }),
+    } : pullRequest.stack;
     const resolved = directory?.facts[pullRequestFactKey(pullRequest)] ?? null;
     // An authored row seeds the directory with its own partial fact. Preserve
     // that exact wire shape until a richer thread/Changes fact is available.
     if (!resolved || (!resolved.checks && !resolved.review && !resolved.mergeability))
-      return pullRequest;
-    return {
+      return [{ ...pullRequest, ...(stack === undefined ? {} : { stack }) }];
+    return [{
       ...pullRequest,
+      ...(stack === undefined ? {} : { stack }),
       state: fact.state === "draft" ? "draft" : "open",
       draft: fact.draft,
       title: fact.title,
@@ -160,7 +175,7 @@ function resolveAuthoredPullRequests<T extends {
       reviewCommentCount: fact.signal.reviewCommentCount,
       reviewCommentCounts: fact.signal.reviewCommentCounts,
       attention: fact.attention,
-    } as T;
+    } as T];
   });
 }
 
@@ -280,7 +295,10 @@ export function useAuthoredPullRequests(
   const enriched = stacks.data ?? base.data;
   useEffect(() => {
     if (!enriched) return;
-    hydratePullRequestFacts(client, enriched.map(factFromAuthoredPullRequest));
+    hydratePullRequestFacts(client, enriched.flatMap((pullRequest) => [
+      factFromAuthoredPullRequest(pullRequest),
+      ...(pullRequest.stack?.pullRequests.map(factFromSidebarStackLayer) ?? []),
+    ]));
   }, [client, enriched]);
   const refresh = async () => {
     await Promise.all([
