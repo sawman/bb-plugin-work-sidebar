@@ -72,6 +72,7 @@ export async function readSignalObservations(input: {
   owner: string; repo: string; numbers: readonly number[]; lifecycle: ServerLifecycle;
   demands: Readonly<Record<number, SignalDemands>>;
   receivedSequence?: number;
+  canValidate?: (group: SignalGroup) => boolean;
   load(numbers: number[], afterSequence?: number): Promise<Map<number, GitHubSignal>>;
 }) {
   const { lifecycle, demands } = input;
@@ -133,7 +134,11 @@ export async function readSignalObservations(input: {
         pending.admitted = [...(pending.receipts ?? [])];
         return pending.admitted;
       });
-      const bound = receipts.length ? Math.max(...receipts.map((receipt) => receipt.sequence)) : undefined;
+      // A source that cannot observe a group cannot satisfy its demand. Keep
+      // the receipt unsatisfied, but do not repeatedly force unrelated inputs
+      // fresh just to attempt that unsupported group during source backoff.
+      const forced = receipts.filter((receipt) => input.canValidate?.(receipt.group) ?? true);
+      const bound = forced.length ? Math.max(...forced.map((receipt) => receipt.sequence)) : undefined;
       const loaded = await input.load(owned, bound);
       assertCurrent();
       for (const number of owned) {

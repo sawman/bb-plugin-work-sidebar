@@ -129,6 +129,27 @@ does not replace that server authority. GitHub-classified failures do not
 trigger extra client retries. Configurable active/background/authored polling
 and explicit refresh retain their distinct scopes.
 
+The authored PR tab enables its roster and Stack observers only while the tab
+is active and its document is visible. First open may be cold; hidden/inactive
+tabs retain warm Query data without starting cold or interval reads. Returning
+to the visible tab refetches stale queries under the existing 60-second client
+stale window and server caches. Already admitted work may finish after hiding;
+explicit refresh remains available and retires the existing generations.
+
+Changes mounts only for the selected right-panel tab. Its active interval
+applies to a visible document; background means a hidden document/window, not
+another thread or inactive tab. Hidden-window polling offers **Off** (stored
+`"0"`, projected as 0ms), alongside the existing 120/300/600/900-second
+intervals. The default remains 300 seconds and existing nonzero preferences
+keep their cadence. Off suppresses all Changes interval reads (local repository,
+summary, local enrichment, remote files and fingerprint) while hidden. It does
+not cancel already admitted work or block explicit refresh, mutations, realtime
+invalidation, new native causal demands or direct native RPC. Visible interval
+polling resumes at the configured active cadence, without an immediate focus
+refetch; warm paint remains available and manual refresh can update it sooner.
+Native keyed watches and their visibility lifecycle remain BB-owned.
+The global REST poll budget caps fingerprint reads only, not all GitHub work.
+
 
 Conditional validation has an explicit API cost. A relevant changed PR/group
 may add one coalesced batched GraphQL signal command when existing raw data
@@ -138,7 +159,8 @@ Identical replay, title/`updatedAt`-only change, topology, files, search, review
 lists and comments add zero conditional commands. Host polling at 30 seconds
 (active) or five minutes (quiet) illustrates the cadence; manual/event-driven
 transitions mean 120/hour is not a hard ceiling. Ordinary polling/backoff/TTLs
-remain unchanged.
+remain unchanged except for observer scopes and optional hidden-window Off
+above.
 
 A genuinely new client/window with no retained fact-generation history may
 issue one initial causal demand for that PR and conditionally validate when
@@ -154,8 +176,12 @@ same immutable head SHA. Each source has a ten-page, 100-items-per-page cap;
 missing/error/truncated/capped pages cannot certify passing or no-checks.
 Lowercase outcomes and pending states are normalized, with failure before
 pending before passing. A trailing fresh PR metadata read rejects head/base
-changes before proof issuance; the proof's lower bound covers the earliest
-contributing read, not completion. Fallback CLI cost is two PR metadata
+changes before proof issuance unless the initial metadata's actual admission
+already strictly follows every contributing check/status admission. Unknown
+order still requires a fresh trailing read. Reusing that existing guard never
+renews source validation time or bypasses a causal demand. The proof's lower
+bound covers the earliest contributing read, not completion. Cold fallback
+CLI cost is two PR metadata
 commands, one reviews command, max(1, ceil(check-runs/100)) check commands and
 max(1, ceil(legacy-statuses/100)) status commands. Reviews retain their existing
 `--paginate --slurp` behavior without a new page cap: that single CLI command
@@ -164,6 +190,15 @@ issue one HTTP request each. Backoff is never bypassed. The contracts are the
 GitHub [check-runs](https://docs.github.com/en/rest/checks/runs#list-check-runs-for-a-git-reference)
 and [combined statuses](https://docs.github.com/en/rest/commits/statuses#get-the-combined-status-for-a-specific-reference)
 APIs. No additional scan is added on the normal GraphQL path.
+
+During active GraphQL backoff, REST cannot observe the complete
+mergeability/queue group. Its receipt remains unsatisfied and receives no proof;
+it alone does not raise the forced REST admission bound on repeated reads.
+New checks/review receipts still force all contributing REST inputs after their
+receipt. Ordinary TTL expiry, explicit refresh and later authorized reads after
+GraphQL backoff still revalidate; no negative cache, retry timer or new client
+domain cache is added. Once GraphQL is available, the retained mergeability
+demand again requires a causal admission and can receive its exact proof.
 
 Remote topology retention is at most 30 seconds and cannot outlive the raw
 discovery inputs' 120-second expiry. File snapshots retain at most ten

@@ -7,6 +7,7 @@ import type { z } from "zod";
 import type { rpcContract } from "../../contracts";
 import { pullRequestAttentionFromSignal } from "./presentation";
 import { queryPolicies } from "../../query-runtime";
+import { useDocumentVisibility } from "../../shared/use-document-visibility";
 import type { AuthoredPullRequestContract, PullRequestReviewerContract, threadPullRequest } from "./schemas";
 import {
   factFromAuthoredPullRequest,
@@ -276,15 +277,19 @@ export function invalidateThreadPullRequestDirectory(client: {
 export function useAuthoredPullRequests(
   rpc: PullRequestRpc,
   polling: AuthoredPullRequestPolling = { intervalMs: 300_000 },
+  { enabled = true }: { enabled?: boolean } = {},
 ) {
   const client = useQueryClient();
   const facts = useSharedPullRequestFactDirectory();
+  const visible = useDocumentVisibility();
+  const observe = enabled && visible;
   const forceRefresh = useRef(false);
   const authoredLogin = polling.authoredLogin?.trim() ?? "";
   const base = useQuery({
     queryKey: pullRequestKeys.authored(authoredLogin),
     queryFn: () => authoredPullRequests(rpc, forceRefresh.current),
     ...pullRequestPolicies.authored,
+    enabled: observe,
     refetchInterval: pullRequestPolicies.authored.refetchInterval(polling),
   });
   const stacks = useQuery({
@@ -296,7 +301,7 @@ export function useAuthoredPullRequests(
       authoredLogin,
     ),
     queryFn: () => authoredPullRequestStacks(rpc),
-    enabled: base.isSuccess,
+    enabled: observe && base.isSuccess,
     ...pullRequestPolicies.authoredStacks,
   });
   const enriched = stacks.data ?? base.data;

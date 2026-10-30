@@ -1,7 +1,8 @@
 import { toast } from "sonner";
 import { refreshChanges } from "./invalidation";
 export { invalidateChanges, refreshChanges } from "./invalidation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
+import { useDocumentVisibility } from "../../shared/use-document-visibility";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PluginRpcClient } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../contracts";
@@ -15,18 +16,6 @@ export type ChangesPolling = {
   visiblePollMs: number;
   backgroundPollMs: number;
 };
-function useDocumentVisibility() {
-  const [visible, setVisible] = useState(
-    () =>
-      typeof document === "undefined" || document.visibilityState === "visible",
-  );
-  useEffect(() => {
-    const update = () => setVisible(document.visibilityState === "visible");
-    document.addEventListener("visibilitychange", update);
-    return () => document.removeEventListener("visibilitychange", update);
-  }, []);
-  return visible;
-}
 export function useChanges(
   rpc: ChangesRpc,
   threadId: string,

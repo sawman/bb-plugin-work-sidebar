@@ -61,12 +61,12 @@ export function PullRequestsLeftSidebar({
   const authoredLogin = String(settings?.githubAuthoredLogin ?? "").trim();
   const [localSearchQuery, setLocalSearchQuery] = useState("");
   const effectiveSearchQuery = localSearchQuery || searchQuery;
-  // Left sidebar tabs intentionally warm independently so opening PRs can use
-  // the shared authored cache immediately instead of starting a cold fetch.
+  // Retain warm Query data across tabs without fetching an unseen authored
+  // roster and its per-repository/PR enrichment in the background.
   const list = useAuthoredPullRequests(rpc, {
     intervalMs: Number(settings?.githubLeftListRefreshSeconds ?? "300") * 1_000,
     authoredLogin,
-  });
+  }, { enabled: active });
   const draft = useSetAuthoredPullRequestDraft(rpc);
   const healthQuery = useGitHubApiHealth(rpc, {
     poll: active,

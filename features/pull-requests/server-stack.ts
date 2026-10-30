@@ -539,6 +539,7 @@ export async function readGitHubSignals(
   receivedSequence?: number,
 ): Promise<Map<number, GitHubSignal>> {
   return readSignalObservations({ owner, repo, numbers, lifecycle, demands: requirements, receivedSequence,
+    canValidate: (group) => group !== "mergeability" || Date.now() >= lifecycle.githubGraphqlBackoffUntil,
     load: async (missing, afterSequence) => {
       const revision = lifecycle.remoteGeneration(`${owner}/${repo}`);
       const assertCurrent = () => { if (revision !== lifecycle.remoteGeneration(`${owner}/${repo}`) || lifecycle.isDisposed) throw new Error("GitHub signals changed during the read."); };
@@ -666,7 +667,13 @@ export async function readGitHubPullRequestRest(
       };
     }
     const checksRead = await readRestChecks({ owner, repo, sha, run, headers, afterSequence });
-    const trailingMetadata = await readObservedGitHub(run,
+    // Cached SHA-scoped checks may precede the initial metadata admission.
+    // That metadata already guards their head/base; forcing it again on every
+    // semantic-cache expiry spends a REST request without observing new inputs.
+    // Unknown admission order still needs the conservative trailing read.
+    const metadataFollowsChecks = metadataRead.sequence !== undefined && checksRead.sources.every((source) =>
+      source.sequence !== undefined && source.sequence < metadataRead.sequence!);
+    const trailingMetadata = metadataFollowsChecks ? metadataRead : await readObservedGitHub(run,
       ["api", "--method", "GET", `repos/${owner}/${repo}/pulls/${number}`, ...headers], 2_000_000,
       lifecycle.nextObservationSequence());
     const trailing = JSON.parse(trailingMetadata.text) as unknown;

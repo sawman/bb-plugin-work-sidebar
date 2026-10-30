@@ -20,18 +20,19 @@ export function createGitHubPollingService(
   const settings = bb.settings.define({
     githubActivePollSeconds: {
       type: "select",
-      label: "Right Work PR polling",
+      label: "Changes PR polling",
       description:
-        "How often to poll the visible right-side Work PR through GitHub REST.",
+        "How often to refresh the visible Changes panel, including GitHub reads.",
       options: ["30", "60", "120", "300"],
       default: "60",
     },
     githubBackgroundPollSeconds: {
       type: "select",
-      label: "Right Work PR background polling",
+      label: "Changes hidden-window polling",
       description:
-        "How often to poll the right-side Work PR while BB is not visible.",
-      options: ["120", "300", "600", "900"],
+        "How often to refresh Changes while this document is hidden. Off stops interval reads; explicit refresh remains available.",
+      options: ["0", "120", "300", "600", "900"],
+      experimental_optionLabels: { "0": "Off" },
       default: "300",
     },
     githubLeftListRefreshSeconds: {
@@ -46,7 +47,7 @@ export function createGitHubPollingService(
       type: "select",
       label: "Global REST poll budget",
       description:
-        "Maximum fingerprint polls across all Work panels each minute.",
+        "Maximum REST fingerprint polls across Changes panels each minute; other GitHub reads have separate caches.",
       options: ["10", "20", "30", "60"],
       default: "30",
     },
