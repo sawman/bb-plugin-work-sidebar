@@ -842,7 +842,7 @@ describe("R18 registered left sidebar parity", () => {
   });
 
   it("shows a compact stack-number badge only for threads returned by the stack projection", async () => {
-    const directory = vi.fn(() => ({
+    const projection = {
       available: true,
       pullRequests: {
         thr_one: {
@@ -862,7 +862,11 @@ describe("R18 registered left sidebar parity", () => {
         thr_two: null,
       },
       error: null,
-    }));
+    };
+    const directory = vi.fn((_input: {
+      threadIds: string[];
+      validationRequirements?: import("../../pull-requests/schemas").PullRequestValidationDemands;
+    }) => projection);
     const slot = await leftSlot({
       threads: [
         { ...thread("thr_one", "One"), environment: { id: "env_stack_parity", name: null, branchName: "feature/stacked", path: null, isWorktree: true, providerId: "git-worktree", workspaceDisplayKind: "managed-worktree" } },
@@ -871,8 +875,8 @@ describe("R18 registered left sidebar parity", () => {
       rpc: {
         pullRequests: () => ({ env_stack_parity: { outcome: "available", pullRequest: {
           number: 17, title: "Stacked pull request", url: "https://github.com/acme/repo/pull/17", state: "open",
-          checks: directory().pullRequests.thr_one.checks, review: directory().pullRequests.thr_one.review,
-          mergeability: directory().pullRequests.thr_one.mergeability, attention: "ready_to_merge", headRefName: "feature/stacked", baseRefName: "main",
+          checks: projection.pullRequests.thr_one.checks, review: projection.pullRequests.thr_one.review,
+          mergeability: projection.pullRequests.thr_one.mergeability, attention: "ready_to_merge", headRefName: "feature/stacked", baseRefName: "main",
           updatedAt: "2026-10-26T00:00:00Z", autoMerge: false, inMergeQueue: null,
         } } }),
         sidebarThreadPullRequests: directory,
@@ -884,7 +888,31 @@ describe("R18 registered left sidebar parity", () => {
         "#17",
       ),
     );
-    expect(directory).toHaveBeenCalledWith({ threadIds: ["thr_one"] });
+    expect(directory).toHaveBeenCalledTimes(1);
+    const client = directory.mock.calls[0]?.[0].validationRequirements?.["acme/repo#17"]?.checks?.client ?? "";
+    expect(client.trim().length).toBeGreaterThan(0);
+    expect(directory.mock.calls).toStrictEqual([[{
+      threadIds: ["thr_one"],
+      validationRequirements: {
+        "acme/repo#17": {
+          checks: {
+            client,
+            occurrence: 1,
+            fingerprint: JSON.stringify(["acme/repo#17", "checks", ["passing", 1, 1, 0, 0]]),
+          },
+          review: {
+            client,
+            occurrence: 1,
+            fingerprint: JSON.stringify(["acme/repo#17", "review", ["approved", 0]]),
+          },
+          mergeability: {
+            client,
+            occurrence: 1,
+            fingerprint: JSON.stringify(["acme/repo#17", "mergeability", ["mergeable", "MERGEABLE", "CLEAN", false]]),
+          },
+        },
+      },
+    }]]);
     expect(
       slot.getByRole("link", { name: /Two/ }).querySelector(".ws-stack-number"),
     ).toBeNull();
