@@ -104,8 +104,45 @@ unexpected files after copying, and corruption of an untouched app.js.map.
 Baseline, backup and postcopy verification now require exact directory membership;
 postcopy hashes cover every pristine entry with only the twelve staged overrides.
 No real deployment ran in this worker; root deployment is recorded separately.
-F2 is addressed by the actual registered eight-check probe above. BBPLUG-434
-still owns integrating that behavior gate into the build pipeline.
+F2 was addressed for that release preflight by the actual registered eight-check
+probe above. The subsequently added mandatory pipeline gate is recorded below;
+the historical probe was not itself part of that original sync run.
+
+## Mandatory Tasks behavior gate
+
+BBPLUG-434 subsequently adds the
+[cataloged 24-test native gate](../../../bb-plugins/tasks/README.md#mandatory-source-behavior-gate)
+to the actual sync pipeline before any artifact staging or deployment. It uses
+the release's own Tasks/SDK/SQLite/Vitest seams and dependencies; missing profile,
+input/report, incomplete results and version mismatch block the pipeline. The
+separate exact-byte artifact verifier is unchanged.
+
+The owning-entrypoint regression first failed because sync reached stage/deploy
+without executing a configured failing behavior command. Isolated tool/app
+fixtures were used for that RED and for orchestration GREEN. Native acceptance
+uses a private disposable copy of the retained 0.47.1 build workspace at exact
+source HEAD `5e1acd765039e874643f34c4d35409e58484e408`: patched behavior passes
+24/24, removing the whole Tasks patch fails the mandatory pre-staging boundary,
+and removing CLI parent forwarding alone fails the same boundary. Both mutations
+are restored and patched behavior passes again. Missing/empty/skipped/corrupt
+reports (including stale successes) and source/build-version failures are exercised
+separately in 15 passing actual-entrypoint fixture checks. The native mutation
+runner passes all four acceptance checks; Tasks typecheck including the injected
+test, all seven unchanged artifact-verifier regressions, Node syntax checks and
+`git diff --check` pass. No artifact build or full Sidebar/catalog suite ran.
+An initial test typecheck caught the missing CLI status argument; that test-only
+registration was fixed and native acceptance rerun. Current raw evidence is in the
+[compressed validation log](tasks-gate-validation.log.gz).
+
+The profile is selected for every cataloged Tasks release. Actual native
+execution here covers 0.47.1; older release preflights have not been rerun or
+newly certified. There is no bypass for older versions. Original suite counts,
+manual eight-check probes, accepted artifacts and deployment acceptance above
+remain historical evidence. No production Tasks/Questions patch bytes change;
+Automations stays pristine and retired. No app bundle, installation, deployment,
+reload, restart, remote Git/API, package install or global CLI identity change
+is part of this work. Root still owns integration, broader gates and lifecycle.
+Questions disposal safety below remains mandatory for any later writes/reload.
 
 ## Root reproduction and deployment boundary
 

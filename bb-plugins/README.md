@@ -55,6 +55,10 @@ match the verified stage byte-for-byte. Backup packages above record the
 version-matched pre-deployment artifacts and SHA-256 checksums.
 
 Run `npm run bb-plugins:sync` for the non-mutating source/test/build pass.
+Every cataloged Tasks patch now selects a [mandatory native behavior gate](tasks/README.md#mandatory-source-behavior-gate),
+which must pass before any artifact staging/deployment. It supplements the
+upstream suite and the separate exact-byte artifact verifier; historical
+preflight counts above are not evidence that the new gate ran then.
 For deployment or rollback, use the exact release's reviewed runbook and
 mandatory verifier rather than sync's historical copy path. Never use a
 rollback payload from a different BB version.

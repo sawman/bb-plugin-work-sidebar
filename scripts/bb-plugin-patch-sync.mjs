@@ -1,3 +1,4 @@
+import { withPatchBehaviorGates } from "./bb-plugin-behavior-gates.mjs";
 import { execFileSync } from "node:child_process";
 import {
   copyFile,
@@ -139,110 +140,114 @@ try {
     "--filter=@get-bb/plugin-sdk",
     "--force",
   ], { cwd: sourceRoot });
-  if (coreArtifacts.length > 0) {
-    run(join(sourceRoot, "node_modules/.bin/turbo"), [
-      "run",
-      "build",
-      "--filter=@bb/server",
-      "--force",
-    ], { cwd: sourceRoot });
-    for (const artifact of coreArtifacts) {
-      await copyCoreArtifact(
-        join(sourceRoot, artifact.sourcePath),
-        join(stagingRoot, "core", artifact.targetPath),
-      );
+  await withPatchBehaviorGates({
+    repoRoot, sourceRoot, version, plan, run, env: pluginTestEnvironment,
+  }, async () => {
+    if (coreArtifacts.length > 0) {
+      run(join(sourceRoot, "node_modules/.bin/turbo"), [
+        "run",
+        "build",
+        "--filter=@bb/server",
+        "--force",
+      ], { cwd: sourceRoot });
+      for (const artifact of coreArtifacts) {
+        await copyCoreArtifact(
+          join(sourceRoot, artifact.sourcePath),
+          join(stagingRoot, "core", artifact.targetPath),
+        );
+      }
     }
-  }
 
-  if (coreTests.length > 0) {
-    run(join(sourceRoot, "node_modules/.bin/turbo"), [
-      "run",
-      "typecheck",
-      "--filter=@bb/server",
-      "--force",
-    ], { cwd: sourceRoot });
-    run("pnpm", [
-      "--filter",
-      "@bb/server",
-      "exec",
-      "vitest",
-      "run",
-      "--no-file-parallelism",
-      ...coreTests,
-    ], {
-      cwd: sourceRoot,
-    });
-  }
-  for (const entry of plan.patches) {
-    run("pnpm", [
-      "--filter",
-      entry.turboFilter,
-      "exec",
-      "vitest",
-      "run",
-      "--no-file-parallelism",
-    ], { cwd: sourceRoot, env: pluginTestEnvironment });
-    run(join(sourceRoot, "node_modules/.bin/turbo"), [
-      "run",
-      "typecheck",
-      `--filter=${entry.turboFilter}`,
-      "--force",
-    ], { cwd: sourceRoot });
-    // Some official plugins import the SDK runtime rather than vendoring its
-    // declarations. Build their dependency closure before the standalone CLI
-    // build so module resolution tests the artifact we will actually stage.
-    run(join(sourceRoot, "node_modules/.bin/turbo"), [
-      "run",
-      "build",
-      `--filter=${entry.turboFilter}`,
-      "--force",
-    ], { cwd: sourceRoot });
-    const pluginRoot = join(sourceRoot, entry.pluginPath);
-    run(targetBbCli, ["plugin", "build", "."], {
-      cwd: pluginRoot,
-      env: standaloneBbEnvironment,
-    });
-    const metadata = JSON.parse(await readFile(join(pluginRoot, "dist/server.meta.json"), "utf8"));
-    if (metadata.pluginId !== entry.pluginId || metadata.builtWith?.bbVersion !== version ||
-        metadata.builtWith?.pluginSdkVersion !== sourceSdkVersion || metadata.sdkVersion !== sourceSdkVersion) {
-      throw new Error(`Unexpected ${entry.pluginId} build metadata.`);
-    }
-    await copyPluginArtifacts(join(pluginRoot, "dist"), join(stagingRoot, entry.pluginId));
-  }
-
-  await writeFile(
-    join(stagingRoot, "manifest.json"),
-    `${JSON.stringify({ version, sdkVersion: sourceSdkVersion, sourceRef: plan.sourceRef, sourceCommit: plan.sourceCommit, patches: plan.patches, retiredPatches: plan.retiredPatches ?? [], coreArtifacts }, null, 2)}\n`,
-  );
-  console.log(`Verified build staged at ${stagingRoot}`);
-
-  if (!deploy) {
-    console.log("Not deployed. Re-run with --deploy after reviewing the staged artifacts.");
-    process.exitCode = 0;
-  } else {
-    const backupRoot = join(
-      process.env.BB_PATCH_BACKUP_ROOT ?? join(process.env.HOME ?? "", ".bb/patch-backups"),
-      `bb-${version}-${new Date().toISOString().replaceAll(/[:.]/g, "-")}`,
-    );
-    for (const artifact of coreArtifacts) {
-      const target = join(appRoot, artifact.targetPath);
-      await copyCoreArtifact(target, join(backupRoot, "core", artifact.targetPath));
-      await copyCoreArtifact(
-        join(stagingRoot, "core", artifact.targetPath),
-        target,
-      );
+    if (coreTests.length > 0) {
+      run(join(sourceRoot, "node_modules/.bin/turbo"), [
+        "run",
+        "typecheck",
+        "--filter=@bb/server",
+        "--force",
+      ], { cwd: sourceRoot });
+      run("pnpm", [
+        "--filter",
+        "@bb/server",
+        "exec",
+        "vitest",
+        "run",
+        "--no-file-parallelism",
+        ...coreTests,
+      ], {
+        cwd: sourceRoot,
+      });
     }
     for (const entry of plan.patches) {
-      const target = installedPluginDir(entry.pluginId);
-      await copyPluginArtifacts(target, join(backupRoot, entry.pluginId));
-      await copyPluginArtifacts(join(stagingRoot, entry.pluginId), target);
-      run("bb", ["plugin", "reload", entry.pluginId]);
+      run("pnpm", [
+        "--filter",
+        entry.turboFilter,
+        "exec",
+        "vitest",
+        "run",
+        "--no-file-parallelism",
+      ], { cwd: sourceRoot, env: pluginTestEnvironment });
+      run(join(sourceRoot, "node_modules/.bin/turbo"), [
+        "run",
+        "typecheck",
+        `--filter=${entry.turboFilter}`,
+        "--force",
+      ], { cwd: sourceRoot });
+      // Some official plugins import the SDK runtime rather than vendoring its
+      // declarations. Build their dependency closure before the standalone CLI
+      // build so module resolution tests the artifact we will actually stage.
+      run(join(sourceRoot, "node_modules/.bin/turbo"), [
+        "run",
+        "build",
+        `--filter=${entry.turboFilter}`,
+        "--force",
+      ], { cwd: sourceRoot });
+      const pluginRoot = join(sourceRoot, entry.pluginPath);
+      run(targetBbCli, ["plugin", "build", "."], {
+        cwd: pluginRoot,
+        env: standaloneBbEnvironment,
+      });
+      const metadata = JSON.parse(await readFile(join(pluginRoot, "dist/server.meta.json"), "utf8"));
+      if (metadata.pluginId !== entry.pluginId || metadata.builtWith?.bbVersion !== version ||
+          metadata.builtWith?.pluginSdkVersion !== sourceSdkVersion || metadata.sdkVersion !== sourceSdkVersion) {
+        throw new Error(`Unexpected ${entry.pluginId} build metadata.`);
+      }
+      await copyPluginArtifacts(join(pluginRoot, "dist"), join(stagingRoot, entry.pluginId));
     }
-    console.log(`Deployed. Previous artifacts backed up at ${backupRoot}`);
-    if (coreArtifacts.length > 0) {
-      console.log("Restart BB before relying on deployed core artifacts.");
+
+    await writeFile(
+      join(stagingRoot, "manifest.json"),
+      `${JSON.stringify({ version, sdkVersion: sourceSdkVersion, sourceRef: plan.sourceRef, sourceCommit: plan.sourceCommit, patches: plan.patches, retiredPatches: plan.retiredPatches ?? [], coreArtifacts }, null, 2)}\n`,
+    );
+    console.log(`Verified build staged at ${stagingRoot}`);
+
+    if (!deploy) {
+      console.log("Not deployed. Re-run with --deploy after reviewing the staged artifacts.");
+      process.exitCode = 0;
+    } else {
+      const backupRoot = join(
+        process.env.BB_PATCH_BACKUP_ROOT ?? join(process.env.HOME ?? "", ".bb/patch-backups"),
+        `bb-${version}-${new Date().toISOString().replaceAll(/[:.]/g, "-")}`,
+      );
+      for (const artifact of coreArtifacts) {
+        const target = join(appRoot, artifact.targetPath);
+        await copyCoreArtifact(target, join(backupRoot, "core", artifact.targetPath));
+        await copyCoreArtifact(
+          join(stagingRoot, "core", artifact.targetPath),
+          target,
+        );
+      }
+      for (const entry of plan.patches) {
+        const target = installedPluginDir(entry.pluginId);
+        await copyPluginArtifacts(target, join(backupRoot, entry.pluginId));
+        await copyPluginArtifacts(join(stagingRoot, entry.pluginId), target);
+        run("bb", ["plugin", "reload", entry.pluginId]);
+      }
+      console.log(`Deployed. Previous artifacts backed up at ${backupRoot}`);
+      if (coreArtifacts.length > 0) {
+        console.log("Restart BB before relying on deployed core artifacts.");
+      }
     }
-  }
+  });
 } finally {
   if (!keepWorkspace) await rm(workspace, { recursive: true, force: true });
   else console.log(`Kept source workspace at ${workspace}`);

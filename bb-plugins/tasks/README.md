@@ -22,11 +22,69 @@ Work Sidebar now consumes this indexed RPC for the preview of five completed tas
 that contract, or coordinate an equivalent native migration before retirement.
 The project-wide Tasks pane remains a separate consumer.
 
+## Mandatory source behavior gate
+
+`bb-plugins:sync` now requires the catalog-selected
+`tasks-thread-workflow-v1` profile for every versioned Tasks patch, before
+**any** plugin/core artifact staging or deployment. The profile copies the
+[native regression source](thread-workflow.behavior.test.ts.txt) into the
+release-pinned disposable Tasks plugin, runs that file serially through the
+release's own Vitest/SDK/SQLite dependencies, and requires a fresh JSON report
+with all 24 tests passing and no skips/todos. The copied test also participates
+in the ordinary Tasks suite and typecheck, then is removed. `.ts.txt` keeps
+this release-local test out of Work Sidebar's separate suite/typecheck.
+Missing/unknown profile, missing input/report, incomplete results or a version
+mismatch fails closed. Existing immutable-source, upstream-suite, metadata and
+artifact-verifier checks remain separate requirements.
+
+The tests execute the real store, registered typed RPC, CLI and delegation
+handlers. Coverage includes four pending statuses, done/canceled inclusion,
+status/empty filters, recency order, cross-project thread/link scope, default
+100 and maximum 500 limits, invalid bounds, and actual SQLite query plans for
+both reverse reads using `idx_task_threads_thread`. A scoped read uses two
+bounded data queries plus one label-hydration query and no host SDK calls.
+CLI dispatch/alias exercise caller-parent forwarding all the way to spawn,
+absent-caller omission, and spawn-error propagation without task advancement.
+Only the host SDK boundary is fake; the Tasks implementations and DB are real.
+
+All cataloged Tasks releases (0.42.0, 0.42.1, 0.43.1, 0.43.3, 0.43.4, 0.44.0,
+0.45.0, 0.46.0, 0.46.1 and 0.47.1) explicitly select this shared seam profile.
+There is no new dependency or historical bypass. Actual native acceptance in
+this change is **0.47.1 only**; older release suites/builds were not rerun or
+retrospectively certified. Their existing exact-source/patch checks still apply;
+any incompatible patch, harness or profile blocks that release until reviewed.
+A future catalog entry must explicitly select a reviewed profile.
+
+Focused orchestration checks run the actual sync entrypoint against isolated
+filesystem/tool fixtures, including its `--deploy` branch; no real app is
+written or reloaded. Native failure proof uses the same mandatory pre-staging
+boundary as sync: removing the Tasks patch or only CLI caller forwarding causes
+real native failures and prevents entering the staging/deployment continuation.
+The untouched patched workspace passes before and after both mutations.
+
+```sh
+node --test scripts/bb-plugin-patch-sync.test.mjs
+# Private COPY of an existing release-pinned patched build workspace with deps:
+printf 'BBPLUG-434 disposable\n' > "$DISPOSABLE_BB_SOURCE/.bb-catalog-disposable"
+BB_PATCH_BEHAVIOR_TEST_SOURCE="$DISPOSABLE_BB_SOURCE" \
+  BB_PATCH_BEHAVIOR_TEST_LOG_ROOT="$GATE_LOG_ROOT" \
+  node --test scripts/bb-plugin-behavior-gates.native.test.mjs
+```
+
+Never place the marker in pristine source or a shared/installed workspace.
+The native acceptance runner intentionally mutates and restores only that private
+copy; it does not install dependencies, build app artifacts, stage or deploy.
+The [current audit](../../docs/compatibility/bb-0.47.1/README.md#mandatory-tasks-behavior-gate)
+records validation and limits. The accepted artifact manifest and rollback
+payload remain unchanged by this test-only catalog/pipeline change.
+
 ## BB 0.47.1 compatibility preflight (2026-10-26)
 
 Exact `desktop-v0.47.1`, SHA `5e1acd765039e874643f34c4d35409e58484e408`,
 BB 0.47.1 / SDK 0.6.79. Retain unchanged plugin-only patch; actual service/CLI
-eight-check probe passes separately from the shipped suite.
+eight-check probe passed separately from the shipped suite at the original
+preflight. The mandatory 24-test source gate above was added subsequently;
+that does not rewrite the original preflight/deployment evidence.
 [Audit, gates and root deployment command](../../docs/compatibility/bb-0.47.1/README.md).
 [Exact pristine rollback](../rollback/bb-0.47.1/README.md). Worker preflight
 staged only; root subsequently deployed Questions/Tasks with pristine Automations.
@@ -134,14 +192,17 @@ Exact paths and SHA-256 are recorded in
 ## Update procedure
 
 Run the cataloged sync job from the repository root. It applies this patch to
-the immutable source tag, runs the Tasks suite serially (to avoid upstream
-shared-browser-storage races), typechecks, builds, validates metadata, then
-stages the artifacts. Review the stage before deployment:
+the immutable source tag, runs the mandatory native behavior gate and Tasks
+suite serially (to avoid upstream shared-browser-storage races), typechecks,
+builds, validates metadata, then stages the artifacts. Review the stage before
+deployment through the release-specific runbook and separate artifact verifier:
 
 ```sh
 npm run bb-plugins:sync
-npm run bb-plugins:sync -- --deploy
 ```
+
+Do not use sync's historical unchecked `--deploy` copy path. Questions writes/reload
+require the current audit's zero-pending/resolving-form disposal gate.
 
 Retire the patch once upstream exposes an equivalent indexed thread-task read
 and CLI dispatch forwards its caller thread. Track that decision in

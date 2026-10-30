@@ -1,0 +1,178 @@
+// Copied into the disposable, release-pinned Tasks plugin by the mandatory sync
+// gate. These are native tests of production registrations and SQLite queries;
+// only the host SDK boundary is fake. No task/store/RPC/CLI implementation is mocked.
+import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createStore, registerTasksApi } from "./api";
+import { registerTasksCli } from "./cli";
+import { tasksRpcContract } from "./shared/contract";
+
+const cleanups: Array<() => Promise<void>> = [];
+afterEach(async () => {
+  vi.restoreAllMocks();
+  for (const cleanup of cleanups.splice(0)) await cleanup();
+});
+
+function fixture(spawnFailure = false) {
+  const { bb, harness } = createFakePluginHost({
+    pluginId: "tasks",
+    sdk: { threads: {
+      spawn: async () => {
+        if (spawnFailure) throw new Error("catalog spawn refused");
+        return { id: "thr_catalog_child" };
+      },
+      get: async ({ threadId }) => makeThreadResponse({ id: threadId, status: "starting" }),
+    } },
+  });
+  cleanups.push(() => harness.dispose());
+  const store = createStore(bb);
+  registerTasksApi(bb, store);
+  registerTasksCli(bb, store, { name: "tasks", version: "catalog-test" });
+  const project = store.tasks.createProject({
+    name: "Catalog", prefix: "CAT", color: "blue", linkedBbProjectId: "proj_catalog",
+  });
+  const statuses = ["backlog", "todo", "in_progress", "in_review", "done", "canceled"] as const;
+  const tasks = statuses.map(status => store.tasks.createTask({ projectId: project.id, title: status, status }));
+  for (const task of tasks) {
+    store.tasks.upsertTaskThread({ taskId: task.id, threadId: "thr_catalog", presetName: "Gate", title: task.title, liveStatus: "idle" });
+  }
+  const database = bb.storage.database();
+  // Stable ordering independent of clock resolution; production selects by updated_at/id.
+  tasks.forEach((task, offset) => database.prepare("UPDATE tasks SET updated_at = ? WHERE id = ?").run(`2026-01-01T00:00:0${offset}.000Z`, task.id));
+  const read = async (options: Record<string, unknown> = {}) => tasksRpcContract.listTasksForThread.output.parse(
+    await harness.callRpc("listTasksForThread", { threadId: "thr_catalog", ...options }),
+  );
+  return { bb, harness, store, project, tasks, database, read };
+}
+
+function expectScoped(result: { tasks: Array<{ id: string }>; taskThreads: Array<{ taskId: string; threadId: string }> }, expectedIds: string[]) {
+  expect(result.tasks.map(task => task.id)).toEqual(expectedIds);
+  expect(result.taskThreads.map(link => link.taskId)).toEqual(expectedIds);
+  expect(result.taskThreads.every(link => link.threadId === "thr_catalog")).toBe(true);
+}
+
+function preset(store: ReturnType<typeof createStore>) {
+  return store.tasks.createPreset({
+    name: "Catalog worker", providerId: "codex", modelId: "catalog-model", reasoningLevel: "high",
+    serviceTier: null, permissionMode: "full", environmentKind: "project-default",
+    baseBranch: null, machineId: null, instructions: "", builtin: false,
+  });
+}
+
+describe("mandatory catalog thread workflow v1", () => {
+  it("defaults to all four pending statuses with matching links and zero host reads", async () => {
+    const { read, tasks, harness } = fixture();
+    expectScoped(await read(), tasks.slice(0, 4).reverse().map(task => task.id));
+    expect(harness.sdk.calls).toEqual([]);
+  });
+  it("includes done and canceled only when requested", async () => {
+    const { read, tasks } = fixture();
+    expectScoped(await read({ includeCompleted: true }), tasks.reverse().map(task => task.id));
+  });
+  it("filters explicit pending statuses", async () => {
+    const { read, tasks } = fixture();
+    expectScoped(await read({ statuses: ["todo", "in_review"] }), [tasks[3].id, tasks[1].id]);
+  });
+  it("filters both completed statuses", async () => {
+    const { read, tasks } = fixture();
+    expectScoped(await read({ statuses: ["done", "canceled"], includeCompleted: true }), [tasks[5].id, tasks[4].id]);
+  });
+  it("does not override completed exclusion with a status filter", async () => {
+    const { read } = fixture();
+    expectScoped(await read({ statuses: ["done", "canceled"] }), []);
+  });
+  it("treats an explicit empty status list as empty", async () => {
+    const { read } = fixture();
+    expectScoped(await read({ statuses: [], includeCompleted: true }), []);
+  });
+  it("returns empty for an unlinked thread", async () => {
+    const { read } = fixture();
+    expect(await read({ threadId: "thr_unknown" })).toEqual({ tasks: [], taskThreads: [] });
+  });
+  it("scopes reverse lookup across projects and excludes other links on the same tasks", async () => {
+    const { store, project, tasks, read } = fixture();
+    const otherProject = store.tasks.createProject({ name: "Other", prefix: "OTH", color: "blue" });
+    const linked = store.tasks.createTask({ projectId: otherProject.id, title: "Linked", status: "todo" });
+    const unrelated = store.tasks.createTask({ projectId: project.id, title: "Unrelated", status: "todo" });
+    for (const [taskId, threadId] of [[linked.id, "thr_catalog"], [unrelated.id, "thr_other"], [tasks[1].id, "thr_other"]]) {
+      store.tasks.upsertTaskThread({ taskId, threadId, presetName: "Gate", title: "Link", liveStatus: "idle" });
+    }
+    expectScoped(await read(), [linked.id, ...tasks.slice(0, 4).reverse().map(task => task.id)]);
+  });
+  it("uses descending id as a stable recency tie breaker", async () => {
+    const { tasks, database, read } = fixture();
+    database.prepare("UPDATE tasks SET updated_at = ?").run("2026-01-01T00:00:00.000Z");
+    expectScoped(await read({ includeCompleted: true, limit: 1 }), [tasks.map(task => task.id).sort().at(-1)!]);
+  });
+  it("enforces the default 100 and maximum 500 at both store and RPC with equally bounded links", async () => {
+    const { store, database, project, read } = fixture();
+    database.transaction(() => {
+      for (let offset = 0; offset < 501; offset++) {
+        const task = store.tasks.createTask({ projectId: project.id, title: `Bulk ${offset}`, status: "todo" });
+        store.tasks.upsertTaskThread({ taskId: task.id, threadId: "thr_catalog", presetName: "Gate", title: task.title, liveStatus: "idle" });
+      }
+    })();
+    for (const limit of [undefined, 1, 500]) {
+      const result = await read(limit === undefined ? {} : { limit });
+      expect(result.tasks).toHaveLength(limit ?? 100);
+      expectScoped(result, result.tasks.map(task => task.id));
+      expectScoped(store.tasks.listTasksForThread({ threadId: "thr_catalog", limit }), result.tasks.map(task => task.id));
+    }
+  });
+  it.each([0, -1, 0.5, 501, Infinity, NaN])("rejects invalid limit %s in RPC and store", async limit => {
+    const { read, store } = fixture();
+    await expect(read({ limit })).rejects.toThrow();
+    expect(() => store.tasks.listTasksForThread({ threadId: "thr_catalog", limit })).toThrow(/integer from 1 to 500/);
+  });
+  it.each([
+    { threadId: "other" }, { statuses: ["unknown"] }, { unexpected: true },
+  ])("validates typed input %j", async options => {
+    const { read } = fixture();
+    await expect(read(options)).rejects.toThrow();
+  });
+  it("executes both real reverse queries via the thread index without an unbounded scan", async () => {
+    const { read, database, harness } = fixture();
+    const prepare = vi.spyOn(database, "prepare");
+    await read({ limit: 1 });
+    const executedQueries = prepare.mock.calls.map(([sql]) => sql);
+    // The two production reads and one label hydration read are independent of
+    // project size. EXPLAIN runs the captured production SQL against the real DB.
+    expect(executedQueries).toHaveLength(3);
+    const reverseQueries = executedQueries.filter(sql => sql.includes("task_threads tt"));
+    expect(reverseQueries).toHaveLength(2);
+    for (const sql of reverseQueries) {
+      const plan = database.prepare<Record<string, string | number>, { detail: string }>(`EXPLAIN QUERY PLAN ${sql}`)
+        .all({ threadId: "thr_catalog", limit: 1 });
+      expect(plan.some(step => /SEARCH tt USING INDEX idx_task_threads_thread/.test(step.detail))).toBe(true);
+      expect(plan.some(step => /SCAN (tt|t)( |$)/.test(step.detail))).toBe(false);
+    }
+    expect(harness.sdk.calls).toEqual([]);
+  });
+  it.each(["dispatch", "delegate"])("%s forwards the CLI caller through real delegation to spawn", async command => {
+    const { store, tasks, harness } = fixture();
+    const worker = preset(store);
+    const result = await harness.runCli([command, tasks[1].key, "--preset", worker.name], { threadId: "thr_catalog_parent" });
+    expect(result.exitCode, result.stderr).toBe(0);
+    expect(harness.sdk.callsTo("threads.spawn")).toEqual([[expect.objectContaining({ parentThreadId: "thr_catalog_parent" })]]);
+    expect(store.tasks.listTaskThreads(tasks[1].id).some(link => link.threadId === "thr_catalog_child")).toBe(true);
+  });
+  it("omits the spawn parent when the CLI has no caller", async () => {
+    const { store, tasks, harness } = fixture();
+    const worker = preset(store);
+    const result = await harness.runCli(["dispatch", tasks[1].key, "--preset", worker.name]);
+    expect(result.exitCode, result.stderr).toBe(0);
+    const calls = harness.sdk.callsTo("threads.spawn");
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0]).not.toHaveProperty("parentThreadId");
+  });
+  it("forwards spawn errors to the CLI without attaching or advancing the task", async () => {
+    const { store, tasks, harness } = fixture(true);
+    const worker = preset(store);
+    const result = await harness.runCli(["dispatch", tasks[1].key, "--preset", worker.name], { threadId: "thr_catalog_parent" });
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("catalog spawn refused");
+    expect(harness.sdk.callsTo("threads.spawn")).toEqual([[expect.objectContaining({ parentThreadId: "thr_catalog_parent" })]]);
+    expect(store.tasks.getTask(tasks[1].id)?.status).toBe("todo");
+    expect(store.tasks.listTaskThreads(tasks[1].id).map(link => link.threadId)).toEqual(["thr_catalog"]);
+  });
+});
