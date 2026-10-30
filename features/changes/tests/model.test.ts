@@ -9,6 +9,7 @@ import {
   mergePullRequestFacts,
 } from "../../pull-requests/facts";
 import { currentPr } from "./latency-fixtures";
+import { prObservations } from "../../../tests/fixtures/pr-observation";
 
 describe("R13 Changes model", () => {
   it.each(["same-head-different-number", "same-number-different-repository"])("does not promote a different merged PR identity: %s", (shape) => {
@@ -27,7 +28,7 @@ describe("R13 Changes model", () => {
   });
 
   it("resolves a merged sibling summary before an older detailed OPEN fact without changing local flags", () => {
-    const sibling = currentPr(2518, "Detailed title");
+    const sibling = { ...currentPr(2518, "Detailed title"), observations: prObservations(200) };
     const current = currentPr(2531);
     const facts = mergePullRequestFacts(undefined, [factFromThreadPullRequest({ ...sibling, stackNumber: 7 })]);
     const branch = {
@@ -36,6 +37,7 @@ describe("R13 Changes model", () => {
       pr: { number: sibling.number, url: sibling.url, title: sibling.title, state: "open", isDraft: false, metadataStale: false },
     };
     const layer = { ...sibling, title: "Old topology title", state: "merged", draft: false,
+      observations: prObservations(100),
       checks: "passing" as const, review: "approved" as const, reviewCommentCount: 0 };
     const resolved = mergeStackBranchSignals(branch, { currentPullRequest: current,
       stack: { number: 7, base: "main", currentPullRequest: 2531, pullRequests: [layer] }, stackUnavailableReason: null, githubStack: null }, current, facts);

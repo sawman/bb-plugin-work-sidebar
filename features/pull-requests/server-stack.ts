@@ -1,5 +1,8 @@
 import type { GitHubStackBranch } from "../../contracts.js";
 import type { ServerLifecycle } from "../../server-lifecycle.js";
+import { githubObservation, readObservedGitHub } from "./source-observation.js";
+import { readSignalObservations, type SignalDemands } from "./signal-validation.js";
+import { readRestChecks, earliestValidation } from "./rest-checks.js";
 import type {
   GitHubApiRunner,
   GitHubPullRequest,
@@ -201,9 +204,20 @@ function parseStackPullRequest(value: unknown): GitHubPullRequest {
   if (!isRecord(value)) throw new Error("GitHub Stack response has an invalid pull request");
   const head = isRecord(value.head) ? value.head.ref : undefined;
   const base = isRecord(value.base) ? value.base.ref : undefined;
+  const state = requiredString(value.state, "pull request state").toLowerCase();
+  if (state !== "open" && state !== "closed" && state !== "merged" && state !== "draft")
+    throw new Error("GitHub Stack response has an invalid pull request state");
+  const observation = githubObservation(value, null);
   return {
+    observations: {
+      ...(typeof value.title === "string" || value.title === null ? { title: observation } : {}),
+      ...(state !== "open" || typeof value.draft === "boolean" ? { lifecycle: observation } : {}),
+      ...(typeof head === "string" || value.head === null ? { head: observation } : {}),
+      ...(typeof base === "string" || value.base === null ? { base: observation } : {}),
+      ...(typeof value.review_comments === "number" ? { comments: observation } : {}),
+    },
     number: requiredNumber(value.number, "pull request number"),
-    state: requiredString(value.state, "pull request state"),
+    state,
     draft: value.draft === true,
     head: typeof head === "string" ? head : "",
     base: typeof base === "string" ? base : "",
@@ -331,7 +345,7 @@ export async function readGitHubPullRequestFilePatch(
   return { kind: "patch", path, patch: file.patch, message: null };
 }
 
-function signalFromGraphql(value: unknown): GitHubSignal | null {
+function signalFromGraphql(value: unknown, validatedAt: number | null = null): GitHubSignal | null {
   if (!isRecord(value)) return null;
   const graphqlReviews = isRecord(value.reviews) ? value.reviews : null;
   // GitHub caps a GraphQL connection at 100. Do not guess a reviewer's
@@ -354,6 +368,19 @@ function signalFromGraphql(value: unknown): GitHubSignal | null {
     reviewerStates,
   });
   const reviewerFact = reviewerFacts(reviewerStates);
+  const hasReviewPeople = Boolean(graphqlReviews && Array.isArray(graphqlReviews.nodes));
+  const hasReviewRequests = isRecord(value.reviewRequests) && Array.isArray(value.reviewRequests.nodes);
+  const hasChecks = isRecord(value.commits) && Array.isArray(value.commits.nodes);
+  const hasReview = Object.hasOwn(value, "reviewDecision") || hasReviewPeople || hasReviewRequests;
+  if (!hasChecks && !hasReview) return null;
+  const observation = { ...githubObservation(value, validatedAt),
+    reviewIdentity: JSON.stringify([reviewDecision, value.reviews ?? null, value.reviewRequests ?? null]) };
+  const mergeable = value.mergeable === "CONFLICTING" || value.mergeable === "MERGEABLE" || value.mergeable === "UNKNOWN" ? value.mergeable : null;
+  const mergeStateStatus = typeof value.mergeStateStatus === "string" ? value.mergeStateStatus : null;
+  const conflicts = mergeable === "CONFLICTING" || mergeStateStatus === "DIRTY";
+  const mergeabilityState = conflicts ? "conflicts" as const : value.isDraft === true ? "draft" as const
+    : ["BLOCKED", "BEHIND", "HAS_HOOKS"].includes(mergeStateStatus ?? "") ? "blocked" as const
+      : mergeable === "MERGEABLE" || mergeStateStatus === "CLEAN" ? "mergeable" as const : "unknown" as const;
   const commits = isRecord(value.commits) && Array.isArray(value.commits.nodes) ? value.commits.nodes : [];
   const commit = commits[commits.length - 1];
   const rollup = isRecord(commit) && isRecord(commit.commit) && isRecord(commit.commit.statusCheckRollup)
@@ -365,15 +392,28 @@ function signalFromGraphql(value: unknown): GitHubSignal | null {
   const head = typeof value.headRefName === "string" && value.headRefName ? value.headRefName : null;
   const base = typeof value.baseRefName === "string" && value.baseRefName ? value.baseRefName : null;
   return {
+    observations: {
+      ...(hasChecks ? { checks: observation } : {}), ...(hasReview ? { review: observation } : {}),
+      ...(hasReviewPeople || hasReviewRequests ? { people: observation } : {}),
+      ...(typeof value.title === "string" ? { title: observation } : {}),
+      ...(typeof value.state === "string" && typeof value.isDraft === "boolean" ? { lifecycle: observation } : {}),
+      ...(head ? { head: observation } : {}), ...(base ? { base: observation } : {}),
+      ...(mergeable !== null || mergeStateStatus !== null ? { mergeability: observation } : {}),
+    },
+    ...(typeof value.title === "string" ? { title: value.title } : {}),
+    ...(typeof value.url === "string" ? { url: value.url } : {}),
+    ...(typeof value.state === "string" ? { state: value.state === "MERGED" ? "merged" as const
+      : value.state === "CLOSED" ? "closed" as const : value.isDraft === true ? "draft" as const : "open" as const,
+      draft: value.isDraft === true } : {}),
     checks,
     review,
-    ...(reviewerFact.approvers.length
-      ? { approvers: reviewerFact.approvers }
-      : {}),
-    ...(reviewerFact.changeRequesters.length
-      ? { changeRequesters: reviewerFact.changeRequesters }
-      : {}),
-    ...(requestedReviewers.length ? { requestedReviewers } : {}),
+    ...(isRecord(value.reviewRequests) && typeof value.reviewRequests.totalCount === "number" ? { reviewRequestCount: value.reviewRequests.totalCount } : {}),
+    ...(hasReviewPeople ? { approvers: reviewerFact.approvers, changeRequesters: reviewerFact.changeRequesters } : {}),
+    ...(hasReviewRequests ? { requestedReviewers } : {}),
+    ...(mergeable !== null || mergeStateStatus !== null ? { mergeability: {
+      state: mergeabilityState,
+      mergeable, mergeStateStatus: mergeStateStatus as import("./server-types.js").CurrentPullRequest["mergeability"]["mergeStateStatus"],
+    }, attention: conflicts ? "conflicts" as const : value.isInMergeQueue === true ? "queued" as const : "none" as const } : {}),
     ...(head ? { head } : {}),
     ...(base ? { base } : {}),
   };
@@ -417,6 +457,13 @@ export async function readGitHubReviewCommentCounts(
   numbers: readonly number[],
   run: GitHubApiRunner,
 ): Promise<Map<number, ReviewCommentCounts>> {
+  const observed = await readGitHubReviewCommentObservations(owner, repo, numbers, run);
+  return new Map([...observed].map(([number, value]) => [number, value.counts]));
+}
+
+export async function readGitHubReviewCommentObservations(
+  owner: string, repo: string, numbers: readonly number[], run: GitHubApiRunner, epoch?: string,
+): Promise<Map<number, { counts: ReviewCommentCounts; observation: import("./schemas.js").PullRequestObservation }>> {
   const unique = [...new Set(numbers)].filter(
     (number) => Number.isInteger(number) && number > 0,
   );
@@ -424,11 +471,16 @@ export async function readGitHubReviewCommentCounts(
   const selections = unique
     .map(
       (number, index) =>
-        `p${index}: pullRequest(number: ${number}) { reviewThreads(first: 100) { totalCount nodes { isResolved comments { totalCount } } } }`,
+        [
+          `p${index}: pullRequest(number: ${number}) { headRefOid baseRefOid updatedAt reviewDecision`,
+          "reviewRequests(first: 100) { totalCount nodes { requestedReviewer { ... on User { login } ... on Team { slug } } } }",
+          "reviews(last: 100) { totalCount nodes { author { login } state submittedAt } }",
+          "reviewThreads(first: 100) { totalCount nodes { isResolved comments { totalCount } } } }",
+        ].join(" "),
     )
     .join(" ");
   try {
-    const stdout = await run(
+    const source = await readObservedGitHub(run,
       [
         "api",
         "graphql",
@@ -437,15 +489,17 @@ export async function readGitHubReviewCommentCounts(
       ],
       2_000_000,
     );
-    const parsed: unknown = JSON.parse(stdout);
+    const parsed: unknown = JSON.parse(source.text);
     const repository =
       isRecord(parsed) && isRecord(parsed.data) && isRecord(parsed.data.repository)
         ? parsed.data.repository
         : {};
-    const result = new Map<number, ReviewCommentCounts>();
+    const result = new Map<number, { counts: ReviewCommentCounts; observation: import("./schemas.js").PullRequestObservation }>();
     unique.forEach((number, index) => {
-      const counts = reviewCommentCountsFromGraphql(repository[`p${index}`]);
-      if (counts) result.set(number, counts);
+      const value = repository[`p${index}`];
+      const counts = reviewCommentCountsFromGraphql(value);
+      if (counts && isRecord(value)) result.set(number, { counts, observation: { ...githubObservation(value, source.validatedAt),
+        sequence: source.sequence, epoch, reviewIdentity: JSON.stringify([String(value.reviewDecision ?? ""), value.reviews ?? null, value.reviewRequests ?? null]) } });
     });
     return result;
   } catch {
@@ -480,64 +534,49 @@ export async function readGitHubSignals(
   numbers: readonly number[],
   lifecycle: ServerLifecycle,
   run: GitHubApiRunner,
+  requirements: Readonly<Record<number, SignalDemands>> = {},
+  receivedSequence?: number,
 ): Promise<Map<number, GitHubSignal>> {
-  const revision = lifecycle.remoteGeneration(`${owner}/${repo}`);
-  const assertCurrent = () => { if (revision !== lifecycle.remoteGeneration(`${owner}/${repo}`) || lifecycle.isDisposed) throw new Error("GitHub signals changed during the read."); };
-  const unique = [...new Set(numbers)].filter((number) => Number.isInteger(number) && number > 0);
-  const signals = new Map<number, GitHubSignal>();
-  const missing: number[] = [];
-  for (const number of unique) {
-    const cached = lifecycle.githubPullRequestSignalCache.get(signalKey(owner, repo, number));
-    if (cached && cached.expiresAt > Date.now()) signals.set(number, cached.value);
-    else missing.push(number);
-  }
-  if (missing.length && Date.now() >= lifecycle.githubGraphqlBackoffUntil) {
-    const selections = missing
-      .map((number, index) =>
-        [
+  return readSignalObservations({ owner, repo, numbers, lifecycle, demands: requirements, receivedSequence,
+    load: async (missing, afterSequence) => {
+      const revision = lifecycle.remoteGeneration(`${owner}/${repo}`);
+      const assertCurrent = () => { if (revision !== lifecycle.remoteGeneration(`${owner}/${repo}`) || lifecycle.isDisposed) throw new Error("GitHub signals changed during the read."); };
+      const signals = new Map<number, GitHubSignal>();
+      if (Date.now() >= lifecycle.githubGraphqlBackoffUntil) {
+        const selections = missing.map((number, index) => [
           `p${index}: pullRequest(number: ${number}) {`,
-          "headRefName baseRefName reviewDecision",
+          "title url state isDraft updatedAt headRefName baseRefName headRefOid baseRefOid reviewDecision mergeable mergeStateStatus isInMergeQueue",
           "reviewRequests(first: 100) { totalCount nodes { requestedReviewer { ... on User { login } ... on Team { slug } } } }",
           "reviews(last: 100) { totalCount nodes { author { login } state submittedAt } }",
           "commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }",
           "}",
-        ].join(" "),
-      )
-      .join(" ");
-    try {
-      const stdout = await run(["api", "graphql", "-f", `query=query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${selections} } }`], 4_000_000);
+        ].join(" ")).join(" ");
+        try {
+          const observed = await readObservedGitHub(run, ["api", "graphql", "-f", `query=query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${selections} } }`], 4_000_000, afterSequence);
+          assertCurrent();
+          const parsed: unknown = JSON.parse(observed.text);
+          const repository = isRecord(parsed) && isRecord(parsed.data) && isRecord(parsed.data.repository) ? parsed.data.repository : {};
+          missing.forEach((number, index) => {
+            const signal = signalFromGraphql(repository[`p${index}`], observed.validatedAt);
+            if (!signal) return;
+            signal.observations = Object.fromEntries(Object.entries(signal.observations ?? {}).map(([group, clock]) =>
+              [group, { ...clock, ...(observed.sequence === undefined ? {} : { sequence: observed.sequence }), epoch: lifecycle.observationEpoch }]));
+            signals.set(number, signal);
+          });
+        } catch (error) {
+          assertCurrent();
+          if (graphQlRateLimited(error)) lifecycle.githubGraphqlBackoffUntil = Date.now() + GITHUB_GRAPHQL_BACKOFF_MS;
+        }
+      }
+      const fallback = await Promise.all(missing.filter((number) => !signals.has(number)).map(async (number) => {
+        const recovered = await readGitHubPullRequestRest(owner, repo, number, lifecycle, run, afterSequence);
+        return [number, recovered?.signal ?? null] as const;
+      }));
       assertCurrent();
-      const parsed: unknown = JSON.parse(stdout);
-      const repository = isRecord(parsed) && isRecord(parsed.data) && isRecord(parsed.data.repository) ? parsed.data.repository : {};
-      missing.forEach((number, index) => {
-        const signal = signalFromGraphql(repository[`p${index}`]);
-        if (!signal) return;
-        signals.set(number, signal);
-        lifecycle.cacheGitHubPullRequestSignal(signalKey(owner, repo, number), signal, Date.now() + GITHUB_SIGNAL_CACHE_MS);
-      });
-    } catch (error) {
-      assertCurrent();
-      if (graphQlRateLimited(error)) lifecycle.githubGraphqlBackoffUntil = Date.now() + GITHUB_GRAPHQL_BACKOFF_MS;
-    }
-  }
-  const fallback = await Promise.all(missing.filter((number) => !signals.has(number)).map(async (number) => {
-    const key = signalKey(owner, repo, number);
-    const pending = lifecycle.githubPullRequestSignalPending.get(key);
-    if (pending) return [number, await pending] as const;
-    const request = readGitHubPullRequestRest(owner, repo, number, lifecycle, run)
-      .then((recovered) => { assertCurrent(); return recovered?.signal ?? null; })
-      .finally(() => {
-        if (lifecycle.githubPullRequestSignalPending.get(key) === request)
-          lifecycle.releasePending("pullRequestSignal", key);
-      });
-    lifecycle.githubPullRequestSignalPending.set(key, request);
-    return [number, await request] as const;
-  }));
-  assertCurrent();
-  for (const [number, signal] of fallback) {
-    if (signal) signals.set(number, signal);
-  }
-  return signals;
+      for (const [number, signal] of fallback) if (signal) signals.set(number, signal);
+      return signals;
+    },
+  });
 }
 
 export async function readGitHubPullRequestRest(
@@ -546,16 +585,17 @@ export async function readGitHubPullRequestRest(
   number: number,
   lifecycle: ServerLifecycle,
   run: GitHubApiRunner,
+  afterSequence?: number,
 ): Promise<GitHubRestPullRequest | null> {
   const revision = lifecycle.remoteGeneration(`${owner}/${repo}`);
   try {
     const headers = ["-H", `Accept: ${GITHUB_ACCEPT_HEADER}`, "-H", `X-GitHub-Api-Version: ${GITHUB_STACK_API_VERSION}`];
-    const [pullRequestText, reviewsText] = await Promise.all([
-      run(["api", "--method", "GET", `repos/${owner}/${repo}/pulls/${number}`, ...headers], 2_000_000),
-      run(["api", "--method", "GET", "--paginate", "--slurp", `repos/${owner}/${repo}/pulls/${number}/reviews?per_page=100`, ...headers], 2_000_000),
+    const [metadataRead, reviewsRead] = await Promise.all([
+      readObservedGitHub(run, ["api", "--method", "GET", `repos/${owner}/${repo}/pulls/${number}`, ...headers], 2_000_000, afterSequence),
+      readObservedGitHub(run, ["api", "--method", "GET", "--paginate", "--slurp", `repos/${owner}/${repo}/pulls/${number}/reviews?per_page=100`, ...headers], 2_000_000, afterSequence),
     ]);
-    const pullRequest = JSON.parse(pullRequestText) as unknown;
-    const reviews = JSON.parse(reviewsText) as unknown;
+    const pullRequest = JSON.parse(metadataRead.text) as unknown;
+    const reviews = JSON.parse(reviewsRead.text) as unknown;
     if (!isRecord(pullRequest)) return null;
     const head = isRecord(pullRequest.head) && typeof pullRequest.head.ref === "string" && pullRequest.head.ref
       ? pullRequest.head.ref : null;
@@ -582,10 +622,24 @@ export async function readGitHubPullRequestRest(
       reviewerStates,
     });
     const reviewerFact = reviewerFacts(reviewerStates);
+    const metadataObservation = { ...githubObservation(pullRequest, metadataRead.validatedAt), ...(metadataRead.sequence === undefined ? {} : { sequence: metadataRead.sequence }), epoch: lifecycle.observationEpoch };
+    const reviewObservation = { ...metadataObservation,
+      validatedAt: metadataRead.validatedAt === null || reviewsRead.validatedAt === null ? null : Math.min(metadataRead.validatedAt, reviewsRead.validatedAt),
+      sequence: metadataRead.sequence === undefined || reviewsRead.sequence === undefined ? undefined : Math.min(metadataRead.sequence, reviewsRead.sequence),
+      reviewIdentity: JSON.stringify([reviews, pullRequest.requested_reviewers ?? null, pullRequest.requested_teams ?? null]) };
+    const observations = {
+      ...(typeof pullRequest.title === "string" || pullRequest.title === null ? { title: metadataObservation } : {}),
+      ...(typeof pullRequest.state === "string" && typeof pullRequest.draft === "boolean" ? { lifecycle: metadataObservation } : {}),
+      ...(head || pullRequest.head === null ? { head: metadataObservation } : {}),
+      ...(base || pullRequest.base === null ? { base: metadataObservation } : {}),
+      review: reviewObservation, people: reviewObservation,
+      ...(typeof pullRequest.review_comments === "number" || pullRequest.review_comments === null ? { comments: { ...metadataObservation, reviewIdentity: reviewObservation.reviewIdentity } } : {}),
+    };
     const sha = isRecord(pullRequest.head) && typeof pullRequest.head.sha === "string" ? pullRequest.head.sha : null;
     const recoveredPullRequest: GitHubPullRequest = {
+      observations,
       number,
-      state: pullRequest.merged === true ? "merged" : typeof pullRequest.state === "string" ? pullRequest.state : "open",
+      state: pullRequest.merged === true ? "merged" : pullRequest.state === "closed" ? "closed" : "open",
       draft: pullRequest.draft === true,
       head: head ?? "",
       base: base ?? "",
@@ -595,14 +649,13 @@ export async function readGitHubPullRequestRest(
     };
     if (!sha) {
       const signal = {
+        observations,
         checks: "unknown",
         review,
-        ...(reviewerFact.approvers.length
-          ? { approvers: reviewerFact.approvers }
-          : {}),
-        ...(reviewerFact.changeRequesters.length
-          ? { changeRequesters: reviewerFact.changeRequesters }
-          : {}),
+        approvers: reviewerFact.approvers,
+        changeRequesters: reviewerFact.changeRequesters,
+        requestedReviewers: requestedReviewerList,
+        reviewRequestCount: requests,
         ...metadata,
       } satisfies GitHubSignal;
       return {
@@ -612,41 +665,43 @@ export async function readGitHubPullRequestRest(
         reviewRequestCount: requests,
       };
     }
-    const checks = JSON.parse(await run([
-      "api", "--method", "GET", `repos/${owner}/${repo}/commits/${sha}/check-runs?per_page=100`,
-      ...headers,
-    ], 4_000_000)) as unknown;
-    const runs = isRecord(checks) && Array.isArray(checks.check_runs) ? checks.check_runs : [];
-    const failedStates = new Set(["FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE"]);
-    const conclusions = runs.map((item) => isRecord(item) ? String(item.conclusion ?? "") : "");
-    const failedCount = conclusions.filter((state) => failedStates.has(state)).length;
-    const pendingCount = runs.filter((item) => !isRecord(item) || item.status !== "completed" || item.conclusion === null).length;
-    const passedCount = conclusions.filter((state) => state === "SUCCESS").length;
-    const failed = failedCount > 0;
-    const pending = pendingCount > 0;
+    const checksRead = await readRestChecks({ owner, repo, sha, run, headers, afterSequence });
+    const trailingMetadata = await readObservedGitHub(run,
+      ["api", "--method", "GET", `repos/${owner}/${repo}/pulls/${number}`, ...headers], 2_000_000,
+      lifecycle.nextObservationSequence());
+    const trailing = JSON.parse(trailingMetadata.text) as unknown;
+    if (!isRecord(trailing) || !isRecord(trailing.head) || trailing.head.sha !== sha
+      || !isRecord(trailing.base) || !isRecord(pullRequest.base)
+      || trailing.base.sha !== pullRequest.base.sha || trailing.base.ref !== pullRequest.base.ref)
+      throw new Error("Pull request head/base changed during checks validation.");
+    const validation = earliestValidation([metadataRead, ...checksRead.sources, trailingMetadata]);
+    const reviewValidation = earliestValidation([metadataRead, reviewsRead, trailingMetadata]);
+    const checks = checksRead.checks;
+    const signalChecks = checks.state === "failing" ? "failed" : checks.state === "no_checks" ? "none" : checks.state;
+    const checkedObservation = { ...metadataObservation, ...validation };
+    const checkedReviewObservation = { ...reviewObservation, ...reviewValidation };
+    if (typeof trailing.review_comments === "number") {
+      recoveredPullRequest.reviewCommentCount = trailing.review_comments;
+      observations.comments = { ...metadataObservation, validatedAt: trailingMetadata.validatedAt,
+        ...(trailingMetadata.sequence === undefined ? {} : { sequence: trailingMetadata.sequence }), reviewIdentity: reviewObservation.reviewIdentity };
+    }
+
     const signal = {
-      checks: failed ? "failed" : pending ? "pending" : runs.length ? "passing" : "none",
+      observations: { ...observations, checks: checkedObservation, checkCounts: checkedObservation, review: checkedReviewObservation, people: checkedReviewObservation },
+      checks: signalChecks,
       review,
-      ...(reviewerFact.approvers.length
-        ? { approvers: reviewerFact.approvers }
-        : {}),
-      ...(reviewerFact.changeRequesters.length
-        ? { changeRequesters: reviewerFact.changeRequesters }
-        : {}),
+      approvers: reviewerFact.approvers,
+      changeRequesters: reviewerFact.changeRequesters,
+      requestedReviewers: requestedReviewerList,
+      reviewRequestCount: requests,
+      checkDetails: checks,
       ...metadata,
     } satisfies GitHubSignal;
     if (revision !== lifecycle.remoteGeneration(`${owner}/${repo}`) || lifecycle.isDisposed) throw new Error("GitHub signals changed during the read.");
-    lifecycle.cacheGitHubPullRequestSignal(signalKey(owner, repo, number), signal, Date.now() + GITHUB_SIGNAL_CACHE_MS);
     return {
       pullRequest: recoveredPullRequest,
       signal,
-      checks: {
-        failedCount,
-        passedCount,
-        pendingCount,
-        state: failed ? "failing" : pending ? "pending" : runs.length ? "passing" : "no_checks",
-        totalCount: runs.length,
-      },
+      checks,
       reviewRequestCount: requests,
     };
   } catch {
@@ -661,10 +716,13 @@ export async function fetchGitHubStack(
   run: GitHubApiRunner,
   lifecycle: ServerLifecycle,
   discovered?: ReturnType<typeof parseGitHubStackResponse>,
+  requirements: Readonly<Record<number, SignalDemands>> = {},
 ): Promise<{ number: number; base: string; currentPullRequest: number; pullRequests: Array<GitHubPullRequest & GitHubSignal> } | null> {
-  const raw = discovered === undefined
-    ? parseGitHubStackResponse(JSON.parse(await run(githubStackApiArgs(owner, repo, pullRequest), 4_000_000)))
-    : discovered;
+  const source = discovered === undefined ? await readObservedGitHub(run, githubStackApiArgs(owner, repo, pullRequest), 4_000_000) : null;
+  const raw = source ? parseGitHubStackResponse(JSON.parse(source.text)) : discovered;
+  if (source && raw) raw.pullRequests = raw.pullRequests.map((member) => ({ ...member,
+    observations: Object.fromEntries(Object.entries(member.observations ?? {}).map(([group, clock]) => [group,
+      { ...clock, validatedAt: source.validatedAt, ...(source.sequence === undefined ? {} : { sequence: source.sequence }), epoch: lifecycle.observationEpoch }])) }));
   if (!raw) return null;
   const pullRequests = await Promise.all(raw.pullRequests.map(async (item) => {
     if (!needsGitHubPullRequestRecovery(item)) return item;
@@ -675,8 +733,8 @@ export async function fetchGitHubStack(
   }));
   const numbers = pullRequests.map((item) => item.number);
   const [signals, reviewCommentCounts] = await Promise.all([
-    readGitHubSignals(owner, repo, numbers, lifecycle, run),
-    readGitHubReviewCommentCounts(owner, repo, numbers, run),
+    readGitHubSignals(owner, repo, numbers, lifecycle, run, requirements),
+    readGitHubReviewCommentObservations(owner, repo, numbers, run, lifecycle.observationEpoch),
   ]);
   return {
     number: raw.number,
@@ -687,7 +745,9 @@ export async function fetchGitHubStack(
       return {
         ...item,
         ...(signals.get(item.number) ?? { checks: "unknown", review: "none" }),
-        ...(counts ? { reviewCommentCounts: counts } : {}),
+        observations: { ...item.observations, ...signals.get(item.number)?.observations },
+        ...(counts ? { reviewCommentCounts: counts.counts, reviewCommentCount: counts.counts.unresolved + counts.counts.resolved } : {}),
+        ...(counts ? { observations: { ...item.observations, ...signals.get(item.number)?.observations, comments: counts.observation } } : {}),
       };
     }),
   };

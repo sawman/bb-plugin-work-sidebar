@@ -4,21 +4,8 @@ export type GitHubApiHealth = {
   message: string | null;
   retryAt: number | null;
 };
-export type GitHubPullRequestSignal = {
-  checks: "failed" | "passing" | "pending" | "none" | "unknown";
-  review:
-    | "approved"
-    | "changes_requested"
-    | "review_requested"
-    | "review_required"
-    | "none";
-  head?: string;
-  base?: string;
-  reviewCommentCounts?: {
-    unresolved: number;
-    resolved: number;
-  };
-};
+export type GitHubPullRequestSignal = import("./features/pull-requests/server-types.js").GitHubSignal;
+export type GitHubReadPending = Promise<string> & { validatedAt?: number; sequence?: number };
 export type LegacyWorkContext = {
   state: "none" | "adoptable" | "ambiguous" | "project_mismatch";
   taskIds: string[];
@@ -35,6 +22,9 @@ export const MAX_LEGACY_WORK_CACHE = 128;
 type DisposableService = { dispose(): void };
 
 export class ServerLifecycle {
+  readonly observationEpoch = Math.random().toString(36).slice(2);
+  private observationSequence = 0;
+  nextObservationSequence() { return ++this.observationSequence; }
   remoteRevision = 0;
   private remoteSequence = 0;
   private readonly remoteRepositoryGenerations = new Map<string, number>();
@@ -61,16 +51,16 @@ export class ServerLifecycle {
   }
   readonly githubReadCache = new Map<
     string,
-    { expiresAt: number; value: string }
+    { expiresAt: number; value: string; validatedAt?: number | null; sequence?: number }
   >();
-  readonly githubReadPending = new Map<string, Promise<string>>();
+  readonly githubReadPending = new Map<string, GitHubReadPending>();
   readonly githubPullRequestSignalCache = new Map<
     string,
     ExpiringValue<GitHubPullRequestSignal>
   >();
   readonly githubPullRequestSignalPending = new Map<
     string,
-    Promise<GitHubPullRequestSignal | null>
+    import("./features/pull-requests/signal-validation.js").PendingSignalValidation
   >();
   readonly legacyWorkCache = new Map<string, ExpiringValue<LegacyWorkContext>>();
   readonly legacyWorkPending = new Map<string, LegacyWorkPending>();
@@ -110,7 +100,7 @@ export class ServerLifecycle {
     return service;
   }
 
-  cacheGitHubRead(key: string, value: string, expiresAt: number): void {
+  cacheGitHubRead(key: string, value: string, expiresAt: number, validatedAt: number | null = null, sequence?: number): void {
     if (this.disposed) return;
     for (const [entryKey, entry] of this.githubReadCache)
       if (entry.expiresAt <= Date.now()) this.githubReadCache.delete(entryKey);
@@ -124,7 +114,7 @@ export class ServerLifecycle {
       retainedBytes -= Buffer.byteLength(this.githubReadCache.get(oldest)!.value);
       this.githubReadCache.delete(oldest);
     }
-    this.githubReadCache.set(key, { value, expiresAt });
+    this.githubReadCache.set(key, { value, expiresAt, validatedAt, sequence });
   }
 
   cacheGitHubPullRequestSignal(

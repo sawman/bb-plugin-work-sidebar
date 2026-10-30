@@ -1,9 +1,13 @@
 import { useEffect, useMemo } from "react";
 import { experimental_useRpcKeyedQuery, useRpc } from "@get-bb/plugin-sdk/app";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { GITHUB_PR_STATUS_PLUGIN_ID, nativeStatusContract, environmentPullRequestSchema, type PullRequest } from "./native-status-schemas";
+import { GITHUB_PR_STATUS_PLUGIN_ID, nativeStatusContract, environmentPullRequestSchema, nativePullRequestAttention, type PullRequest } from "./native-status-schemas";
 import { normalizePullRequestSignal } from "./presentation";
-import { factFromPullRequest, factFromThreadPullRequest, pullRequestFromFact, mergePullRequestFacts, pullRequestFactKey, reconcileThreadPullRequestFactReferences, type PullRequestFactDirectory } from "./facts";
+import {
+  factFromPullRequest, factFromThreadPullRequest, pullRequestFromFact, pullRequestFactForThread,
+  mergePullRequestFacts, mergeNativePullRequestFact, nativeValidationDemands, pullRequestFactKey,
+  reconcileThreadPullRequestFactReferences, type PullRequestFactDirectory,
+} from "./facts";
 import { hydratePullRequestFacts, pullRequestKeys, pullRequestPolicies, useSharedPullRequestFactDirectory } from "./queries";
 import type { rpcContract } from "../../contracts";
 
@@ -12,8 +16,10 @@ export function projectNativePullRequest(pullRequest: PullRequest) {
     number: pullRequest.number, title: pullRequest.title, url: pullRequest.url, state: pullRequest.state,
     head: pullRequest.headRefName, base: pullRequest.baseRefName,
     checks: pullRequest.checks, review: pullRequest.review, mergeability: pullRequest.mergeability,
-    attention: pullRequest.attention,
+    attention: nativePullRequestAttention(pullRequest),
     signal: normalizePullRequestSignal({ checks: pullRequest.checks, review: pullRequest.review }),
+    observations: Object.fromEntries(["title", "lifecycle", "head", "base", "checks", "checkCounts", "review", "mergeability"].map((group) =>
+      [group, { source: "native" as const, validatedAt: null, updatedAt: pullRequest.updatedAt }])),
   };
 }
 
@@ -34,20 +40,7 @@ export function useNativeThreadPullRequest(threadId: string, environmentId: stri
     client.setQueryData<PullRequestFactDirectory>(pullRequestKeys.factDirectory(), (current) => {
       const pullRequest = row?.outcome === "available" ? projectNativePullRequest(row.pullRequest) : null;
       const fact = pullRequest ? factFromPullRequest(pullRequest) : null;
-      const previous = fact ? current?.facts[fact.key] : undefined;
-      if (fact && previous) {
-        // Native core rows do not contain enrichment's people or comment totals.
-        const people = previous.signal.review === fact.signal.review ? {
-          approvers: previous.signal.approvers,
-          changeRequesters: previous.signal.changeRequesters,
-          requestedReviewers: previous.signal.requestedReviewers,
-        } : {};
-        fact.signal = { ...fact.signal, ...people,
-          reviewCommentCount: previous.signal.reviewCommentCount,
-          reviewCommentCounts: previous.signal.reviewCommentCounts,
-        };
-      }
-      const merged = mergePullRequestFacts(current, fact ? [fact] : []);
+      const merged = fact ? mergeNativePullRequestFact(current, fact) : mergePullRequestFacts(current, []);
       const references = { ...merged.threadFactKeys };
       delete references[threadId];
       if (pullRequest) references[threadId] = pullRequestFactKey(pullRequest);
@@ -78,26 +71,28 @@ export function useObservedThreadPullRequest(threadId: string, environmentId: st
   const native = useNativeThreadPullRequest(threadId, environmentId);
   const facts = useSharedPullRequestFactDirectory();
   const pullRequest = native.pullRequest;
+  const key = pullRequest ? pullRequestFactKey(pullRequest) : null;
+  const validationDemand = nativeValidationDemands(facts.data, key);
   const enrichment = useQuery({
-    queryKey: [...pullRequestKeys.threadDirectory(), threadId, native.row],
+    queryKey: [...pullRequestKeys.threadDirectory(), threadId, key, validationDemand ?? null],
     queryFn: async ({ signal }) => {
-      const before = client.getQueryData<PullRequestFactDirectory>(pullRequestKeys.factDirectory());
-      const result = await rpc.call("sidebarThreadPullRequests", { threadIds: [threadId] });
+      const result = await rpc.call("sidebarThreadPullRequests", { threadIds: [threadId],
+        ...(key && validationDemand ? { validationRequirements: { [key]: validationDemand } } : {}) });
       if (!result.available) throw new Error(result.error ?? "Pull request enrichment unavailable.");
       const entry = result.pullRequests[threadId];
       if (entry === undefined) throw new Error("Pull request enrichment omitted this thread.");
       if (entry && !signal.aborted) {
         const fact = factFromThreadPullRequest(entry);
-        const current = client.getQueryData<PullRequestFactDirectory>(pullRequestKeys.factDirectory());
-        if (current?.facts[fact.key] === before?.facts[fact.key]) hydratePullRequestFacts(client, [fact]);
+        hydratePullRequestFacts(client, [fact]);
       }
       return entry;
     },
     ...pullRequestPolicies.threadDirectory,
-    enabled: Boolean(pullRequest) && !native.error,
+    enabled: Boolean(pullRequest && validationDemand) && !native.error,
   });
   const fact = pullRequest ? facts.data?.facts[pullRequestFactKey(pullRequest)] : undefined;
-  const displayed = pullRequest && fact ? pullRequestFromFact(fact) : pullRequest;
+  const retained = native.row?.outcome === "absent" ? null : pullRequestFactForThread(facts.data, threadId);
+  const displayed = pullRequest && fact ? pullRequestFromFact(fact) : pullRequest ?? (retained ? pullRequestFromFact(retained) : null);
   const detail = enrichment.data?.url === pullRequest?.url ? enrichment.data : null;
   return {
     pullRequest: displayed ? { ...displayed, stackNumber: detail?.stackNumber ?? null } : null,

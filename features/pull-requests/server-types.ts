@@ -1,6 +1,7 @@
 import type { SidebarStack } from "../../work-model.js";
 
 export interface CurrentPullRequest {
+  observations?: import("./schemas.js").PullRequestObservations;
   number: number;
   title: string;
   url: string;
@@ -31,7 +32,7 @@ export interface CurrentPullRequest {
     review: "approved" | "changes_requested" | "review_requested" | "review_required" | "none";
     requestedReviewers?: string[];
     reviewCommentCount: number;
-    reviewCommentCounts?: ReviewCommentCounts;
+    reviewCommentCounts?: ReviewCommentCounts | null;
   };
 }
 
@@ -41,8 +42,9 @@ export type ReviewCommentCounts = {
 };
 
 export type GitHubPullRequest = {
+  observations?: import("./schemas.js").PullRequestObservations;
   number: number;
-  state: string;
+  state: "closed" | "draft" | "merged" | "open";
   draft: boolean;
   head: string;
   base: string;
@@ -52,6 +54,16 @@ export type GitHubPullRequest = {
 };
 
 export type GitHubSignal = {
+  reviewCommentCount?: number;
+  observations?: import("./schemas.js").PullRequestObservations;
+  title?: string;
+  url?: string;
+  state?: "open" | "closed" | "merged" | "draft";
+  draft?: boolean;
+  checkDetails?: CurrentPullRequest["checks"];
+  reviewRequestCount?: number;
+  mergeability?: CurrentPullRequest["mergeability"];
+  attention?: CurrentPullRequest["attention"];
   approvers?: string[];
   checks: "failed" | "passing" | "pending" | "none" | "unknown";
   changeRequesters?: string[];
@@ -62,10 +74,13 @@ export type GitHubSignal = {
   base?: string;
 };
 
-export type GitHubApiRunner = (args: readonly string[], maxBuffer: number) => Promise<string>;
-export type GitHubReadRunner = (args: readonly string[], maxBuffer: number, cacheTtlMs?: number, identity?: string) => Promise<string>;
+export type GitHubApiRunner = (args: readonly string[], maxBuffer: number, policy?: import("../../shared/github/read-cache.js").GitHubReadPolicy) => Promise<string>;
+export type GitHubReadRunner = (args: readonly string[], maxBuffer: number, cacheTtlMs?: number, identity?: string, policy?: import("../../shared/github/read-cache.js").GitHubReadPolicy) => Promise<string>;
 
 export type AuthoredPullRequest = {
+  observations?: import("./schemas.js").PullRequestObservations;
+  attention?: CurrentPullRequest["attention"];
+  mergeability?: CurrentPullRequest["mergeability"] | null;
   number: number;
   title: string;
   url: string;
@@ -80,6 +95,6 @@ export type AuthoredPullRequest = {
   changeRequesters?: string[];
   requestedReviewers?: string[];
   reviewCommentCount: number;
-  reviewCommentCounts?: ReviewCommentCounts;
+  reviewCommentCounts?: ReviewCommentCounts | null;
   stack: SidebarStack | null;
 };

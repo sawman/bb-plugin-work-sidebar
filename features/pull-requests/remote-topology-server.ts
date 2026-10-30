@@ -2,6 +2,7 @@ import type { ServerLifecycle } from "../../server-lifecycle.js";
 import type { GitHubReadRunner } from "./server-types.js";
 import { createRemoteCache } from "./remote-cache.js";
 import { githubStackApiArgs, githubStacksApiArgs, parseGitHubStacksResponse } from "./server-stack.js";
+import { readObservedGitHub } from "./source-observation.js";
 
 export type RemoteTopology = ReturnType<typeof parseGitHubStacksResponse>[number];
 export type RepositoryTopologyReader = ReturnType<typeof createRepositoryTopologyReader>;
@@ -15,9 +16,12 @@ export function createRepositoryTopologyReader(lifecycle: ServerLifecycle, read:
     let deadline = Infinity;
     const generation = lifecycle.remoteGeneration(repository);
     return cache.read(key, async () => {
-      const raw = await read(args, 12_000_000);
+      const source = await readObservedGitHub((commandArgs, buffer, policy) => read(commandArgs, buffer, undefined, undefined, policy), args, 12_000_000);
       deadline = lifecycle.githubReadCache.get(args.join("\u0000"))?.expiresAt ?? Infinity;
-      const parsed = parseGitHubStacksResponse(JSON.parse(raw));
+      const parsed = parseGitHubStacksResponse(JSON.parse(source.text)).map((stack) => ({ ...stack, pullRequests: stack.pullRequests.map((member) => {
+        return { ...member, observations: Object.fromEntries(Object.entries(member.observations ?? {}).map(([group, clock]) => [group,
+          { ...clock, validatedAt: source.validatedAt, ...(source.sequence === undefined ? {} : { sequence: source.sequence }), epoch: lifecycle.observationEpoch }])) };
+      }) }));
       if (lifecycle.isDisposed || lifecycle.remoteGeneration(repository) !== generation)
         throw new Error("Remote topology changed during discovery.");
       return parsed;

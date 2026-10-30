@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef } from "react";
 import type { PluginRpcClient } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../../contracts";
+import { pullRequestAttentionFromSignal } from "./presentation";
 import { queryPolicies } from "../../query-runtime";
 import type { AuthoredPullRequestContract, PullRequestReviewerContract, threadPullRequest } from "./schemas";
 import {
@@ -13,6 +14,7 @@ import {
   factFromSidebarStackLayer,
   mergePullRequestFact,
   mergePullRequestFacts,
+  mergeNativePullRequestFact,
   pullRequestFactKey,
   pullRequestFromFact,
   reconcileThreadPullRequestFactReferences,
@@ -111,7 +113,12 @@ export function hydratePullRequestFacts(
   client.setQueryData<PullRequestFactDirectory>(
     pullRequestKeys.factDirectory(),
     (current) => {
-      const merged = mergePullRequestFacts(current, facts);
+      let observed = current;
+      for (const fact of facts) {
+        if (!observed?.facts[fact.key] && Object.values(fact.observations ?? {}).some((clock) => clock?.source === "native" && !clock.native))
+          observed = mergeNativePullRequestFact(observed, fact);
+      }
+      const merged = mergePullRequestFacts(observed, facts);
       return threadFactKeys === undefined
         ? merged
         : reconcileThreadPullRequestFactReferences(merged, threadFactKeys);
@@ -150,13 +157,12 @@ function resolveAuthoredPullRequests<T extends {
         const resolvedLayer = mergePullRequestFact(directory?.facts[pullRequestFactKey(layer)], factFromSidebarStackLayer(layer));
         return { ...layer, state: resolvedLayer.state, draft: resolvedLayer.draft,
           title: resolvedLayer.title, head: resolvedLayer.head, base: resolvedLayer.base,
+          ...(resolvedLayer.observations ? { observations: resolvedLayer.observations } : {}),
           attention: resolvedLayer.attention, ...resolvedLayer.signal };
       }),
     } : pullRequest.stack;
     const resolved = directory?.facts[pullRequestFactKey(pullRequest)] ?? null;
-    // An authored row seeds the directory with its own partial fact. Preserve
-    // that exact wire shape until a richer thread/Changes fact is available.
-    if (!resolved || (!resolved.checks && !resolved.review && !resolved.mergeability))
+    if (!resolved)
       return [{ ...pullRequest, ...(stack === undefined ? {} : { stack }) }];
     return [{
       ...pullRequest,
@@ -167,14 +173,15 @@ function resolveAuthoredPullRequests<T extends {
       url: fact.url,
       head: fact.head,
       base: fact.base,
+      ...(resolved.observations ? { observations: resolved.observations } : {}),
       checks: fact.signal.checks,
       review: fact.signal.review,
-      approvers: fact.signal.approvers,
-      changeRequesters: fact.signal.changeRequesters,
-      requestedReviewers: fact.signal.requestedReviewers,
+      ...(fact.signal.approvers === undefined ? {} : { approvers: fact.signal.approvers }),
+      ...(fact.signal.changeRequesters === undefined ? {} : { changeRequesters: fact.signal.changeRequesters }),
+      ...(fact.signal.requestedReviewers === undefined ? {} : { requestedReviewers: fact.signal.requestedReviewers }),
       reviewCommentCount: fact.signal.reviewCommentCount,
-      reviewCommentCounts: fact.signal.reviewCommentCounts,
-      attention: fact.attention,
+      ...(fact.signal.reviewCommentCounts === undefined ? {} : { reviewCommentCounts: fact.signal.reviewCommentCounts }),
+      ...(fact.attention === pullRequestAttentionFromSignal(fact.signal) ? {} : { attention: fact.attention }),
     } as T];
   });
 }

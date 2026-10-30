@@ -12,12 +12,13 @@ import { hydratePullRequestFacts, pullRequestKeys, useAuthoredPullRequests, useS
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../../contracts";
 import { currentPr } from "../../changes/tests/latency-fixtures";
+import { prObservations } from "../../../tests/fixtures/pr-observation";
 
 afterEach(() => { cleanup(); changesInteractionStore.setState({ byThread: new Map() }); });
 
 it("publishes a merged sibling through stale detailed OPEN facts into both bars without changing the current PR or local flags", async () => {
   const client = new QueryClient();
-  const sibling = currentPr(2518, "Detailed sibling title");
+  const sibling = { ...currentPr(2518, "Detailed sibling title"), observations: prObservations(200) };
   const current = currentPr(2531, "Current PR");
   const previousFact = factFromPullRequest(sibling);
   hydratePullRequestFacts(client, [previousFact], { thr_sibling: previousFact.key });
@@ -25,7 +26,7 @@ it("publishes a merged sibling through stale detailed OPEN facts into both bars 
     checks: "passing" as const, review: "approved" as const, reviewCommentCount: 0 });
   const cachedStack = { id: "stack", number: 7, base: "main", currentPullRequest: 2531,
     pullRequests: [light(sibling), light(current)] };
-  const mergedLayer = { ...light(sibling), title: "Older topology title", state: "merged" as const };
+  const mergedLayer = { ...light(sibling), title: "Older topology title", state: "merged" as const, observations: prObservations(100) };
   const summary = { currentPullRequest: current, stack: { ...cachedStack, pullRequests: [mergedLayer, light(current)] }, stackUnavailableReason: null };
   let completeSummary!: (value: typeof summary) => void;
   const pendingSummary = new Promise<typeof summary>((resolve) => { completeSummary = resolve; });

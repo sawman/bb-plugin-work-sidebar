@@ -43,7 +43,7 @@ export type PullRequestSignal = {
   reviewCommentCounts?: {
     unresolved: number;
     resolved: number;
-  };
+  } | null;
 };
 
 export type { StatusPresentation } from "../../components/ui/status";
@@ -269,7 +269,7 @@ export function normalizePullRequestSignal(input: {
   reviewCommentCounts?: {
     unresolved: number;
     resolved: number;
-  };
+  } | null;
 }): PullRequestSignal {
   const checks =
     typeof input.checks === "string"
@@ -278,10 +278,10 @@ export function normalizePullRequestSignal(input: {
         ? "failed"
         : input.checks.pendingCount > 0 || input.checks.state === "pending"
           ? "pending"
-          : input.checks.totalCount > 0 || input.checks.state === "passing"
-            ? "passing"
-            : input.checks.state === "unknown"
-              ? "unknown"
+          : input.checks.state === "unknown"
+            ? "unknown"
+            : input.checks.state === "passing"
+              ? "passing"
               : "none";
   // Identity-aware coercion happens on the GitHub-reading server. The client
   // sees only a count, which must never turn another reviewer's request into
@@ -290,15 +290,15 @@ export function normalizePullRequestSignal(input: {
   return {
     checks,
     review,
-    ...(input.approvers?.length ? { approvers: input.approvers } : {}),
-    ...(input.changeRequesters?.length
+    ...(input.approvers !== undefined ? { approvers: input.approvers } : {}),
+    ...(input.changeRequesters !== undefined
       ? { changeRequesters: input.changeRequesters }
       : {}),
-    ...(input.requestedReviewers?.length
+    ...(input.requestedReviewers !== undefined
       ? { requestedReviewers: input.requestedReviewers }
       : {}),
     reviewCommentCount: Math.max(0, input.reviewCommentCount ?? 0),
-    ...(input.reviewCommentCounts
+    ...(input.reviewCommentCounts === null ? { reviewCommentCounts: null } : input.reviewCommentCounts
       ? {
           reviewCommentCounts: {
             unresolved: Math.max(0, input.reviewCommentCounts.unresolved),

@@ -3,6 +3,10 @@ import type { GitHubApiHealth, ServerLifecycle } from "../../server-lifecycle.js
 export type GitHubReadScope = "graphql" | "rest";
 export type GitHubCommand = (args: readonly string[], maxBuffer: number) => Promise<string>;
 export type GitHubErrorClassifier = (error: unknown, scope: GitHubReadScope) => GitHubApiHealth;
+export type GitHubReadPolicy = {
+  afterSequence?: number;
+  onValidation?: (validatedAt: number | null, sequence?: number) => void;
+};
 
 const GRAPHQL_BACKOFF_MS = 60 * 60_000;
 
@@ -32,11 +36,13 @@ function recordGitHubReadSuccess(
   key: string,
   stdout: string,
   ttlMs: number,
+  validatedAt: number,
+  sequence: number,
 ): string {
   if (lifecycle.isDisposed) return stdout;
   recordGitHubReadAvailability(lifecycle, scope);
   if (lifecycle.githubReadCache.size >= 300) lifecycle.githubReadCache.delete(lifecycle.githubReadCache.keys().next().value!);
-  if (ttlMs > 0) lifecycle.cacheGitHubRead(key, stdout, Date.now() + ttlMs);
+  if (ttlMs > 0) lifecycle.cacheGitHubRead(key, stdout, Date.now() + ttlMs, validatedAt, sequence);
   return stdout;
 }
 
@@ -85,25 +91,40 @@ export async function readGitHub(
   maxBuffer: number,
   ttlMs: number,
   identity?: string,
+  policy?: GitHubReadPolicy,
 ): Promise<string> {
   if (lifecycle.isDisposed) throw new Error("GitHub read lifecycle is disposed.");
   const scope = scopeFor(args);
   const key = args.join("\u0000") + (ttlMs === 0 ? "\u0000fresh" : "") + (identity ? `\u0000${identity}` : "");
   const cached = lifecycle.githubReadCache.get(key);
-  if (ttlMs > 0 && cached && cached.expiresAt > Date.now()) return cached.value;
+  if (ttlMs > 0 && cached && cached.expiresAt > Date.now()
+    && (policy?.afterSequence === undefined || (cached.sequence ?? -Infinity) > policy.afterSequence)) {
+    policy?.onValidation?.(cached.validatedAt ?? null, cached.sequence);
+    return cached.value;
+  }
   const health = scope === "graphql" ? lifecycle.githubGraphqlHealth : lifecycle.githubRestHealth;
   if (health.state === "rate_limited" && health.retryAt && health.retryAt > Date.now()) {
     throw new Error(health.message ?? "GitHub API is rate limited.");
   }
   const pending = lifecycle.githubReadPending.get(key);
-  if (pending) return pending;
+  if (pending) {
+    if (policy?.afterSequence !== undefined && (pending.sequence ?? -Infinity) <= policy.afterSequence) {
+      await pending.catch(() => undefined);
+      return readGitHub(lifecycle, command, classifyError, args, maxBuffer, ttlMs, identity, policy);
+    }
+    const stdout = await pending;
+    policy?.onValidation?.(pending.validatedAt ?? null, pending.sequence);
+    return stdout;
+  }
 
+  const validatedAt = Date.now();
+  const sequence = lifecycle.nextObservationSequence();
   const isCurrent = () => !lifecycle.isDisposed && lifecycle.githubReadPending.get(key) === request;
-  const request = command(args, maxBuffer)
+  const request = Object.assign(command(args, maxBuffer)
     .then((stdout) => {
       if (lifecycle.isDisposed) return stdout;
       if (!isCurrent()) throw new Error("GitHub remote data changed during the read.");
-      return recordGitHubReadSuccess(lifecycle, scope, key, stdout, ttlMs);
+      return recordGitHubReadSuccess(lifecycle, scope, key, stdout, ttlMs, validatedAt, sequence);
     })
     .catch((error) => {
       if (lifecycle.isDisposed) throw error;
@@ -113,7 +134,9 @@ export async function readGitHub(
     .finally(() => {
       if (lifecycle.githubReadPending.get(key) === request)
         lifecycle.releasePending("githubRead", key);
-    });
+    }), { validatedAt, sequence });
   lifecycle.githubReadPending.set(key, request);
-  return request;
+  const stdout = await request;
+  policy?.onValidation?.(validatedAt, sequence);
+  return stdout;
 }

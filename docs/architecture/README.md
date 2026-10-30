@@ -79,7 +79,7 @@ packages remain external; exact host-compatible tooling belongs in
   Queue, task history, hierarchy safety and Recycle Bin versus host archive.
 - [Inbox](inbox.md): one-way messages, retention, editing and rendering limits.
 - [Changes and PR data](changes-and-prs.md): cache authorities, local/remote
-  separation, refresh and unresolved status correctness findings.
+  separation, source observations, shared status and refresh.
 - [PR status matrix](pull-request-status-matrix.md): intended common precedence.
 
 Work cards load independently. Goal and Plan reflect thread timeline content;

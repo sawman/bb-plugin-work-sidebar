@@ -1,6 +1,6 @@
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { GITHUB_PR_STATUS_PLUGIN_ID, nativeStatusContract } from "./native-status-schemas.js";
+import { GITHUB_PR_STATUS_PLUGIN_ID, nativeStatusContract, nativePullRequestAttention } from "./native-status-schemas.js";
 import { rpcContract, type GitHubStackBranch } from "../../contracts.js";
 import type { ServerLifecycle } from "../../server-lifecycle.js";
 import type { PullRequestChangesAdapter } from "../../shared/server-composition-dependencies.js";
@@ -16,7 +16,7 @@ import {
   readGitHubPullRequestFilePatch,
   readGitHubPullRequestRest,
   readGitHubPullRequestDiff,
-  readGitHubReviewCommentCounts,
+  readGitHubReviewCommentObservations,
   readGitHubSignals,
 } from "./server-stack.js";
 import type {
@@ -29,6 +29,7 @@ import type {
 import { remoteMetadataSchema } from "./remote-files-server.js";
 import { createRepositoryTopologyReader, type RepositoryTopologyReader } from "./remote-topology-server.js";
 import { createThreadReadService } from "./thread-read-server.js";
+import type { PullRequestValidationDemands } from "./schemas.js";
 
 const GITHUB_STACK_PLUGIN_ID = "gh-stack";
 
@@ -132,7 +133,8 @@ function applyRestPullRequestRecovery(
       state: signal.review,
     },
     attention: pullRequestAttentionFromSignal(signal),
-    signal: { ...signal, reviewCommentCount: pullRequest.reviewCommentCount },
+    signal: normalizePullRequestSignal({ ...signal, reviewCommentCount: pullRequest.reviewCommentCount }),
+    observations: { ...current.observations, ...pullRequest.observations, ...signal.observations },
   };
 }
 
@@ -142,6 +144,8 @@ function applyGitHubPullRequestSignal(
   signal: GitHubSignal | undefined,
 ): CurrentPullRequest {
   if (!signal) return current;
+  const hasChecks = !signal.observations || Boolean(signal.observations.checks);
+  const hasReview = !signal.observations || Boolean(signal.observations.review);
   const checkState = signal.checks === "failed"
     ? "failing"
     : signal.checks === "none"
@@ -149,23 +153,31 @@ function applyGitHubPullRequestSignal(
       : signal.checks;
   return {
     ...current,
-    checks: {
-      ...current.checks,
-      state: checkState,
-    },
-    review: {
-      reviewRequestCount: signal.requestedReviewers?.length ?? current.review.reviewRequestCount,
+    ...(signal.title === undefined ? {} : { title: signal.title }),
+    ...(signal.state === undefined ? {} : { state: current.state === "merged" ? "merged" : signal.state }),
+    ...(signal.head === undefined ? {} : { head: signal.head }),
+    ...(signal.base === undefined ? {} : { base: signal.base }),
+    ...(signal.mergeability === undefined ? {} : { mergeability: signal.mergeability }),
+    checks: hasChecks ? signal.checkDetails ?? { state: checkState, failedCount: 0, passedCount: 0, pendingCount: 0, totalCount: 0 } : current.checks,
+    review: hasReview ? {
+      reviewRequestCount: signal.reviewRequestCount ?? signal.requestedReviewers?.length ?? 0,
       state: signal.review,
-    },
-    attention: current.attention === "conflicts"
+    } : current.review,
+    attention: signal.attention ?? (current.attention === "conflicts"
       ? current.attention
       : current.attention === "queued"
         ? pullRequestQueuedAttention(signal)
-        : pullRequestAttentionFromSignal(signal),
-    signal: {
+        : pullRequestAttentionFromSignal(signal)),
+    signal: normalizePullRequestSignal({
       ...signal,
-      reviewCommentCount: current.signal.reviewCommentCount,
-    },
+      checks: hasChecks ? signal.checks : current.signal.checks,
+      review: hasReview ? signal.review : current.signal.review,
+      reviewCommentCount: signal.reviewCommentCount ?? (signal.reviewCommentCounts
+        ? signal.reviewCommentCounts.unresolved + signal.reviewCommentCounts.resolved : current.signal.reviewCommentCount),
+    }),
+    observations: { ...current.observations, ...signal.observations,
+      // The overlay has no raw count observation unless REST actually read it.
+      ...(hasChecks ? { checkCounts: signal.observations?.checkCounts } : {}) },
   };
 }
 
@@ -282,8 +294,9 @@ export function createThreadStackService(
     if (lifecycle.isDisposed) return Promise.reject(new Error("PR service is disposed."));
     return bb.sdk.plugins.callRpc({ pluginId: GITHUB_STACK_PLUGIN_ID, method, input, outputSchema });
   };
-  const readWhileActive: GitHubReadRunner = (args, buffer, ttlMs, identity) => {
+  const readWhileActive: GitHubReadRunner = (args, buffer, ttlMs, identity, policy) => {
     if (lifecycle.isDisposed) return Promise.reject(new Error("PR service is disposed."));
+    if (policy !== undefined) return read(args, buffer, ttlMs, identity, policy);
     if (identity !== undefined) return read(args, buffer, ttlMs, identity);
     return ttlMs === undefined ? read(args, buffer) : read(args, buffer, ttlMs);
   };
@@ -306,8 +319,10 @@ export function createThreadStackService(
       let currentPullRequest = projectCurrentPullRequest({
         number: result.pullRequest.number, title: result.pullRequest.title, url: result.pullRequest.url, state: result.pullRequest.state,
         head: result.pullRequest.headRefName, base: result.pullRequest.baseRefName, checks: result.pullRequest.checks, review: result.pullRequest.review,
-        attention: result.pullRequest.attention, mergeability: result.pullRequest.mergeability,
+        attention: nativePullRequestAttention(result.pullRequest), mergeability: result.pullRequest.mergeability,
         signal: normalizePullRequestSignal({ checks: result.pullRequest.checks, review: result.pullRequest.review }),
+        observations: Object.fromEntries(["title", "lifecycle", "head", "base", "checks", "checkCounts", "review", "mergeability"].map((group) =>
+          [group, { source: "native" as const, validatedAt: null, updatedAt: result.pullRequest.updatedAt }])),
       });
       const match = currentPullRequest.url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
       if (!match) return { currentPullRequest, stack: null, reason: "The linked pull request is not hosted on GitHub." };
@@ -320,13 +335,13 @@ export function createThreadStackService(
             match[2],
             currentPullRequest.number,
             lifecycle,
-            (args, buffer) => readWhileActive(args, buffer),
+            (args, buffer, policy) => readWhileActive(args, buffer, undefined, undefined, policy),
           ),
         );
       }
       const discovered = await topology.member(match[1], match[2], currentPullRequest.number, currentPullRequest.head, currentPullRequest.base);
       const stack = await fetchGitHubStack(match[1], match[2], currentPullRequest.number,
-        (args, buffer) => readWhileActive(args, buffer), lifecycle, discovered);
+        (args, buffer, policy) => readWhileActive(args, buffer, undefined, undefined, policy), lifecycle, discovered);
       let signal: GitHubSignal | undefined = stack?.pullRequests.find((pullRequest) =>
         pullRequest.number === currentPullRequest.number,
       );
@@ -337,19 +352,22 @@ export function createThreadStackService(
             match[2],
             [currentPullRequest.number],
             lifecycle,
-            (args, buffer) => readWhileActive(args, buffer),
+            (args, buffer, policy) => readWhileActive(args, buffer, undefined, undefined, policy),
           ),
-          readGitHubReviewCommentCounts(
+          readGitHubReviewCommentObservations(
             match[1],
             match[2],
             [currentPullRequest.number],
-            (args, buffer) => readWhileActive(args, buffer),
+            (args, buffer, policy) => readWhileActive(args, buffer, undefined, undefined, policy),
+            lifecycle.observationEpoch,
           ),
         ]);
         signal = signals.get(currentPullRequest.number);
         const counts = commentCounts.get(currentPullRequest.number);
         if (signal && counts)
-          signal = { ...signal, reviewCommentCounts: counts };
+          signal = { ...signal, reviewCommentCounts: counts.counts,
+            reviewCommentCount: counts.counts.unresolved + counts.counts.resolved,
+            observations: { ...signal.observations, comments: counts.observation } };
       }
       currentPullRequest = applyGitHubPullRequestSignal(
         currentPullRequest,
@@ -367,20 +385,45 @@ export function createThreadStackService(
   const threadReads = lifecycle.own(createThreadReadService((threadId) => {
     if (pendingRepositories.size >= 128 && !pendingRepositories.has(threadId))
       throw new Error("Thread PR read capacity reached.");
-    const marker: { repository: string | null } = { repository: null };
+    const marker = { repository: null as string | null };
     pendingRepositories.set(threadId, marker);
     return readStackForThread(threadId, (repository) => { marker.repository = repository; }).finally(() => {
       if (pendingRepositories.get(threadId) === marker) pendingRepositories.delete(threadId);
     });
   }));
-  const stackForThread = (threadId: string) => threadReads.read(threadId);
+  const stackForThread = async (threadId: string, requirements?: PullRequestValidationDemands) => {
+    // Receipt precedes the shared core read, in this factory's sequence domain.
+    // Different windows join that core read instead of retiring each other.
+    const receivedSequence = requirements ? lifecycle.nextObservationSequence() : undefined;
+    const remote = await threadReads.read(threadId);
+    const current = remote.currentPullRequest;
+    if (!requirements || !current || ("failed" in remote && remote.failed)) return remote;
+    const match = current.url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+    if (!match) return remote;
+    const repository = `${match[1]}/${match[2]}`.toLowerCase();
+    const members = new Set([current.number, ...(remote.stack?.pullRequests.map((member) => member.number) ?? [])]);
+    const demands = Object.fromEntries(Object.entries(requirements).flatMap(([key, demand]) => {
+      const separator = key.lastIndexOf("#");
+      const number = Number(key.slice(separator + 1));
+      return key.slice(0, separator).toLowerCase() === repository && members.has(number) ? [[number, demand]] : [];
+    }));
+    const numbers = Object.keys(demands).map(Number);
+    if (!numbers.length) return remote;
+    const signals = await readGitHubSignals(match[1], match[2], numbers, lifecycle,
+      (args, buffer, policy) => readWhileActive(args, buffer, undefined, undefined, policy), demands, receivedSequence);
+    return { ...remote, currentPullRequest: applyGitHubPullRequestSignal(current, signals.get(current.number)),
+      stack: remote.stack ? { ...remote.stack, pullRequests: remote.stack.pullRequests.map((member) => {
+        const signal = signals.get(member.number);
+        return signal ? { ...member, ...signal, observations: { ...member.observations, ...signal.observations } } : member;
+      }) } : null };
+  };
   // The SDK owns event subscriptions; release the captured service on dispose.
   let invalidateThread: ((threadId: string) => void) | null = (threadId) => threadReads.invalidate(threadId);
   lifecycle.own({ dispose() { invalidateThread = null; } });
   for (const event of ["thread.active", "thread.idle", "thread.archived", "thread.deleted"] as const)
     bb.events?.on(event, ({ thread }) => invalidateThread?.(thread.id));
-  const summary: PullRequestChangesAdapter["summary"] = async (threadId) => {
-    const remote = await stackForThread(threadId);
+  const summary: PullRequestChangesAdapter["summary"] = async (threadId, requirements) => {
+    const remote = await stackForThread(threadId, requirements);
     if ("failed" in remote && remote.failed) throw new Error(remote.reason ?? "Pull request unavailable.");
     return { currentPullRequest: remote.currentPullRequest, stack: remote.stack, stackUnavailableReason: remote.reason };
   };
@@ -459,7 +502,7 @@ export function createThreadStackService(
     }
   };
   const handlers: ThreadStackHandlers = {
-    async sidebarThreadPullRequests({ threadIds }) {
+    async sidebarThreadPullRequests({ threadIds, validationRequirements }) {
       try {
         const pullRequests: Record<
           string,
@@ -472,7 +515,7 @@ export function createThreadStackService(
         for (let start = 0; start < uniqueThreadIds.length; start += 8) {
           const entries = await Promise.all(
             uniqueThreadIds.slice(start, start + 8).map(async (threadId) => {
-              const stack = await stackForThread(threadId);
+              const stack = await stackForThread(threadId, validationRequirements);
               if ("failed" in stack && stack.failed) throw new Error(stack.reason ?? "Pull request unavailable.");
               return [
                 threadId,

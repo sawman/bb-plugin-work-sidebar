@@ -1,6 +1,7 @@
 import { pullRequest, pullRequestFact, threadPullRequest } from "../schemas";
 import { pullRequestSummaryPresentation } from "../presentation";
 import { describe, expect, it } from "vitest";
+import { prObservations } from "../../../tests/fixtures/pr-observation";
 import {
   factFromAuthoredPullRequest,
   factFromThreadPullRequest,
@@ -13,6 +14,7 @@ import {
 } from "../facts";
 
 const authored = {
+  observations: prObservations(50, ["title", "lifecycle", "head", "base", "checks", "review", "people"]),
   number: 1402,
   title: "Review lifecycle",
   url: "https://github.com/example-org/example-repo/pull/1402",
@@ -29,6 +31,7 @@ const authored = {
 };
 
 const thread = {
+  observations: prObservations(100),
   number: 1402,
   title: "Review lifecycle",
   url: "https://github.com/example-org/example-repo/pull/1402",
@@ -62,26 +65,26 @@ const thread = {
 describe("pull-request fact directory", () => {
   it("promotes merged lifecycle from a light Stack without replacing detailed metadata or its observation time", () => {
     const detailed = factFromThreadPullRequest(thread);
-    const first = mergePullRequestFacts(undefined, [detailed], {}, 100);
+    const first = mergePullRequestFacts(undefined, [detailed], {});
     const layer = { ...authored, title: "Older topology title", head: "old/head", base: "old/base", state: "merged", draft: false };
     const light = factFromSidebarStackLayer(layer);
-    const promoted = mergePullRequestFacts(first, [light], {}, 200);
+    const promoted = mergePullRequestFacts(first, [light], {});
     expect(promoted.facts[detailed.key]).toEqual({ ...detailed, state: "merged", draft: false, attention: "merged" });
     expect(promoted.observedAtByFact?.[detailed.key]).toBe(100);
     expect(resolvePullRequestFact({ ...authored, state: "merged" as const }, first).state).toBe("merged");
-    const staleOpen = mergePullRequestFacts(promoted, [detailed], {}, 300);
+    const staleOpen = mergePullRequestFacts(promoted, [detailed], {});
     expect(staleOpen.facts[detailed.key].state).toBe("merged");
     expect(staleOpen.facts[detailed.key].draft).toBe(false);
   });
 
   it("allows authoritative closed PRs to reopen and open PRs to toggle draft", () => {
-    const closed = factFromThreadPullRequest({ ...thread, state: "closed" });
+    const closed = factFromThreadPullRequest({ ...thread, state: "closed", observations: prObservations(100) });
     const first = mergePullRequestFacts(undefined, [closed]);
-    const reopened = mergePullRequestFacts(first, [factFromThreadPullRequest(thread)]);
+    const reopened = mergePullRequestFacts(first, [factFromThreadPullRequest({ ...thread, observations: prObservations(200) })]);
     expect(reopened.facts[closed.key].state).toBe("open");
-    const drafted = mergePullRequestFacts(reopened, [factFromThreadPullRequest({ ...thread, state: "draft" })]);
+    const drafted = mergePullRequestFacts(reopened, [factFromThreadPullRequest({ ...thread, state: "draft", observations: prObservations(300) })]);
     expect(drafted.facts[closed.key]).toMatchObject({ state: "draft", draft: true });
-    expect(mergePullRequestFacts(drafted, [factFromThreadPullRequest(thread)]).facts[closed.key]).toMatchObject({ state: "open", draft: false });
+    expect(mergePullRequestFacts(drafted, [factFromThreadPullRequest({ ...thread, observations: prObservations(400) })]).facts[closed.key]).toMatchObject({ state: "open", draft: false });
   });
   it("normalizes one fact identity across authored and thread envelopes", () => {
     expect(pullRequestFactKey(authored)).toBe("example-org/example-repo#1402");
@@ -109,7 +112,7 @@ describe("pull-request fact directory", () => {
     });
   });
 
-  it("does not let a lightweight authored envelope erase a detailed fact", () => {
+  it("rejects an older lightweight observation without using detail presence as authority", () => {
     const directory = mergePullRequestFacts(undefined, [
       factFromThreadPullRequest(thread),
       factFromAuthoredPullRequest({
@@ -134,7 +137,7 @@ describe("pull-request fact directory", () => {
         reviewCommentCounts: { unresolved: 1, resolved: 3 },
       },
     });
-    const withoutBreakdown = factFromThreadPullRequest(thread);
+    const withoutBreakdown = factFromThreadPullRequest({ ...thread, observations: prObservations(200, ["checks", "review"]) });
     const directory = mergePullRequestFacts(
       mergePullRequestFacts(undefined, [withBreakdown]),
       [withoutBreakdown],
@@ -149,16 +152,16 @@ describe("pull-request fact directory", () => {
   it("keeps per-PR detailed freshness independent of unrelated PRs, partial merges, roster reconciliation and eviction", () => {
     const detailed = factFromThreadPullRequest(thread);
     const other = { ...detailed, key: "acme/other#2", number: 2, url: "https://github.com/acme/other/pull/2" };
-    const first = mergePullRequestFacts(undefined, [detailed], {}, 100);
-    const refreshedOther = mergePullRequestFacts(first, [other], {}, 200);
-    const partial = mergePullRequestFacts(refreshedOther, [factFromAuthoredPullRequest(authored)], {}, 300);
+    const first = mergePullRequestFacts(undefined, [detailed], {});
+    const refreshedOther = mergePullRequestFacts(first, [{ ...other, observations: prObservations(200) }], {});
+    const partial = mergePullRequestFacts(refreshedOther, [factFromAuthoredPullRequest(authored)], {});
     expect(partial.observedAtByFact?.[detailed.key]).toBe(100);
     expect(partial.observedAtByFact?.[other.key]).toBe(200);
     const reconciled = reconcileThreadPullRequestFactReferences(partial, {});
     expect(reconciled.observedAtByFact).toEqual(partial.observedAtByFact);
-    const authoritative = mergePullRequestFacts(reconciled, [detailed], {}, 400);
+    const authoritative = mergePullRequestFacts(reconciled, [{ ...detailed, observations: prObservations(400) }], {});
     expect(authoritative.observedAtByFact?.[detailed.key]).toBe(400);
-    const overCapacity = mergePullRequestFacts(authoritative, Array.from({ length: MAX_PULL_REQUEST_FACTS }, (_, index) => ({ ...other, key: `acme/other#${index + 10}` })), {}, 500);
+    const overCapacity = mergePullRequestFacts(authoritative, Array.from({ length: MAX_PULL_REQUEST_FACTS }, (_, index) => ({ ...other, key: `acme/other#${index + 10}` })), {});
     expect(Object.keys(overCapacity.observedAtByFact ?? {})).toHaveLength(MAX_PULL_REQUEST_FACTS);
     expect(overCapacity.observedAtByFact?.[detailed.key]).toBeUndefined();
     expect(overCapacity.observedAtByFact?.[other.key]).toBeUndefined();
@@ -206,15 +209,15 @@ it("carries host merge-queue attention through RPC schemas and normalized facts"
 });
 
 
-describe("R41 detailed metadata authority", () => {
+describe("source-ordered metadata authority", () => {
   it("retains authoritative title/head/base and freshness after a delayed lightweight projection", () => {
     const detailed = factFromThreadPullRequest({ ...thread, title: "fresh title", head: "fresh head", base: "fresh base" });
-    const original = mergePullRequestFacts(undefined, [detailed], {}, 100);
+    const original = mergePullRequestFacts(undefined, [detailed], {});
     const late = factFromAuthoredPullRequest({ ...authored, title: "cached old title", head: "cached head", base: "cached base" });
-    const merged = mergePullRequestFacts(original, [late], {}, 200);
+    const merged = mergePullRequestFacts(original, [late], {});
     expect(merged.facts[detailed.key]).toEqual(detailed);
     expect(merged.observedAtByFact?.[detailed.key]).toBe(100);
-    const refreshed = factFromThreadPullRequest({ ...thread, title: "next detailed title" });
-    expect(mergePullRequestFacts(merged, [refreshed], {}, 300).facts[detailed.key].title).toBe("next detailed title");
+    const refreshed = factFromThreadPullRequest({ ...thread, title: "next detailed title", observations: prObservations(300) });
+    expect(mergePullRequestFacts(merged, [refreshed], {}).facts[detailed.key].title).toBe("next detailed title");
   });
 });

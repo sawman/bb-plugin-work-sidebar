@@ -116,6 +116,14 @@ export const pullRequestSchema = z
   .strict();
 export type PullRequest = z.infer<typeof pullRequestSchema>;
 
+/** Queue membership is independent of the host's derived attention priority. */
+export function nativePullRequestAttention(pullRequest: Pick<PullRequest, "attention" | "inMergeQueue" | "mergeability">) {
+  if (pullRequest.mergeability.state === "conflicts") return "conflicts" as const;
+  if (pullRequest.inMergeQueue === true) return "queued" as const;
+  if (pullRequest.inMergeQueue === false && pullRequest.attention === "queued") return "none" as const;
+  return pullRequest.attention;
+}
+
 export const environmentPullRequestSchema = z.discriminatedUnion("outcome", [
   z
     .object({ outcome: z.literal("available"), pullRequest: pullRequestSchema })

@@ -3,8 +3,10 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type PropsWithChildren } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { factFromPullRequest, type PullRequestFactDirectory } from "../facts";
+import { factFromPullRequest, mergeNativePullRequestFact, type PullRequestFactDirectory } from "../facts";
+import { projectNativePullRequest } from "../native-status-queries";
 import { hydratePullRequestFacts } from "../queries";
+import { prObservations } from "../../../tests/fixtures/pr-observation";
 import {
   pullRequestKeys,
   pullRequestPolicies,
@@ -53,6 +55,26 @@ function deferred<T>() {
 describe("R5 pull-request queries", () => {
   afterEach(() => vi.useRealTimers());
 
+  it("a delayed server-native envelope cannot create a new native occurrence or replace a keyed change", () => {
+    const client = new QueryClient();
+    const native = projectNativePullRequest({ number: 1, title: "Native", url: "https://github.com/acme/repo/pull/1", state: "open",
+      headRefName: "feature", baseRefName: "main", updatedAt: "2026-10-30T00:00:00Z", autoMerge: false, inMergeQueue: false,
+      checks: { state: "pending", totalCount: 1, pendingCount: 1, passedCount: 0, failedCount: 0 },
+      review: { state: "none", reviewRequestCount: 0 }, attention: "checks_pending",
+      mergeability: { state: "unknown", mergeStateStatus: "UNKNOWN", mergeable: "UNKNOWN" } });
+    const old = factFromPullRequest(native);
+    const changed = factFromPullRequest({ ...native,
+      checks: { state: "passing", totalCount: 1, pendingCount: 0, passedCount: 1, failedCount: 0 },
+      signal: { checks: "passing", review: "none", reviewCommentCount: 0 } });
+    const directory = mergeNativePullRequestFact(mergeNativePullRequestFact(undefined, old), changed);
+    client.setQueryData(pullRequestKeys.factDirectory(), directory);
+    hydratePullRequestFacts(client, [old]);
+    const result = client.getQueryData<PullRequestFactDirectory>(pullRequestKeys.factDirectory())!;
+    expect(result.facts[old.key].signal.checks).toBe("passing");
+    expect(result.nativeByFact?.[old.key].groups.checks).toEqual(directory.nativeByFact?.[old.key].groups.checks);
+    client.clear();
+  });
+
   it.each(["merged", "closed"] as const)("removes a canonically %s authored root while preserving its lifecycle inside an open Stack", async (state) => {
     const terminal = authored[0]!;
     const open = { ...terminal, number: 13, url: "https://github.com/acme/sidebar/pull/13", head: "r6", base: "r5" };
@@ -64,7 +86,7 @@ describe("R5 pull-request queries", () => {
     const view = renderHook(() => useAuthoredPullRequests(rpc), { wrapper: wrapper(client) });
     try {
       await waitFor(() => expect(view.result.current.data).toHaveLength(2));
-      const fact = factFromPullRequest({ ...terminal, state, attention: state,
+      const fact = factFromPullRequest({ ...terminal, state, attention: state, observations: prObservations(200),
         checks: { state: "passing", totalCount: 1, passedCount: 1, failedCount: 0, pendingCount: 0 },
         review: { state: "approved", reviewRequestCount: 0 },
         mergeability: { state: "mergeable", mergeable: "MERGEABLE", mergeStateStatus: "CLEAN" },

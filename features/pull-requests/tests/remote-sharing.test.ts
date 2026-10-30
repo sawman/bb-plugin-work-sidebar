@@ -18,6 +18,27 @@ function deferred<T>() {
   return { promise, resolve };
 }
 describe("R41 raw remote generation", () => {
+  it("retains successful source validation start through delayed completion and cached reuse", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100_000);
+    const lifecycle = createServerLifecycle();
+    const response = deferred<string>();
+    const command = vi.fn(() => response.promise);
+    const classify = () => ({ state: "unavailable" as const, scope: "rest" as const, message: "offline", retryAt: null });
+    const args = ["api", "--method", "GET", "repos/acme/repo/pulls/1"];
+    try {
+      const first = readGitHub(lifecycle, command, classify, args, 100, 120_000);
+      vi.setSystemTime(110_000);
+      response.resolve("same upstream observation");
+      await first;
+      expect(lifecycle.githubReadCache.get(args.join("\u0000"))).toMatchObject({ validatedAt: 100_000 });
+      vi.setSystemTime(150_000);
+      await expect(readGitHub(lifecycle, command, classify, args, 100, 120_000)).resolves.toBe("same upstream observation");
+      expect(command).toHaveBeenCalledOnce();
+      expect(lifecycle.githubReadCache.get(args.join("\u0000"))).toMatchObject({ validatedAt: 100_000 });
+    } finally { lifecycle.dispose(); vi.useRealTimers(); }
+  });
+
   it("force refresh retires pending raw reads and old responses cannot refill cache or remove replacement", async () => {
     const old = deferred<string>();
     const fresh = deferred<string>();

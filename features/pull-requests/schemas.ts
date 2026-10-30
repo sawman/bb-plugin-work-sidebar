@@ -1,4 +1,40 @@
 import { z } from "zod";
+export const pullRequestValidationDemand = z.object({ client: z.string(), fingerprint: z.string(), occurrence: z.number().int().nonnegative() }).strict();
+export const pullRequestValidationDemands = z.record(z.string(), z.object({
+  checks: pullRequestValidationDemand.optional(), review: pullRequestValidationDemand.optional(), mergeability: pullRequestValidationDemand.optional(),
+}).strict());
+export type PullRequestValidationDemand = z.infer<typeof pullRequestValidationDemand>;
+export type PullRequestValidationDemands = z.infer<typeof pullRequestValidationDemands>;
+
+/** Bounds on the source observation, never the time a projection was painted. */
+export const pullRequestObservation = z.object({
+  source: z.enum(["github", "native"]),
+  validatedAt: z.number().nullable(),
+  native: pullRequestValidationDemand.optional(),
+  satisfies: z.array(pullRequestValidationDemand).max(32).optional(),
+  sequence: z.number().int().nonnegative().optional(),
+  epoch: z.string().optional(),
+  updatedAt: z.string().optional(),
+  headSha: z.string().nullable().optional(),
+  baseSha: z.string().nullable().optional(),
+  headRef: z.string().optional(),
+  baseRef: z.string().optional(),
+  reviewIdentity: z.string().nullable().optional(),
+}).strict();
+export const pullRequestObservations = z.object({
+  title: pullRequestObservation.optional(),
+  lifecycle: pullRequestObservation.optional(),
+  head: pullRequestObservation.optional(),
+  base: pullRequestObservation.optional(),
+  checks: pullRequestObservation.optional(),
+  checkCounts: pullRequestObservation.optional(),
+  review: pullRequestObservation.optional(),
+  people: pullRequestObservation.optional(),
+  comments: pullRequestObservation.optional(),
+  mergeability: pullRequestObservation.optional(),
+}).strict();
+export type PullRequestObservation = z.infer<typeof pullRequestObservation>;
+export type PullRequestObservations = z.infer<typeof pullRequestObservations>;
 
 export const pullRequestSignal = z.object({
   checks: z.enum(["failed", "passing", "pending", "none", "unknown"]),
@@ -19,6 +55,7 @@ export const pullRequestSignal = z.object({
       resolved: z.number().int().nonnegative(),
     })
     .strict()
+    .nullable()
     .optional(),
 });
 
@@ -26,6 +63,7 @@ export const pullRequestSignal = z.object({
 // server-only `defineRpcContract` composition imports these schemas, never the
 // other way around.
 export const pullRequest = z.object({
+  observations: pullRequestObservations.optional(),
   number: z.number(),
   title: z.string(),
   url: z.string(),
@@ -90,6 +128,8 @@ export const pullRequest = z.object({
  */
 export const pullRequestFact = z
   .object({
+    observations: pullRequestObservations.optional(),
+    retiredEpochs: z.array(z.string()).max(8).optional(),
     key: z.string().min(1),
     number: z.number().int().positive(),
     title: z.string(),
@@ -127,6 +167,7 @@ export const threadPullRequest = pullRequest.extend({
   stackNumber: z.number().int().positive().nullable(),
 });
 export const sidebarStackLayer = pullRequestSignal.extend({
+  observations: pullRequestObservations.optional(),
   number: z.number().int().positive(),
   title: z.string(),
   state: z.string(),
@@ -135,6 +176,7 @@ export const sidebarStackLayer = pullRequestSignal.extend({
   head: z.string(),
   base: z.string(),
   attention: z.string().nullable().optional(),
+  mergeability: pullRequest.shape.mergeability.nullable().optional(),
 });
 export const sidebarStack = z.object({
   id: z.string(),
@@ -144,6 +186,9 @@ export const sidebarStack = z.object({
   pullRequests: z.array(sidebarStackLayer),
 });
 export const authoredPullRequest = pullRequestSignal.extend({
+  observations: pullRequestObservations.optional(),
+  attention: pullRequest.shape.attention.optional(),
+  mergeability: pullRequest.shape.mergeability.nullable().optional(),
   number: z.number().int().positive(),
   title: z.string(),
   url: z.string().url(),

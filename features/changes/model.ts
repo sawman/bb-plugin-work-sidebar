@@ -36,7 +36,7 @@ export function mergeStackBranchSignals(
   const cachedFact = branch.pr
     ? facts?.facts[pullRequestFactKey(branch.pr)]
     : undefined;
-  const sharedFact = cachedFact && stackPullRequest?.state === "merged"
+  const sharedFact = cachedFact && stackPullRequest
     ? mergePullRequestFact(cachedFact, factFromSidebarStackLayer(stackPullRequest))
     : cachedFact;
   if (sharedFact)

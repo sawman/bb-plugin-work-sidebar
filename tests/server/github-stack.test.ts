@@ -1,4 +1,5 @@
 import { withNativeStatusRpc } from "../fixtures/native-status-rpc";
+import { factFromThreadPullRequest } from "../../features/pull-requests/facts";
 import { describe, expect, it, vi } from "vitest";
 import {
   fetchGitHubStack,
@@ -15,6 +16,43 @@ import { createServerLifecycle } from "../../server-lifecycle.js";
 import { reviewLifecycleCorpus } from "../../features/pull-requests/tests/review-lifecycle-fixtures.js";
 
 describe("GitHub Stack enrichment ownership", () => {
+  it.each(["failed", "pending"] as const)("publishes passing enrichment without stale %s counters overriding it during hydration", async (oldState) => {
+    const bb = { sdk: {
+      threads: { get: async () => ({ environmentId: "env_current" }) },
+      nativeStatus: { read: async () => ({ outcome: "available", pullRequest: {
+        number: 1402, title: "Checks transition", url: "https://github.com/acme/repo/pull/1402", state: "open",
+        headRefName: "feature/current", baseRefName: "main",
+        checks: { failedCount: oldState === "failed" ? 1 : 0, passedCount: 0, pendingCount: oldState === "pending" ? 1 : 0,
+          state: oldState === "failed" ? "failing" : "pending", totalCount: 1 },
+        review: { reviewRequestCount: 0, state: "none" }, attention: oldState === "failed" ? "checks_failed" : "checks_pending",
+        mergeability: { mergeStateStatus: "CLEAN", mergeable: "MERGEABLE", state: "mergeable" },
+      } }) },
+    } };
+    const read = vi.fn(async (args: readonly string[]) => {
+      if (args[3]?.includes("stacks")) return "[]";
+      if (args[1] === "graphql") return JSON.stringify({ data: { repository: { p0: {
+        headRefName: "feature/current", baseRefName: "main", reviewDecision: "APPROVED",
+        reviewRequests: { totalCount: 0, nodes: [] }, reviews: { totalCount: 0, nodes: [] },
+        commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
+      } } } });
+      throw new Error(`Unexpected request: ${args.join(" ")}`);
+    });
+    const lifecycle = createServerLifecycle();
+    const service = createThreadStackService(withNativeStatusRpc(bb) as never, lifecycle, read);
+    try {
+      const result = await service.sidebarThreadPullRequests({ threadIds: ["thr_current"] });
+      const entry = result.pullRequests.thr_current!;
+      expect(result.available).toBe(true);
+      expect(entry.signal).toMatchObject({ checks: "passing", review: "approved" });
+      expect(entry.checks.failedCount).toBe(0);
+      expect(entry.checks.pendingCount).toBe(0);
+      // Aggregate-only GraphQL cannot manufacture how many checks passed.
+      expect(entry.checks.totalCount).toBe(0);
+      expect(entry.checks.passedCount).toBe(0);
+      expect(factFromThreadPullRequest(entry).signal).toMatchObject({ checks: "passing", review: "approved" });
+    } finally { lifecycle.dispose(); }
+  });
+
   it("splits complete review-thread comment totals by resolution", async () => {
     const run = vi.fn(async (_args: readonly string[]) => JSON.stringify({
       data: {
@@ -218,12 +256,16 @@ describe("GitHub Stack enrichment ownership", () => {
       run,
     );
 
-    expect(signals.get(91)).toEqual({
+    const { observations, ...signal } = signals.get(91)!;
+    expect(observations?.review).toMatchObject({ source: "github", validatedAt: null, epoch: lifecycle.observationEpoch });
+    expect(signal).toEqual({
       head: "feature/authored-row",
       base: "main",
       checks: "passing",
       review: "review_required",
       changeRequesters: ["reviewer-a"],
+      approvers: [],
+      reviewRequestCount: 2,
       requestedReviewers: ["reviewer-a", "platform-team"],
     });
     expect(run).toHaveBeenCalledTimes(1);
@@ -270,16 +312,20 @@ describe("GitHub Stack enrichment ownership", () => {
       });
     });
 
-    await expect(readGitHubSignals("acme", "repo", [93], lifecycle, run)).resolves.toEqual(
-      new Map([[93, {
+    const signals = await readGitHubSignals("acme", "repo", [93], lifecycle, run);
+    const { observations, ...signal } = signals.get(93)!;
+    expect([...signals.keys()]).toEqual([93]);
+    expect(observations?.review).toMatchObject({ source: "github", validatedAt: null, epoch: lifecycle.observationEpoch });
+    expect(signal).toEqual({
         head: "feature/review-heavy",
         base: "main",
         checks: "unknown",
         review: "review_required",
         changeRequesters: ["reviewer-a"],
+        approvers: [],
+        reviewRequestCount: 1,
         requestedReviewers: ["reviewer-a"],
-      }]]),
-    );
+      });
     expect(
       run.mock.calls.some(([args]) =>
         (args as readonly string[]).some((value) => value.endsWith("/reviews?per_page=100")),
@@ -313,12 +359,16 @@ describe("GitHub Stack enrichment ownership", () => {
       run,
     );
 
-    expect(signals.get(92)).toEqual({
+    const { observations, ...signal } = signals.get(92)!;
+    expect(observations?.review).toMatchObject({ source: "github", validatedAt: null, epoch: lifecycle.observationEpoch });
+    expect(signal).toEqual({
       head: "feature/rest-fallback",
       base: "main",
       checks: "unknown",
       review: "review_required",
       changeRequesters: ["reviewer-one"],
+      approvers: [],
+      reviewRequestCount: 2,
       requestedReviewers: ["reviewer-one", "platform-team"],
     });
     expect(run).toHaveBeenCalledTimes(3);
@@ -340,7 +390,9 @@ describe("GitHub Stack enrichment ownership", () => {
       if (args.some((value) => value.endsWith("/reviews?per_page=100")))
         return JSON.stringify([{ user: { login: "reviewer" }, state: "APPROVED" }]);
       if (args.some((value) => value.includes("/check-runs?per_page=100")))
-        return JSON.stringify({ check_runs: [{ status: "completed", conclusion: "SUCCESS" }] });
+        return JSON.stringify({ total_count: 1, check_runs: [{ status: "completed", conclusion: "success", head_sha: "abc" }] });
+      if (args.some((value) => value.includes("/status?per_page=100")))
+        return JSON.stringify({ total_count: 0, sha: "abc", statuses: [] });
       if (args[1] === "graphql")
         return JSON.stringify({ data: { repository: { p0: {
           reviewThreads: {
@@ -718,7 +770,9 @@ describe("GitHub Stack enrichment ownership", () => {
       }
       if (args.some((value) => value.endsWith("/reviews?per_page=100"))) return "[]";
       if (args.some((value) => value.includes("/check-runs?per_page=100")))
-        return JSON.stringify({ check_runs: [{ status: "completed", conclusion: "SUCCESS" }] });
+        return JSON.stringify({ total_count: 1, check_runs: [{ status: "completed", conclusion: "success", head_sha: "def" }] });
+      if (args.some((value) => value.includes("/status?per_page=100")))
+        return JSON.stringify({ total_count: 0, sha: "def", statuses: [] });
       if (args.some((value) => value.includes("/files?per_page=100"))) return "[]";
       return JSON.stringify({
         title: "Recovered current title",

@@ -367,6 +367,7 @@ export function primaryTaskLink(links: readonly ThreadTaskLink[]): ThreadTaskLin
 }
 
 export interface StackLayer {
+  observations?: import("./features/pull-requests/schemas").PullRequestObservations;
   number: number;
   title: string;
   state: string;
@@ -384,7 +385,7 @@ export interface StackLayer {
   reviewCommentCounts?: {
     unresolved: number;
     resolved: number;
-  };
+  } | null;
 }
 
 /** The compact, host-neutral stack payload used by the PR-sidebar adapter. */
@@ -463,7 +464,7 @@ export interface CurrentPullRequestView {
     reviewCommentCounts?: {
       unresolved: number;
       resolved: number;
-    };
+    } | null;
   };
 }
 

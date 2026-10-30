@@ -29,7 +29,7 @@ export type TrackerCompositionDependencies = Pick<
 export type PullRequestChangesAdapter = {
   remoteFiles(input: import("../features/changes/schemas.js").RemoteFilesInput): Promise<import("../features/changes/schemas.js").RemoteFiles>;
   invalidateRemote(repository: string | null, threadIds?: string[]): { ok: boolean };
-  summary(threadId: string): Promise<Awaited<
+  summary(threadId: string, validationRequirements?: import("../features/pull-requests/schemas.js").PullRequestValidationDemands): Promise<Awaited<
     ReturnType<PluginRpcHandlers<typeof rpcContract>["getChangesPullRequests"]>
   >>;
   projection(threadId: string): Promise<Omit<

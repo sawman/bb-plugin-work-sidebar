@@ -17,6 +17,7 @@ import {
 import {
   pullRequestFactForThread,
   pullRequestFactKey,
+  nativeValidationDemands,
   pullRequestFromFact,
   resolvePullRequestFact,
 } from "../pull-requests/facts";
@@ -47,15 +48,26 @@ export function ChangesPanel({ threadId, environmentId }: { threadId: string; en
   const rpc = useRpc<typeof rpcContract>();
   const client = useQueryClient();
   const native = useNativeThreadPullRequest(threadId, environmentId);
-  const previousNative = useRef<{ threadId: string; row: typeof native.row }>({ threadId, row: undefined });
+  const pullRequestFacts = useSharedPullRequestFactDirectory();
+  const nativeKey = native.pullRequest ? pullRequestFactKey(native.pullRequest) : null;
+  const validationBound = JSON.stringify(nativeValidationDemands(pullRequestFacts.data, nativeKey) ?? null);
+  const previousNative = useRef({ threadId, key: nativeKey, bound: validationBound });
   useEffect(() => {
     const previous = previousNative.current;
-    previousNative.current = { threadId, row: native.row };
-    if (native.row && previous.threadId === threadId && previous.row && native.row !== previous.row) {
-      void client.invalidateQueries({ queryKey: changesKeys.summary(threadId) });
-      void client.invalidateQueries({ queryKey: changesKeys.projection(threadId) });
+    previousNative.current = { threadId, key: nativeKey, bound: validationBound };
+    if (previous.threadId === threadId && validationBound !== "null" && validationBound !== previous.bound) {
+      // Invalidating an initial fetch alone does not create a successor in
+      // Query. Retire that publication before reading the new causal demand.
+      void client.cancelQueries({ queryKey: changesKeys.summary(threadId) })
+        .then(() => client.invalidateQueries({ queryKey: changesKeys.summary(threadId) }));
     }
-  }, [client, threadId, native.row]);
+    if (previous.threadId === threadId && previous.key && nativeKey !== previous.key) {
+      void client.cancelQueries({ queryKey: changesKeys.summary(threadId) })
+        .then(() => client.invalidateQueries({ queryKey: changesKeys.summary(threadId) }));
+      void client.cancelQueries({ queryKey: changesKeys.projection(threadId) })
+        .then(() => client.invalidateQueries({ queryKey: changesKeys.projection(threadId) }));
+    }
+  }, [client, threadId, nativeKey, validationBound]);
   const { values: pluginSettings } = useSettings();
   const changesQuery = useChanges(rpc, threadId, {
     visiblePollMs:
@@ -63,7 +75,6 @@ export function ChangesPanel({ threadId, environmentId }: { threadId: string; en
     backgroundPollMs:
       Number(pluginSettings?.githubBackgroundPollSeconds ?? "300") * 1_000,
   });
-  const pullRequestFacts = useSharedPullRequestFactDirectory();
   const sidebarAppearance = useSidebarAppearance();
   const githubHealthQuery = useGitHubApiHealth(rpc, { poll: false });
   const githubApiHealth = githubHealthQuery.data ?? {
@@ -123,10 +134,11 @@ export function ChangesPanel({ threadId, environmentId }: { threadId: string; en
     changesQuery.data?.stack || (githubStack?.branches.length ?? 0) > 1
       ? githubStack
       : null;
-  const projectedPullRequest = native.row?.outcome === "absent" ? null : native.pullRequest ?? changesQuery.data?.currentPullRequest ?? null;
+  const confirmedAbsent = native.row?.outcome === "absent" || changesQuery.isSuccess && changesQuery.data?.currentPullRequest === null;
+  const projectedPullRequest = confirmedAbsent ? null : native.pullRequest ?? changesQuery.data?.currentPullRequest ?? null;
   const currentPullRequest = projectedPullRequest
     ? resolvePullRequestFact(projectedPullRequest, pullRequestFacts.data)
-    : changesQuery.data || native.row?.outcome === "absent" ? null : (() => {
+    : confirmedAbsent ? null : (() => {
         const fact = pullRequestFactForThread(pullRequestFacts.data, threadId);
         return fact ? pullRequestFromFact(fact) : null;
       })();

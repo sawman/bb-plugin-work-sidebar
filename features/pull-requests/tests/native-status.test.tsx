@@ -7,6 +7,9 @@ import { useNativeThreadPullRequest } from "../native-status-queries";
 import { pullRequestKeys, hydratePullRequestFacts, useSharedPullRequestFactDirectory } from "../queries";
 import { factFromPullRequest, type PullRequestFactDirectory } from "../facts";
 import { projectNativePullRequest } from "../native-status-queries";
+import { prObservations } from "../../../tests/fixtures/pr-observation";
+import { pullRequestSummaryPresentation } from "../presentation";
+import { act } from "@testing-library/react";
 import type { PullRequest, EnvironmentPullRequest } from "../native-status-schemas";
 
 function nativePr(number = 1): PullRequest {
@@ -28,12 +31,18 @@ function Probe({ threadId, environmentId, label }: { threadId: string; environme
 afterEach(cleanup);
 
 describe("installed SDK keyed PR boundary", () => {
+  it("retains native queue membership independently of derived host attention and resolves blockers centrally", () => {
+    const queued = projectNativePullRequest({ ...nativePr(), inMergeQueue: true, attention: "checks_failed",
+      checks: { state: "failing", totalCount: 1, passedCount: 0, failedCount: 1, pendingCount: 0 } });
+    expect(queued.attention).toBe("queued");
+    expect(pullRequestSummaryPresentation({ ...queued, draft: false }).label).toBe("CI failure");
+    expect(pullRequestSummaryPresentation({ ...queued, draft: false, signal: { checks: "passing", review: "approved" } }).label).toBe("Queued to merge");
+  });
   it("coalesces left/right opt-in reads and publishes native invalidation into the one shared fact directory", async () => {
     const client = new QueryClient();
-    const enriched = factFromPullRequest(projectNativePullRequest(nativePr()));
+    const enriched = factFromPullRequest({ ...projectNativePullRequest(nativePr()), observations: prObservations(200) });
     enriched.signal = { ...enriched.signal, approvers: ["reviewer"], reviewCommentCount: 5,
       reviewCommentCounts: { unresolved: 2, resolved: 3 } };
-    hydratePullRequestFacts(client, [enriched], { thr_a: enriched.key });
     let row: EnvironmentPullRequest = { outcome: "available", pullRequest: nativePr() };
     const read = vi.fn(async () => ({ env_shared: row }));
     const Content = () => <QueryClientProvider client={client}>
@@ -45,9 +54,14 @@ describe("installed SDK keyed PR boundary", () => {
       await waitFor(() => expect(slot.getByLabelText("right fact").textContent).toBe("Native 1"));
       expect(read).toHaveBeenCalledOnce();
       expect(read).toHaveBeenCalledWith({ keys: ["env_shared"] });
+      const current = client.getQueryData<PullRequestFactDirectory>(pullRequestKeys.factDirectory())!;
+      const demands = current.nativeByFact![enriched.key]!.groups;
+      const observations = Object.fromEntries(Object.entries(enriched.observations!).map(([group, clock]) => [group,
+        { ...clock, ...(demands[group as keyof typeof demands] ? { satisfies: [demands[group as keyof typeof demands]] } : {}) }]));
+      act(() => hydratePullRequestFacts(client, [{ ...enriched, observations }], { thr_a: enriched.key }));
       expect(client.getQueryData<PullRequestFactDirectory>(pullRequestKeys.factDirectory())?.facts[enriched.key].signal)
         .toMatchObject({ approvers: ["reviewer"], reviewCommentCount: 5, reviewCommentCounts: { unresolved: 2, resolved: 3 } });
-      row = { outcome: "available", pullRequest: { ...nativePr(), title: "Fresh", state: "merged", attention: "merged" } };
+      row = { outcome: "available", pullRequest: { ...nativePr(), title: "Fresh", state: "merged", attention: "merged", updatedAt: "2026-10-31T00:00:00Z" } };
       await slot.behavior.experimental_invalidateRpc(["environment:env_shared"], "bb--github-pr-status");
       await waitFor(() => expect(slot.getByLabelText("left status").textContent).toBe("Fresh"));
       await waitFor(() => expect(slot.getByLabelText("right fact").textContent).toBe("Fresh"));

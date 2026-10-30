@@ -3,8 +3,36 @@ import { describe, expect, it, vi } from "vitest";
 import { createServerLifecycle } from "../../../server";
 import { createAuthoredPullRequestService } from "../server-authored";
 import type { GitHubCommandService } from "../server-github-read";
+import { readGitHub } from "../../../shared/github/read-cache";
+import { createRepositoryTopologyReader } from "../remote-topology-server";
 
 describe("authored pull-request stack wire projection", () => {
+  it("keeps cached search title/lifecycle age separate from newly observed sparse topology head/base", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(100_000);
+    const host = createFakePluginHost(); const lifecycle = createServerLifecycle();
+    let head = "old/head";
+    const command = vi.fn(async (args: readonly string[]) => {
+      if (args[0] === "search") return JSON.stringify([{ number: 1, title: "Search title", url: "https://github.com/acme/repo/pull/1",
+        repository: { nameWithOwner: "acme/repo" }, state: "OPEN", isDraft: false }]);
+      if (args[3]?.includes("stacks")) return JSON.stringify([{ number: 7, base: { ref: "main" }, pull_requests: [{ number: 1, state: "open", draft: false,
+        html_url: "https://github.com/acme/repo/pull/1", head: { ref: head }, base: { ref: "main" } }] }]);
+      if (args.join(" ").includes("isArchived")) return JSON.stringify({ data: { r0: { isArchived: false } } });
+      return JSON.stringify({ data: { repository: { p0: { headRefName: "old/head", baseRefName: "main", headRefOid: "old-sha", baseRefOid: "base",
+        reviewDecision: "APPROVED", reviews: { totalCount: 0, nodes: [] }, reviewRequests: { totalCount: 0, nodes: [] }, commits: { nodes: [] } } } } });
+    });
+    const read: GitHubCommandService["read"] = (args, buffer, ttl = 120_000, identity, policy) => readGitHub(lifecycle, command,
+      () => ({ state: "unavailable", scope: "rest", message: null, retryAt: null }), args, buffer, ttl, identity, policy);
+    const handlers = createAuthoredPullRequestService(host.bb, lifecycle, { read, execute: vi.fn() }, createRepositoryTopologyReader(lifecycle, read));
+    try {
+      await handlers.sidebarAuthoredPullRequests({});
+      vi.setSystemTime(150_000); head = "new/head";
+      const result = await handlers.sidebarAuthoredPullRequestStacks(null);
+      expect(result.pullRequests[0]).toMatchObject({ title: "Search title", head: "new/head" });
+      expect(result.pullRequests[0]?.observations?.title?.validatedAt).toBe(100_000);
+      expect(result.pullRequests[0]?.observations?.head?.validatedAt).toBe(150_000);
+      expect(command.mock.calls.filter(([args]) => args[0] === "search")).toHaveLength(1);
+    } finally { lifecycle.dispose(); await host.harness.lifecycle.dispose(); vi.useRealTimers(); }
+  });
   it("uses a validated configured GitHub login and clears authored caches when it changes", async () => {
     const host = createFakePluginHost({
       settings: { githubAuthoredLogin: "octocat" },
@@ -27,6 +55,8 @@ describe("authored pull-request stack wire projection", () => {
       expect.arrayContaining(["--author", "octocat"]),
       12_000_000,
       expect.any(Number),
+      undefined,
+      expect.objectContaining({ onValidation: expect.any(Function) }),
     );
 
     await host.harness.behavior.setSettings({
@@ -40,6 +70,8 @@ describe("authored pull-request stack wire projection", () => {
       expect.arrayContaining(["--author", "hubot"]),
       12_000_000,
       expect.any(Number),
+      undefined,
+      expect.objectContaining({ onValidation: expect.any(Function) }),
     );
 
     await expect(
@@ -63,6 +95,8 @@ describe("authored pull-request stack wire projection", () => {
       expect.arrayContaining(["--author", "@me"]),
       12_000_000,
       expect.any(Number),
+      undefined,
+      expect.objectContaining({ onValidation: expect.any(Function) }),
     );
     await host.harness.lifecycle.dispose();
   });
@@ -234,7 +268,7 @@ describe("authored pull-request stack wire projection", () => {
     await host.harness.lifecycle.dispose();
   });
 
-  it("omits absent optional reviewer names from nested stack layers", async () => {
+  it("preserves explicit empty reviewer lists and JSON field presence in nested stack layers", async () => {
     const host = createFakePluginHost();
     const lifecycle = createServerLifecycle();
     const read = vi.fn(async (args: readonly string[]) => {
@@ -307,7 +341,7 @@ describe("authored pull-request stack wire projection", () => {
       pullRequests: [
         {
           stack: {
-            pullRequests: [{ number: 12 }],
+            pullRequests: [{ number: 12, requestedReviewers: [] }],
           },
         },
       ],

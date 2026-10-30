@@ -9,6 +9,7 @@ import {
   mergePullRequestFacts,
   pullRequestFactKey,
 } from "../../pull-requests/facts";
+import { prObservations } from "../../../tests/fixtures/pr-observation";
 import { changesInteractionStore } from "../store";
 import { changesKeys } from "../model";
 import { currentPr } from "./latency-fixtures";
@@ -224,7 +225,7 @@ async function changesSlot(fixture: ChangesFixture) {
       mergePullRequestFacts(
         undefined,
         Object.values(fixture.threadPullRequests).flatMap((pullRequest) =>
-          pullRequest ? [factFromPullRequest(pullRequest as never)] : [],
+          pullRequest ? [factFromPullRequest({ ...pullRequest, observations: prObservations(200) } as never)] : [],
         ),
         Object.fromEntries(
           Object.entries(fixture.threadPullRequests).flatMap(

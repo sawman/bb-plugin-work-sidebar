@@ -36,6 +36,7 @@ import type {
 } from "./queries";
 
 export type AuthoredPullRequest = {
+  observations?: import("./schemas").PullRequestObservations;
   number: number;
   title: string;
   url: string;
@@ -53,7 +54,7 @@ export type AuthoredPullRequest = {
   reviewCommentCounts?: {
     unresolved: number;
     resolved: number;
-  };
+  } | null;
   stack: SidebarStack | null;
 };
 type AuthoredRow = Omit<AuthoredPullRequest, "stack" | "state"> & {
@@ -104,10 +105,7 @@ export function AuthoredPullRequestRow({
     signal: signalSource,
   });
   const stateAction = resolvedFact.draft ? "Mark open" : "Mark draft";
-  const reviewers =
-    matchingThread?.signal.requestedReviewers?.filter(Boolean) ??
-    pullRequest.requestedReviewers?.filter(Boolean) ??
-    [];
+  const reviewers = signalSource.requestedReviewers?.filter(Boolean) ?? [];
   return (
     <>
       <ContextMenu>
@@ -117,18 +115,18 @@ export function AuthoredPullRequestRow({
           <div className="ws-pr-target ws-sidebar-row-main">
             <PullRequestUrlLink
               className="ws-pr-target-title ws-sidebar-row-title"
-              href={pullRequest.url}
+              href={resolvedFact.url}
               externalOnModifier={externalOnModifier}
-              aria-label={`Open pull request #${pullRequest.number}: ${pullRequest.title}`}
+              aria-label={`Open pull request #${resolvedFact.number}: ${resolvedFact.title}`}
             >
-              {pullRequest.title}
+              {resolvedFact.title}
             </PullRequestUrlLink>
             <span className="ws-pr-context ws-pr-target-context ws-sidebar-row-meta">
               <ContextMenuTrigger asChild>
                 <PullRequestIdentifierBadge
                   kind="pull-request"
                   number={pullRequest.number}
-                  url={pullRequest.url}
+                  url={resolvedFact.url}
                   presentation={state}
                   reviewDetail={reviewDetail ?? undefined}
                 />
@@ -136,7 +134,7 @@ export function AuthoredPullRequestRow({
               {stackNumber != null && <StackNumberBadge number={stackNumber} />}
               <PullRequestIdentifierBadge
                 kind="branch"
-                name={pullRequest.head}
+                name={resolvedFact.head}
               />
             </span>
           </div>
@@ -185,7 +183,7 @@ export function AuthoredPullRequestRow({
       >
         <ContextMenuLabel>PR #{pullRequest.number}</ContextMenuLabel>
         {onOpenPullRequest ? (
-          <ContextMenuItem onSelect={() => onOpenPullRequest(pullRequest.url)}>
+          <ContextMenuItem onSelect={() => onOpenPullRequest(resolvedFact.url)}>
             Open pull request
           </ContextMenuItem>
         ) : null}
@@ -196,7 +194,8 @@ export function AuthoredPullRequestRow({
         ) : null}
         <ContextMenuItem
           disabled={changingDraft || resolvedFact.state === "merged" || resolvedFact.state === "closed"}
-          onSelect={() => onToggleDraft({ ...pullRequest, state: resolvedFact.state, draft: resolvedFact.draft })}
+          onSelect={() => onToggleDraft({ ...pullRequest, title: resolvedFact.title, url: resolvedFact.url,
+            head: resolvedFact.head, base: resolvedFact.base, state: resolvedFact.state, draft: resolvedFact.draft })}
         >
           {changingDraft ? "Updating…" : stateAction}
         </ContextMenuItem>
@@ -221,7 +220,7 @@ export function AuthoredPullRequestRow({
           rpc={rpc}
           repository={pullRequest.repository}
           number={pullRequest.number}
-          title={pullRequest.title}
+          title={resolvedFact.title}
           requestedReviewers={reviewers}
           anchorRef={reviewerTriggerRef}
           onClose={() => setReviewerPickerOpen(false)}

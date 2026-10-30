@@ -13,6 +13,8 @@ import {
 } from "./server-stack.js";
 import type { AuthoredPullRequest, GitHubReadRunner, GitHubSignal } from "./server-types.js";
 import { createPullRequestReviewerService } from "./server-reviewers.js";
+import { githubObservation, readObservedGitHub } from "./source-observation.js";
+import { factFromAuthoredPullRequest, factFromSidebarStackLayer, mergePullRequestFact } from "./facts.js";
 
 const GITHUB_SEARCH_CACHE_MS = 5 * 60_000;
 
@@ -100,11 +102,16 @@ function createAuthoredReader(
 ) {
   return async (): Promise<AuthoredPullRequest[]> => {
     const author = await readAuthor();
-    const value = JSON.parse(await read(["search", "prs", "--author", author, "--state", "open", "--limit", "1000", "--json", "number,title,url,repository,state,isDraft"], 12_000_000, GITHUB_SEARCH_CACHE_MS)) as unknown;
+    const source = await readObservedGitHub((args, buffer, policy) => read(args, buffer, GITHUB_SEARCH_CACHE_MS, undefined, policy),
+      ["search", "prs", "--author", author, "--state", "open", "--limit", "1000", "--json", "number,title,url,repository,state,isDraft,updatedAt"], 12_000_000);
+    const value = JSON.parse(source.text) as unknown;
     if (!Array.isArray(value)) throw new Error("GitHub returned an invalid authored pull request list");
     const base = value.flatMap((entry): AuthoredPullRequest[] => {
       if (!isRecord(entry) || typeof entry.number !== "number" || typeof entry.title !== "string" || typeof entry.url !== "string" || !isRecord(entry.repository) || typeof entry.repository.nameWithOwner !== "string") return [];
+      const observation = { ...githubObservation(entry, source.validatedAt), epoch: lifecycle.observationEpoch,
+        ...(source.sequence === undefined ? {} : { sequence: source.sequence }) };
       return [{
+        observations: { title: observation, lifecycle: observation },
         number: entry.number, title: entry.title, url: entry.url, repository: entry.repository.nameWithOwner,
         state: entry.isDraft === true ? "draft" : "open", draft: entry.isDraft === true,
         head: "", base: "", checks: "unknown", review: "none", reviewCommentCount: 0, stack: null,
@@ -120,11 +127,19 @@ function createAuthoredReader(
     for (const [repository, numbers] of groups) {
       const [owner, repo] = repository.split("/", 2);
       if (!owner || !repo) continue;
-      for (const [number, signal] of await readGitHubSignals(owner, repo, numbers, lifecycle, (args, buffer) => read(args, buffer))) {
+      for (const [number, signal] of await readGitHubSignals(owner, repo, numbers, lifecycle, (args, buffer, policy) => read(args, buffer, undefined, undefined, policy))) {
         signals.set(`${repository}#${number}`, signal);
       }
     }
-    return base.map((item) => ({ ...item, ...(signals.get(`${item.repository}#${item.number}`) ?? {}) }));
+    return base.flatMap((item): AuthoredPullRequest[] => {
+      const signal = signals.get(`${item.repository}#${item.number}`);
+      if (!signal) return [item];
+      const fact = mergePullRequestFact(factFromAuthoredPullRequest(item), factFromSidebarStackLayer({ ...item, ...signal,
+        observations: signal.observations }));
+      if (fact.state === "merged" || fact.state === "closed") return [];
+      return [{ ...item, title: fact.title, head: fact.head, base: fact.base, state: fact.state, draft: fact.draft,
+        ...fact.signal, observations: fact.observations, ...(fact.attention ? { attention: fact.attention } : {}), mergeability: fact.mergeability }];
+    });
   };
 }
 
@@ -138,6 +153,7 @@ function createAuthoredStackReader(read: GitHubReadRunner, topology?: Repository
       byRepository.set(item.repository, items);
     }
     const enriched = new Map<string, AuthoredPullRequest>();
+    const terminal = new Set<string>();
     const failures: unknown[] = [];
     const describeRepository = async (
       repository: string,
@@ -157,21 +173,20 @@ function createAuthoredStackReader(read: GitHubReadRunner, topology?: Repository
         for (const stack of stacks) {
           const pullRequests = stack.pullRequests.flatMap((layer) => {
             const known = byPullRequest.get(`${repository}#${layer.number}`);
-            return known
-              ? [
-                  {
-                    ...known,
-                    head: layer.head,
-                    base: layer.base || stack.base,
-                  },
-                ]
-              : [];
+            if (!known) return [];
+            const resolved = mergePullRequestFact(factFromAuthoredPullRequest(known), factFromSidebarStackLayer({
+              ...layer, checks: known.checks, review: known.review, base: layer.base || stack.base,
+            }));
+            return [{ ...known, title: resolved.title, head: resolved.head, base: resolved.base, state: resolved.state,
+              draft: resolved.draft, observations: resolved.observations, ...resolved.signal }];
           });
           if (pullRequests.length === 0) continue;
           for (const item of pullRequests) {
             if (!authoredNumbers.has(item.number)) continue;
+            if (item.state === "closed" || item.state === "merged") { terminal.add(`${repository}#${item.number}`); continue; }
             enriched.set(`${repository}#${item.number}`, {
               ...item,
+              state: item.state,
               stack: {
                 id: `github-stack:${repository}:${stack.number}`,
                 number: stack.number,
@@ -197,8 +212,8 @@ function createAuthoredStackReader(read: GitHubReadRunner, topology?: Repository
       );
     }
     if (failures.length > 0) throw failures[0];
-    return base.map(
-      (item) => enriched.get(`${item.repository}#${item.number}`) ?? item,
+    return base.flatMap(
+      (item) => terminal.has(`${item.repository}#${item.number}`) ? [] : [enriched.get(`${item.repository}#${item.number}`) ?? item],
     );
   };
 }

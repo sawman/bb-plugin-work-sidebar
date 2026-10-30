@@ -10,8 +10,7 @@ import {
 import type { CurrentPullRequestView } from "../../work-model.js";
 import {
   normalizePullRequestSignal,
-  pullRequestAttentionFromSignal,
-  pullRequestPresentation,
+  pullRequestSummaryPresentation,
   pullRequestSignalPresentation,
   type PullRequestSignal,
 } from "../pull-requests/presentation.js";
@@ -467,21 +466,13 @@ export function ChangesStackBranchRow({
         reviewCommentCountMode: "breakdown",
       })
     : null;
-  const attention = branch.needsRebase
-    ? "blocked"
-    : // The signal is the current per-PR GitHub fact. Its aggregate attention
-      // counterpart can arrive from an older stack projection, so it must not
-      // turn an already-approved PR back into "Review pending".
-      signal
-      ? pullRequestAttentionFromSignal(signal)
-      : signals?.attention && signals.attention !== "none"
-        ? signals.attention
-        : undefined;
-  const statePresentation = pullRequestPresentation({
+  const attention = branch.needsRebase ? "blocked" : branch.isQueued ? "queued" : signals?.attention;
+  const statePresentation = pullRequestSummaryPresentation({
     state: status === "blocked" ? "open" : status,
     draft: status === "draft",
     mergedLayer: merged,
     attention,
+    signal,
   });
   const visibleTitle = `${pr ? `#${pr.number} ` : ""}${title}`;
   const filesLabel = `${expanded ? "Hide" : "Show"} changed files for ${pr ? `pull request #${pr.number}` : branch.name}`;

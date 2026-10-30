@@ -8,7 +8,7 @@ import type { rpcContract } from "../../contracts";
 import { changesKeys, changesPolicies, remoteChangesIdentity, remoteFilesProjection } from "./model";
 import type { Changes, RemoteFileHead } from "./schemas";
 import { hydratePullRequestFacts, pullRequestKeys } from "../pull-requests/queries";
-import { factFromPullRequest, factFromSidebarStackLayer, type PullRequestFactDirectory } from "../pull-requests/facts";
+import { factFromPullRequest, factFromSidebarStackLayer, nativeValidationDemands, pullRequestFactKey, reconcileThreadPullRequestFactReferences, type PullRequestFactDirectory } from "../pull-requests/facts";
 
 type ChangesRpc = PluginRpcClient<typeof rpcContract>;
 export type ChangesPolling = {
@@ -47,27 +47,28 @@ export function useChanges(
   const summary = useQuery({
     queryKey: changesKeys.summary(threadId),
     queryFn: async ({ signal }) => {
-      const before = client.getQueryData<PullRequestFactDirectory>(pullRequestKeys.factDirectory());
-      const summaryState = client.getQueryState(changesKeys.summary(threadId));
-      const coldMount = summaryState?.data === undefined && !summaryState?.isInvalidated;
-      const result = await rpc.call("getChangesPullRequests", { threadId });
+      const directory = client.getQueryData<PullRequestFactDirectory>(pullRequestKeys.factDirectory());
+      const key = directory?.threadFactKeys[threadId];
+      const demand = nativeValidationDemands(directory, key);
+      const result = await rpc.call("getChangesPullRequests", { threadId,
+        ...(key && demand ? { validationRequirements: { [key]: demand } } : {}) });
       if (!signal.aborted) {
-        const current = client.getQueryData<PullRequestFactDirectory>(pullRequestKeys.factDirectory());
+        const currentAssociation = client.getQueryData<PullRequestFactDirectory>(pullRequestKeys.factDirectory())?.threadFactKeys[threadId];
+        const returnedAssociation = result.currentPullRequest ? pullRequestFactKey(result.currentPullRequest) : undefined;
+        if (currentAssociation !== key && currentAssociation !== returnedAssociation)
+          throw new Error("PR association changed during the read. Retry the operation.");
         const facts = [
           ...(result.currentPullRequest ? [factFromPullRequest(result.currentPullRequest)] : []),
           ...(result.stack?.pullRequests.map(factFromSidebarStackLayer) ?? []),
         ];
-        // A newer directory/manual read can settle while this RPC is pending.
-        // Only publish facts whose canonical record has not changed meanwhile.
-        hydratePullRequestFacts(client, facts.filter((fact) =>
-          // Immutable merged lifecycle from a Stack may promote an OPEN fact
-          // even during warm paint/racing reads. The fact merger preserves
-          // detailed metadata and its observation time for this light input.
-          (fact.state === "merged" && !fact.checks && !fact.review && !fact.mergeability)
-          || current?.facts[fact.key] === before?.facts[fact.key]
-            && !(coldMount && before?.facts[fact.key]
-              && Date.now() - (before.observedAtByFact?.[fact.key] ?? 0) < changesPolicies.projection.staleTime),
-        ));
+        hydratePullRequestFacts(client, facts);
+        client.setQueryData<PullRequestFactDirectory>(pullRequestKeys.factDirectory(), (current) => {
+          if (!current) return current;
+          const references = { ...current.threadFactKeys };
+          if (returnedAssociation) references[threadId] = returnedAssociation;
+          else delete references[threadId];
+          return reconcileThreadPullRequestFactReferences(current, references);
+        });
       }
       return result;
     },

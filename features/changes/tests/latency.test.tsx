@@ -7,6 +7,7 @@ import { changesKeys, changesPolicies } from "../model";
 import { invalidateChanges, useChanges } from "../queries";
 import { pullRequestKeys } from "../../pull-requests/queries";
 import { factFromPullRequest, mergePullRequestFacts } from "../../pull-requests/facts";
+import { prObservations } from "../../../tests/fixtures/pr-observation";
 
 import { currentPr } from "./latency-fixtures";
 const repo = (branch: string) => ({
@@ -100,18 +101,20 @@ describe("Changes independent readiness and latency", () => {
 
   it("fresh A survives an initial stale summary, while explicit refresh publishes a newer authoritative A and clear removes metadata", async () => {
     const client = new QueryClient();
-    const fresh = factFromPullRequest(currentPr(1, "fresh A"));
+    const fresh = factFromPullRequest({ ...currentPr(1, "fresh A"), observations: prObservations(200) });
     client.setQueryData(pullRequestKeys.factDirectory(), mergePullRequestFacts(undefined, [fresh]));
     let title = "initial stale summary";
+    let validation = 100;
     const rpc = { call: vi.fn(async (method: string) => {
       if (method === "getChangesRepository") return repo("A");
       if (method === "getChangesFingerprint") return { fingerprint: null };
-      return { ...summary(1), currentPullRequest: currentPr(1, title), githubStack: null };
+      return { ...summary(1), currentPullRequest: { ...currentPr(1, title), observations: prObservations(validation) }, githubStack: null };
     }) };
     const view = renderHook(() => useChanges(rpc as never, "thr_a", polling), { wrapper: wrapper(client) });
     await waitFor(() => expect(view.result.current.isPending).toBe(false));
     expect(client.getQueryData<any>(pullRequestKeys.factDirectory()).facts[fresh.key].title).toBe("fresh A");
     title = "manual authoritative update";
+    validation = 300;
     await act(async () => { await invalidateChanges(client, "thr_a"); });
     expect(client.getQueryData<any>(pullRequestKeys.factDirectory()).facts[fresh.key].title).toBe(title);
     view.unmount(); client.clear();
@@ -119,7 +122,7 @@ describe("Changes independent readiness and latency", () => {
   });
 
   it("late summary and enrichment cannot replace newer canonical PR facts", async () => {
-    const pending = deferred<ReturnType<typeof summary>>();
+    const pending = deferred<Omit<ReturnType<typeof summary>, "currentPullRequest"> & { currentPullRequest: import("../../pull-requests/schemas").PullRequestContract }>();
     const client = new QueryClient();
     const rpc = { call: vi.fn(async (method: string) => {
       if (method === "getChangesRepository") return repo("A");
@@ -128,11 +131,33 @@ describe("Changes independent readiness and latency", () => {
     }) };
     const view = renderHook(() => useChanges(rpc as never, "thr_a", polling), { wrapper: wrapper(client) });
     await waitFor(() => expect(rpc.call).toHaveBeenCalledTimes(3));
-    const newer = factFromPullRequest(currentPr(1, "new manual refresh"));
+    const newer = factFromPullRequest({ ...currentPr(1, "new manual refresh"), observations: prObservations(200) });
     client.setQueryData(pullRequestKeys.factDirectory(), mergePullRequestFacts(undefined, [newer]));
-    await act(async () => { pending.resolve(summary(1)); });
+    await act(async () => { pending.resolve({ ...summary(1), currentPullRequest: { ...currentPr(1), observations: prObservations(100) } }); });
     await waitFor(() => expect(view.result.current.isPending).toBe(false));
     expect(client.getQueryData<any>(pullRequestKeys.factDirectory()).facts[newer.key].title).toBe("new manual refresh");
+    view.unmount(); client.clear();
+  });
+
+  it("a cancelled old server epoch cannot publish after the replacement epoch through the actual summary Query", async () => {
+    const old = deferred<Omit<ReturnType<typeof summary>, "currentPullRequest"> & { currentPullRequest: import("../../pull-requests/schemas").PullRequestContract }>();
+    const client = new QueryClient();
+    const rpc = { call: vi.fn(async (method: string) => {
+      if (method === "getChangesRepository") return repo("A");
+      if (method === "getChangesFingerprint") return { fingerprint: null };
+      if (method === "getChangesPullRequests") return old.promise;
+      return { ...summary(1), githubStack: null };
+    }) };
+    const view = renderHook(() => useChanges(rpc as never, "thr_a", polling), { wrapper: wrapper(client) });
+    await waitFor(() => expect(rpc.call).toHaveBeenCalledWith("getChangesPullRequests", { threadId: "thr_a" }));
+    await act(async () => { await client.cancelQueries({ queryKey: changesKeys.summary("thr_a") }); });
+    const observations = Object.fromEntries(Object.entries(prObservations(100)).map(([group, clock]) => [group, { ...clock, sequence: 1, epoch: "replacement" }]));
+    const replacement = factFromPullRequest({ ...currentPr(1, "Replacement epoch"), observations });
+    act(() => client.setQueryData(pullRequestKeys.factDirectory(), mergePullRequestFacts(undefined, [replacement])));
+    const retiredObservations = Object.fromEntries(Object.entries(prObservations(999)).map(([group, clock]) => [group, { ...clock, sequence: 999, epoch: "retired" }]));
+    await act(async () => { old.resolve({ ...summary(1), currentPullRequest: { ...currentPr(1, "Late retired epoch"), observations: retiredObservations } }); });
+    expect(client.getQueryData<any>(pullRequestKeys.factDirectory()).facts[replacement.key].title).toBe("Replacement epoch");
+    expect(client.getQueryData(changesKeys.summary("thr_a"))).toBeUndefined();
     view.unmount(); client.clear();
   });
 

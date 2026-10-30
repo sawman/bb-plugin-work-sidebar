@@ -8,6 +8,7 @@ import { refreshChanges, useChanges } from "../queries";
 import { currentPr } from "./latency-fixtures";
 import { useAuthoredPullRequests, pullRequestKeys } from "../../pull-requests/queries";
 import { factFromPullRequest, mergePullRequestFacts } from "../../pull-requests/facts";
+import { prObservations } from "../../../tests/fixtures/pr-observation";
 const polling = { visiblePollMs: 60_000, backgroundPollMs: 300_000 };
 const summary = (number = 1, repo = "acme/repo") => ({ currentPullRequest: { ...currentPr(number), url: `https://github.com/${repo}/pull/${number}` },
   stack: { number: 17, base: "main", currentPullRequest: number, pullRequests: [1, 2].map((entry) => ({
@@ -253,14 +254,15 @@ describe("R41 delayed authored hydration authority", () => {
   it("keeps fresh detailed metadata in both panes when the new topology carries cached lightweight metadata", async () => {
     const client = new QueryClient(); const delayed = deferred<any>(); let fresh = false;
     const authored = { number: 1, title: "cached old title", url: currentPr(1).url, repository: "acme/repo", state: "open", draft: false,
+      observations: prObservations(100),
       head: "cached-head", base: "cached-base", checks: "passing", review: "approved", reviewCommentCount: 0, stack: null };
     const rpc = { call: vi.fn(async (method: string) => {
       if (method === "sidebarAuthoredPullRequests") return { available: true, pullRequests: [authored], error: null };
       if (method === "sidebarAuthoredPullRequestStacks") return fresh ? delayed.promise : { available: true, pullRequests: [{ ...authored, stack: { number: 17, base: "main", pullRequests: [] } }], error: null };
       if (method === "getChangesPullRequests" || method === "getChangesProjection") {
         const data = summary(); const title = fresh ? "fresh canonical title" : "cached old title";
-        return { ...data, currentPullRequest: { ...data.currentPullRequest, title }, stack: { ...data.stack, number: fresh ? 18 : 17,
-          pullRequests: data.stack.pullRequests.map((entry) => ({ ...entry, title: entry.number === 1 ? title : entry.title })) }, githubStack: null };
+        return { ...data, currentPullRequest: { ...data.currentPullRequest, title, observations: prObservations(fresh ? 200 : 100) }, stack: { ...data.stack, number: fresh ? 18 : 17,
+          pullRequests: data.stack.pullRequests.map((entry) => ({ ...entry, observations: prObservations(fresh ? 200 : 100), title: entry.number === 1 ? title : entry.title })) }, githubStack: null };
       }
       if (method === "getChangesRepository") return repo("A");
       if (method === "getChangesRemoteFiles") return { files: [] };

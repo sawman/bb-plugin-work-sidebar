@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { pullRequest, sidebarStackLayer } from "../pull-requests/schemas.js";
+import { pullRequest, sidebarStackLayer, pullRequestValidationDemands } from "../pull-requests/schemas.js";
 
 export const workingTreeFileSchema = z.object({
   path: z.string(),
@@ -157,7 +157,7 @@ export const changesRpcSchemas = {
   invalidateChangesRemote: { input: z.object({ repository: z.string().nullable(), threadIds: z.array(z.string().startsWith("thr_")).max(128).optional() }).strict(), output: z.object({ ok: z.boolean() }) },
   getChanges: { input: threadInput, output: changesSchema },
   getChangesRepository: { input: threadInput, output: repositorySchema },
-  getChangesPullRequests: { input: threadInput, output: changesPullRequestsSchema },
+  getChangesPullRequests: { input: threadInput.extend({ validationRequirements: pullRequestValidationDemands.optional() }), output: changesPullRequestsSchema },
   getChangesProjection: { input: threadInput, output: changesProjectionSchema },
   getChangesFingerprint: {
     input: z
