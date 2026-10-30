@@ -112,8 +112,29 @@ configured BB automation invoking `expireRecycleBinThreads({ retentionDays })`.
 The plugin starts no retention timer. Eligible expiry archives through BB,
 removes accepted bin records and invalidates Threads.
 
-Archived rows currently offer **Resume in new worktree**, which opens a new
-thread flow for the original project, rather than restoring the original
-thread/history/environment. BB now exposes native environment restoration;
-adopting it remains BBPLUG-414. Do not retain the obsolete claim that the host
-cannot restore environments, or claim this plugin already uses that API.
+Archived rows keep **Resume in new worktree**, including their ordinary click,
+as an explicit compose flow for the original project. This does not restore
+the original history or create a workspace itself. **Open original thread**
+navigates to the original history without unarchiving or restoring anything.
+**Unarchive** invokes the existing native core archive/unarchive action;
+BB retains lifecycle ownership, disabled state and recursive confirmation.
+
+After explicit native unarchive, an active row's context menu reads fresh
+`threads.get` state including its environment. It offers **Restore workspace**
+only for a settled, unarchived, undeleted thread with a destroyed environment
+and host `canRestoreEnvironment: true`. The action rechecks eligibility before
+calling `threads.restoreEnvironment`; BB revalidates atomically, owns provider
+restoration/provisioning and starts no turn. Acceptance opens the original
+thread and is not a claim that provisioning has finished. Already-ready state
+opens the original thread without restoring again.
+
+A known false eligibility for a settled destroyed workspace offers the
+explicit **Resume in new worktree** alternative. Missing/failed eligibility is
+unavailable, with a read retry on failure. Busy/provisioning states cannot
+restore or offer replacement as an implicit recovery. Restore failures show
+the error; they never automatically compose or create a replacement. Explicit
+retry rereads host state, preventing a second restore after BB has accepted
+provisioning. Pending actions are disabled; dismissed menu reads and late
+replies after the owning row is removed cannot initiate a restore or navigate.
+No provider implementation, deleted data recovery or new environment backend
+belongs to this feature. BBPLUG-414 retains root-owned live acceptance.

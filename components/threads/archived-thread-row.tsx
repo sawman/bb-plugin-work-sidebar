@@ -118,12 +118,25 @@ export function ArchivedThreadRow({
         </ContextMenuTrigger>
         <ContextMenuContent aria-label={`Actions for ${title}`}>
           <ContextMenuLabel>{title}</ContextMenuLabel>
+          <ContextMenuItem onSelect={() => {
+            actions.open(thread.id, { split: false });
+            onNavigate();
+          }}>
+            Open original thread
+          </ContextMenuItem>
+          <ContextMenuItem
+            disabled={!actions.canArchive}
+            onSelect={() => void actions.archive(thread.id)}
+          >
+            Unarchive
+          </ContextMenuItem>
           <ContextMenuItem onSelect={resume}>
             Resume in new worktree
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem
             data-tone="destructive"
+            disabled={!actions.canDelete}
             onSelect={() => actions.requestDelete(thread.id)}
           >
             Delete

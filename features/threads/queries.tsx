@@ -41,6 +41,7 @@ export const threadQueryKeys = {
   queuedMessages: () => [...root, "queued-messages"] as const,
   archived: () => [...root, "archived"] as const,
   recycleBin: () => [...root, "recycle-bin"] as const,
+  workspace: (threadId: string) => [...root, "workspace", threadId] as const,
 } as const;
 export const threadQueryPolicies = {
   order: queryPolicies.sidebarOrderPreferences,
@@ -52,6 +53,13 @@ export const threadQueryPolicies = {
     gcTime: 5 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
+  },
+  workspace: {
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   },
 } as const;
 export type ThreadsRpc = PluginRpcClient<typeof rpcContract>;

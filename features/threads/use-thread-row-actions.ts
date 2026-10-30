@@ -47,6 +47,10 @@ export function useThreadRowActions({
     draftTitle,
     setDraftTitle,
     open,
+    resumeInNewWorktree: () => {
+      actions.openNewThread({ projectId: thread.projectId, focusPrompt: true });
+      onNavigate();
+    },
     commitRename,
     startRename: () => setRenaming(true),
     cancelRename: () => setRenaming(false),

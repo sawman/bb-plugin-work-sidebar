@@ -43,6 +43,8 @@ export function useThreadControls(thread: ThreadControlTarget) {
     }
   };
   return {
+    canArchive: lifecycleActions.some((entry) => entry.key === "bb--core/archive" && !entry.action.disabled),
+    canDelete: lifecycleActions.some((entry) => entry.key === "bb--core/delete" && !entry.action.disabled),
     open: navigate.toThread,
     openNewThread: navigate.toCompose,
     rename: (threadId: string, title: string) => writeThread(

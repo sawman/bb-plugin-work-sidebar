@@ -28,7 +28,11 @@ vi.mock("@get-bb/plugin-sdk/app", async () => {
   );
   return {
     ...actual,
-
+    useSdk: () => ({ threads: { get: async ({ threadId }: { threadId: string }) => ({
+      id: threadId, projectId: "project", archivedAt: null, deletedAt: null,
+      status: "idle", runtime: { displayStatus: "idle" },
+      canRestoreEnvironment: false, environment: null,
+    }) } }),
     experimental_useSidebarThreadSplit: () => ({
       splitProps: {},
       isAvailable: true,

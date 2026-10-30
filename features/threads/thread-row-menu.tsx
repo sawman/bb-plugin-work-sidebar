@@ -10,11 +10,14 @@ import {
 import type { SidebarThreadGroup } from "./model";
 import type { ThreadRowActions } from "./use-thread-row-actions";
 import { useThreadHierarchyMenu } from "./use-thread-hierarchy-menu";
+import { useWorkspaceRestore } from "./use-workspace-restore";
+import { ThreadWorkspaceMenu } from "./thread-workspace-menu";
 
 export function ThreadRowMenu({
   children,
   title,
   threadId,
+  projectId,
   parentThreadId,
   isPinned,
   isUnread,
@@ -29,6 +32,7 @@ export function ThreadRowMenu({
   children: ReactElement<HTMLAttributes<HTMLElement>>;
   title: string;
   threadId: string;
+  projectId: string;
   parentThreadId: string | null;
   isPinned: boolean;
   isUnread: boolean;
@@ -41,6 +45,7 @@ export function ThreadRowMenu({
   actions: ThreadRowActions;
 }) {
   const hierarchy = useThreadHierarchyMenu({ threadId, title, onFocusReturn });
+  const workspace = useWorkspaceRestore(threadId, projectId, () => actions.open(false));
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
@@ -57,6 +62,13 @@ export function ThreadRowMenu({
             Open in split
           </ContextMenuItem>
         )}
+        <ThreadWorkspaceMenu
+          threadId={threadId}
+          projectId={projectId}
+          pending={workspace.pending}
+          onRestore={workspace.restore}
+          onResumeInNewWorktree={actions.resumeInNewWorktree}
+        />
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={() => actions.setRead(isUnread)}>
           {isUnread ? "Mark read" : "Mark unread"}

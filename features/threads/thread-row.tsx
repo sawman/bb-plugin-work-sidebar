@@ -140,6 +140,7 @@ export function ThreadRow({
         <ThreadRowMenu
           title={title}
           threadId={thread.id}
+          projectId={thread.projectId}
           parentThreadId={thread.parentThreadId}
           isPinned={thread.isPinned}
           isUnread={thread.isUnread}
