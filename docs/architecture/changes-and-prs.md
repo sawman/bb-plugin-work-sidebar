@@ -177,7 +177,7 @@ missing/error/truncated/capped pages cannot certify passing or no-checks.
 Lowercase outcomes and pending states are normalized, with failure before
 pending before passing. A trailing fresh PR metadata read rejects head/base
 changes before proof issuance unless the initial metadata's actual admission
-already strictly follows every contributing check/status admission. Unknown
+already strictly follows every contributing review/check/status admission. Unknown
 order still requires a fresh trailing read. Reusing that existing guard never
 renews source validation time or bypasses a causal demand. The proof's lower
 bound covers the earliest contributing read, not completion. Cold fallback

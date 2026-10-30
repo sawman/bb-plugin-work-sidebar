@@ -11,7 +11,7 @@ import type { GitHubSignal } from "../server-types";
 
 afterEach(() => vi.useRealTimers());
 
-function fixture() {
+function fixture(checksWait?: Promise<void>) {
   const lifecycle = createServerLifecycle();
   lifecycle.githubGraphqlBackoffUntil = 10_000_000;
   let metadataHead = "head";
@@ -22,7 +22,8 @@ function fixture() {
       reviews: { totalCount: 0, nodes: [] }, reviewRequests: { totalCount: 0, nodes: [] }, reviewDecision: "APPROVED", commits: { nodes: [] },
     } } } });
     const target = args.find((arg) => arg.startsWith("repos/"))!;
-    if (target.includes("/reviews")) return "[]";
+    if (target.includes("/reviews")) return JSON.stringify(metadataHead === "head" ? [] : [{ user: { login: "reviewer" }, state: "CHANGES_REQUESTED", submitted_at: "2026-10-30T00:00:00Z", commit_id: metadataHead }]);
+    if (checksWait && (target.includes("/check-runs") || target.includes("/status?"))) await checksWait;
     if (target.includes("/check-runs")) return JSON.stringify({ total_count: 1, check_runs: [{ status: "completed", conclusion: "success", head_sha: "head" }] });
     if (target.includes("/status?")) return JSON.stringify({ total_count: 0, sha: "head", statuses: [] });
     return JSON.stringify({ title: "PR", state: "open", draft: false, head: { ref: "feature", sha: metadataHead }, base: { ref: "main", sha: "base" }, requested_reviewers: [] });
@@ -32,6 +33,26 @@ function fixture() {
 }
 
 describe("REST fallback admissions through the production raw cache", () => {
+  it("guards freshly refetched reviews when their TTL expires before deferred checks and cached metadata", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(100_000);
+    let releaseChecks!: () => void;
+    const checksWait = new Promise<void>((resolve) => { releaseChecks = resolve; });
+    const { lifecycle, command, run, changeHead } = fixture(checksWait);
+    try {
+      const firstRead = readGitHubSignals("acme", "repo", [1], lifecycle, run);
+      await vi.waitFor(() => expect(command).toHaveBeenCalledTimes(4));
+      vi.setSystemTime(110_000);
+      releaseChecks();
+      expect((await firstRead).get(1)?.checks).toBe("passing");
+      expect(command).toHaveBeenCalledTimes(5);
+      vi.setSystemTime(225_000);
+      changeHead();
+      const next = await readGitHubSignals("acme", "repo", [1], lifecycle, run);
+      expect(command).toHaveBeenCalledTimes(7); // expired reviews and a new metadata guard
+      expect(next.has(1)).toBe(false);
+    } finally { lifecycle.dispose(); }
+  });
+
   it("reuses the existing post-checks metadata guard across ordinary polls without renewing evidence", async () => {
     vi.useFakeTimers(); vi.setSystemTime(100_000);
     const { lifecycle, command, run } = fixture();
