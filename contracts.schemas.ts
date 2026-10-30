@@ -79,7 +79,7 @@ export const rpcSchemas = {
   getWorkGoal: { input: workCardInputSchema, output: workGoalSchema },
   getWorkPlan: { input: workCardInputSchema, output: workPlanSchema },
   ...workContextRpcSchemas,
-  getGitHubPollingPolicy: { input: z.null(), output: z.object({ activePollMs: z.number().int().positive(), backgroundPollMs: z.number().int().positive(), maxRestPollsPerMinute: z.number().int().positive() }) },
+  getGitHubPollingPolicy: { input: z.null(), output: z.object({ activePollMs: z.number().int().positive(), backgroundPollMs: z.number().int().nonnegative(), maxRestPollsPerMinute: z.number().int().positive() }) },
   ...trackerRpcSchemas,
   getWorkProviderStatus: {
     input: z.union([

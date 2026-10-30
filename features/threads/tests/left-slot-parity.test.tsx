@@ -2296,9 +2296,14 @@ describe("R18 registered left sidebar parity", () => {
       expect(getArchive).toHaveBeenCalledTimes(counts.archive + 1);
     });
     expect(slot.getByRole("link", { name: /One/ })).not.toBe(beforeRefresh);
+    expect(authored).not.toHaveBeenCalled();
+    expect(stacks).not.toHaveBeenCalled();
     fireEvent.click(slot.getByRole("button", { name: "PRs" }));
     await waitFor(() => expect(authored).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(stacks).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(
+      (slot.getByRole("button", { name: "Refresh pull requests" }) as HTMLButtonElement).disabled,
+    ).toBe(false));
     fireEvent.click(
       slot.getByRole("button", { name: "Refresh pull requests" }),
     );
