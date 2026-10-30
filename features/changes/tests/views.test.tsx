@@ -9,11 +9,16 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GitHubStackBranch } from "../../../contracts";
 import { changesHeaderLabel } from "../model";
-import { ChangesError, ChangesStackBranchRow } from "../views";
+import { ChangesCurrentPullRequestRow, ChangesError, ChangesStackBranchRow } from "../views";
+import { currentPr } from "./latency-fixtures";
 import { dispatchHrefClickWithoutJsdomNavigation } from "../../../tests/utils/dispatch-href-click";
 import { renderPluginComponent as render } from "../../../tests/utils/render-plugin-component";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 function stackBranch(
   overrides: Partial<GitHubStackBranch> = {},
@@ -55,6 +60,103 @@ function stackBranch(
 }
 
 describe("R13 Changes error presentation", () => {
+  it.each(["current", "stack"] as const)(
+    "copies the resolved %s PR URL from an independent leading badge",
+    (rowKind) => {
+      const onToggle = vi.fn();
+      const onCheckout = vi.fn();
+      const onParentClick = vi.fn();
+      const onParentKeyDown = vi.fn();
+      const clipboardWrite = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal("navigator", { clipboard: { writeText: clipboardWrite } });
+      const openWindow = vi.spyOn(window, "open").mockReturnValue(null);
+      const canonicalUrl = "https://github.com/acme/canonical/pull/8";
+      const branch = stackBranch();
+      const row = rowKind === "current" ? (
+        <ChangesCurrentPullRequestRow
+          pullRequest={{ ...currentPr(8, branch.pr!.title ?? undefined), url: canonicalUrl }}
+          branch={branch}
+          expanded={false}
+          externalOnModifier
+          onToggle={onToggle}
+          onOpenFile={() => undefined}
+        />
+      ) : (
+        <ChangesStackBranchRow
+          branch={branch}
+          signals={{ state: "open", draft: false, checks: "passing", review: "approved", reviewCommentCount: 0, url: canonicalUrl }}
+          expanded={false}
+          externalOnModifier
+          checkingOut={false}
+          onToggle={onToggle}
+          onCheckout={onCheckout}
+        />
+      );
+      const { container } = render(
+        <div onClick={onParentClick} onKeyDown={onParentKeyDown}>{row}</div>,
+      );
+      const badge = screen.getByRole("button", { name: "Copy PR URL #8" });
+      const titleToggle = screen.getByRole("button", {
+        name: `#8 ${branch.pr!.title} — Show changed files for pull request #8`,
+      });
+      const githubLink = screen.getByRole("link", { name: "Open pull request #8 on GitHub" });
+      const onNavigate = vi.fn();
+      githubLink.addEventListener("click", onNavigate);
+      expect(githubLink.getAttribute("href")).toBe(canonicalUrl);
+      expect(badge.textContent).toBe("#8");
+      expect(badge.tabIndex).toBe(0);
+      expect(badge.parentElement?.closest('button, a, [role="button"]')).toBeNull();
+      expect(titleToggle.contains(badge)).toBe(false);
+      expect(badge.compareDocumentPosition(titleToggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(container.querySelector('button button, button [role="button"], a [role="button"]')).toBeNull();
+      expect(titleToggle.getAttribute("aria-expanded")).toBe("false");
+
+      badge.focus();
+      expect(document.activeElement).toBe(badge);
+      expect(screen.getByRole("tooltip", { name: "Copy PR URL" })).toBeTruthy();
+      fireEvent.pointerDown(badge);
+      fireEvent.mouseDown(badge);
+      fireEvent.click(badge);
+      fireEvent.click(badge, { metaKey: true });
+      fireEvent.keyDown(badge, { key: "Enter" });
+      fireEvent.keyDown(badge, { key: " " });
+      expect(clipboardWrite.mock.calls).toEqual(Array.from({ length: 4 }, () => [canonicalUrl]));
+      expect(onToggle).not.toHaveBeenCalled();
+      expect(onCheckout).not.toHaveBeenCalled();
+      expect(onParentClick).not.toHaveBeenCalled();
+      expect(onParentKeyDown).not.toHaveBeenCalled();
+      expect(onNavigate).not.toHaveBeenCalled();
+      expect(openWindow).not.toHaveBeenCalled();
+      expect(titleToggle.getAttribute("aria-expanded")).toBe("false");
+
+      fireEvent.click(titleToggle);
+      expect(onToggle).toHaveBeenCalledOnce();
+      expect(clipboardWrite).toHaveBeenCalledTimes(4);
+      dispatchHrefClickWithoutJsdomNavigation(githubLink,
+        new MouseEvent("click", { bubbles: true, cancelable: true, metaKey: true }));
+      expect(openWindow).toHaveBeenCalledWith(canonicalUrl, "_blank", "noopener,noreferrer");
+      expect(onToggle).toHaveBeenCalledOnce();
+      if (rowKind === "stack") {
+        fireEvent.click(screen.getByRole("button", { name: /Check out/ }));
+        expect(onCheckout).toHaveBeenCalledOnce();
+        expect(onToggle).toHaveBeenCalledOnce();
+      }
+    },
+  );
+
+  it("does not add a PR copy badge to a non-PR branch", () => {
+    render(<ChangesStackBranchRow
+      branch={stackBranch({ pr: null, diff: null })}
+      expanded={false}
+      checkingOut={false}
+      onToggle={() => undefined}
+      onCheckout={() => undefined}
+    />);
+    expect(screen.queryByRole("button", { name: /Copy PR URL/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Open pull request/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "feature/aligned-actions" }).getAttribute("aria-disabled")).toBe("true");
+  });
+
   it("renders an accessible Changes failure and retries only the Changes query", () => {
     const retry = vi.fn();
     render(

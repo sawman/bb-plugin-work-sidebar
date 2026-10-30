@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 import type { GitHubStackBranch } from "../../contracts.js";
 import { Icon } from "../../components/ui/icon.js";
+import { CopyBadge } from "../../components/ui/copy-badge.js";
 import { Status } from "../../components/ui/status.js";
 import {
   SurfaceCard,
@@ -494,39 +495,51 @@ export function ChangesStackBranchRow({
           presentation={statePresentation}
           className="ws-stack-state-icon"
         />
-        <button
-          type="button"
-          className="ws-stack-layer-toggle"
-          onClick={() => {
-            if (hasDisclosure) onToggle();
-          }}
-          {...(hasDisclosure
-            ? {
-                "aria-expanded": expanded,
-                "aria-label": `${visibleTitle} — ${filesLabel}`,
-              }
-            : { "aria-disabled": true, "aria-label": visibleTitle })}
-        >
-          <strong>{visibleTitle}</strong>
-          <small>
-            <span className="ws-stack-subtitle-signals">
-              {presented && (
-                <>
-                  <Status presentation={presented.checks} size="metadata" />
-                  <Status presentation={presented.review} size="metadata" />
-                </>
-              )}
-            </span>
-            {branch.name}
-          </small>
-          {branch.diff ? (
-            <ChangeLineDeltas
-              additions={branch.diff.additions}
-              deletions={branch.diff.deletions}
-              className="ws-stack-line-deltas"
-            />
-          ) : null}
-        </button>
+        <div className="ws-stack-layer-summary">
+          {pr && (
+            <CopyBadge
+              value={`#${pr.number}`}
+              copyValue={pr.url}
+              label="PR URL"
+              title="Copy PR URL"
+            >
+              #{pr.number}
+            </CopyBadge>
+          )}
+          <button
+            type="button"
+            className="ws-stack-layer-toggle"
+            onClick={() => {
+              if (hasDisclosure) onToggle();
+            }}
+            {...(hasDisclosure
+              ? {
+                  "aria-expanded": expanded,
+                  "aria-label": `${visibleTitle} — ${filesLabel}`,
+                }
+              : { "aria-disabled": true, "aria-label": visibleTitle })}
+          >
+            <strong>{title}</strong>
+            <small>
+              <span className="ws-stack-subtitle-signals">
+                {presented && (
+                  <>
+                    <Status presentation={presented.checks} size="metadata" />
+                    <Status presentation={presented.review} size="metadata" />
+                  </>
+                )}
+              </span>
+              {branch.name}
+            </small>
+            {branch.diff ? (
+              <ChangeLineDeltas
+                additions={branch.diff.additions}
+                deletions={branch.diff.deletions}
+                className="ws-stack-line-deltas"
+              />
+            ) : null}
+          </button>
+        </div>
         <StackBranchActions
           pullRequest={pr}
           branchName={branch.name}

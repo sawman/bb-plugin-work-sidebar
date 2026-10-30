@@ -92,7 +92,7 @@ it("publishes a merged sibling through stale detailed OPEN facts into both bars 
       expect(badge(surface).querySelector("svg")?.getAttribute("data-icon")).toBe("GitMerge");
     }
     const right = within(slot.getByRole("region", { name: "right Changes" }));
-    const mergedTitle = await right.findByText("#2518 Detailed sibling title");
+    const mergedTitle = await right.findByRole("button", { name: /#2518 Detailed sibling title/ });
     expect(mergedTitle.closest(".ws-stack-layer-item")?.querySelector('.ws-stack-state-icon[data-tone="merged"]')).toBeTruthy();
     expect(right.getByRole("button", { name: "Merged branch" }).hasAttribute("disabled")).toBe(true);
     expect(right.getByRole("button", { name: "Copy PR number #2531" })).toBeTruthy();

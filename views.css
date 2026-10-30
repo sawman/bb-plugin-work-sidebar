@@ -1654,7 +1654,14 @@
 .ws-stack-layer:hover {
   background: var(--accent);
 }
+.ws-stack-layer-summary {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+  gap: 0.25rem;
+}
 .ws-stack-layer-toggle {
+  flex: 1;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:

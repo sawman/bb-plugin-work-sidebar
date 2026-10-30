@@ -333,7 +333,7 @@ describe("R13 registered Changes Work slot", () => {
       getChangesProjection: remote,
       threadPullRequests: { thr_changes: currentPr(42, "Canonical cached PR") },
     });
-    await waitFor(() => expect(slot.getByText(/#42 Canonical cached PR/)).toBeTruthy());
+    await waitFor(() => expect(slot.getByRole("button", { name: /#42 Canonical cached PR/ })).toBeTruthy());
     await waitFor(() => expect(slot.getByText("Clean")).toBeTruthy());
     if (state === "error") expect(slot.getByRole("alert")).toBeTruthy();
     expect(slot.queryByText("No pull request is linked to this thread.")).toBeNull();
@@ -350,12 +350,12 @@ describe("R13 registered Changes Work slot", () => {
       getChangesProjection: () => slow.promise,
       threadPullRequests: { thr_changes: currentPr(42, "Cold summary") },
     });
-    await waitFor(() => expect(slot.getByText(/#42 Cold summary/)).toBeTruthy());
+    await waitFor(() => expect(slot.getByRole("button", { name: /#42 Cold summary/ })).toBeTruthy());
     expect(slot.getByText("Loading pull requests and working-tree changes…")).toBeTruthy();
     linked = false;
     fireEvent.click(slot.getByRole("button", { name: "Refresh work context" }));
     await waitFor(() => expect(slot.getByText("No pull request is linked to this thread.")).toBeTruthy());
-    expect(slot.queryByText(/#42 Cold summary/)).toBeNull();
+    expect(slot.queryByRole("button", { name: /#42 Cold summary/ })).toBeNull();
     slot.lifecycle.unmount();
   });
   it.each(["merged", "draft", "closed"] as const)("late open enrichment preserves fresh canonical %s PR state, title and branch actions", async (state) => {
@@ -368,7 +368,7 @@ describe("R13 registered Changes Work slot", () => {
       getChangesPullRequests: () => changesResult(repository("available"), { currentPullRequest: authoritative, stack: stackSummary }),
       getChangesProjection: () => late.promise,
     });
-    await waitFor(() => expect(slot.getByText(`#42 Fresh ${state}`)).toBeTruthy());
+    await waitFor(() => expect(slot.getByRole("button", { name: new RegExp(`#42 Fresh ${state}`) })).toBeTruthy());
     fireEvent.click(slot.getByRole("button", { name: "Show changed files for pull request #42" }));
     expect(slot.getByText("Loading changed files…")).toBeTruthy();
     late.resolve(changesResult(repository("available"), {
@@ -386,7 +386,7 @@ describe("R13 registered Changes Work slot", () => {
       } },
     }));
     await waitFor(() => expect(slot.getByRole("list", { name: "GitHub Stack based on main" })).toBeTruthy());
-    expect(slot.getByText(`#42 Fresh ${state}`)).toBeTruthy();
+    expect(slot.getByRole("button", { name: new RegExp(`#42 Fresh ${state}`) })).toBeTruthy();
     expect(slot.getByRole("button", { name: "Hide changed files for pull request #42" }).getAttribute("aria-expanded")).toBe("true");
     expect(slot.getByText("late.ts")).toBeTruthy();
     expect(slot.container.querySelector(`.ws-stack-state-icon[data-tone="${state}"]`)).toBeTruthy();
@@ -404,12 +404,12 @@ describe("R13 registered Changes Work slot", () => {
       getChangesPullRequests: () => changesResult(repository("available"), { currentPullRequest: currentPr(number), stack: null }),
       getChangesProjection: () => late.promise,
     });
-    await waitFor(() => expect(slot.getByText("#42 PR 42")).toBeTruthy());
+    await waitFor(() => expect(slot.getByRole("button", { name: /#42 PR 42/ })).toBeTruthy());
     fireEvent.click(slot.getByRole("button", { name: "Show changed files for pull request #42" }));
     expect(slot.getByText("Loading changed files…")).toBeTruthy();
     number = 43;
     await getPluginQueryClient().invalidateQueries({ queryKey: changesKeys.summary("thr_changes") });
-    await waitFor(() => expect(slot.getByText("#43 PR 43")).toBeTruthy());
+    await waitFor(() => expect(slot.getByRole("button", { name: /#43 PR 43/ })).toBeTruthy());
     expect(slot.getByRole("button", { name: "Show changed files for pull request #43" }).getAttribute("aria-expanded")).toBe("false");
     late.resolve(changesResult(repository("available"), {
       currentPullRequest: currentPr(42),
@@ -424,7 +424,7 @@ describe("R13 registered Changes Work slot", () => {
       } },
     }));
     await waitFor(() => expect(getPluginQueryClient().getQueryState(changesKeys.projection("thr_changes"))?.fetchStatus).toBe("idle"));
-    expect(slot.getByText("#43 PR 43")).toBeTruthy();
+    expect(slot.getByRole("button", { name: /#43 PR 43/ })).toBeTruthy();
     expect(slot.queryByText("Loading changed files…")).toBeNull();
     expect(slot.getByRole("button", { name: "Show changed files for pull request #43" }).getAttribute("aria-expanded")).toBe("false");
     slot.lifecycle.unmount();
@@ -490,7 +490,7 @@ describe("R13 registered Changes Work slot", () => {
       threadPullRequests: { thr_changes: sharedPullRequest },
     });
     await waitFor(() =>
-      expect(slot.getByText(/#42 Shared current PR/)).toBeTruthy(),
+      expect(slot.getByRole("button", { name: /#42 Shared current PR/ })).toBeTruthy(),
     );
     expect(
       slot.getByText("Loading pull requests and working-tree changes…"),
@@ -540,7 +540,7 @@ describe("R13 registered Changes Work slot", () => {
         changesResult(repository("available"), { currentPullRequest }),
     });
     await waitFor(() =>
-      expect(nonStack.getByText(/#42 Current PR/)).toBeTruthy(),
+      expect(nonStack.getByRole("button", { name: /#42 Current PR/ })).toBeTruthy(),
     );
     const currentPrNumber = nonStack.getByRole("button", {
       name: "Copy PR number #42",
@@ -554,6 +554,12 @@ describe("R13 registered Changes Work slot", () => {
     const nonStackDisclosure = nonStack.getByRole("button", {
       name: "Show changed files for pull request #42",
     });
+    const currentUrlBadge = nonStack.getByRole("button", {
+      name: "Copy PR URL #42",
+    });
+    fireEvent.click(currentUrlBadge);
+    await waitFor(() => expect(clipboardWrite).toHaveBeenLastCalledWith(currentPullRequest.url));
+    expect(nonStackDisclosure.getAttribute("aria-expanded")).toBe("false");
     expect(nonStackDisclosure.closest(".ws-stack-layer")).toBeTruthy();
     expect(
       (nonStack.getByRole("button", { name: "Current branch" }) as HTMLButtonElement)
@@ -655,6 +661,9 @@ describe("R13 registered Changes Work slot", () => {
     const trailingDisclosure = stack.getByRole("button", {
       name: "Show changed files for pull request #43",
     });
+    expect(disclosure.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.keyDown(stack.getByRole("button", { name: "Copy PR URL #43" }), { key: "Enter" });
+    await waitFor(() => expect(clipboardWrite).toHaveBeenLastCalledWith(branch.pr.url));
     expect(disclosure.getAttribute("aria-expanded")).toBe("false");
     expect(trailingDisclosure.classList.contains("ws-stack-expand")).toBe(true);
     expect(
@@ -840,7 +849,7 @@ describe("R13 registered Changes Work slot", () => {
     });
 
     await waitFor(() =>
-      expect(slot.getByText(/#1279 Upgrade Pulumi/)).toBeTruthy(),
+      expect(slot.getByRole("button", { name: /#1279 Upgrade Pulumi/ })).toBeTruthy(),
     );
     expect(
       slot.queryByRole("list", { name: "GitHub Stack based on main" }),
@@ -1171,7 +1180,7 @@ describe("R41 registered host refresh and selected head identity", () => {
     const remote = { files: [{ url: member.url, head: member.head, base: member.base, headSha: "old", baseSha: "base", diff: fileDiff }] };
     const patches = vi.fn(({ path }: { path: string }) => ({ kind: "absent", path, patch: null, message: "No diff" }));
     const slot = await changesSlot({ getChanges: () => data, getChangesRemoteFiles: () => remote, getPullRequestFileDiff: patches });
-    await waitFor(() => expect(slot.getByText("#43 PR 43")).toBeTruthy());
+    await waitFor(() => expect(slot.getByRole("button", { name: /#43 PR 43/ })).toBeTruthy());
     await waitFor(() => expect(getPluginQueryClient().getQueriesData({ queryKey: ["work-sidebar", "changes-remote"] }).some(([, value]) => Boolean(value))).toBe(true));
     fireEvent.click(slot.getByRole("button", { name: "Show changed files for pull request #43" }));
     fireEvent.click(slot.getByRole("button", { name: "Open pull request diff for sibling.ts" }));
