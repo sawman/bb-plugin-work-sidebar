@@ -74,7 +74,7 @@ export function ChangesPanel({ threadId, environmentId }: { threadId: string; en
       Number(pluginSettings?.githubActivePollSeconds ?? "60") * 1_000,
     backgroundPollMs:
       Number(pluginSettings?.githubBackgroundPollSeconds ?? "300") * 1_000,
-  });
+  }, native.row?.outcome === "available" ? nativeKey : native.row?.outcome === "absent" ? null : undefined);
   const sidebarAppearance = useSidebarAppearance();
   const githubHealthQuery = useGitHubApiHealth(rpc, { poll: false });
   const githubApiHealth = githubHealthQuery.data ?? {
@@ -134,7 +134,8 @@ export function ChangesPanel({ threadId, environmentId }: { threadId: string; en
     changesQuery.data?.stack || (githubStack?.branches.length ?? 0) > 1
       ? githubStack
       : null;
-  const confirmedAbsent = native.row?.outcome === "absent" || changesQuery.isSuccess && changesQuery.data?.currentPullRequest === null;
+  const confirmedAbsent = native.row?.outcome === "absent"
+    || native.row?.outcome !== "available" && changesQuery.isSuccess && changesQuery.data?.currentPullRequest === null;
   const projectedPullRequest = confirmedAbsent ? null : native.pullRequest ?? changesQuery.data?.currentPullRequest ?? null;
   const currentPullRequest = projectedPullRequest
     ? resolvePullRequestFact(projectedPullRequest, pullRequestFacts.data)

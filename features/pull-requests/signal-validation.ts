@@ -27,7 +27,7 @@ function demandSatisfied(signal: GitHubSignal | null | undefined, demand: Signal
 }
 function addReceipts(pending: PendingSignalValidation, cached: GitHubSignal | undefined,
   key: string, demand: SignalDemands | undefined, lifecycle: ServerLifecycle, receivedSequence?: number) {
-  const receipts = pending.receipts ??= [];
+  const receipts = [...(pending.receipts ?? [])];
   for (const group of groups) {
     const requested = demand?.[group];
     if (!requested || satisfied(cached, group, requested) || superseded(cached, group, requested)) continue;
@@ -39,6 +39,7 @@ function addReceipts(pending: PendingSignalValidation, cached: GitHubSignal | un
       throw new Error("PR validation capacity reached.");
     receipts.push({ group, demand: requested, sequence: receivedSequence ?? lifecycle.nextObservationSequence() });
   }
+  pending.receipts = receipts;
 }
 
 function withProofs(signal: GitHubSignal, previous: GitHubSignal | undefined, receipts: Receipt[], lifecycle: ServerLifecycle) {
@@ -86,32 +87,41 @@ export async function readSignalObservations(input: {
   const waits: Array<{ number: number; pending: PendingSignalValidation }> = [];
   const completions = new Map<number, (signal: GitHubSignal | null) => void>();
   const reservations = new Map<number, PendingSignalValidation>();
+  const rejected = new Set<number>();
   for (const number of [...new Set(input.numbers)].filter((value) => Number.isInteger(value) && value > 0)) {
-    const key = keyFor(number);
-    const cached = lifecycle.githubPullRequestSignalCache.get(key);
-    if (cached && cached.expiresAt > Date.now() && input.receivedSequence !== undefined && demands[number]) {
-      const admission: PendingSignalValidation = Promise.resolve(cached.value);
-      addReceipts(admission, cached.value, key, demands[number], lifecycle, input.receivedSequence);
-      const proved = withProofs(cached.value, cached.value, admission.receipts ?? [], lifecycle);
-      if (demandSatisfied(proved, demands[number])) {
-        // Only proof metadata changes. A cache reuse never renews validation/TTL.
-        lifecycle.cacheGitHubPullRequestSignal(key, proved, cached.expiresAt);
-        result.set(number, proved); continue;
+    try {
+      const key = keyFor(number);
+      const cached = lifecycle.githubPullRequestSignalCache.get(key);
+      if (cached && cached.expiresAt > Date.now() && input.receivedSequence !== undefined && demands[number]) {
+        const admission: PendingSignalValidation = Promise.resolve(cached.value);
+        addReceipts(admission, cached.value, key, demands[number], lifecycle, input.receivedSequence);
+        const proved = withProofs(cached.value, cached.value, admission.receipts ?? [], lifecycle);
+        if (demandSatisfied(proved, demands[number])) {
+          // Only proof metadata changes. A cache reuse never renews validation/TTL.
+          lifecycle.cacheGitHubPullRequestSignal(key, proved, cached.expiresAt);
+          result.set(number, proved); continue;
+        }
       }
-    }
-    if (cached && cached.expiresAt > Date.now() && demandSatisfied(cached.value, demands[number])) {
-      result.set(number, cached.value); continue;
-    }
-    let pending = lifecycle.githubPullRequestSignalPending.get(key);
-    if (pending) {
+      if (cached && cached.expiresAt > Date.now() && demandSatisfied(cached.value, demands[number])) {
+        result.set(number, cached.value); continue;
+      }
+      let pending = lifecycle.githubPullRequestSignalPending.get(key);
+      if (pending) {
+        addReceipts(pending, cached?.value, key, demands[number], lifecycle, input.receivedSequence);
+        waits.push({ number, pending }); continue;
+      }
+      if (lifecycle.githubPullRequestSignalPending.size >= 300) throw new Error("PR validation capacity reached.");
+      pending = new Promise<GitHubSignal | null>((resolve) => { completions.set(number, resolve); });
       addReceipts(pending, cached?.value, key, demands[number], lifecycle, input.receivedSequence);
-      waits.push({ number, pending }); continue;
+      reservations.set(number, pending); owned.push(number);
+      lifecycle.githubPullRequestSignalPending.set(key, pending);
+    } catch {
+      // Admission is per PR. Do not strand earlier reservations or attach a
+      // partial demand to an existing read when a later group is rejected.
+      completions.get(number)?.(null);
+      completions.delete(number);
+      rejected.add(number);
     }
-    if (lifecycle.githubPullRequestSignalPending.size >= 300) throw new Error("PR validation capacity reached.");
-    pending = new Promise<GitHubSignal | null>((resolve) => { completions.set(number, resolve); });
-    addReceipts(pending, cached?.value, key, demands[number], lifecycle, input.receivedSequence);
-    reservations.set(number, pending); owned.push(number);
-    lifecycle.githubPullRequestSignalPending.set(key, pending);
   }
   if (owned.length) {
     try {
@@ -161,7 +171,7 @@ export async function readSignalObservations(input: {
     } else if (signal) result.set(number, signal);
   }));
   assertCurrent();
-  if (input.numbers.some((number) => demands[number] && !result.has(number)))
+  if (!result.size && (rejected.size || input.numbers.some((number) => demands[number])))
     throw new Error("Pull request validation is unavailable. Retry the operation.");
   return result;
 }

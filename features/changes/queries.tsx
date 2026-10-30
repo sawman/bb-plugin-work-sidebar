@@ -31,6 +31,7 @@ export function useChanges(
   rpc: ChangesRpc,
   threadId: string,
   polling: ChangesPolling,
+  nativeAssociation?: string | null,
 ) {
   const client = useQueryClient();
   const visible = useDocumentVisibility();
@@ -65,7 +66,8 @@ export function useChanges(
         client.setQueryData<PullRequestFactDirectory>(pullRequestKeys.factDirectory(), (current) => {
           if (!current) return current;
           const references = { ...current.threadFactKeys };
-          if (returnedAssociation) references[threadId] = returnedAssociation;
+          const association = nativeAssociation === undefined ? returnedAssociation : nativeAssociation;
+          if (association) references[threadId] = association;
           else delete references[threadId];
           return reconcileThreadPullRequestFactReferences(current, references);
         });

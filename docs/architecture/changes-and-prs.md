@@ -40,6 +40,8 @@ boundaries when changing loading or refresh behavior.
   disable draft conversion. Thread/Stack overlays must match the full
   repository/PR key. Confirmed successful absence clears only that thread's
   association; unavailable/malformed/missing results retain warm facts.
+  An available keyed native association wins over a null summary; summary
+  absence clears the reference only when no keyed row is available.
 - Remote-only repository topology and PR files may be shared across threads.
   Raw topology seeds carry discovery/order, not a second computed status
   directory. The left authored projection filters open PRs and archived
@@ -77,6 +79,14 @@ server wall clocks. A proof for another PR, group, occurrence, head or retired
 server epoch cannot win. This works with remote/web client clock skew. Native
 metadata-only changes do not force signal validation.
 
+Metadata with equal PR `updatedAt` remains incomparable. When native metadata
+arrived first, an equal-version GitHub observation does not replace its values
+or attach head/base SHA evidence. The SHA compatibility guard is unavailable
+for those metadata groups until a newer metadata version is observed. Checks
+and review still require their own exact causal proof; GitHub observations are
+ordered within their server sequence/epoch. This is an explicit partial-order
+limit, not a complete ordering of all snapshots.
+
 Per-PR pending reservations coalesce consumers and windows. A demand arriving
 after admission joins one coalesced successor after that read settles. There
 is at most one active read and one successor at a time; a finite burst during
@@ -86,6 +96,10 @@ error boundaries immediately, retaining the unsatisfied client demand for the
 next existing authorized read; no sleeping RPC, retry loop or timer is added.
 Proofs retain only the latest occurrence per client/group (32 clients per
 cached PR group); pending state caps at 300 PRs and rejects capacity overflow.
+Scope or capacity rejection isolates that PR, settles/releases every owned
+reservation, and leaves independent valid PR admissions running. The rejected
+client demand remains unsatisfied for its next authorized read; it receives no
+proof and never means confirmed absence.
 Evidence evicts/disposes with the existing fact, semantic cache and pending
 owners. Retired server epochs are bounded at eight per fact; cancelled Query
 publications and server generation guards reject retired in-flight work.
@@ -119,6 +133,14 @@ lists and comments add zero conditional commands. Host polling at 30 seconds
 (active) or five minutes (quiet) illustrates the cadence; manual/event-driven
 transitions mean 120/hour is not a hard ceiling. Ordinary polling/backoff/TTLs
 remain unchanged.
+
+A genuinely new client/window with no retained fact-generation history may
+issue one initial causal demand for that PR and conditionally validate when
+the existing cached/pending observation cannot satisfy server receipt order.
+An older client's proof is not aliased to it. This cold-client cost is separate
+from replay/remount/duplicate delivery within a retained generation, which
+creates no additional demand or conditional read. Source validation time
+advances only after a real successful upstream admission, never on arrival.
 
 Complete GraphQL aggregate success adds no REST calls. Its existing REST
 fallback now reads complete check runs and combined legacy statuses by the

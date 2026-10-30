@@ -35,6 +35,83 @@ function publication(signal: GitHubSignal) {
 afterEach(() => vi.useRealTimers());
 
 describe("causal signal validation at the actual raw cache boundary", () => {
+  it("a cold client may validate once, while its retained-generation replay and remount demand costs zero", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(100_000);
+    const lifecycle = createServerLifecycle(); const command = vi.fn(async () => response());
+    const run: GitHubApiRunner = (args, buffer, policy) => readGitHub(lifecycle, command,
+      () => ({ state: "unavailable", scope: "rest", message: null, retryAt: null }), args, buffer, 120_000, undefined, policy);
+    try {
+      const cached = (await readGitHubSignals("acme", "repo", [1], lifecycle, run)).get(1)!;
+      const first = mergeNativePullRequestFact(undefined, native("passing"));
+      const demand = nativeValidationDemands(first, "acme/repo#1")!;
+      vi.setSystemTime(110_000);
+      const current = (await readGitHubSignals("acme", "repo", [1], lifecycle, run, { 1: demand })).get(1)!;
+      expect(command).toHaveBeenCalledTimes(2);
+      expect(current.observations?.checks?.sequence).toBeGreaterThan(cached.observations?.checks?.sequence ?? 0);
+      expect(current.observations?.checks?.validatedAt).toBe(110_000);
+      const replay = mergeNativePullRequestFact(first, native("passing"));
+      expect(replay).toBe(first);
+      for (let index = 0; index < 5; index++) await readGitHubSignals("acme", "repo", [1], lifecycle, run, { 1: demand });
+      expect(command).toHaveBeenCalledTimes(2);
+    } finally { lifecycle.dispose(); }
+  });
+
+  it("a changed PR among seven members adds one scoped signal command and leaves unrelated source validation unchanged", async () => {
+    const lifecycle = createServerLifecycle(); let state = "PENDING";
+    const command = vi.fn(async (args: readonly string[]) => {
+      const repository: Record<string, unknown> = {};
+      for (const match of args.join(" ").matchAll(/p(\d+): pullRequest\(number: (\d+)\)/g)) {
+        const number = Number(match[2]);
+        const sample = JSON.parse(response(state)).data.repository.p0;
+        repository[`p${match[1]}`] = { ...sample, url: currentPr(number).url, headRefName: `feature/${number}` };
+      }
+      return JSON.stringify({ data: { repository } });
+    });
+    const run: GitHubApiRunner = (args, buffer, policy) => readGitHub(lifecycle, command,
+      () => ({ state: "unavailable", scope: "rest", message: null, retryAt: null }), args, buffer, 120_000, undefined, policy);
+    const numbers = [1, 2, 3, 4, 5, 6, 7];
+    try {
+      const initial = await readGitHubSignals("acme", "repo", numbers, lifecycle, run);
+      const changed = mergeNativePullRequestFact(mergeNativePullRequestFact(undefined, native()), native("passing"));
+      const demand = nativeValidationDemands(changed, "acme/repo#1")!; state = "SUCCESS";
+      const current = await readGitHubSignals("acme", "repo", numbers, lifecycle, run, { 1: demand });
+      expect(command).toHaveBeenCalledTimes(2);
+      expect(current.size).toBe(7);
+      expect(current.get(1)?.checks).toBe("passing");
+      for (const number of numbers.slice(1)) {
+        expect(current.get(number)?.checks).toBe("pending");
+        expect(current.get(number)?.observations).toEqual(initial.get(number)?.observations);
+      }
+      const forcedNumbers = [...command.mock.calls[1]![0].join(" ").matchAll(/pullRequest\(number: (\d+)\)/g)].map((match) => Number(match[1]));
+      expect(forcedNumbers).toEqual([1]);
+    } finally { lifecycle.dispose(); }
+  });
+
+  it("a demand arriving after successor admission needs one further successor instead of borrowing its earlier proof", async () => {
+    const lifecycle = createServerLifecycle();
+    const first = deferred<string>(); const second = deferred<string>(); const third = deferred<string>();
+    const command = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise).mockReturnValueOnce(third.promise);
+    const run: GitHubApiRunner = (args, buffer, policy) => readGitHub(lifecycle, command,
+      () => ({ state: "unavailable", scope: "rest", message: null, retryAt: null }), args, buffer, 120_000, undefined, policy);
+    const demands = [1, 2, 3].map(() => nativeValidationDemands(mergeNativePullRequestFact(undefined, native()), "acme/repo#1")!);
+    try {
+      const a = readGitHubSignals("acme", "repo", [1], lifecycle, run, { 1: demands[0]! });
+      await vi.waitFor(() => expect(command).toHaveBeenCalledOnce());
+      const b = readGitHubSignals("acme", "repo", [1], lifecycle, run, { 1: demands[1]! });
+      first.resolve(response());
+      await vi.waitFor(() => expect(command).toHaveBeenCalledTimes(2));
+      const c = readGitHubSignals("acme", "repo", [1], lifecycle, run, { 1: demands[2]! });
+      second.resolve(response());
+      await vi.waitFor(() => expect(command).toHaveBeenCalledTimes(3));
+      third.resolve(response());
+      const results = await Promise.all([a, b, c]);
+      expect(command).toHaveBeenCalledTimes(3);
+      for (let index = 0; index < results.length; index++)
+        expect(results[index]?.get(1)?.observations?.checks?.satisfies).toContainEqual(demands[index]!.checks);
+      expect(lifecycle.githubPullRequestSignalPending.size).toBe(0);
+    } finally { lifecycle.dispose(); }
+  });
+
   it.each([-600_000, 0, 600_000])("client skew %i cannot make pre-demand cached data win; identical replay/title-only update costs zero", async (skew) => {
     vi.useFakeTimers(); vi.setSystemTime(100_000);
     const lifecycle = createServerLifecycle(); let checkState = "PENDING";

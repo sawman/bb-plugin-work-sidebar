@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
+import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { ThreadMetadata } from "../../threads/thread-row-presentation";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getPluginQueryClient } from "../../../query-runtime";
-import { pullRequestKeys } from "../../pull-requests/queries";
+import { pullRequestKeys, useSharedThreadPullRequestDirectory } from "../../pull-requests/queries";
 import {
   factFromPullRequest,
   mergePullRequestFacts,
@@ -358,6 +361,39 @@ describe("R13 registered Changes Work slot", () => {
     await waitFor(() => expect(slot.getByText("No pull request is linked to this thread.")).toBeTruthy());
     expect(slot.queryByRole("button", { name: /#42 Cold summary/ })).toBeNull();
     slot.lifecycle.unmount();
+  });
+  it("a native available PR remains in the header when the successful summary is null", async () => {
+    const pr = currentPr(42, "Native current PR");
+    const slot = await changesSlot({
+      getChanges: () => changesResult(repository("available"), { currentPullRequest: null }),
+      getWorkStatus: () => ({ currentThread: { ...context.currentThread, environmentId: "env_native_wins" }, children: [] }),
+      getChangesRepository: () => repository("available"),
+      getChangesPullRequests: () => changesResult(repository("available"), { currentPullRequest: null }),
+      getChangesProjection: () => changesResult(repository("available"), { currentPullRequest: null }),
+      pullRequests: () => ({ env_native_wins: { outcome: "available", pullRequest: {
+        number: pr.number, title: pr.title, url: pr.url, state: pr.state, checks: pr.checks,
+        review: pr.review, mergeability: pr.mergeability, attention: pr.attention,
+        headRefName: pr.head, baseRefName: pr.base, updatedAt: "2026-10-30T00:00:00Z", autoMerge: false, inMergeQueue: false } } }),
+    });
+    function SharedThreadRow() {
+      const directory = useSharedThreadPullRequestDirectory();
+      return <ThreadMetadata thread={{ environment: { branchName: pr.head } } as PluginSidebarThread}
+        projectLabel="Repo" pullRequest={directory.data.thr_changes ?? null} pullRequestLoading={false} />;
+    }
+    function ThreadSurface() {
+      return <QueryClientProvider client={getPluginQueryClient()}><SharedThreadRow /></QueryClientProvider>;
+    }
+    const threadSlot = renderSlot({ component: ThreadSurface }, {}, {});
+    try {
+      await waitFor(() => expect(slot.getByRole("button", { name: /#42 Native current PR/ })).toBeTruthy());
+      const headerBadge = within(slot.container).getByRole("button", { name: "Copy PR number #42" });
+      const threadBadge = within(threadSlot.container).getByRole("button", { name: "Copy PR number #42" });
+      const label = (element: Element) => document.getElementById(element.getAttribute("aria-describedby") ?? "")?.getAttribute("aria-label");
+      expect(label(headerBadge)).toBe("Ready to merge");
+      expect(label(threadBadge)).toBe(label(headerBadge));
+      expect(slot.queryByText("No pull request is linked to this thread.")).toBeNull();
+      expect(getPluginQueryClient().getQueryData<any>(pullRequestKeys.factDirectory()).threadFactKeys.thr_changes).toBe("acme/repo#42");
+    } finally { threadSlot.lifecycle.unmount(); slot.lifecycle.unmount(); }
   });
   it.each(["merged", "draft", "closed"] as const)("late open enrichment preserves fresh canonical %s PR state, title and branch actions", async (state) => {
     const late = deferred<ChangesResult>();
