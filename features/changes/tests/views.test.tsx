@@ -61,6 +61,54 @@ function stackBranch(
 
 describe("R13 Changes error presentation", () => {
   it.each(["current", "stack"] as const)(
+    "keeps the %s PR badge on the title line and metadata outside that line",
+    (rowKind) => {
+      const branch = stackBranch();
+      const onToggle = vi.fn();
+      const row = rowKind === "current" ? (
+        <ChangesCurrentPullRequestRow
+          pullRequest={currentPr(8, branch.pr!.title ?? undefined)}
+          branch={branch}
+          expanded={false}
+          onToggle={onToggle}
+          onOpenFile={() => undefined}
+        />
+      ) : (
+        <ChangesStackBranchRow
+          branch={branch}
+          expanded={false}
+          checkingOut={false}
+          onToggle={onToggle}
+          onCheckout={() => undefined}
+        />
+      );
+      const { container } = render(row);
+      const badge = screen.getByRole("button", { name: "Copy PR URL #8" });
+      const titleToggle = screen.getByRole("button", { name: /#8 A very long/ });
+      const titleLine = titleToggle.closest(".ws-stack-layer-title");
+      const subtitle = container.querySelector(".ws-stack-layer-summary > small");
+      const deltas = container.querySelector(".ws-stack-layer-summary > .ws-stack-line-deltas");
+
+      expect(titleLine).not.toBeNull();
+      expect(titleLine?.contains(badge)).toBe(true);
+      expect(titleLine?.contains(subtitle)).toBe(false);
+      expect(titleLine?.contains(deltas)).toBe(false);
+      expect(titleToggle.tagName).toBe("BUTTON");
+      expect(titleToggle.querySelector("strong")?.textContent).toBe(branch.pr!.title);
+      expect(titleToggle.querySelector("small")).toBeNull();
+      expect(subtitle?.textContent).toContain(branch.name);
+      expect(deltas?.textContent).toBe("+2−1");
+      expect(titleToggle.parentElement).toBe(badge.parentElement?.parentElement);
+
+      // The old two-line toggle also accepted pointer activation on metadata.
+      fireEvent.click(subtitle!);
+      fireEvent.click(deltas!);
+      fireEvent.click(titleToggle);
+      expect(onToggle).toHaveBeenCalledTimes(3);
+    },
+  );
+
+  it.each(["current", "stack"] as const)(
     "copies the resolved %s PR URL from an independent leading badge",
     (rowKind) => {
       const onToggle = vi.fn();
@@ -526,7 +574,8 @@ describe("R13 Changes error presentation", () => {
     const toggle = screen.getByRole("button", {
       name: /#8 A very long pull request title/,
     });
-    expect(summaryDeltas?.parentElement).toBe(toggle);
+    expect(summaryDeltas?.parentElement).toBe(toggle.closest(".ws-stack-layer-summary"));
+    expect(toggle.closest(".ws-stack-layer-title")?.contains(summaryDeltas)).toBe(false);
     expect(toggle.querySelector("small .ws-stack-line-deltas")).toBeNull();
   });
 

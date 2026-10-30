@@ -495,50 +495,54 @@ export function ChangesStackBranchRow({
           presentation={statePresentation}
           className="ws-stack-state-icon"
         />
-        <div className="ws-stack-layer-summary">
-          {pr && (
-            <CopyBadge
-              value={`#${pr.number}`}
-              copyValue={pr.url}
-              label="PR URL"
-              title="Copy PR URL"
+        <div
+          className="ws-stack-layer-summary"
+          onClick={() => {
+            if (hasDisclosure) onToggle();
+          }}
+        >
+          <div className="ws-stack-layer-title">
+            {pr && (
+              <CopyBadge
+                value={`#${pr.number}`}
+                copyValue={pr.url}
+                label="PR URL"
+                title="Copy PR URL"
+              >
+                #{pr.number}
+              </CopyBadge>
+            )}
+            <button
+              type="button"
+              className="ws-stack-layer-toggle"
+              {...(hasDisclosure
+                ? {
+                    "aria-expanded": expanded,
+                    "aria-label": `${visibleTitle} — ${filesLabel}`,
+                  }
+                : { "aria-disabled": true, "aria-label": visibleTitle })}
             >
-              #{pr.number}
-            </CopyBadge>
-          )}
-          <button
-            type="button"
-            className="ws-stack-layer-toggle"
-            onClick={() => {
-              if (hasDisclosure) onToggle();
-            }}
-            {...(hasDisclosure
-              ? {
-                  "aria-expanded": expanded,
-                  "aria-label": `${visibleTitle} — ${filesLabel}`,
-                }
-              : { "aria-disabled": true, "aria-label": visibleTitle })}
-          >
-            <strong>{title}</strong>
-            <small>
-              <span className="ws-stack-subtitle-signals">
-                {presented && (
-                  <>
-                    <Status presentation={presented.checks} size="metadata" />
-                    <Status presentation={presented.review} size="metadata" />
-                  </>
-                )}
-              </span>
-              {branch.name}
-            </small>
-            {branch.diff ? (
-              <ChangeLineDeltas
-                additions={branch.diff.additions}
-                deletions={branch.diff.deletions}
-                className="ws-stack-line-deltas"
-              />
-            ) : null}
-          </button>
+              <strong>{title}</strong>
+            </button>
+          </div>
+          <small>
+            <span className="ws-stack-subtitle-signals">
+              {presented && (
+                <>
+                  <Status presentation={presented.checks} size="metadata" />
+                  <Status presentation={presented.review} size="metadata" />
+                </>
+              )}
+            </span>
+            {branch.name}
+          </small>
+          {branch.diff ? (
+            <ChangeLineDeltas
+              additions={branch.diff.additions}
+              deletions={branch.diff.deletions}
+              className="ws-stack-line-deltas"
+            />
+          ) : null}
         </div>
         <StackBranchActions
           pullRequest={pr}

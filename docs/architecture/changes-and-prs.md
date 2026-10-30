@@ -89,7 +89,11 @@ open through host diff/source rendering. No second diff renderer is owned here.
 Current and Stack PR rows begin with an independently focusable number badge
 that copies the row's resolved PR URL. Copying by mouse, Enter or Space leaves
 disclosure, checkout and navigation untouched; title and trailing controls keep
-their separate actions. The header context-number badge keeps its own behavior.
+their separate actions. The badge replaces only the title-line number; subtitle,
+status, branch name and delta columns retain their existing full-width grid
+geometry. Pointer activation of metadata still discloses files, and the title
+remains a native keyboard-focusable button. The header context-number badge
+keeps its own behavior.
 Authored title activation follows BB browser preferences; modifier clicks stay
 native. Reviewer discovery/mutation remains server-owned, lazy on picker open.
 

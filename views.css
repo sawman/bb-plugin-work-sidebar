@@ -1655,13 +1655,6 @@
   background: var(--accent);
 }
 .ws-stack-layer-summary {
-  display: flex;
-  align-items: flex-start;
-  min-width: 0;
-  gap: 0.25rem;
-}
-.ws-stack-layer-toggle {
-  flex: 1;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
@@ -1669,6 +1662,18 @@
     "subtitle deltas";
   min-width: 0;
   gap: 0.05rem;
+  cursor: pointer;
+}
+.ws-stack-layer-title {
+  grid-area: title;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.25rem;
+}
+.ws-stack-layer-toggle {
+  flex: 1;
+  min-width: 0;
   border: 0;
   background: transparent;
   color: inherit;
@@ -1678,17 +1683,17 @@
   cursor: pointer;
 }
 .ws-stack-layer-toggle strong,
-.ws-stack-layer-toggle small {
+.ws-stack-layer-summary > small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .ws-stack-layer-toggle strong {
-  grid-area: title;
+  display: block;
   font: var(--ws-text-title);
   line-height: inherit;
 }
-.ws-stack-layer-toggle small {
+.ws-stack-layer-summary > small {
   grid-area: subtitle;
   font: var(--ws-text-metadata);
   line-height: inherit;
