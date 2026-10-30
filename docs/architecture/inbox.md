@@ -83,8 +83,12 @@ least as long as the opener.
 
 Incomplete Mermaid fences, extra Mermaid info words, detected nested container
 fences and ambiguous escaped/entity info strings show the entire original
-message as labelled, selectable source. Ordinary enclosing fences continue
-through host Markdown, including literal Mermaid examples. Inbox does not
+message as labelled, selectable source. Mixed raw HTML (including comments)
+outside recognized literal code and fence markers also use source, as does
+leading host frontmatter containing fence markers: those contexts can contain
+phantom fences that the host does not parse as code. HTML without fences,
+plain frontmatter and ordinary enclosing code continue through host Markdown,
+including literal HTML/Mermaid examples inside enclosing fences. Inbox does not
 parse Mermaid grammar. The host contains malformed diagram/load failures
 within the diagram and supplies source/copy controls; on an invalid source
 edit it can retain its last successful diagram while copying the new source.

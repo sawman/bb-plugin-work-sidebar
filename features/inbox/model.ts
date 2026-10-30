@@ -7,11 +7,21 @@ import type { HumanMessage } from "./schemas";
  * Ambiguous container/escaped info strings use original message source.
  */
 export function canRenderInboxMarkdown(content: string): boolean {
+  const hasFenceMarkers = /`{3,}|~{3,}/.test(content);
+  // BB strips this leading frontmatter before parsing Markdown. A fence in
+  // that removed section must never become a phantom enclosure in our guard.
+  const frontmatter = /^---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/.exec(content);
+  if (frontmatter && /`{3,}|~{3,}/.test(frontmatter[1]!)) return false;
   let fence: { marker: string; length: number; mermaid: boolean } | null = null;
   for (const match of content.matchAll(/[^\r\n]*(?:\r\n|\r|\n|$)/g)) {
     const raw = match[0];
     if (!raw) continue;
     const line = raw.replace(/(?:\r\n|\r|\n)$/, "");
+    // HTML blocks/comments can contain fence-looking text that Markdown never
+    // treats as code. Keep mixed HTML/fence originals as source instead of
+    // trying to duplicate the host's block grammar. Literal HTML inside an
+    // already recognized code fence remains ordinary host-rendered code.
+    if (!fence && hasFenceMarkers && /<(?:!--|\?|![a-z\[]|\/?[a-z][a-z0-9-]*(?=[\t />]|$))/i.test(line)) return false;
     const boundary = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
     if (!boundary) {
       if (!fence) {

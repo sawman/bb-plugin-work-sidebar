@@ -82,7 +82,10 @@ describe("registered Work Inbox Markdown host boundary", () => {
     ["CRLF and whitespace", "Before\r\n   ````mermaid  \r\nflowchart LR\r\n A-->B\r\n   `````\r\nAfter"],
     ["CR lines", "```js\rcode\r```\r```mermaid\rflowchart TD\rA-->B\r```"],
     ["host parse error", "Before\n```mermaid\nthis is not a diagram\n<script>literal</script>\n```\nAfter"],
-    ["HTML document context", "<details>\n<summary>Diagram</summary>\n\n```mermaid\nflowchart TD\nA-->B\n```\n</details>"],
+    ["HTML without fences", "<details>\n<summary>Answer</summary>\n\nOrdinary **Markdown** 😀\n</details>"],
+    ["HTML in enclosing literal code", "````markdown\n<!--\n```text\n-->\n\n```mermaid\nflowchart TD\nA-->B\n````"],
+    ["plain frontmatter and diagram", "---\ntitle: Diagram\n---\n\n```mermaid\nflowchart TD\nA-->B\n```"],
+    ["autolink and diagram", "<https://example.com>\n\n```mermaid\nflowchart TD\nA-->B\n```"],
   ])("preserves %s as one original host Markdown document", async (_label, body) => {
     const { row } = await mount(body);
     expect(within(row).getByTestId("bb-markdown").textContent).toBe(body);
@@ -90,6 +93,16 @@ describe("registered Work Inbox Markdown host boundary", () => {
   });
 
   it.each([
+    ["F1 HTML-comment context", "<!--\n```text\n-->\n\n```mermaid\nflowchart TD\nA-->B"],
+    ["F1 raw pre context", "<pre>\n```text\n</pre>\n\n```mermaid\nflowchart TD\nA-->B"],
+    ["F1 raw div context", "<div>\n```text\n</div>\n\n```mermaid\nflowchart TD\nA-->B"],
+    ["F1 raw script context", "<script>\n```text\n</script>\n\n```mermaid\nflowchart TD\nA-->B"],
+    ["F1 frontmatter context", "---\nexample: |\n```text\n---\n\n```mermaid\nflowchart TD\nA-->B"],
+    ["HTML with complete diagram", "<details>\n<summary>Diagram</summary>\n\n```mermaid\nflowchart TD\nA-->B\n```\n</details>"],
+    ["HTML processing instruction context", "<?example\n```text\n?>\n\n```mermaid\nflowchart TD\nA-->B"],
+    ["HTML CDATA context", "<![CDATA[\n```text\n]]>\n\n```mermaid\nflowchart TD\nA-->B"],
+    ["inline HTML and fences", "Answer <b>detail</b>\n\n```mermaid\nflowchart TD\nA-->B\n```"],
+    ["frontmatter CRLF phantom fence", "---\r\nexample: |\r\n~~~text\r\n---\r\n\r\n~~~mermaid\r\nflowchart TD\r\nA-->B"],
     ["unclosed Mermaid", "Before\n```mermaid\nflowchart TD\nA-->B"],
     ["short closing fence", "````mermaid\nflowchart TD\nA-->B\n```"],
     ["wrong closing marker", "~~~mermaid\nflowchart TD\nA-->B\n```"],
