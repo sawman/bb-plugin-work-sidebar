@@ -1,7 +1,7 @@
 import { expectTaskDetailLink } from "../../../tests/fixtures/bb-task-navigation-contract";
 // @vitest-environment jsdom
 import { createElement } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, waitFor, within } from "@testing-library/react";
 import { configureAxe } from "vitest-axe";
 import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
@@ -160,6 +160,20 @@ function fixture(overrides: Partial<Rpc> = {}): Rpc {
 }
 
 describe("registered Work context cards", () => {
+  beforeAll(async () => {
+    // The public loader collects registrations without mounting a host or
+    // content scripts, so there is no preload host/disposer to retain. Keep
+    // cold module loading in setup; every case still collects and mounts its
+    // own fresh harness below, within its original timeout and assertions.
+    const bodyBefore = document.body.innerHTML;
+    const focusBefore = document.activeElement;
+    await loadPluginApp(() => import("../../../app"));
+    expect(getPluginQueryClient().getQueryCache().getAll()).toHaveLength(0);
+    expect(getPluginQueryClient().getMutationCache().getAll()).toHaveLength(0);
+    expect(document.body.innerHTML).toBe(bodyBefore);
+    expect(document.activeElement).toBe(focusBefore);
+  });
+
   it("opens BB goal and queue rows in the host-owned Tasks detail view", async () => {
     getPluginQueryClient().clear();
     const app = await loadPluginApp(() => import("../../../app"));
