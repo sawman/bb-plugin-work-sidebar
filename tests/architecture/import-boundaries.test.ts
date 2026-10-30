@@ -79,6 +79,7 @@ const threadRowCompositionBudgets = {
   "features/threads/thread-tree.tsx": { lines: 130, declarations: 1 },
   "features/threads/thread-row-presentation.tsx": { lines: 170, declarations: 4 },
   "features/threads/thread-row-menu.tsx": { lines: 120, declarations: 1 },
+  "features/threads/thread-group-destinations-menu.tsx": { lines: 50, declarations: 1 },
   "features/threads/use-thread-row-actions.ts": { lines: 65, declarations: 1 },
   "features/threads/use-thread-row-pointer-drag.ts": { lines: 175, declarations: 1 },
   "features/threads/thread-tree-model.ts": { lines: 40, declarations: 1 },

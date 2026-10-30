@@ -12,6 +12,7 @@ import type { ThreadRowActions } from "./use-thread-row-actions";
 import { useThreadHierarchyMenu } from "./use-thread-hierarchy-menu";
 import { useWorkspaceRestore } from "./use-workspace-restore";
 import { ThreadWorkspaceMenu } from "./thread-workspace-menu";
+import { ThreadGroupDestinationsMenu } from "./thread-group-destinations-menu";
 
 export function ThreadRowMenu({
   children,
@@ -90,23 +91,12 @@ export function ThreadRowMenu({
           Move under…
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem
-          className="ws-thread-menu-destination"
-          disabled={groupId === null}
-          onSelect={() => void Promise.resolve(onMoveToGroup(threadId, null)).catch(() => undefined)}
-        >
-          Active
-        </ContextMenuItem>
-        {groups.map((group) => (
-          <ContextMenuItem
-            key={group.id}
-            className="ws-thread-menu-destination"
-            disabled={group.id === groupId}
-            onSelect={() => void Promise.resolve(onMoveToGroup(threadId, group.id)).catch(() => undefined)}
-          >
-            {group.name}
-          </ContextMenuItem>
-        ))}
+        <ThreadGroupDestinationsMenu
+          threadId={threadId}
+          groupId={groupId}
+          groups={groups}
+          onMoveToGroup={onMoveToGroup}
+        />
         <ContextMenuSeparator />
         <ContextMenuItem
           onSelect={() => (onMoveToRecycleBin ?? actions.archiveTree)(threadId)}

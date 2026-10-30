@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent } from "@testing-library/react";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
+import { renderSlot, type RenderedSlot } from "@get-bb/plugin-sdk/testing/app";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { getPluginQueryClient, withPluginProviders } from "../../../query-runtime";
 
 const host = vi.hoisted(() => ({
   splitPointerDown: vi.fn(),
+  workspaceRead: vi.fn(async () => { throw new Error("Unexpected workspace read during split gesture"); }),
+  workspaceRestore: vi.fn(async () => { throw new Error("Unexpected workspace restore during split gesture"); }),
 }));
 
 vi.mock("@get-bb/plugin-sdk/app", async () => {
@@ -18,11 +22,13 @@ vi.mock("@get-bb/plugin-sdk/app", async () => {
       isAvailable: true,
       layout: null,
     }),
-    useSidebarThreadDraft: () => ({ hasUnsubmittedDraft: false }),
   };
 });
 
 import { ThreadRow } from "../thread-row";
+
+const rowRegistration = { component: withPluginProviders(ThreadRow) };
+const renderedRows: RenderedSlot[] = [];
 
 const thread = {
   id: "thr_one",
@@ -45,36 +51,42 @@ function renderRow(
   const onDragThreadChange = vi.fn();
   const onDropTargetChange = vi.fn();
   const onDropThread = vi.fn();
-  const view = render(
-    <ThreadRow
-      thread={thread}
-      active={false}
-      children={0}
-      childAgentCount={0}
-      activeChildren={0}
-      childrenExpanded={false}
-      selected={false}
-      groupId={null}
-      groups={[]}
-      onToggleChildren={vi.fn()}
-      onSelect={() => false}
-      onMoveToGroup={vi.fn()}
-      onNavigate={vi.fn()}
-      reorderDisabled={reorderDisabled}
-      dragThreadId={dragThreadId}
-      onDragThreadChange={onDragThreadChange}
-      dropTarget={null}
-      onDropTargetChange={onDropTargetChange}
-      canDropThread={() => true}
-      onDropThread={onDropThread}
-    />,
-  );
+  const view = renderSlot(rowRegistration, {
+    thread,
+    active: false,
+    children: 0,
+    childAgentCount: 0,
+    activeChildren: 0,
+    childrenExpanded: false,
+    selected: false,
+    groupId: null,
+    groups: [],
+    onToggleChildren: vi.fn(),
+    onSelect: () => false,
+    onMoveToGroup: vi.fn(),
+    onNavigate: vi.fn(),
+    reorderDisabled,
+    dragThreadId,
+    onDragThreadChange,
+    dropTarget: null,
+    onDropTargetChange,
+    canDropThread: () => true,
+    onDropThread,
+  }, { sdk: { threads: { get: host.workspaceRead, restoreEnvironment: host.workspaceRestore } } });
+  renderedRows.push(view);
   return { ...view, onDragThreadChange, onDropTargetChange, onDropThread };
 }
 
 afterEach(() => {
   cleanup();
+  expect(host.workspaceRead).not.toHaveBeenCalled();
+  expect(host.workspaceRestore).not.toHaveBeenCalled();
+  for (const row of renderedRows) expect(row.inspection.navigateCalls).toEqual([]);
+  renderedRows.length = 0;
+  getPluginQueryClient().clear();
   host.splitPointerDown.mockReset();
+  host.workspaceRead.mockClear();
+  host.workspaceRestore.mockClear();
   Reflect.deleteProperty(document, "elementFromPoint");
 });
 
@@ -256,5 +268,3 @@ describe("ThreadRow split ownership", () => {
     fireEvent.pointerCancel(window, { pointerId: 7 });
   });
 });
-
-vi.mock("@/shared/use-thread-controls", () => ({ useThreadControls: () => ({ open: vi.fn(), rename: vi.fn(), archive: vi.fn(), requestDelete: vi.fn(), setPinned: vi.fn(), setRead: vi.fn() }) }));
