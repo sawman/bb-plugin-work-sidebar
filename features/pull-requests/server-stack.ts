@@ -499,7 +499,8 @@ export async function readGitHubReviewCommentObservations(
       const value = repository[`p${index}`];
       const counts = reviewCommentCountsFromGraphql(value);
       if (counts && isRecord(value)) result.set(number, { counts, observation: { ...githubObservation(value, source.validatedAt),
-        sequence: source.sequence, epoch, reviewIdentity: JSON.stringify([String(value.reviewDecision ?? ""), value.reviews ?? null, value.reviewRequests ?? null]) } });
+        ...(source.sequence === undefined ? {} : { sequence: source.sequence }), ...(epoch === undefined ? {} : { epoch }),
+        reviewIdentity: JSON.stringify([String(value.reviewDecision ?? ""), value.reviews ?? null, value.reviewRequests ?? null]) } });
     });
     return result;
   } catch {
@@ -622,10 +623,9 @@ export async function readGitHubPullRequestRest(
       reviewerStates,
     });
     const reviewerFact = reviewerFacts(reviewerStates);
-    const metadataObservation = { ...githubObservation(pullRequest, metadataRead.validatedAt), ...(metadataRead.sequence === undefined ? {} : { sequence: metadataRead.sequence }), epoch: lifecycle.observationEpoch };
-    const reviewObservation = { ...metadataObservation,
-      validatedAt: metadataRead.validatedAt === null || reviewsRead.validatedAt === null ? null : Math.min(metadataRead.validatedAt, reviewsRead.validatedAt),
-      sequence: metadataRead.sequence === undefined || reviewsRead.sequence === undefined ? undefined : Math.min(metadataRead.sequence, reviewsRead.sequence),
+    const metadataIdentity = { ...githubObservation(pullRequest, metadataRead.validatedAt), epoch: lifecycle.observationEpoch };
+    const metadataObservation = { ...metadataIdentity, ...(metadataRead.sequence === undefined ? {} : { sequence: metadataRead.sequence }) };
+    const reviewObservation = { ...metadataIdentity, ...earliestValidation([metadataRead, reviewsRead]),
       reviewIdentity: JSON.stringify([reviews, pullRequest.requested_reviewers ?? null, pullRequest.requested_teams ?? null]) };
     const observations = {
       ...(typeof pullRequest.title === "string" || pullRequest.title === null ? { title: metadataObservation } : {}),
@@ -678,11 +678,13 @@ export async function readGitHubPullRequestRest(
     const reviewValidation = earliestValidation([metadataRead, reviewsRead, trailingMetadata]);
     const checks = checksRead.checks;
     const signalChecks = checks.state === "failing" ? "failed" : checks.state === "no_checks" ? "none" : checks.state;
-    const checkedObservation = { ...metadataObservation, ...validation };
-    const checkedReviewObservation = { ...reviewObservation, ...reviewValidation };
+    // Composite evidence cannot inherit a metadata-only sequence when any
+    // contributing read has no sequence. Omit it rather than certify that read.
+    const checkedObservation = { ...metadataIdentity, ...validation };
+    const checkedReviewObservation = { ...metadataIdentity, ...reviewValidation, reviewIdentity: reviewObservation.reviewIdentity };
     if (typeof trailing.review_comments === "number") {
       recoveredPullRequest.reviewCommentCount = trailing.review_comments;
-      observations.comments = { ...metadataObservation, validatedAt: trailingMetadata.validatedAt,
+      observations.comments = { ...metadataIdentity, validatedAt: trailingMetadata.validatedAt,
         ...(trailingMetadata.sequence === undefined ? {} : { sequence: trailingMetadata.sequence }), reviewIdentity: reviewObservation.reviewIdentity };
     }
 

@@ -151,6 +151,10 @@ function applyGitHubPullRequestSignal(
     : signal.checks === "none"
       ? "no_checks"
       : signal.checks;
+  const observations = { ...current.observations, ...signal.observations };
+  // An aggregate-only signal invalidates the old breakdown without claiming
+  // that it observed raw counts. Absent groups must also be absent on the wire.
+  if (hasChecks && !signal.observations?.checkCounts) delete observations.checkCounts;
   return {
     ...current,
     ...(signal.title === undefined ? {} : { title: signal.title }),
@@ -175,9 +179,7 @@ function applyGitHubPullRequestSignal(
       reviewCommentCount: signal.reviewCommentCount ?? (signal.reviewCommentCounts
         ? signal.reviewCommentCounts.unresolved + signal.reviewCommentCounts.resolved : current.signal.reviewCommentCount),
     }),
-    observations: { ...current.observations, ...signal.observations,
-      // The overlay has no raw count observation unless REST actually read it.
-      ...(hasChecks ? { checkCounts: signal.observations?.checkCounts } : {}) },
+    observations,
   };
 }
 

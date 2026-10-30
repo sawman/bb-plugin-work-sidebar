@@ -62,6 +62,12 @@ separate evidence; combining cached search data with new topology cannot make
 the title fresh. Existing batched signal reads include PR metadata and SHA
 identities, so a fresh lightweight observation can replace stale detail.
 
+RPC envelopes omit unobserved optional groups and unavailable optional evidence;
+they never materialize an `undefined` property. Composite REST evidence omits
+its sequence when any contributing read lacks one, without inheriting a
+metadata-only sequence or issuing a proof. The strict host JSON result validator
+checks the original projected objects, before serialization can discard keys.
+
 SDK 0.6.79's native public row exposes neither upstream validation time nor head
 SHA. Its GitHub PR `updatedAt` is not a checks clock or a SHA. An opaque native
 change paints provisionally without a freshness claim. Consecutive identical

@@ -61,8 +61,8 @@ function withProofs(signal: GitHubSignal, previous: GitHubSignal | undefined, re
     }
     observations[group] = { ...observation, ...(proofs.length ? { satisfies: proofs.slice(-MAX_CLIENTS_PER_GROUP) } : {}) };
     if (group === "checks" && observations.checkCounts?.sequence === observation.sequence
-      && observations.checkCounts?.epoch === observation.epoch && observations.checkCounts)
-      observations.checkCounts = { ...observations.checkCounts, satisfies: observations.checks!.satisfies };
+      && observations.checkCounts?.epoch === observation.epoch && observations.checkCounts && observations.checks?.satisfies)
+      observations.checkCounts = { ...observations.checkCounts, satisfies: observations.checks.satisfies };
   }
   return { ...signal, observations };
 }

@@ -60,8 +60,9 @@ export async function readRestChecks(input: {
 }
 
 export function earliestValidation(sources: Source[]) {
+  const sequence = sources.some((source) => source.sequence === undefined) ? undefined : Math.min(...sources.map((source) => source.sequence!));
   return {
     validatedAt: sources.some((source) => source.validatedAt === null) ? null : Math.min(...sources.map((source) => source.validatedAt!)),
-    sequence: sources.some((source) => source.sequence === undefined) ? undefined : Math.min(...sources.map((source) => source.sequence!)),
+    ...(sequence === undefined ? {} : { sequence }),
   };
 }
