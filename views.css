@@ -3237,10 +3237,10 @@ button.ws-provider-health:focus-visible {
   height: 0.66rem;
   flex: none;
 }
-.ws-github-api-rate_limited {
+.ws-github-api-warning {
   color: var(--warning);
 }
-.ws-github-api-unavailable {
+.ws-github-api-destructive {
   color: var(--destructive);
 }
 .ws-repository-heading-meta {

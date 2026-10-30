@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
@@ -259,6 +260,75 @@ afterEach(() => {
 });
 
 describe("R13 registered Changes Work slot", () => {
+  it.each(["available", "rate_limited"] as const)(
+    "replaces native PR rate-limit failures with one warning while health is %s",
+    async (githubHealth) => {
+      const message = "GitHub REST API is rate limited.";
+      const summary = vi.fn(() => { throw new Error(`Pull request unavailable: ${message}`); });
+      const projection = vi.fn(() => { throw new Error(message); });
+      const slot = await changesSlot({
+        githubHealth,
+        getChanges: () => changesResult(),
+        getChangesRepository: () => repository("available", true),
+        getChangesPullRequests: summary,
+        getChangesProjection: projection,
+        getWorkStatus: () => ({ currentThread: { ...context.currentThread, environmentId: "env_limited" }, children: [] }),
+        pullRequests: () => ({ env_limited: { outcome: "unavailable", message } }),
+        threadPullRequests: { thr_changes: currentPr(42, "Retained PR") },
+      });
+      try {
+        await waitFor(() => expect(summary).toHaveBeenCalledOnce());
+        await waitFor(() => expect(projection).toHaveBeenCalledOnce());
+        await waitFor(() => expect(slot.getByText("GitHub limited")).toBeTruthy());
+        expect(slot.queryAllByRole("alert")).toHaveLength(0);
+        expect(slot.queryByText("Could not load pull request changes")).toBeNull();
+        expect(slot.queryByText("No pull request is linked to this thread.")).toBeNull();
+        expect(slot.getByRole("button", { name: /#42 Retained PR/ })).toBeTruthy();
+        fireEvent.click(slot.getByRole("button", { name: "Show 3 working-tree files" }));
+        expect(slot.getByText("renamed.ts")).toBeTruthy();
+        expect(slot.getByRole("button", { name: "Refresh work context" })).toBeTruthy();
+      } finally { slot.lifecycle.unmount(); }
+    },
+  );
+
+  it.each(["repository", "summary", "projection", "files", "native"] as const)(
+    "keeps a genuine %s failure visible during GitHub rate limiting",
+    async (failure) => {
+      const genuineError = "Permission denied";
+      const fail = vi.fn(() => { throw new Error(genuineError); });
+      const slot = await changesSlot({
+        githubHealth: "rate_limited",
+        getChanges: () => changesResult(repository("available"), { currentPullRequest: currentPr(42) }),
+        getChangesPullRequests: failure === "summary" ? fail : failure === "files" ? undefined : () => { throw new Error("GitHub REST API is rate limited."); },
+        getChangesRepository: failure === "repository" ? fail : () => repository("available"),
+        getChangesProjection: failure === "projection" ? fail : () => changesResult(),
+        getChangesRemoteFiles: failure === "files" ? fail : undefined,
+        getWorkStatus: () => ({ currentThread: { ...context.currentThread, environmentId: "env_error" }, children: [] }),
+        pullRequests: () => ({ env_error: { outcome: "unavailable", message: failure === "native" ? genuineError : "GitHub REST API is rate limited." } }),
+      });
+      try {
+        await waitFor(() => expect(slot.getByText("GitHub limited")).toBeTruthy());
+        await waitFor(() => expect(slot.getByRole("alert").textContent).toContain(genuineError));
+        expect(slot.queryAllByRole("alert")).toHaveLength(1);
+      } finally { slot.lifecycle.unmount(); }
+    },
+  );
+
+  it("applies the warning host token to the rendered GitHub limited indicator", async () => {
+    const stylesheet = document.createElement("style");
+    stylesheet.textContent = readFileSync("views.css", "utf8");
+    document.head.append(stylesheet);
+    const slot = await changesSlot({ githubHealth: "rate_limited", getChanges: () => changesResult() });
+    try {
+      const indicator = await waitFor(() => slot.getByText("GitHub limited"));
+      expect(getComputedStyle(indicator).color).toBe("var(--warning)");
+      expect(slot.getByText("No pull request is linked to this thread.")).toBeTruthy();
+    } finally {
+      slot.lifecycle.unmount();
+      stylesheet.remove();
+    }
+  });
+
   it("keeps local Stack branches usable while native PR summary fails, then retries both status and summary", async () => {
     let retry = false;
     const projection = changesResult(repository("available"), { githubStack: { stack: {

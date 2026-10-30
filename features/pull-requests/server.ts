@@ -1,6 +1,7 @@
 import { isVisibleAuthoredPullRequest } from "./presentation.js";
 
-export type PullRequestHealth = { state: "available" | "rate_limited" | "unavailable"; scope: "graphql" | "rest" | "unknown"; message: string | null; retryAt: number | null };
+import { classifyPullRequestError, type PullRequestHealth } from "./health.js";
+export { classifyPullRequestError, type PullRequestHealth } from "./health.js";
 export type AuthoredPullRequestRecord = { repository: string };
 
 type CacheEntry<T> = { expiresAt: number; value: T };
@@ -13,25 +14,6 @@ type Options<T extends AuthoredPullRequestRecord> = {
 };
 
 const AUTHORED_TTL = 5 * 60_000;
-
-export function classifyPullRequestError(error: unknown, scope: PullRequestHealth["scope"], now: () => number = Date.now): PullRequestHealth {
-  const message = error instanceof Error ? error.message : String(error);
-  const rateLimited = /graphql_rate_limit|API rate limit already exceeded|secondary rate limit|rate limit/i.test(message);
-  if (rateLimited) {
-    return {
-      state: "rate_limited",
-      scope,
-      message: scope === "graphql" ? "GitHub GraphQL is rate limited; using REST where possible." : "GitHub REST API is rate limited.",
-      retryAt: now() + 60 * 60_000,
-    };
-  }
-  return {
-    state: "unavailable",
-    scope,
-    message: `GitHub ${scope === "graphql" ? "GraphQL" : "REST"} request failed.`,
-    retryAt: null,
-  };
-}
 
 export class PullRequestService<T extends AuthoredPullRequestRecord> {
   private authoredCache: CacheEntry<T[]> | null = null;

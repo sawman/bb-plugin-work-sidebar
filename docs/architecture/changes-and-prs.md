@@ -200,6 +200,19 @@ keeps its own behavior.
 Authored title activation follows BB browser preferences; modifier clicks stay
 native. Reviewer discovery/mutation remains server-owned, lazy on picker open.
 
+Changes represents GitHub-classified PR rate-limit failures through the existing
+GitHub limited status in the repository heading, using the shared warning tone
+and host warning token. It suppresses only those PR-read callouts (native row,
+summary, enrichment and remote files), classifying each failure independently
+with the same browser-safe classifier used by server GitHub reads. A classified
+PR failure can supply the heading warning before independent API health catches
+up. Global rate-limit health alone never hides another failure: repository errors
+and other PR errors keep their callout/retry, cached PR facts and local changes
+remain usable, and unavailable PR status never means confirmed absence. The
+existing header refresh remains available. Both surfaces use the same warning
+and destructive GitHub health tones; request, cache and backoff policies stay
+with their existing owners.
+
 The [status matrix](pull-request-status-matrix.md) is the intended common
 precedence. Lifecycle and authoritative signals should control presentation;
 do not create per-view status rules. Complete GraphQL review-thread data can

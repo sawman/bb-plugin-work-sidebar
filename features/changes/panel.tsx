@@ -1,3 +1,4 @@
+import { classifyPullRequestError } from "../pull-requests/health";
 import { PullRequestReadError } from "../pull-requests/status-error";
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -170,7 +171,19 @@ export function ChangesPanel({ threadId, environmentId }: { threadId: string; en
     : (githubStack?.branches.find(
         (branch) => branch.pr?.number === currentPullRequestNumber,
       ) ?? null);
-  const githubHealth = githubHealthPresentation(githubApiHealth);
+  // Classify each PR read independently: global backoff must not hide a
+  // simultaneous repository, permission, transport or projection failure.
+  const nativeFailure = native.error ? classifyPullRequestError(native.error, "unknown") : null;
+  const remoteFailures = [changesQuery.error, changesQuery.enrichment.error, changesQuery.remoteFiles.error]
+    .filter((error): error is Error => error !== null)
+    .map((error) => ({ error, health: classifyPullRequestError(error, "unknown") }));
+  const rateLimit = nativeFailure?.state === "rate_limited" ? nativeFailure
+    : remoteFailures.find(({ health }) => health.state === "rate_limited")?.health;
+  const changesError = changesQuery.repository.error
+    ?? remoteFailures.find(({ health }) => health.state !== "rate_limited")?.error;
+  const githubHealth = githubHealthPresentation(
+    rateLimit && githubApiHealth.state === "available" ? rateLimit : githubApiHealth,
+  );
   const contextMeta = (
     <>
       {githubHealth ? (
@@ -228,12 +241,12 @@ export function ChangesPanel({ threadId, environmentId }: { threadId: string; en
           selectedPullRequestNumber === null ? selectedDiffPreview : null
         }
       />
-      {native.error && <PullRequestReadError message={native.error} onRetry={() => {
+      {native.error && nativeFailure?.state !== "rate_limited" && <PullRequestReadError message={native.error} onRetry={() => {
         void native.refetch().then(() => Promise.all([changesQuery.refetch(), changesQuery.enrichment.refetch()]));
       }} />}
-      {(changesQuery.isError || changesQuery.repository.isError || changesQuery.enrichment.isError || changesQuery.remoteFiles.isError) && (
+      {changesError && (
         <ChangesError
-          error={changesQuery.error ?? changesQuery.repository.error ?? changesQuery.enrichment.error ?? changesQuery.remoteFiles.error ?? new Error("Changes are unavailable.")}
+          error={changesError}
           onRetry={() => void changesQuery.refresh().catch(() => { toast.error("Could not refresh Changes."); })}
         />
       )}
