@@ -420,30 +420,30 @@ describe("Inbox Work card", () => {
     const view = renderCard([diagramMessage]);
     const row = await findMessageRow(view, "msg_active");
     fireEvent.click(within(row).getByRole("button", { name: "Expand message body" }));
-    expect(await view.findByLabelText("Mermaid diagram source")).toBeTruthy();
+    expect((await view.findByTestId("markdown")).textContent).toBe(diagramMessage.body);
     const inbox = view.getByRole("button", { name: /^Messages:/ });
     const panelId = inbox.getAttribute("aria-controls");
     expect(panelId).toBeTruthy();
     fireEvent.click(inbox);
     expect(view.container.querySelector('[data-message-id="msg_active"]')).toBeNull();
-    expect(view.queryByLabelText("Mermaid diagram source")).toBeNull();
+    expect(view.queryByTestId("markdown")).toBeNull();
     expect(view.container.querySelector(`[id="${panelId}"]`)).toBeNull();
     fireEvent.click(inbox);
     const restored = await findMessageRow(view, "msg_active");
     expect(within(restored).getByRole("button", { name: "Expand message body" })).toBeTruthy();
-    expect(view.queryByLabelText("Mermaid diagram source")).toBeNull();
+    expect(view.queryByTestId("markdown")).toBeNull();
     fireEvent.click(within(restored).getByRole("button", { name: "Expand message body" }));
-    expect(await view.findByLabelText("Mermaid diagram source")).toBeTruthy();
+    expect((await view.findByTestId("markdown")).textContent).toBe(diagramMessage.body);
     view.unmount();
     view.client.clear();
   });
 
-  it("keeps fenced Mermaid as an accessible source fallback and passes axe", async () => {
+  it("keeps incomplete Mermaid as an accessible source fallback and passes axe", async () => {
     const view = render(
-      <InboxMessageContent content={"Before\n```mermaid\nflowchart TD\n A-->B\n```\nAfter"} />,
+      <InboxMessageContent content={"Before\n```mermaid\nflowchart TD\n A-->B"} />,
     );
-    expect(view.getByLabelText("Mermaid diagram source").textContent).toContain("flowchart TD");
-    expect(view.getByText("Mermaid rendering is disabled in this bundle; showing source.")).toBeTruthy();
+    expect(view.getByLabelText("Inbox message source").textContent).toContain("flowchart TD");
+    expect(view.getByText("Showing message source.")).toBeTruthy();
     const card = renderCard();
     await findMessageRow(card, "msg_active");
     fireEvent.click(card.getByRole("button", { name: "Search Inbox" }));

@@ -1,16 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { messageIsHistory, messageIsInbox, messageIsSaved, splitInboxMarkdown } from "../model";
+import { canRenderInboxMarkdown, messageIsHistory, messageIsInbox, messageIsSaved } from "../model";
 
-describe("Inbox Markdown segmentation", () => {
-  it("only extracts complete fenced mermaid blocks with the exact info string", () => {
-    expect(splitInboxMarkdown("before\n```mermaid\ngraph TD\nA-->B\n```\nafter")).toEqual([
-      { kind: "markdown", content: "before\n" },
-      { kind: "mermaid", content: "graph TD\nA-->B" },
-      { kind: "markdown", content: "\nafter" },
-    ]);
-    expect(splitInboxMarkdown("```mermaid dark\nA-->B\n```\n```js\nalert(1)\n```")).toEqual([
-      { kind: "markdown", content: "```mermaid dark\nA-->B\n```\n```js\nalert(1)\n```" },
-    ]);
+describe("Inbox Markdown host eligibility", () => {
+  it("allows complete Mermaid and ordinary code but guards unsupported or incomplete Mermaid", () => {
+    expect(canRenderInboxMarkdown("before\n```mermaid\ngraph TD\nA-->B\n```\nafter")).toBe(true);
+    expect(canRenderInboxMarkdown("```mermaid dark\nA-->B\n```\n```js\nalert(1)\n```")).toBe(false);
+    expect(canRenderInboxMarkdown("```mermaid\ngraph TD\nA-->B")).toBe(false);
+    expect(canRenderInboxMarkdown("```js\nconst incomplete = 1")).toBe(true);
+  });
+
+  it("handles long container-like prose without a backtracking fence expression", () => {
+    expect(canRenderInboxMarkdown(`${"- > ".repeat(7000)}plain text`)).toBe(true);
+    expect(canRenderInboxMarkdown(`${"> ".repeat(7000)}\`\`\`mermaid\nA-->B`)).toBe(false);
   });
 });
 
@@ -28,9 +29,6 @@ it("partitions Inbox, Saved, and History without duplicate rows", () => {
 it.each(["````markdown", "~~~~markdown", "   `````text"])("keeps literal Mermaid inside %s untouched", (opener) => {
   const closer = opener.trim().match(/^[`~]+/)![0];
   const literal = `${opener}\nexample\n\`\`\`mermaid\ngraph TD\nA-->B\n\`\`\`\n${closer}`;
-  expect(splitInboxMarkdown(literal)).toEqual([{ kind: "markdown", content: literal }]);
-  expect(splitInboxMarkdown(`${literal}\n\`\`\`mermaid\nC-->D\n\`\`\``)).toEqual([
-    { kind: "markdown", content: `${literal}\n` },
-    { kind: "mermaid", content: "C-->D" },
-  ]);
+  expect(canRenderInboxMarkdown(literal)).toBe(true);
+  expect(canRenderInboxMarkdown(`${literal}\n\`\`\`mermaid\nC-->D\n\`\`\``)).toBe(true);
 });

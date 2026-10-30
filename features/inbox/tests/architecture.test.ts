@@ -80,7 +80,7 @@ describe("Inbox architecture boundaries", () => {
     expect(styles.slice(styles.lastIndexOf(".ws-inbox-card"))).not.toMatch(/font-size\s*:/);
   });
 
-  it("keeps scope-safe debouncing, exact invalidation, optimistic count updates, and safe Mermaid policy explicit", () => {
+  it("keeps scope-safe debouncing, exact invalidation and optimistic count updates explicit", () => {
     expect(views).toContain("setTimeout");
     expect(queries).toContain("useInfiniteQuery");
     expect(queries).toContain("queryKeys.inbox.scope(threadId, normalized)");
@@ -89,9 +89,6 @@ describe("Inbox architecture boundaries", () => {
     expect(queries).toContain("activeCount");
     expect(queries).toContain("savedCount");
     expect(queries).toContain("historyCount");
-    expect(views).not.toContain("mermaid-adapter");
-    expect(views).toContain('aria-label="Mermaid diagram source"');
-    expect(views).toContain("Mermaid rendering is disabled in this bundle");
   });
 
   it("places Inbox directly after Status and before Work items", () => {

@@ -70,19 +70,37 @@ are logged with thread ID. A list already in flight can briefly contain a
 purged record; the invalidation and next read must return empty. Disposal
 leaves no owned listeners/timers, pending writes or frontend observers.
 
-## Rendering and current limitation
+## Rendering
 
 Ordinary Markdown, links and emoji use host Markdown and BB browser
-preferences. Complete fenced blocks with info string exactly `mermaid` are
-currently intercepted as labelled accessible source. They are **not rendered
-diagrams**. Other content, including enclosing fences, remains Markdown.
+preferences. Complete plain Mermaid fences reach the existing lazy host
+renderer through that same Markdown component. Inbox passes the original
+document intact, preserving enclosing fences, code, links and copy context.
+Supported fence lines use at least three matching backticks or tildes, up to
+three leading spaces and the sole info word `mermaid` (case-insensitive,
+surrounding whitespace allowed); a closing fence has no info text and is at
+least as long as the opener.
 
-BBPLUG-433 tracks adopting the existing lazy host Mermaid path, with live
-security/accessibility/theme/narrow-width acceptance. The host already has
-this capability; the limitation is the plugin's interception. Do not bundle
-another Mermaid renderer or claim the follow-up is complete. Preserve safe
-source fallback and browser/server import boundaries. The
-[compatibility watchlist](../bb-compatibility-watchlist.md) records host evidence.
+Incomplete Mermaid fences, extra Mermaid info words, detected nested container
+fences and ambiguous escaped/entity info strings show the entire original
+message as labelled, selectable source. Ordinary enclosing fences continue
+through host Markdown, including literal Mermaid examples. Inbox does not
+parse Mermaid grammar. The host contains malformed diagram/load failures
+within the diagram and supplies source/copy controls; on an invalid source
+edit it can retain its last successful diagram while copying the new source.
+An unexpected host component render/effect error falls back to original
+message source locally; a content edit retries host rendering. These paths
+leave record IDs and row actions intact.
+
+The host owns strict Mermaid configuration, SVG sanitization/insertion,
+accessible diagram controls, source copy, zoom/pan and theme rendering. Raw
+HTML Markdown uses the host HTML sanitizer. Inbox neither injects SVG/HTML
+nor bundles Mermaid or another renderer, and keeps browser/server import
+boundaries. BBPLUG-433 evidence distinguishes registered renderer delegation
+from native security/accessibility/theme/narrow-width acceptance; a harness
+does not certify native diagram output. The
+[compatibility watchlist](../bb-compatibility-watchlist.md) retains the host
+capability history.
 
 Keyboard controls, shared search, focus return, terse tooltips, local conflict
 recovery and minimum-width usability in both themes remain contract checks.

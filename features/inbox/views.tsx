@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { Component, useEffect, useId, useMemo, useState } from "react";
 import { Markdown } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { ActionTooltip } from "../../components/ui/action-tooltip";
@@ -11,7 +11,7 @@ import {
   messageIsInbox,
   messageIsSaved,
   messageLabel,
-  splitInboxMarkdown,
+  canRenderInboxMarkdown,
 } from "./model";
 import {
   useInboxMessages,
@@ -373,23 +373,39 @@ export function formatMessageAge(value: string, now = Date.now()) {
 export function InboxMessageContent({ content, id }: { content: string; id?: string }) {
   return (
     <div id={id} className="ws-inbox-message-content">
-      {splitInboxMarkdown(content).map((segment, index) => (
-        segment.kind === "mermaid" ? (
-          <MermaidBlock key={`mermaid-${index}`} content={segment.content} />
-        ) : (
-          <Markdown key={`markdown-${index}`} content={segment.content} />
-        )
-      ))}
+      {canRenderInboxMarkdown(content) ? (
+        <InboxMarkdownBoundary content={content} />
+      ) : <InboxSourceFallback content={content} />}
     </div>
   );
 }
 
-function MermaidBlock({ content }: { content: string }) {
+// Host Mermaid owns async load/parse recovery. This boundary contains unexpected
+// host render/effect failures to this message, without logging private bodies.
+class InboxMarkdownBoundary extends Component<{ content: string }, { content: string; failed: boolean }> {
+  state = { content: this.props.content, failed: false };
+
+  static getDerivedStateFromProps({ content }: { content: string }, state: { content: string }) {
+    return content === state.content ? null : { content, failed: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    return this.state.failed
+      ? <InboxSourceFallback content={this.props.content} />
+      : <Markdown content={this.props.content} />;
+  }
+}
+
+function InboxSourceFallback({ content }: { content: string }) {
   return (
     <div className="ws-inbox-mermaid" data-state="fallback">
-      <pre aria-label="Mermaid diagram source"><code>{content}</code></pre>
+      <pre aria-label="Inbox message source"><code>{content}</code></pre>
       <span className="ws-inbox-mermaid-fallback">
-        Mermaid rendering is disabled in this bundle; showing source.
+        Showing message source.
       </span>
     </div>
   );
