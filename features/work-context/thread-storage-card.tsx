@@ -7,6 +7,8 @@ import type { StorageEntry, StorageListing } from "./thread-storage-model";
 import { refreshThreadStorage, useThreadStorage } from "./thread-storage-queries";
 import { ThreadStorageFileRow } from "./thread-storage-file-row";
 
+const STORAGE_DIRECTORY_PAGE_SIZE = 200;
+
 export function ThreadStorageCard({ threadId }: { threadId: string }) {
   return <ThreadStorageBoundary key={threadId} threadId={threadId} />;
 }
@@ -93,10 +95,13 @@ function StorageDirectory({ threadId, entries, parent, expanded, onToggle }: {
   expanded: ReadonlySet<string>;
   onToggle(path: string): void;
 }) {
+  const [visibleCount, setVisibleCount] = useState(STORAGE_DIRECTORY_PAGE_SIZE);
   const children = entries.filter((entry) => entry.parent === parent);
+  const visibleChildren = children.slice(0, visibleCount);
+  const remaining = children.length - visibleChildren.length;
   return (
     <ul className="ws-storage-list" aria-label={parent ? undefined : "Stored files and folders"}>
-      {children.map((entry) => (
+      {visibleChildren.map((entry) => (
         <li key={entry.path}>
           {entry.kind === "directory" ? (
             <>
@@ -105,13 +110,22 @@ function StorageDirectory({ threadId, entries, parent, expanded, onToggle }: {
                 <Icon name="Folder" aria-hidden />
                 <span className="ws-storage-name">{entry.name}</span>
               </button>
-              {expanded.has(entry.path) ? <StorageDirectory threadId={threadId} entries={entries} parent={entry.path} expanded={expanded} onToggle={onToggle} /> : null}
+              {expanded.has(entry.path) ? <StorageDirectory key={entry.path} threadId={threadId} entries={entries} parent={entry.path} expanded={expanded} onToggle={onToggle} /> : null}
             </>
           ) : (
             <ThreadStorageFileRow threadId={threadId} path={entry.path} name={entry.name} />
           )}
         </li>
       ))}
+      {remaining > 0 ? (
+        <li>
+          <button className="ws-text-button" type="button"
+            aria-label={`Show more in ${parent || "thread storage"} (${remaining} remaining)`}
+            onClick={() => setVisibleCount((previous) => previous + STORAGE_DIRECTORY_PAGE_SIZE)}>
+            Show more ({remaining} remaining)
+          </button>
+        </li>
+      ) : null}
     </ul>
   );
 }

@@ -26,12 +26,22 @@ describe("bounded thread storage metadata projection", () => {
   });
 
   it("bounds returned and inferred nodes, path bytes and nesting without reading file bodies", () => {
-    const projection = projectStorageListing({ paths: Array.from({ length: 500 }, (_, index) => ({ path: `folder-${index}/nested/file.md`, kind: "file" })), truncated: false });
+    const projection = projectStorageListing({ paths: Array.from({ length: 4_000 }, (_, index) => ({ path: `folder-${index}/nested/file.md`, kind: "file" })), truncated: false });
     expect(projection.entries).toHaveLength(STORAGE_ENTRY_LIMIT);
     expect(projection.truncated).toBe(true);
-    expect(JSON.stringify(projection).length).toBeLessThan(100_000);
+    expect(JSON.stringify(projection).length).toBeLessThan(STORAGE_ENTRY_LIMIT * 200);
     expect(safeStoragePath(`${"a/".repeat(20)}file`)).toBe(false);
     expect(safeStoragePath("a".repeat(1025))).toBe(false);
+  });
+
+  it("retains all 10000 safe returned entries without an invented truncation or lower projection cap", () => {
+    const paths = Array.from({ length: 10_000 }, (_, index) => ({ path: `file-${String(index).padStart(5, "0")}.md`, kind: "file" as const }));
+    const projection = projectStorageListing({ paths, truncated: false });
+    expect(STORAGE_ENTRY_LIMIT).toBe(10_000);
+    expect(projection.entries.map((entry) => entry.path)).toEqual(paths.map((entry) => entry.path));
+    expect(projection).toMatchObject({ truncated: false, unavailable: false });
+    expect(projectStorageListing({ paths: [...paths, { kind: "file", path: "overflow.md" }], truncated: false })).toMatchObject({ truncated: true });
+    expect(projectStorageListing({ paths, truncated: true })).toMatchObject({ truncated: true });
   });
 
   it("does not infer an empty listing from withheld malformed entries", () => {

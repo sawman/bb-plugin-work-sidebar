@@ -147,7 +147,7 @@ describe("registered Work Thread storage", () => {
     toggle();
     expect(slot.getByText("Loading thread storage…")).toBeTruthy();
     expect(await slot.findByText("No provider background jobs")).toBeTruthy();
-    expect(storagePaths).toHaveBeenCalledExactlyOnceWith({ threadId: "thr_a", limit: "200", includeDirectories: "true", includeFiles: "true", signal: expect.any(AbortSignal) });
+    expect(storagePaths).toHaveBeenCalledExactlyOnceWith({ threadId: "thr_a", limit: "10000", includeDirectories: "true", includeFiles: "true", signal: expect.any(AbortSignal) });
     await act(async () => pending.resolve(listing([])));
     expect(await slot.findByText("No stored files or folders")).toBeTruthy();
   });
@@ -321,5 +321,74 @@ describe("registered Work Thread storage", () => {
     toggle();
     await act(async () => vi.advanceTimersByTimeAsync(120_001));
     expect(getPluginQueryClient().getQueryCache().find({ queryKey: queryKeys.work.storage("thr_a") })).toBeUndefined();
+  });
+
+  it("keeps all 10000 returned entries in Query while initially mounting only 200 file rows", async () => {
+    const paths = Array.from({ length: 10_000 }, (_, index) => pathEntry(`file-${String(index).padStart(5, "0")}.md`));
+    const { slot, toggle } = await mount(vi.fn().mockResolvedValue(listing(paths)));
+    toggle();
+    await slot.findByText("file-00000.md");
+    const storedFiles = slot.getByRole("list", { name: "Stored files and folders" });
+    const cached = getPluginQueryClient().getQueryData(queryKeys.work.storage("thr_a")) as { entries: unknown[]; truncated: boolean };
+    expect(cached.entries).toHaveLength(10_000);
+    expect(cached.truncated).toBe(false);
+    expect(storedFiles.querySelectorAll("a[download]")).toHaveLength(200);
+    expect(slot.queryByText("Listing incomplete; some entries are not shown.")).toBeNull();
+    const more = slot.getByRole("button", { name: "Show more in thread storage (9800 remaining)" });
+    expect(more.textContent).toBe("Show more (9800 remaining)");
+    fireEvent.click(more, { detail: 0 });
+    expect(storedFiles.querySelectorAll("a[download]")).toHaveLength(400);
+    expect(slot.getByRole("button", { name: "Show more in thread storage (9600 remaining)" })).toBeTruthy();
+  });
+
+  it("makes every retained file beyond 200 reachable through Show more without refetching or claiming host truncation", async () => {
+    const paths = Array.from({ length: 405 }, (_, index) => pathEntry(`file-${String(index).padStart(3, "0")}.md`));
+    const { slot, toggle, storagePaths } = await mount(vi.fn().mockResolvedValue(listing(paths)));
+    toggle();
+    await slot.findByText("file-000.md");
+    const storedFiles = slot.getByRole("list", { name: "Stored files and folders" });
+    expect(slot.queryByText("file-404.md")).toBeNull();
+    fireEvent.click(slot.getByRole("button", { name: "Show more in thread storage (205 remaining)" }));
+    fireEvent.click(slot.getByRole("button", { name: "Show more in thread storage (5 remaining)" }));
+    const downloadAnchors = [...storedFiles.querySelectorAll<HTMLAnchorElement>("a[download]")];
+    expect(downloadAnchors).toHaveLength(405);
+    expect(downloadAnchors.map((anchor) => {
+      const url = new URL(anchor.getAttribute("href")!, "http://localhost");
+      return { name: anchor.getAttribute("download"), label: anchor.getAttribute("aria-label"), threadId: url.searchParams.get("threadId"), path: url.searchParams.get("path") };
+    })).toEqual(paths.map((entry) => ({ name: entry.name, label: `Download ${entry.name}`, threadId: "thr_a", path: entry.path })));
+    expect(slot.queryByRole("button", { name: /^Show more/ })).toBeNull();
+    expect(slot.queryByText("Listing incomplete; some entries are not shown.")).toBeNull();
+    fireEvent.click(slot.getByText("file-404.md").closest("a")!);
+    expect(slot.navigateCalls.at(-1)).toMatchObject({ method: "experimental_openFilePreview", options: { target: { threadId: "thr_a", path: "file-404.md" } } });
+    expect(storagePaths).toHaveBeenCalledOnce();
+  });
+
+  it("keeps Show more state local to each directory and resets it on folder collapse and thread switch", async () => {
+    const paths = ["docs", "other"].flatMap((folder) => Array.from({ length: 201 }, (_, index) => pathEntry(`${folder}/file-${String(index).padStart(3, "0")}.md`)));
+    const { slot, toggle, switchThread } = await mount(vi.fn().mockResolvedValue(listing(paths)));
+    toggle();
+    const docs = await slot.findByRole("button", { name: "docs" });
+    const storedFiles = slot.getByRole("list", { name: "Stored files and folders" });
+    fireEvent.click(docs);
+    const more = slot.getByRole("button", { name: "Show more in docs (1 remaining)" });
+    act(() => more.focus());
+    expect(document.activeElement).toBe(more);
+    expect(more.getAttribute("type")).toBe("button");
+    fireEvent.click(more, { detail: 0 });
+    expect(storedFiles.querySelectorAll("a[download]")).toHaveLength(201);
+    fireEvent.click(slot.getByRole("button", { name: "other" }));
+    expect(slot.getByRole("button", { name: "Show more in other (1 remaining)" })).toBeTruthy();
+    expect(storedFiles.querySelectorAll("a[download]")).toHaveLength(401);
+    fireEvent.click(docs);
+    fireEvent.click(docs);
+    expect(slot.getByRole("button", { name: "Show more in docs (1 remaining)" })).toBeTruthy();
+    switchThread("thr_b");
+    toggle();
+    fireEvent.click(await slot.findByRole("button", { name: "docs" }));
+    expect(slot.getByRole("list", { name: "Stored files and folders" }).querySelectorAll("a[download]")).toHaveLength(200);
+    expect(slot.getByRole("button", { name: "Show more in docs (1 remaining)" })).toBeTruthy();
+    const lastVisible = slot.getByText("file-199.md").closest("a")!;
+    fireEvent.click(lastVisible);
+    expect(slot.navigateCalls.at(-1)).toMatchObject({ method: "experimental_openFilePreview", options: { target: { threadId: "thr_b", path: "docs/file-199.md" } } });
   });
 });

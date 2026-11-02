@@ -1,4 +1,4 @@
-export const STORAGE_ENTRY_LIMIT = 200;
+export const STORAGE_ENTRY_LIMIT = 10_000;
 const MAX_PATH_LENGTH = 1024;
 const MAX_DEPTH = 20;
 

@@ -93,9 +93,15 @@ current panel. These remain distinct feature responsibilities.
 
 The Work tab ends with a Thread storage card. It starts collapsed;
 opening it mounts a thread-scoped Query over `threads.storagePaths`. The
-projection contains at most 200 safe relative file/directory entries, ordered
-directories first, with local folder disclosures and an explicit truncated
-notice. The listing does not fetch file bodies or expose absolute host paths. Files
+request and projection use the host maximum of 10,000 safe relative file/directory
+entries, ordered directories first, with local folder disclosures and an explicit truncated
+notice only when the host or projection actually truncates data. Each directory
+initially renders 200 rows; its local Show more control adds 200 rows at a time
+and reports the remaining count, without another request or a false incomplete
+notice. Every retained entry is reachable; folder collapse and thread switches
+reset this directory-local presentation state. The projection budget includes
+inferred ancestor directories and preserves the existing safe-path/depth limits.
+The listing does not fetch file bodies or expose absolute host paths. Files
 open through BB FileLink with an explicit thread-storage target.
 
 Each file has an always-visible download control beside its preview link;
