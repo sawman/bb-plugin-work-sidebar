@@ -8,6 +8,12 @@ import type { rpcContract } from "../../../contracts";
 import { getPluginQueryClient, queryKeys, queryPolicies } from "../../../query-runtime";
 import { threadInteractionStore } from "../../threads/store";
 
+const { saveFile } = vi.hoisted(() => ({ saveFile: vi.fn().mockResolvedValue("started") }));
+vi.mock("@get-bb/plugin-sdk/app", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@get-bb/plugin-sdk/app")>(),
+  experimental_saveFile: saveFile,
+}));
+
 type Rpc = NonNullable<RenderSlotOptions<typeof rpcContract>["rpc"]>;
 const fixture = {
   sidebarTasks: () => ({ available: true, tasks: [], projects: [], error: null }),
@@ -36,6 +42,7 @@ async function mount(storagePaths = vi.fn().mockResolvedValue(listing()), thread
   threadInteractionStore.getState().setWorkTab(threadId, "work");
   const app = await loadPluginApp(() => import("../../../app"));
   const slot = renderSlot(app.threadPanelActions[0]!, { threadId, params: null }, {
+    pluginId: "work-sidebar",
     rpc: fixture,
     sdk: { threads: { storagePaths } },
   });
@@ -45,7 +52,83 @@ async function mount(storagePaths = vi.fn().mockResolvedValue(listing()), thread
 }
 
 describe("registered Work Thread storage", () => {
-  afterEach(() => { cleanup(); getPluginQueryClient().clear(); vi.useRealTimers(); });
+  afterEach(() => { cleanup(); getPluginQueryClient().clear(); vi.useRealTimers(); vi.unstubAllGlobals(); saveFile.mockReset().mockResolvedValue("started"); });
+
+  it("offers separate downloads only for files; preserves preview and exact thread/path through a pending download", async () => {
+    const pending = deferred<Response>();
+    const fetchFile = vi.fn(() => pending.promise);
+    vi.stubGlobal("fetch", fetchFile);
+    const path = "docs/财务 #1?.bin";
+    const { slot, toggle } = await mount(vi.fn().mockResolvedValue(listing([pathEntry(path)])), "thr_b");
+    toggle();
+    expect(slot.queryByRole("link", { name: /^Download/ })).toBeNull();
+    fireEvent.click(await slot.findByRole("button", { name: "docs" }));
+    const download = slot.getByRole("link", { name: "Download 财务 #1?.bin" });
+    const url = new URL(download.getAttribute("href")!, "http://localhost");
+    expect(url.pathname).toBe("/api/v1/plugins/work-sidebar/http/thread-storage/download");
+    expect([...url.searchParams]).toEqual([["threadId", "thr_b"], ["path", path]]);
+    expect(download.getAttribute("download")).toBe("财务 #1?.bin");
+    expect(slot.queryByRole("link", { name: "Download docs" })).toBeNull();
+    download.focus();
+    expect(document.activeElement).toBe(download);
+    expect(slot.getByRole("tooltip", { name: "Download file" })).toBeTruthy();
+    fireEvent.click(download, { detail: 0 });
+    await waitFor(() => expect(download.getAttribute("aria-disabled")).toBe("true"));
+    expect(download.getAttribute("aria-busy")).toBe("true");
+    fireEvent.click(download);
+    expect(fetchFile).toHaveBeenCalledTimes(1);
+    expect(fetchFile.mock.calls[0]).toEqual([download.getAttribute("href"), expect.objectContaining({ credentials: "same-origin" })]);
+    fireEvent.click(slot.getByRole("link", { name: "财务 #1?.bin" }));
+    expect(slot.navigateCalls.at(-1)).toMatchObject({ method: "experimental_openFilePreview", options: { target: { kind: "thread-storage", threadId: "thr_b", path } } });
+    const blob = new Blob([new Uint8Array([0, 255, 128])]);
+    await act(async () => pending.resolve({ ok: true, blob: async () => blob } as Response));
+    await waitFor(() => expect(saveFile).toHaveBeenCalledExactlyOnceWith({ fileName: "财务 #1?.bin", blob }));
+    await waitFor(() => expect(download.hasAttribute("aria-disabled")).toBe(false));
+    expect((await axe(slot.container)).violations).toEqual([]);
+    expect(slot.container.querySelector("a a, [title]")).toBeNull();
+  });
+
+  it("reports safe download failures, retries, and leaves modifier/context-menu actions native", async () => {
+    const fetchFile = vi.fn().mockResolvedValueOnce({ ok: false, text: async () => "/private/host" }).mockRejectedValueOnce(new Error("/private/host offline")).mockResolvedValue({ ok: true, blob: async () => new Blob(["text"]) });
+    vi.stubGlobal("fetch", fetchFile);
+    const { slot, toggle } = await mount();
+    toggle();
+    const download = await slot.findByRole("link", { name: "Download report.md" });
+    for (const modifier of ["metaKey", "ctrlKey", "shiftKey", "altKey"]) expect(fireEvent.click(download, { [modifier]: true })).toBe(true);
+    expect(fireEvent.contextMenu(download)).toBe(true);
+    expect(fetchFile).not.toHaveBeenCalled();
+    for (let index = 0; index < 2; index++) {
+      fireEvent.click(download);
+      expect(await slot.findByRole("alert")).toHaveProperty("textContent", "Could not download report.md. Try again.");
+      expect(saveFile).not.toHaveBeenCalled();
+      expect(slot.container.textContent).not.toContain("/private/host");
+    }
+    saveFile.mockResolvedValueOnce("failed");
+    fireEvent.click(download);
+    await waitFor(() => expect(saveFile).toHaveBeenCalledOnce());
+    expect(await slot.findByRole("alert")).toBeTruthy();
+    fireEvent.click(download);
+    await waitFor(() => expect(saveFile).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(slot.queryByRole("alert")).toBeNull());
+    expect(slot.navigateCalls.filter((call) => call.method === "experimental_openFilePreview")).toEqual([]);
+  });
+
+  it("keeps late download state scoped to the original thread when switching A→B", async () => {
+    const pending = deferred<Response>();
+    vi.stubGlobal("fetch", vi.fn().mockReturnValueOnce(pending.promise).mockResolvedValue({ ok: true, blob: async () => new Blob(["B"]) }));
+    const { slot, toggle, switchThread } = await mount();
+    toggle();
+    fireEvent.click(await slot.findByRole("link", { name: "Download report.md" }));
+    switchThread("thr_b");
+    toggle();
+    const download = await slot.findByRole("link", { name: "Download report.md" });
+    expect(download.getAttribute("href")).toContain("threadId=thr_b");
+    expect(download.hasAttribute("aria-disabled")).toBe(false);
+    await act(async () => pending.resolve({ ok: false } as Response));
+    expect(slot.queryByRole("alert")).toBeNull();
+    fireEvent.click(download);
+    await waitFor(() => expect(saveFile).toHaveBeenCalledOnce());
+  });
 
   it("registers a collapsed card after Background, loads independently and only while open", async () => {
     const pending = deferred<ReturnType<typeof listing>>();
@@ -98,7 +181,7 @@ describe("registered Work Thread storage", () => {
     ])));
     toggle();
     expect(await slot.findByRole("link", { name: "safe name.md" })).toBeTruthy();
-    expect(slot.getAllByRole("link")).toHaveLength(1);
+    expect(slot.getAllByRole("link")).toHaveLength(2);
     expect(slot.container.textContent).not.toContain("/private/host");
     const cached = getPluginQueryClient().getQueryData(queryKeys.work.storage("thr_a"));
     expect(JSON.stringify(cached)).not.toContain("/private/host");
@@ -223,7 +306,7 @@ describe("registered Work Thread storage", () => {
     const { slot, toggle } = await mount(vi.fn().mockResolvedValue(listing(Array.from({ length: 250 }, (_, index) => pathEntry(`file-${index}.md`)))));
     toggle();
     await slot.findByRole("link", { name: "file-0.md" });
-    expect(slot.getAllByRole("link").length).toBeLessThanOrEqual(200);
+    expect(slot.getAllByRole("link").filter((link) => !link.hasAttribute("download")).length).toBeLessThanOrEqual(200);
     const query = getPluginQueryClient().getQueryCache().find({ queryKey: queryKeys.work.storage("thr_a") })!;
     expect(query.options).toMatchObject({ refetchInterval: false });
     expect(JSON.stringify(query.state.data).length).toBeLessThan(100_000);

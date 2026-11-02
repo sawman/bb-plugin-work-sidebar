@@ -10,6 +10,7 @@ import { createThreadRegistration } from "./features/threads/server-registration
 import { registerRecycleBinExpiryRoute } from "./features/threads/recycle-bin-http.js";
 import { createTrackerRegistration } from "./features/tracker/server-registration.js";
 import { createWorkContextRegistration } from "./features/work-context/server-registration.js";
+import { registerThreadStorageDownloadRoute } from "./features/work-context/thread-storage-download-http.js";
 import { createServerLifecycle, type ServerLifecycle } from "./server-lifecycle.js";
 import type { ServerCompositionDependencies } from "./shared/server-composition-dependencies.js";
 
@@ -25,6 +26,7 @@ export default function plugin(bb: BbPluginApi, lifecycle: ServerLifecycle = cre
   const threads = createThreadRegistration(bb, tasks);
   registerRecycleBinExpiryRoute(bb, threads.expireRecycleBinThreads);
   const workContext = createWorkContextRegistration(dependencies);
+  registerThreadStorageDownloadRoute(bb);
   const tracker = createTrackerRegistration(dependencies);
   bb.rpc.register(rpcContract, {
     sidebarBranchDivergence: threads.sidebarBranchDivergence,

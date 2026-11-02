@@ -91,12 +91,30 @@ current panel. These remain distinct feature responsibilities.
 
 ### Thread storage
 
-The Work tab ends with a read-only Thread storage card. It starts collapsed;
+The Work tab ends with a Thread storage card. It starts collapsed;
 opening it mounts a thread-scoped Query over `threads.storagePaths`. The
 projection contains at most 200 safe relative file/directory entries, ordered
 directories first, with local folder disclosures and an explicit truncated
-notice. It does not fetch file bodies or expose absolute host paths. Files
+notice. The listing does not fetch file bodies or expose absolute host paths. Files
 open through BB FileLink with an explicit thread-storage target.
+
+Each file has an always-visible download control beside its preview link;
+directories remain disclosures. Ordinary download activation prepares the file
+through the plugin's local-auth `GET /thread-storage/download` route, then
+hands its Blob to BB's public `experimental_saveFile`. Pending controls prevent
+duplicate requests and failures offer a safe inline retry. The real attachment
+href remains available for native modifier-click and copy-link actions. A
+started save means the host accepted the handoff, not that saving completed.
+
+The route accepts only a thread ID and safe relative path. It resolves
+`threads.storageLocation` server-side, then uses `files.read` on the returned
+host with the exact root boundary and the storage host's path flavor. Absolute
+roots never enter frontend state. The host rejects directories, nonregular
+files and realpath escapes; it limits raster images to 10 MiB and other files
+to 25 MiB. The adapter verifies decoded UTF-8/base64 byte size and SHA-256 and
+returns a no-store attachment, never raw host errors. Reads are buffered rather
+than streamed; the host's realpath/stat/read sequence is not atomic. There is no
+folder ZIP or direct local-filesystem fallback.
 
 Collapse or leaving Work removes the content observer. Reopen and manual
 refresh are the refresh paths; there is no plugin storage realtime hook or

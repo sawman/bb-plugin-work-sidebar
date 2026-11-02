@@ -5,7 +5,7 @@ import { Icon } from "../../components/ui/icon";
 import { RefreshButton } from "../../components/ui/refresh-button";
 import type { StorageEntry, StorageListing } from "./thread-storage-model";
 import { refreshThreadStorage, useThreadStorage } from "./thread-storage-queries";
-import { ThreadStorageFileLink } from "./thread-storage-file-link";
+import { ThreadStorageFileRow } from "./thread-storage-file-row";
 
 export function ThreadStorageCard({ threadId }: { threadId: string }) {
   return <ThreadStorageBoundary key={threadId} threadId={threadId} />;
@@ -108,10 +108,7 @@ function StorageDirectory({ threadId, entries, parent, expanded, onToggle }: {
               {expanded.has(entry.path) ? <StorageDirectory threadId={threadId} entries={entries} parent={entry.path} expanded={expanded} onToggle={onToggle} /> : null}
             </>
           ) : (
-            <ThreadStorageFileLink threadId={threadId} path={entry.path}>
-              <Icon name="File" aria-hidden />
-              <span className="ws-storage-name">{entry.name}</span>
-            </ThreadStorageFileLink>
+            <ThreadStorageFileRow threadId={threadId} path={entry.path} name={entry.name} />
           )}
         </li>
       ))}

@@ -2284,6 +2284,13 @@ button.ws-change-file-row:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.ws-storage-file-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
 .ws-work-section {
   display: grid;
   min-width: 0;
