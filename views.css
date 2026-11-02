@@ -346,6 +346,9 @@
   font: var(--ws-text-label);
   line-height: 0;
 }
+.ws-icon-button[data-variant="ghost"] {
+  border: 0;
+}
 .ws-icon-button svg {
   width: 0.76rem;
   height: 0.76rem;

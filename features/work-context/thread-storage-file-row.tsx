@@ -38,7 +38,7 @@ export function ThreadStorageFileRow({ threadId, path, name }: {
         </ThreadStorageFileLink>
         <ActionTooltip label="Download file">
           {(tooltipId) => (
-            <a className="ws-icon-button" href={href} download={name} rel="noopener" aria-label={`Download ${name}`}
+            <a className="ws-icon-button" data-variant="ghost" href={href} download={name} rel="noopener" aria-label={`Download ${name}`}
               aria-describedby={tooltipId} aria-disabled={download.isPending || undefined} aria-busy={download.isPending || undefined}
               onClick={(event) => {
                 if (preparing.current) { event.preventDefault(); return; }
@@ -47,7 +47,7 @@ export function ThreadStorageFileRow({ threadId, path, name }: {
                 preparing.current = true;
                 download.mutate();
               }}>
-              <Icon name="ArrowDown" aria-hidden />
+              <Icon name="Download" aria-hidden />
             </a>
           )}
         </ActionTooltip>
