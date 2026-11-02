@@ -195,41 +195,12 @@ describe("registered Work Thread storage", () => {
     expect(JSON.stringify(cached)).not.toContain("storageRootPath");
   });
 
-  it("highlights refresh for an incomplete listing, explains it on focus, and clears the warning after a complete refresh", async () => {
-    const refreshed = deferred<ReturnType<typeof listing>>();
-    const { slot, toggle, storagePaths } = await mount(vi.fn().mockResolvedValueOnce(listing([pathEntry("docs", "directory")], true)).mockReturnValueOnce(refreshed.promise));
+  it("shows an incomplete listing notice without empty-folder claims or invented totals", async () => {
+    const { slot, toggle } = await mount(vi.fn().mockResolvedValue(listing([pathEntry("docs", "directory")], true)));
     toggle();
     fireEvent.click(await slot.findByRole("button", { name: "docs" }));
-    expect(slot.queryByText("Listing incomplete; some entries are not shown.")).toBeNull();
-    const refresh = slot.getByRole("button", { name: "Refresh thread storage" });
-    expect(refresh.getAttribute("data-tone")).toBe("warning");
-    act(() => refresh.focus());
-    expect(document.activeElement).toBe(refresh);
-    const tooltip = slot.getByRole("tooltip", { name: "Listing incomplete; refresh" });
-    expect(refresh.getAttribute("aria-describedby")).toBe(tooltip.id);
-    expect(tooltip.getAttribute("data-open")).toBe("true");
+    expect(slot.getByText("Listing incomplete; some entries are not shown.")).toBeTruthy();
     expect(slot.queryByText(/empty|No stored|0 files/i)).toBeNull();
-    expect((await axe(slot.container)).violations).toEqual([]);
-    fireEvent.click(refresh);
-    await waitFor(() => expect(storagePaths).toHaveBeenCalledTimes(2));
-    expect(refresh.getAttribute("data-tone")).toBe("warning");
-    expect(refresh.getAttribute("aria-busy")).toBe("true");
-    await act(async () => refreshed.resolve(listing([])));
-    expect(await slot.findByText("No stored files or folders")).toBeTruthy();
-    expect(refresh.hasAttribute("data-tone")).toBe(false);
-    expect(slot.queryByRole("tooltip", { name: "Listing incomplete; refresh" })).toBeNull();
-  });
-
-  it("keeps incomplete empty listings truthful and isolates warning state when switching threads", async () => {
-    const { slot, toggle, switchThread } = await mount(vi.fn().mockResolvedValueOnce(listing([], true)).mockResolvedValue(listing([])));
-    toggle();
-    await waitFor(() => expect(slot.getByRole("button", { name: "Refresh thread storage" }).getAttribute("data-tone")).toBe("warning"));
-    expect(slot.queryByText("Listing incomplete; some entries are not shown.")).toBeNull();
-    expect(slot.queryByText("No stored files or folders")).toBeNull();
-    switchThread("thr_b");
-    toggle();
-    expect(await slot.findByText("No stored files or folders")).toBeTruthy();
-    expect(slot.getByRole("button", { name: "Refresh thread storage" }).hasAttribute("data-tone")).toBe(false);
   });
 
   it("shows a safe initial error without auto-retry and recovers through the compact retry", async () => {

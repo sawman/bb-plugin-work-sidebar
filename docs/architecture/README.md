@@ -94,10 +94,8 @@ current panel. These remain distinct feature responsibilities.
 The Work tab ends with a Thread storage card. It starts collapsed;
 opening it mounts a thread-scoped Query over `threads.storagePaths`. The
 projection contains at most 200 safe relative file/directory entries, ordered
-directories first, with local folder disclosures. A truncated listing highlights
-the refresh control with a warning tone and an explanatory hover/focus tooltip;
-it does not add a visible listing notice or claim an incomplete folder is empty.
-The listing does not fetch file bodies or expose absolute host paths. Files
+directories first, with local folder disclosures and an explicit truncated
+notice. The listing does not fetch file bodies or expose absolute host paths. Files
 open through BB FileLink with an explicit thread-storage target.
 
 Each file has an always-visible download control beside its preview link;
