@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { SurfaceCard } from "../../components/ui/surface-card";
 import { Icon } from "../../components/ui/icon";
 import { RefreshButton } from "../../components/ui/refresh-button";
+import { ActionTooltip } from "../../components/ui/action-tooltip";
 import type { StorageEntry, StorageListing } from "./thread-storage-model";
 import { refreshThreadStorage, useThreadStorage } from "./thread-storage-queries";
 import { ThreadStorageFileRow } from "./thread-storage-file-row";
@@ -44,14 +45,22 @@ function StorageHeading({ open, id, onToggle, trailing }: {
 function ThreadStorageContent({ threadId, id, onToggle }: { threadId: string; id: string; onToggle(): void }) {
   const query = useThreadStorage(threadId);
   const client = useQueryClient();
+  const refreshLabel = query.isError ? "Retry thread storage" : "Refresh thread storage";
+  const incomplete = query.data?.truncated === true;
   return (
     <>
       <StorageHeading open id={id} onToggle={onToggle} trailing={
-        <RefreshButton
-          label={query.isError ? "Retry thread storage" : "Refresh thread storage"}
-          refreshing={query.isFetching}
-          onRefresh={() => refreshThreadStorage(client, threadId)}
-        />
+        <ActionTooltip label={incomplete ? "Listing incomplete; refresh" : refreshLabel}>
+          {(tooltipId) => (
+            <RefreshButton
+              label={refreshLabel}
+              data-tone={incomplete ? "warning" : undefined}
+              aria-describedby={tooltipId}
+              refreshing={query.isFetching}
+              onRefresh={() => refreshThreadStorage(client, threadId)}
+            />
+          )}
+        </ActionTooltip>
       } />
       <div id={id} className="ws-storage-content" aria-busy={query.isFetching || undefined}>
         {query.isPending ? <p className="ws-card-note" role="status">Loading thread storage…</p> : null}
@@ -78,7 +87,6 @@ function StorageFolders({ threadId, listing }: { threadId: string; listing: Stor
   });
   return (
     <>
-      {listing.truncated ? <p className="ws-card-note">Listing incomplete; some entries are not shown.</p> : null}
       {listing.unavailable ? <p className="ws-card-note">Some entries are unavailable.</p> : null}
       {listing.entries.length === 0 && !listing.truncated && !listing.unavailable ? <p className="ws-card-note">No stored files or folders</p> : null}
       {listing.entries.length ? <StorageDirectory threadId={threadId} entries={listing.entries} parent="" expanded={expanded} onToggle={toggleFolder} /> : null}

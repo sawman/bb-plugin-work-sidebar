@@ -94,17 +94,23 @@ current panel. These remain distinct feature responsibilities.
 The Work tab ends with a Thread storage card. It starts collapsed;
 opening it mounts a thread-scoped Query over `threads.storagePaths`. The
 projection contains at most 200 safe relative file/directory entries, ordered
-directories first, with local folder disclosures and an explicit truncated
-notice. The listing does not fetch file bodies or expose absolute host paths. Files
+directories first, with local folder disclosures. A truncated listing highlights
+the refresh control with a warning tone and an explanatory hover/focus tooltip;
+it does not add a visible listing notice or claim an incomplete folder is empty.
+The listing does not fetch file bodies or expose absolute host paths. Files
 open through BB FileLink with an explicit thread-storage target.
 
 Each file has an always-visible download control beside its preview link;
 directories remain disclosures. Ordinary download activation prepares the file
 through the plugin's local-auth `GET /thread-storage/download` route, then
-hands its Blob to BB's public `experimental_saveFile`. Pending controls prevent
-duplicate requests and failures offer a safe inline retry. The real attachment
+hands its Blob to BB's public `experimental_saveFile`. Pending controls show an
+activity icon with a screen-reader status, prevent duplicate requests and do not
+add visible preparation text. Failures offer a safe inline retry. The real attachment
 href remains available for native modifier-click and copy-link actions. A
 started save means the host accepted the handoff, not that saving completed.
+The public SDK has no client download-folder or no-dialog control; destination
+and save prompts remain host-owned. There is no inactive plugin path setting
+or substitute write to a server/storage-host filesystem.
 
 The route accepts only a thread ID and safe relative path. It resolves
 `threads.storageLocation` server-side, then uses `files.read` on the returned

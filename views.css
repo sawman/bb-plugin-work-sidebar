@@ -366,6 +366,10 @@
 .ws-refresh-button:disabled {
   cursor: default;
 }
+.ws-refresh-button[data-tone="warning"] {
+  border-color: var(--warning);
+  color: var(--warning);
+}
 .ws-refresh-icon[data-motion="spin"] {
   animation: ws-refresh-spin 0.8s linear infinite;
 }

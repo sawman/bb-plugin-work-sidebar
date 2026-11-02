@@ -47,12 +47,13 @@ export function ThreadStorageFileRow({ threadId, path, name }: {
                 preparing.current = true;
                 download.mutate();
               }}>
-              <Icon name="Download" aria-hidden />
+              <Icon name={download.isPending ? "LoaderCircle" : "Download"}
+                className="ws-refresh-icon" data-motion={download.isPending ? "spin" : undefined} aria-hidden />
             </a>
           )}
         </ActionTooltip>
       </div>
-      {download.isPending ? <p className="ws-card-note" role="status">Preparing {name}…</p> : null}
+      {download.isPending ? <span className="ws-sr-only" role="status">Preparing {name}…</span> : null}
       {download.isError ? <p className="ws-card-note" role="alert">Could not download {name}. Try again.</p> : null}
     </>
   );
