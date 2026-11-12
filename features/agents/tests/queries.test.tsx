@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type PropsWithChildren } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -30,6 +30,64 @@ afterEach(() => {
 });
 
 describe("Agents detail query lifecycle", () => {
+  it("coalesces pending panels and admits one successor for a newly mounted disjoint roster", async () => {
+    let release!: (value: { agents: { threadId: string; model: string }[] }) => void;
+    rpcClient.call.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }))
+      .mockImplementation(async (_method, { threadIds }) => ({
+        agents: threadIds.map((threadId: string) => ({ threadId, model: "terra" })),
+      }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const first = renderHook(() => useAgentDetails(["thr_a"]), { wrapper: wrapper(client) });
+    await waitFor(() => expect(rpcClient.call).toHaveBeenCalledOnce());
+    const second = renderHook(() => useAgentDetails(["thr_b"]), { wrapper: wrapper(client) });
+    expect(rpcClient.call).toHaveBeenCalledOnce();
+    await act(async () => { release({ agents: [{ threadId: "thr_a", model: "terra" }] }); });
+    await waitFor(() => expect(second.result.current.data?.facts.thr_b).toEqual({ model: "terra" }));
+    expect(rpcClient.call).toHaveBeenCalledTimes(2);
+    expect(rpcClient.call).toHaveBeenLastCalledWith("getAgentDetails", { threadIds: ["thr_b"] });
+    first.unmount(); second.unmount(); client.clear();
+  });
+
+  it("does not turn a rejected shared read into an automatic retry loop", async () => {
+    rpcClient.call.mockRejectedValue(new Error("Offline"));
+    const client = new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } });
+    const view = renderHook(() => useAgentDetails(["thr_a"]), { wrapper: wrapper(client) });
+    await waitFor(() => expect(view.result.current.isError).toBe(true));
+    view.rerender();
+    expect(rpcClient.call).toHaveBeenCalledTimes(2); // The declared policy allows one retry.
+    view.unmount(); client.clear();
+  });
+
+  it("settles an omitted requested row as an error with only the configured retry", async () => {
+    rpcClient.call.mockResolvedValue({ agents: [] });
+    const client = new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } });
+    const panel = renderHook(() => useAgentDetails(["thr_missing"]), { wrapper: wrapper(client) });
+    await waitFor(() => expect(panel.result.current.isError).toBe(true));
+    panel.rerender();
+    expect(rpcClient.call).toHaveBeenCalledTimes(2);
+    expect(panel.result.current.data?.facts.thr_missing).toBeUndefined();
+    panel.unmount(); client.clear();
+  });
+
+  it("admits one pending replacement after the retired roster settles", async () => {
+    let release!: (value: { agents: { threadId: string; model: string }[] }) => void;
+    rpcClient.call.mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }))
+      .mockImplementation(async (_method, { threadIds }) => ({
+        agents: threadIds.map((threadId: string) => ({ threadId, model: "terra" })),
+      }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const panel = renderHook(({ roster }) => useAgentDetails(roster), {
+      initialProps: { roster: ["thr_a"] }, wrapper: wrapper(client),
+    });
+    await waitFor(() => expect(rpcClient.call).toHaveBeenCalledOnce());
+    panel.rerender({ roster: ["thr_b"] });
+    expect(rpcClient.call).toHaveBeenCalledOnce();
+    await act(async () => { release({ agents: [{ threadId: "thr_a", model: "terra" }] }); });
+    await waitFor(() => expect(panel.result.current.data?.facts).toEqual({ thr_b: { model: "terra" } }));
+    expect(rpcClient.call).toHaveBeenCalledTimes(2);
+    expect(rpcClient.call).toHaveBeenLastCalledWith("getAgentDetails", { threadIds: ["thr_b"] });
+    panel.unmount(); client.clear();
+  });
   it("normalizes roster permutations into one finite directory query", async () => {
     expect(queryPolicies.agentDetails).toMatchObject({
       staleTime: Infinity,

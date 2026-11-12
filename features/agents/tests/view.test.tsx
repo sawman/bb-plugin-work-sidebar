@@ -49,7 +49,6 @@ function thread(
       backgroundAgents: 0,
       backgroundCommands: 0,
       planMode: 0,
-      goals: 0,
     },
     indicator: "none",
     indicatorLabel: null,
@@ -109,7 +108,7 @@ function rpcFixture(overrides: Record<string, unknown> = {}) {
 async function agentsSlot(sidebarThreads: Partial<PluginSidebarThreadsState>, rpc = rpcFixture()) {
   getPluginQueryClient().clear();
   const app = await loadPluginApp(() => import("../../../app"));
-  const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_root", params: null }, {
+  const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_root", params: null, environment: null }, {
     rpc,
     sidebarThreads,
   });
@@ -133,7 +132,7 @@ describe("R15 registered Agents Work slot", () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_root", params: null },
+      { threadId: "thr_root", params: null, environment: null },
       {
         rpc: rpcFixture({ getAgentDetails }),
         sidebarThreads: {
@@ -187,7 +186,7 @@ describe("R15 registered Agents Work slot", () => {
       status: "ready",
       threads: [
         thread("thr_root", null),
-        thread("thr_direct", "thr_root", { indicator: "runtime", activity: { workflows: 0, backgroundAgents: 1, backgroundCommands: 0, planMode: 0, goals: 0 } }),
+        thread("thr_direct", "thr_root", { indicator: "runtime", activity: { workflows: 0, backgroundAgents: 1, backgroundCommands: 0, planMode: 0 } }),
         thread("thr_grandchild", "thr_direct", { indicator: "waiting-for-input", indicatorLabel: "Waiting for input", hasPendingInteraction: true }),
         thread("thr_archived", "thr_root", { isArchived: true }),
       ],

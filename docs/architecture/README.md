@@ -72,6 +72,9 @@ names, visible focus and terse tooltips. Shared domain presentations serve
 both sidebars. React, React DOM, the SDK app runtime and host-shimmed singleton
 packages remain external; exact host-compatible tooling belongs in
 `devDependencies`. Query, Zustand and Zod are bundled runtime dependencies.
+The Work header entry is a public thread action with `placement: "header"`;
+BB renders it and folds it into the thread menu at compact widths. Its panel
+controller opens the registered Work action tab on the focused surface.
 
 ## Current feature contracts
 
@@ -82,12 +85,20 @@ packages remain external; exact host-compatible tooling belongs in
   separation, source observations, shared status and refresh.
 - [PR status matrix](pull-request-status-matrix.md): intended common precedence.
 
-Work cards load independently. Goal and Plan reflect thread timeline content;
+Work cards load independently. Goal reads the validated
+`provider-codex/goal` state from the public timeline's `extensionStates`;
+Plan reflects the timeline's pending todos.
 Background projects BB-reported commands/workflows rather than OS processes.
 The Work timeline snapshot service coalesces compatible reads while retaining
 separate full and summary-only snapshots. Agents projects unarchived children
 with shared runtime presentation and open/split navigation that preserves the
 current panel. These remain distinct feature responsibilities.
+
+Agents model metadata stays in its bounded Query directory. Concurrent reads
+coalesce without cancelling an admitted read. A successful Query revision can
+admit a missing replacement roster after the old roster settles; errors and
+omitted requested rows settle through the existing retry policy, without an
+effect-driven retry loop or timer.
 
 ### Thread storage
 
@@ -136,8 +147,8 @@ the unverified live keyboard/modifier/context-menu and empty/error states.
 
 ## Compatibility and verification
 
-The package declares minimum BB 0.47.1 and SDK 0.6.79; the exact development
-SDK pin is 0.6.79. The [BB 0.47.1 note](../compatibility/bb-0.47.1/SIDEBAR-SDK.md) records the used API migration. Use the
+The package declares minimum BB 0.49.0 and SDK 0.6.132; the exact development
+SDK pin is 0.6.132. The [BB 0.49.0 note](../compatibility/bb-0.49.0/SIDEBAR-SDK.md) records the used API migration and public file API audit. Use the
 [compatibility watchlist](../bb-compatibility-watchlist.md),
 [patch catalog](../../bb-plugins/README.md) and versioned deployment evidence
 for upgrades. Preserve their source/artifact manifests and rollback runbooks.

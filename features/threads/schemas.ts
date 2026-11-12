@@ -31,6 +31,7 @@ const archivedThread = z.object({
   title: z.string().nullable(),
   titleFallback: z.string().nullable(),
   parentThreadId: z.string().nullable(),
+  parentNotifications: z.enum(["auto", "stuck", "off"]),
   providerId: z.string(),
   environmentBranchName: z.string().nullable(),
   environmentName: z.string().nullable(),

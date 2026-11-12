@@ -7,10 +7,27 @@ import {
   queryPolicies,
 } from "../../query-runtime";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
+import { sidebarThreadFixture } from "../utils/sidebar-thread";
 import { changesKeys } from "../../features/changes/model";
 import { pullRequestKeys } from "../../features/pull-requests/queries";
 
 describe("R2 app registration and Query lifecycle", () => {
+  it("opens the registered Work action tab through the public header panel controller", async () => {
+    const app = await loadPluginApp(() => import("../../app"));
+    const openTab = vi.fn(() => true);
+    const registration = app.threadActions.find(({ id }) => id === "work-context-header")!;
+    const action = registration.item({
+      thread: { ...sidebarThreadFixture(), environment: null }, data: undefined, sdk: {} as never, navigate: {} as never,
+      experimental_panel: { openTab, getTabs: vi.fn(), selectTab: vi.fn(), closeTab: vi.fn(), toggleTab: vi.fn(), close: vi.fn() },
+    });
+    expect(registration.placement).toBe("header");
+    expect(action).toMatchObject({ label: "Work", icon: "ListTodo" });
+    await action!.run({ requestRename: vi.fn() });
+    expect(openTab).toHaveBeenCalledExactlyOnceWith({ tab: {
+      context: { kind: "thread" }, availability: "action", id: "work-context",
+    } });
+  });
+
   it("preserves every current slot registration and routes both mounted slots through one module client", async () => {
     const app = await loadPluginApp(() => import("../../app"));
 
@@ -23,9 +40,10 @@ describe("R2 app registration and Query lifecycle", () => {
       id: "work-context", context: { kind: "thread" }, availability: "action", layout: "flush",
     })]);
     expect(app.threadPanelActions.map(({ id }) => id)).toEqual(["work-context"]);
-    expect(app.threadHeaderActions.map(({ id }) => id)).toEqual([
-      "work-context-header",
-    ]);
+    expect(app.threadHeaderActions).toHaveLength(0);
+    expect(app.threadActions).toEqual([expect.objectContaining({
+      id: "work-context-header", placement: "header", title: "Work", icon: "ListTodo",
+    })]);
     expect(app.composerCustomizations.map(({ id }) => id)).toEqual([
       "task-first",
     ]);
@@ -111,7 +129,7 @@ describe("R2 app registration and Query lifecycle", () => {
     });
     const right = renderSlot(app.threadPanelActions[0]!, {
       threadId: "thr_test",
-      params: null,
+      params: null, environment: null,
     }, {
       rpc: {
         getSidebarAppearance: () => ({
@@ -321,11 +339,12 @@ describe("R2 app registration and Query lifecycle", () => {
       });
       const right = renderSlot(app.threadPanelActions[0]!, {
         threadId: `thr_generation_${generation}`,
-        params: null,
+        params: null, environment: null,
       });
       expect(app.threadLists).toHaveLength(1);
       expect(app.threadPanelActions).toHaveLength(1);
-      expect(app.threadHeaderActions).toHaveLength(1);
+      expect(app.threadHeaderActions).toHaveLength(0);
+      expect(app.threadActions).toHaveLength(1);
       left.lifecycle.unmount();
       right.lifecycle.unmount();
       await waitFor(() =>
@@ -365,12 +384,12 @@ describe("R2 app registration and Query lifecycle", () => {
     );
     const rightOne = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_panel_one", params: null },
+      { threadId: "thr_panel_one", params: null, environment: null },
       { rpc },
     );
     const rightTwo = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_panel_two", params: null },
+      { threadId: "thr_panel_two", params: null, environment: null },
       { rpc },
     );
     const appearanceKey = [
@@ -527,7 +546,7 @@ describe("R6 mounted Tasks reads", () => {
     );
     const right = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_test", params: null },
+      { threadId: "thr_test", params: null, environment: null },
       { rpc },
     );
     await waitFor(() =>

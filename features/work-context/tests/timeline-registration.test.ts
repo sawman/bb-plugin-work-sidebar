@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createServerLifecycle } from "../../../server-lifecycle";
 import { createWorkContextRegistration } from "../server-registration";
 
-function timelineFixture() {
+function timelineFixture(status: "active" | "paused" | "blocked" | "usageLimited" | "budgetLimited" | "complete" = "active") {
   return {
     rows: [
       {
@@ -12,13 +12,13 @@ function timelineFixture() {
         createdAt: 100,
       },
     ],
-    goal: {
+    extensionStates: { "provider-codex/goal": {
       objective: "Ship the snapshot",
-      status: "active" as const,
+      status,
       tokensUsed: 12,
       tokenBudget: 100,
       timeUsedSeconds: 3,
-    },
+    } },
     pendingTodos: {
       items: [
         { id: "one", text: "Add tests", status: "in_progress" as const },
@@ -42,10 +42,10 @@ function timelineFixture() {
   };
 }
 
-function registration() {
+function registration(status: Parameters<typeof timelineFixture>[0] = "active") {
   const eventHandlers = new Map<string, (event: { thread: { id: string } }) => void>();
   const timeline = vi.fn(async (_input: { threadId: string }) =>
-    timelineFixture(),
+    timelineFixture(status),
   );
   const lifecycle = createServerLifecycle();
   const work = createWorkContextRegistration({
@@ -76,6 +76,13 @@ function registration() {
 }
 
 describe("registered Work timeline selectors", () => {
+  it.each(["active", "paused", "blocked", "usageLimited", "budgetLimited", "complete"] as const)("preserves the public Goal state %s", async (status) => {
+    const { work } = registration(status);
+    await expect(work.getWorkGoal({ threadId: "thr_one" })).resolves.toEqual({
+      objective: "Ship the snapshot", status, tokensUsed: 12, tokenBudget: 100, timeUsedSeconds: 3,
+    });
+  });
+
   it("shares full reads while keeping the five-second background read narrow", async () => {
     const { timeline, work } = registration();
 

@@ -1,10 +1,12 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { projectBackgroundJobs } from "./background-jobs-server.js";
 import { projectLatestActivity } from "./latest-activity.js";
+import { workGoalSchema } from "./schemas.js";
 
-type WorkTimeline = Awaited<
+// Our reads omit afterTag, so the SDK returns a full snapshot, never a delta.
+type WorkTimeline = Exclude<Awaited<
   ReturnType<BbPluginApi["sdk"]["threads"]["timeline"]>
->;
+>, { delta: unknown }>;
 type CacheEntry<T> = { expiresAt: number; value: T };
 type PendingEntry<T> = { generation: number; promise: Promise<T> };
 
@@ -45,15 +47,8 @@ export function createWorkTimelineEventSubscription({
 }
 
 export function selectWorkGoal(timeline: WorkTimeline) {
-  return timeline.goal
-    ? {
-        objective: timeline.goal.objective,
-        status: timeline.goal.status,
-        tokensUsed: timeline.goal.tokensUsed,
-        tokenBudget: timeline.goal.tokenBudget,
-        timeUsedSeconds: timeline.goal.timeUsedSeconds,
-      }
-    : null;
+  const state = timeline.extensionStates?.["provider-codex/goal"];
+  return state === undefined ? null : workGoalSchema.parse(state);
 }
 
 export function selectWorkPlan(timeline: WorkTimeline) {

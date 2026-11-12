@@ -30,6 +30,7 @@ describe("ArchivedThreadRow", () => {
     const view = render(
       <ArchivedThreadRow
         thread={{
+          parentNotifications: "stuck" as const,
           id: "thr_archived",
           projectId: "project",
           title: "Archived thread",

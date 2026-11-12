@@ -6,7 +6,7 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 
-type ThreadControlTarget = Pick<PluginThreadActionTarget, "id" | "projectId" | "parentThreadId" | "isUnread"> & {
+type ThreadControlTarget = Pick<PluginThreadActionTarget, "id" | "projectId" | "parentThreadId" | "parentNotifications" | "isUnread"> & {
   archivedAt?: number | null;
   pinnedAt?: number | null;
   sectionId?: string | null;
@@ -22,6 +22,7 @@ export function useThreadControls(thread: ThreadControlTarget) {
     id: thread.id,
     projectId: thread.projectId,
     parentThreadId: thread.parentThreadId,
+    parentNotifications: thread.parentNotifications,
     isUnread: thread.isUnread,
     archivedAt: thread.archivedAt ?? null,
     pinnedAt: thread.pinnedAt ?? null,

@@ -25,6 +25,14 @@ boundaries when changing loading or refresh behavior.
 - Repository readiness, PR summary and enrichment are independent queries.
   Local changes can paint before remote enrichment. A truly cold PR summary
   still needs host/remote discovery; cached paint requires a known association.
+- Local Git reads use the public `bb--git` typed RPC: `workspaceStatus` for
+  repository/divergence, `branches` for fallback branch discovery, and `files`
+  followed by a keyed `patches` read for a selected text file. Reuse an initial
+  patch and skip patch reads for binary or absent files. Missing/malformed rows
+  and incomplete patches are unavailable, never complete or confirmed absent.
+  Native Git owns repository access and caching. A patch key includes the file
+  revision, but the host does not enforce that revision as an expected-revision
+  guard; the listing and patch are not an atomic snapshot.
 - One bounded Query PR-fact directory owns the resolved lifecycle, title,
   head/base, checks/review, mergeability and supplementary metadata. Authority
   follows each field group's source evidence, never the presence of rich detail.
@@ -148,6 +156,11 @@ invalidation, new native causal demands or direct native RPC. Visible interval
 polling resumes at the configured active cadence, without an immediate focus
 refetch; warm paint remains available and manual refresh can update it sooner.
 Native keyed watches and their visibility lifecycle remain BB-owned.
+SDK 0.6.132 refreshes only the invoking keyed hook's keys. Manual toolbar
+refresh therefore fans out through live consumer refresh handles, deduplicated
+by environment within the shared window Query client. Handles are removed on
+key change/unmount; another window's Query client is isolated. This registry
+contains callbacks and identities only, with no PR facts, cache or timers.
 The global REST poll budget caps fingerprint reads only, not all GitHub work.
 
 

@@ -136,7 +136,7 @@ export const workOutcomeSchema = z.object({
 });
 export const workGoalSchema = z.object({
   objective: z.string(),
-  status: z.enum(["active", "budgetLimited", "complete", "paused"]),
+  status: z.enum(["active", "budgetLimited", "complete", "paused", "blocked", "usageLimited"]),
   tokensUsed: z.number(),
   tokenBudget: z.number().nullable(),
   timeUsedSeconds: z.number(),

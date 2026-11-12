@@ -16,8 +16,8 @@ describe("Changes server registration", () => {
           threads: {
             get: vi.fn(async () => ({ environmentId: "env_changes" })),
           },
-          environments: {
-            status: vi.fn(async () => ({
+          plugins: {
+            callRpc: vi.fn(async () => ({
               outcome: "available",
               workspace: {
                 branch: {
@@ -33,8 +33,6 @@ describe("Changes server registration", () => {
                 },
               },
             })),
-            diffPatch: vi.fn(),
-            diffFiles: vi.fn(),
           },
         },
       },

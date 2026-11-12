@@ -86,7 +86,7 @@ describe("registered Status activity lifecycle", () => {
     const userText = `user ${"context ".repeat(30)}tail`;
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_status_header", params: null },
+      { threadId: "thr_status_header", params: null, environment: null },
       {
         rpc: fixture({
           getWorkStatus: () => ({
@@ -170,7 +170,7 @@ describe("registered Status activity lifecycle", () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_provider_usage", params: null },
+      { threadId: "thr_provider_usage", params: null, environment: null },
       {
         rpc: fixture({
           getWorkStatus: () => baseStatus("idle"),
@@ -232,7 +232,7 @@ describe("registered Status activity lifecycle", () => {
     slot.lifecycle.rerender(
       createElement(app.threadPanelActions[0]!.component, {
         threadId: "thr_provider_usage",
-        params: null,
+        params: null, environment: null,
       }),
     );
     await waitFor(() => expect(
@@ -281,7 +281,7 @@ describe("registered Status activity lifecycle", () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_blocked", params: null },
+      { threadId: "thr_blocked", params: null, environment: null },
       {
         rpc: fixture({
           getWorkStatus: () => ({
@@ -323,7 +323,7 @@ describe("registered Status activity lifecycle", () => {
     const getWorkPlan = vi.fn(() => ({ items: [] }));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_active", params: null },
+      { threadId: "thr_active", params: null, environment: null },
       {
         rpc: fixture({
           getWorkStatus,
@@ -368,7 +368,7 @@ describe("registered Status activity lifecycle", () => {
     );
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_starting", params: null },
+      { threadId: "thr_starting", params: null, environment: null },
       {
         rpc: fixture({
           getWorkStatus: () => baseStatus("starting"),
@@ -408,7 +408,7 @@ describe("registered Status activity lifecycle", () => {
     const getWorkPlan = vi.fn(() => ({ items: [] }));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_idle", params: null },
+      { threadId: "thr_idle", params: null, environment: null },
       {
         rpc: fixture({
           getWorkStatus,
@@ -450,7 +450,7 @@ describe("registered Status activity lifecycle", () => {
     const getLatestActivity = vi.fn(() => pending);
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_pending", params: null },
+      { threadId: "thr_pending", params: null, environment: null },
       { rpc: fixture({ getLatestActivity }) },
     );
     await act(async () => {
@@ -489,7 +489,7 @@ describe("registered Status activity lifecycle", () => {
     );
     const first = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_a", params: null },
+      { threadId: "thr_a", params: null, environment: null },
       { rpc: fixture({ getLatestActivity }) },
     );
     await act(async () => {
@@ -498,7 +498,7 @@ describe("registered Status activity lifecycle", () => {
     first.lifecycle.unmount();
     const second = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_b", params: null },
+      { threadId: "thr_b", params: null, environment: null },
       { rpc: fixture({ getLatestActivity }) },
     );
     await act(async () => {
@@ -527,7 +527,7 @@ describe("registered Status activity lifecycle", () => {
     const getLatestActivity = vi.fn(() => pending);
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_collision", params: null },
+      { threadId: "thr_collision", params: null, environment: null },
       { rpc: fixture({ getLatestActivity }) },
     );
     await act(async () => {
@@ -556,7 +556,7 @@ describe("registered Status activity lifecycle", () => {
     const getLatestActivity = vi.fn(({ threadId }) => activity(threadId));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_resume", params: null },
+      { threadId: "thr_resume", params: null, environment: null },
       { rpc: fixture({ getWorkStatus, getLatestActivity }) },
     );
     await act(async () => {

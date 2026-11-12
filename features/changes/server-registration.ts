@@ -1,6 +1,7 @@
 import type { PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { rpcContract } from "../../contracts.js";
 import type { ChangesCompositionDependencies } from "../../shared/server-composition-dependencies.js";
+import { createNativeGitReader } from "../../shared/native-git-server.js";
 import {
   createChangesService,
   createWorkingTreeFileDiffReader,
@@ -42,12 +43,11 @@ export function createChangesRegistration(
   dependencies: ChangesCompositionDependencies,
 ): ChangesHandlers {
   const { bb, pullRequests } = dependencies;
+  const nativeGit = createNativeGitReader(bb);
   const fileDiff = createWorkingTreeFileDiffReader({
     getThread: async (threadId) => bb.sdk.threads.get({ threadId }),
-    diffPatch: ({ environmentId, target, paths }) =>
-      bb.sdk.environments.diffPatch({ environmentId, target, paths }),
-    diffFiles: ({ environmentId, target }) =>
-      bb.sdk.environments.diffFiles({ environmentId, target }),
+    diffPatch: nativeGit.diffPatch,
+    diffFiles: nativeGit.diffFiles,
   });
   const changes = createChangesService({
     repository: async (threadId) => {
@@ -59,10 +59,10 @@ export function createChangesRegistration(
         };
       }
       try {
-        const result = await bb.sdk.environments.status({ environmentId: thread.environmentId });
+        const result = await nativeGit.status({ environmentId: thread.environmentId });
         if (result.outcome !== "available") {
           return {
-            ...repositoryUnavailable("message" in result ? result.message : "Repository status is unavailable."),
+            ...repositoryUnavailable("message" in result ? result.message : result.failure.message),
             outcome: result.outcome,
           };
         }

@@ -244,7 +244,7 @@ async function changesSlot(fixture: ChangesFixture) {
   const app = await loadPluginApp(() => import("../../../app"));
   const slot = renderSlot(
     app.threadPanelActions[0]!,
-    { threadId: "thr_changes", params: null },
+    { threadId: "thr_changes", params: null, environment: null },
     { rpc: rpc(fixture) },
   );
   fireEvent.click(slot.getByRole("tab", { name: "Changes" }));
@@ -1262,7 +1262,7 @@ describe("R41 registered host refresh and selected head identity", () => {
       invalidateChangesRemote: vi.fn(() => { calls++; return calls === 1 ? gate.promise : { ok: true }; }) };
     const first = await changesSlot(fixture);
     const app = await loadPluginApp(() => import("../../../app"));
-    const second = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_changes", params: null }, { rpc: rpc(fixture) });
+    const second = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_changes", params: null, environment: null }, { rpc: rpc(fixture) });
     await waitFor(() => expect(getPluginQueryClient().getQueryData(changesKeys.summary("thr_changes"))).toBeTruthy());
     const event = { family: "changes", threadId: "thr_changes" };
     await first.behavior.emitRealtime("work-sidebar:changed", event);

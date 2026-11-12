@@ -28,7 +28,7 @@ async function mount(body: string, configureHost?: (host: PluginSdkApp) => void)
   let currentBody = body;
   // The SDK harness projects the registered thread tab to this typed alias.
   const slot = renderSlot(app.threadPanelActions.find((tab) => tab.id === "work-context")!, {
-    threadId: message.threadId, params: null,
+    threadId: message.threadId, params: null, environment: null,
   }, {
     rpc: {
       sidebarTasks: () => ({ available: true, tasks: [], projects: [], error: null }),

@@ -34,7 +34,6 @@ function thread(
       backgroundAgents: 0,
       backgroundCommands: 0,
       planMode: 0,
-      goals: 0,
     },
     indicator: "none",
     indicatorLabel: null,
@@ -223,9 +222,9 @@ describe("R18 registered left sidebar parity", () => {
     try {
       const goal = thread("thr_goal", "Goal thread");
       Object.assign(goal, {
-        indicator: "goal",
+        indicator: "runtime",
         indicatorLabel: "Goal active",
-        activity: { ...goal.activity, goals: 1 },
+        activity: { ...goal.activity },
         createdAt: now - 15 * 60_000,
         updatedAt: now - 15 * 60_000,
         latestAttentionAt: now - 15 * 60_000,
@@ -376,6 +375,7 @@ describe("R18 registered left sidebar parity", () => {
           available: true,
           threads: [
             {
+              parentNotifications: "stuck" as const,
               id: "thr_archived",
               projectId: project.id,
               title: "Archived gamma",
@@ -1314,6 +1314,26 @@ describe("R18 registered left sidebar parity", () => {
     restored.lifecycle.unmount();
   });
 
+  it.each([["Archive", "archive"], ["Recycle Bin", "recycle-bin"]])("persists opening default-closed %s without initial toggle writes", async (label, key) => {
+    let disclosures: Record<string, boolean> = {};
+    const getThreadGroups = () => ({ groups: [], disclosures });
+    const saveThreadGroups = vi.fn((next: { groups: unknown[]; disclosures?: Record<string, boolean> }) => {
+      disclosures = next.disclosures ?? {};
+      return { ...next, disclosures };
+    });
+    const first = await leftSlot({ rpc: { getThreadGroups, saveThreadGroups } });
+    const section = await first.findByText(label, { exact: true });
+    expect(section.closest("details")?.open).toBe(false);
+    expect(saveThreadGroups).not.toHaveBeenCalled();
+    fireEvent.click(section);
+    await waitFor(() => expect(saveThreadGroups).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ disclosures: { [key]: true } })));
+    first.lifecycle.unmount();
+    const restored = await leftSlot({ rpc: { getThreadGroups, saveThreadGroups } });
+    await waitFor(() => expect(restored.getByText(label, { exact: true }).closest("details")?.open).toBe(true));
+    expect(saveThreadGroups).toHaveBeenCalledOnce();
+    restored.lifecycle.unmount();
+  });
+
   it("keeps the Later default editable only while empty and exposes a dismissible settings dialog", async () => {
     const saveGroups = vi.fn(({ groups }: { groups: unknown[] }) => ({
       groups,
@@ -1471,6 +1491,7 @@ describe("R18 registered left sidebar parity", () => {
           error: null,
           threads: [
             {
+              parentNotifications: "stuck" as const,
               id: "thr_archived",
               projectId: project.id,
               title: "Archived thread",
@@ -1487,6 +1508,7 @@ describe("R18 registered left sidebar parity", () => {
               archivedAt,
             },
             {
+              parentNotifications: "stuck" as const,
               id: "thr_archived_worktree",
               projectId: project.id,
               title: "Archived worktree thread",
@@ -2005,7 +2027,8 @@ describe("R18 registered left sidebar parity", () => {
     });
 
     await slot.findByRole("link", { name: /Parent/ });
-    await waitFor(() => expect(saveThreadGroups).toHaveBeenCalledTimes(1));
+    await slot.findByText("Later", { exact: true });
+    expect(saveThreadGroups).not.toHaveBeenCalled();
     saveThreadGroups.mockClear();
     saveThreadGroups.mockImplementation(() => saved.promise);
     const parent = slot.getByRole("link", { name: /Parent/ });

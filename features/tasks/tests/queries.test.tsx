@@ -186,7 +186,7 @@ describe("Tasks read slots", () => {
     });
     const captured = await app();
     const slot = renderSlot(captured.threadPanelActions[0]!,
-      { threadId: "thr_test", params: null }, { rpc: rpcFixtures(calls) },
+      { threadId: "thr_test", params: null, environment: null }, { rpc: rpcFixtures(calls) },
     );
     await slot.findByText("Loading completed tasks…");
     await slot.findByText(agent.title);
@@ -218,7 +218,7 @@ describe("Tasks read slots", () => {
     expect(client.getQueryData<TaskFactDirectory>(queryKeys.sidebar.tasks.facts(null))?.facts.done).toMatchObject({ assignee: "agent", status: "done" });
     expect(client.getQueryCache().find({ queryKey: historyKey, exact: true })?.gcTime).toBe(queryPolicies.sidebarTasksList.gcTime);
     const otherSlot = renderSlot(captured.threadPanelActions[0]!,
-      { threadId: "thr_other", params: null },
+      { threadId: "thr_other", params: null, environment: null },
       { rpc: rpcFixtures(calls), context: { threadId: "thr_other" } },
     );
     const otherView = within(otherSlot.container);
@@ -329,7 +329,7 @@ describe("Tasks read slots", () => {
     const captured = await app();
     const loading = renderSlot(
       captured.threadPanelActions[0]!,
-      { threadId: "thr_test", params: null },
+      { threadId: "thr_test", params: null, environment: null },
       { rpc: rpcFixtures(() => pending) },
     );
     await waitFor(() =>
@@ -350,7 +350,7 @@ describe("Tasks read slots", () => {
 
     const populated = renderSlot(
       captured.threadPanelActions[0]!,
-      { threadId: "thr_test", params: null },
+      { threadId: "thr_test", params: null, environment: null },
       { rpc: rpcFixtures(() => populatedTasks) },
     );
     await waitFor(() =>
@@ -371,7 +371,7 @@ describe("Tasks read slots", () => {
       .mockReturnValueOnce(emptyTasks);
     const retry = renderSlot(
       captured.threadPanelActions[0]!,
-      { threadId: "thr_test", params: null },
+      { threadId: "thr_test", params: null, environment: null },
       { rpc: rpcFixtures((input) => input ? emptyTasks : failing(input)) },
     );
     await waitFor(
@@ -415,7 +415,7 @@ describe("Tasks read slots", () => {
     const left = renderSlot(captured.threadLists[0]!, leftProps(), { rpc });
     const right = renderSlot(
       captured.threadPanelActions[0]!,
-      { threadId: "thr_test", params: null },
+      { threadId: "thr_test", params: null, environment: null },
       { rpc },
     );
     await vi.advanceTimersByTimeAsync(0);
@@ -505,7 +505,7 @@ describe("Tasks read slots", () => {
 
     const right = renderSlot(captured.threadPanelActions[0]!, {
       threadId: "thr_test",
-      params: null,
+      params: null, environment: null,
     }, {
       rpc,
       context: { projectId, threadId: "thr_test" },

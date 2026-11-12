@@ -98,6 +98,12 @@ remain BB-owned. Shared search, modifier selection, rename text selection,
 shortcut attributes and BB-owned recursive archive/delete confirmation remain
 required behavior on the enhanced list.
 
+Active and custom groups default open; Archive and Recycle Bin default closed.
+Only a change from that section's effective saved state persists a disclosure.
+Initial native toggle events caused by applying controlled open props do not
+write preferences or race another group mutation. Search expansion remains
+temporary and does not change saved disclosure state.
+
 ## Recycle Bin and archive
 
 Recycle Bin is reversible plugin filing: record the previous group and entry

@@ -17,36 +17,37 @@ const packageLock = JSON.parse(readFileSync(resolve(repositoryRoot, "package-loc
 const rootLockPackage = packageLock.packages[""]!;
 
 const hostShims = {
-  "@pierre/diffs": "1.2.9",
-  "@radix-ui/react-alert-dialog": "1.1.19",
-  "@radix-ui/react-context-menu": "2.3.3",
-  "@radix-ui/react-dialog": "1.1.19",
-  "@radix-ui/react-dropdown-menu": "2.1.20",
-  "@radix-ui/react-hover-card": "1.1.19",
-  "@radix-ui/react-menubar": "1.1.20",
-  "@radix-ui/react-navigation-menu": "1.2.18",
-  "@radix-ui/react-popover": "1.1.19",
-  "@radix-ui/react-select": "2.3.3",
-  "@radix-ui/react-tooltip": "1.2.12",
+  "@pierre/diffs": "1.2.12",
+  "@radix-ui/react-alert-dialog": "1.2.1",
+  "@radix-ui/react-context-menu": "2.4.1",
+  "@radix-ui/react-dialog": "1.3.1",
+  "@radix-ui/react-dropdown-menu": "2.2.1",
+  "@radix-ui/react-hover-card": "1.2.1",
+  "@radix-ui/react-menubar": "1.2.1",
+  "@radix-ui/react-navigation-menu": "1.4.1",
+  "@radix-ui/react-popover": "1.3.1",
+  "@radix-ui/react-select": "2.4.1",
+  "@radix-ui/react-tooltip": "1.4.1",
   "class-variance-authority": "0.7.1",
   clsx: "2.1.1",
   sonner: "1.7.4",
-  "tailwind-merge": "3.4.0",
+  "tailwind-merge": "3.7.0",
   vaul: "1.1.2",
-  react: "19.2.4",
-  "react-dom": "19.2.4",
+  react: "19.3.1",
+  "react-dom": "19.3.1",
 } as const;
 
 describe("R1 package and compile boundary", () => {
   it("pins the SDK and keeps host shims out of the plugin bundle", () => {
-    expect(packageJson.engines?.bb).toBe(">=0.47.1");
-    expect(packageJson.engines?.bbPluginSdk).toBe(">=0.6.79");
-    expect(packageJson.devDependencies?.["@get-bb/plugin-sdk"]).toBe("0.6.79");
+    expect(packageJson.engines?.bb).toBe(">=0.49.0");
+    expect(packageJson.engines?.bbPluginSdk).toBe(">=0.6.132");
+    expect(packageJson.devDependencies?.["@get-bb/plugin-sdk"]).toBe("0.6.132");
     expect(packageJson.dependencies?.["@get-bb/plugin-sdk"]).toBeUndefined();
     expect(rootLockPackage.engines).toEqual(packageJson.engines);
 
     for (const [name, version] of Object.entries(hostShims)) {
-      const specifier = name === "react" || name === "react-dom" ? version : `^${version}`;
+      const specifier = name === "react" || name === "react-dom" ? version
+        : name === "@pierre/diffs" ? `~${version}` : `^${version}`;
       expect(packageJson.devDependencies?.[name], `${name} must use the host's required devDependency specifier`).toBe(specifier);
       expect(packageJson.dependencies?.[name], `${name} must not be bundled`).toBeUndefined();
       expect(rootLockPackage.devDependencies?.[name]).toBe(specifier);
@@ -54,17 +55,24 @@ describe("R1 package and compile boundary", () => {
       expect(packageLock.packages[`node_modules/${name}`]?.version).toBe(version);
     }
 
-    expect(packageJson.devDependencies?.react).toBe("19.2.4");
+    expect(packageJson.devDependencies?.react).toBe("19.3.1");
     expect(packageJson.dependencies?.react).toBeUndefined();
-    expect(packageJson.devDependencies?.["react-dom"]).toBe("19.2.4");
+    expect(packageJson.devDependencies?.["react-dom"]).toBe("19.3.1");
     expect(packageJson.dependencies?.["react-dom"]).toBeUndefined();
     expect(packageJson.devDependencies?.["@testing-library/react"]).toBeDefined();
     expect(packageJson.devDependencies?.["better-sqlite3"]).toBeDefined();
     expect(packageJson.devDependencies?.["jsdom"]).toBeDefined();
     expect(packageJson.devDependencies?.["axe-core"]).toBe("^4.13.0");
     expect(packageJson.devDependencies?.["vitest-axe"]).toBe("^0.1.0");
-    expect(packageJson.dependencies?.["@tanstack/react-query"]).toBeDefined();
+    expect(packageJson.dependencies?.["@tanstack/react-query"]).toBe("^5.106.1");
+    expect(packageLock.packages["node_modules/@tanstack/react-query"]?.version).toBe("5.106.1");
+    expect(packageLock.packages["node_modules/@get-bb/plugin-sdk/node_modules/@tanstack/react-query"]).toBeUndefined();
+    expect(packageLock.packages["node_modules/@get-bb/plugin-sdk/node_modules/zod"]).toBeUndefined();
     expect(packageJson.dependencies?.zustand).toBeDefined();
+    expect(packageJson.dependencies?.zod).toBe("4.6.7");
+    expect(packageLock.packages["node_modules/zod"]?.version).toBe("4.6.7");
+    expect(packageJson.devDependencies?.["@types/react"]).toBe("19.3.0");
+    expect(packageJson.devDependencies?.["@types/react-dom"]).toBe("19.3.0");
     expect(packageJson.devDependencies?.["@tanstack/react-query"]).toBeUndefined();
     expect(packageJson.devDependencies?.zustand).toBeUndefined();
 

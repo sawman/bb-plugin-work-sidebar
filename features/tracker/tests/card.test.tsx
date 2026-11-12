@@ -196,7 +196,7 @@ describe("registered tracker card", () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_multi_tracker", params: null },
+      { threadId: "thr_multi_tracker", params: null, environment: null },
       {
         rpc: fixture({
           getWorkTracker: () => multiLinked,
@@ -217,7 +217,7 @@ describe("registered tracker card", () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_populated_tracker", params: null },
+      { threadId: "thr_populated_tracker", params: null, environment: null },
       { rpc: fixture() },
     );
     fireEvent.focus(await openLinearSearch(slot));
@@ -232,7 +232,7 @@ describe("registered tracker card", () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_empty_tracker", params: null },
+      { threadId: "thr_empty_tracker", params: null, environment: null },
       { rpc: fixture({ getWorkTracker: () => ({ ...unlinked, suggestions: [] }) }) },
     );
     fireEvent.focus(await openLinearSearch(slot));
@@ -248,7 +248,7 @@ describe("registered tracker card", () => {
     const searchLinearIssues = vi.fn(() => ({ items: [] }));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_tracker", params: null },
+      { threadId: "thr_tracker", params: null, environment: null },
       { rpc: fixture({ getWorkTracker, searchLinearIssues }) },
     );
     await waitFor(() => expect(getWorkTracker).toHaveBeenCalledTimes(1));
@@ -281,7 +281,7 @@ describe("registered tracker card", () => {
       getPluginQueryClient().clear();
       const slot = renderSlot(
         app.threadPanelActions[0]!,
-        { threadId: `thr_${Math.random()}`, params: null },
+        { threadId: `thr_${Math.random()}`, params: null, environment: null },
         { rpc: fixture({ getWorkTracker: () => result as never }) },
       );
       await waitFor(() => expect(slot.getByText("Status")).toBeTruthy());
@@ -306,7 +306,7 @@ describe("registered tracker card", () => {
       }
       return retryAttempt.promise;
     });
-    const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_tracker_error", params: null }, {
+    const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_tracker_error", params: null, environment: null }, {
       rpc: fixture({
         getWorkTracker,
         getWorkOutcome: () => ({ rootThreadId: "thr_tracker_error", tasksAvailable: true, outcome: { id: "task_1", projectId: "project", projectName: "Work", key: "WORK-1", title: "Keep outcome", status: "todo", priority: "none", dueDate: null, parentTaskId: null, position: 1 }, executionTasks: [], bindings: [], legacy: { state: "none", taskIds: [], message: null } }),
@@ -337,7 +337,7 @@ describe("registered tracker card", () => {
     const getWorkTracker = vi.fn(() => unlinked);
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_mutate", params: null },
+      { threadId: "thr_mutate", params: null, environment: null },
       { rpc: fixture({ getWorkTracker, linkLinearIssue }) },
     );
     fireEvent.focus(await openLinearSearch(slot));
@@ -379,7 +379,7 @@ describe("registered tracker card", () => {
     toast.error.mockImplementation((message: string) => events.push(`error:${message}`));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_linear_backlog_toasts", params: null },
+      { threadId: "thr_linear_backlog_toasts", params: null, environment: null },
       { rpc: fixture({ linkLinearIssue, saveWorkItemQueue }) },
     );
 
@@ -397,7 +397,7 @@ describe("registered tracker card", () => {
   it("creates the BB outcome from the primary Linear issue with the mapped priority", async () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const createWorkTask = vi.fn(() => ({ task: {} } as never));
-    const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_linear_only", params: null }, {
+    const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_linear_only", params: null, environment: null }, {
       rpc: fixture({
         getWorkTracker: () => ({ ...linked, primaryKey: "LIN-1", items: [{ ...linked.items[0], item: { ...linked.items[0].item, priority: "High" } }] }),
         createWorkTask,
@@ -420,7 +420,7 @@ describe("registered tracker card", () => {
       queue: { current: null; backlog: [] };
     }>();
     const saveWorkItemQueue = vi.fn(() => queue.promise);
-    const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_primary", params: null }, {
+    const slot = renderSlot(app.threadPanelActions[0]!, { threadId: "thr_primary", params: null, environment: null }, {
       rpc: fixture({ getWorkTracker: () => ({ ...multiLinked, primaryKey: "LIN-1" }), saveWorkItemQueue }),
     });
     const makeCurrent = await slot.findAllByRole("button", { name: "Make current" });
@@ -451,7 +451,7 @@ describe("registered tracker card", () => {
     const getWorkTracker = vi.fn(() => linked);
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_linked", params: null },
+      { threadId: "thr_linked", params: null, environment: null },
       {
         rpc: fixture({
           getWorkTracker,
@@ -497,7 +497,7 @@ describe("registered tracker card", () => {
     const getWorkTracker = vi.fn(() => unlinked);
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_realtime", params: null },
+      { threadId: "thr_realtime", params: null, environment: null },
       { rpc: fixture({ getWorkTracker }) },
     );
     await waitFor(() => expect(getWorkTracker).toHaveBeenCalledTimes(1));
@@ -516,7 +516,7 @@ describe("registered tracker card", () => {
     const threadId = "thr_inactive_tracker";
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId, params: null },
+      { threadId, params: null, environment: null },
       { rpc: fixture({ getWorkTracker }) },
     );
     const key = ["work-sidebar", "tracker", "context", threadId];
@@ -557,7 +557,7 @@ describe("registered tracker card", () => {
       });
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_search", params: null },
+      { threadId: "thr_search", params: null, environment: null },
       { rpc: fixture({ searchLinearIssues }) },
     );
     fireEvent.change(await openLinearSearch(slot), {
@@ -592,7 +592,7 @@ describe("registered tracker card", () => {
     });
     slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_collision", params: null },
+      { threadId: "thr_collision", params: null, environment: null },
       { rpc: fixture({ getWorkTracker, updateLinearIssueStatus }) },
     );
     await waitFor(() =>

@@ -179,7 +179,7 @@ describe("registered Work context cards", () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({
           sidebarTasks: () => ({
@@ -259,7 +259,7 @@ describe("registered Work context cards", () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({
           getWorkOutcome: () => populatedOutcome,
@@ -304,7 +304,7 @@ describe("registered Work context cards", () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       { rpc: fixture() },
     );
 
@@ -336,7 +336,7 @@ describe("registered Work context cards", () => {
       .mockRejectedValue(new Error("outcome unavailable"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       { rpc: fixture({ getWorkOutcome: failedOutcome }) },
     );
     await waitFor(
@@ -360,7 +360,7 @@ describe("registered Work context cards", () => {
     const getWorkBackgroundJobs = vi.fn(() => ({ items: [] }));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({
           getWorkStatus,
@@ -399,7 +399,7 @@ describe("registered Work context cards", () => {
     }));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_cadence", params: null },
+      { threadId: "thr_cadence", params: null, environment: null },
       {
         rpc: fixture({
           getWorkStatus: () => ({
@@ -459,7 +459,7 @@ describe("registered Work context cards", () => {
     const getWorkBackgroundJobs = vi.fn(() => ({ items: [] }));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({
           getWorkStatus,
@@ -507,7 +507,7 @@ describe("registered Work context cards", () => {
     const siblingStatus = { ...status, rootThreadId: "thr_root" };
     const root = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_root", params: null },
+      { threadId: "thr_root", params: null, environment: null },
       {
         rpc: fixture({
           getWorkStatus: () => rootStatus,
@@ -517,7 +517,7 @@ describe("registered Work context cards", () => {
     );
     const child = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_child", params: null },
+      { threadId: "thr_child", params: null, environment: null },
       {
         rpc: fixture({
           getWorkStatus: () => childStatus,
@@ -527,7 +527,7 @@ describe("registered Work context cards", () => {
     );
     const sibling = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_sibling", params: null },
+      { threadId: "thr_sibling", params: null, environment: null },
       {
         rpc: fixture({
           getWorkStatus: () => siblingStatus,
@@ -607,7 +607,7 @@ describe("registered Work context cards", () => {
     const getWorkPlan = vi.fn(() => ({ items: [] }));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_a", params: null },
+      { threadId: "thr_a", params: null, environment: null },
       { rpc: fixture({ getWorkStatus, getWorkPlan }) },
     );
     try {
@@ -617,7 +617,7 @@ describe("registered Work context cards", () => {
       slot.lifecycle.rerender(
         createElement(app.threadPanelActions[0]!.component, {
           threadId: "thr_b",
-          params: null,
+          params: null, environment: null,
         }),
       );
       await waitFor(() =>
@@ -659,7 +659,7 @@ describe("registered Work context cards", () => {
     const getWorkPlan = vi.fn(() => ({ items: [] }));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       { rpc: fixture({ getWorkStatus, getWorkPlan }) },
     );
     try {
@@ -685,7 +685,7 @@ describe("registered Work context cards", () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({
           sidebarTasks: () => ({
@@ -782,7 +782,7 @@ describe("registered Work context cards", () => {
     }));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({
           sidebarTasks: () => ({
@@ -987,7 +987,7 @@ describe("registered Work context cards", () => {
     });
     const root = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_root", params: null },
+      { threadId: "thr_root", params: null, environment: null },
       {
         rpc: fixture({
           sidebarTasks,
@@ -1007,7 +1007,7 @@ describe("registered Work context cards", () => {
 
     const child = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_child", params: null },
+      { threadId: "thr_child", params: null, environment: null },
       {
         rpc: fixture({
           sidebarTasks,
@@ -1080,7 +1080,7 @@ describe("registered Work context cards", () => {
     const adoptLegacyOutcome = vi.fn(() => pendingAdoption);
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       { rpc: fixture({ getWorkOutcome, adoptLegacyOutcome }) },
     );
     await waitFor(() =>
@@ -1118,7 +1118,7 @@ describe("registered Work context cards", () => {
 
     const rejected = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({
           getWorkOutcome: () => ({
@@ -1160,7 +1160,7 @@ describe("registered Work context cards", () => {
 
     const unsafe = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({
           getWorkOutcome: () => ({
@@ -1190,7 +1190,7 @@ describe("registered Work context cards", () => {
 
     const mismatch = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({
           getWorkOutcome: () => ({
@@ -1229,7 +1229,7 @@ describe("registered Work context cards", () => {
     );
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({
           updateTaskStatus,
@@ -1288,7 +1288,7 @@ describe("registered Work context cards", () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({
           getWorkOutcome: () => populatedOutcome,
@@ -1327,14 +1327,14 @@ describe("registered Work context cards", () => {
     }));
     const first = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_a", params: null },
+      { threadId: "thr_a", params: null, environment: null },
       { rpc: fixture({ getWorkStatus, getLatestActivity }) },
     );
     await waitFor(() => expect(first.getByText("activity thr_a")).toBeTruthy());
     first.lifecycle.unmount();
     const second = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_b", params: null },
+      { threadId: "thr_b", params: null, environment: null },
       { rpc: fixture({ getWorkStatus, getLatestActivity }) },
     );
     await waitFor(() =>
@@ -1343,7 +1343,7 @@ describe("registered Work context cards", () => {
     second.lifecycle.unmount();
     const returned = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_a", params: null },
+      { threadId: "thr_a", params: null, environment: null },
       { rpc: fixture({ getWorkStatus, getLatestActivity }) },
     );
     expect(returned.getByText("activity thr_a")).toBeTruthy();
@@ -1415,7 +1415,7 @@ describe("registered Work context cards", () => {
     };
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({
           sidebarTasks: () => ({
@@ -1599,7 +1599,7 @@ describe("registered Work context cards", () => {
     });
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({
           sidebarTasks: () => ({
@@ -1664,7 +1664,7 @@ describe("registered Work context cards", () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({
           getWorkGoal: () => ({
@@ -1758,7 +1758,7 @@ describe("registered Work context cards", () => {
     }));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({
           sidebarTasks: () => ({
@@ -1872,7 +1872,7 @@ describe("registered Work context cards", () => {
     const attachTaskToThread = vi.fn(() => ({ threadId: "thr_one" }));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({
           sidebarTasks: () => ({
@@ -1948,7 +1948,7 @@ describe("registered Work context cards", () => {
     }));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({ createWorkTask, saveWorkItemQueue }),
       },
@@ -1982,7 +1982,7 @@ describe("registered Work context cards", () => {
     }));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       {
         rpc: fixture({
           sidebarTasks: () => ({
@@ -2036,12 +2036,12 @@ describe("registered Work context cards", () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const first = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_one", params: null },
+      { threadId: "thr_one", params: null, environment: null },
       { rpc: fixture() },
     );
     const second = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_two", params: null },
+      { threadId: "thr_two", params: null, environment: null },
       { rpc: fixture() },
     );
     await waitFor(() =>

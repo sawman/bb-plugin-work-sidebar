@@ -15,18 +15,18 @@ export type ChangesServiceDependencies = {
 };
 
 type WorkingTreePatchResult =
-  | { outcome: "available"; patches: Array<{ path: string; patch: string }> }
+  | { outcome: "available"; patch: { path: string; patch: string; truncated: boolean } }
   | { outcome: "not_applicable"; message: string }
   | { outcome: "unavailable"; failure: { message: string } };
 
 type WorkingTreeFilesResult =
-  | { outcome: "available"; files: Array<{ path: string; binary: boolean }> }
+  | { outcome: "available"; files: Array<{ path: string; binary: boolean; revision: string }>; initialPatches: Array<{ path: string; patch: string; truncated: boolean }>; truncated: boolean }
   | { outcome: "not_applicable"; message: string }
   | { outcome: "unavailable"; failure: { message: string } };
 
 export type WorkingTreeFileDiffReaderDependencies = {
   getThread(threadId: string): Promise<{ environmentId: string | null | undefined }>;
-  diffPatch(input: { environmentId: string; target: { type: "uncommitted" }; paths: string[] }): Promise<WorkingTreePatchResult>;
+  diffPatch(input: { environmentId: string; path: string; revision: string }): Promise<WorkingTreePatchResult>;
   diffFiles(input: { environmentId: string; target: "uncommitted" }): Promise<WorkingTreeFilesResult>;
 };
 
@@ -37,15 +37,23 @@ export function createWorkingTreeFileDiffReader(dependencies: WorkingTreeFileDif
       const thread = await dependencies.getThread(threadId);
       if (!thread.environmentId)
         return { kind: "unavailable", path, patch: null, message: "This thread has no workspace." };
-      const [patchResult, filesResult] = await Promise.all([
-        dependencies.diffPatch({ environmentId: thread.environmentId, target: { type: "uncommitted" }, paths: [path] }),
-        dependencies.diffFiles({ environmentId: thread.environmentId, target: "uncommitted" }),
-      ]);
+      const filesResult = await dependencies.diffFiles({ environmentId: thread.environmentId, target: "uncommitted" });
+      if (filesResult.outcome !== "available")
+        return { kind: "unavailable", path, patch: null, message: "message" in filesResult ? filesResult.message : filesResult.failure.message };
+      const file = filesResult.files.find((entry) => entry.path === path);
+      if (!file)
+        return { kind: filesResult.truncated ? "unavailable" : "absent", path, patch: null, message: "No diff is available for this file." };
+      if (file.binary)
+        return { kind: "binary", path, patch: null, message: "This binary file cannot be shown as a text diff." };
+      const initialPatch = filesResult.initialPatches.find((entry) => entry.path === path);
+      const patchResult = initialPatch
+        ? { outcome: "available" as const, patch: initialPatch }
+        : await dependencies.diffPatch({ environmentId: thread.environmentId, path, revision: file.revision });
       if (patchResult.outcome !== "available")
         return { kind: "unavailable", path, patch: null, message: "message" in patchResult ? patchResult.message : patchResult.failure.message };
-      if (filesResult.outcome === "available" && filesResult.files.find((file) => file.path === path)?.binary)
-        return { kind: "binary", path, patch: null, message: "This binary file cannot be shown as a text diff." };
-      const patch = patchResult.patches.find((entry) => entry.path === path)?.patch ?? null;
+      if (patchResult.patch.truncated)
+        return { kind: "unavailable", path, patch: null, message: "This file's diff is incomplete because it exceeds the host limit." };
+      const patch = patchResult.patch.patch;
       return patch
         ? { kind: "patch", path, patch, message: null }
         : { kind: "absent", path, patch: null, message: "No diff is available for this file." };

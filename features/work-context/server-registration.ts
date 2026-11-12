@@ -208,13 +208,7 @@ export function createWorkContextRegistration(
         ...executions.map(tasks.summarize),
       ],
       legacy: snapshot.legacy,
-      goal: timeline.goal ? {
-        objective: timeline.goal.objective,
-        status: timeline.goal.status,
-        tokensUsed: timeline.goal.tokensUsed,
-        tokenBudget: timeline.goal.tokenBudget,
-        timeUsedSeconds: timeline.goal.timeUsedSeconds,
-      } : null,
+      goal: selectWorkGoal(timeline),
       todos: timeline.pendingTodos?.items ?? [],
       children: children.map(({ thread: child, depth }) => ({
         id: child.id,

@@ -1,10 +1,8 @@
 import {
   definePluginApp,
-  useBbNavigate,
   useComposer,
   useRpc,
 } from "@get-bb/plugin-sdk/app";
-import type { PluginThreadHeaderActionProps } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import type { rpcContract } from "./contracts";
 import "./app.css";
@@ -13,30 +11,10 @@ import "./views.css";
 import { WorkThreadList } from "./features/threads/left-sidebar";
 import { SidebarAppearanceSettings } from "./features/threads/sidebar-appearance-settings";
 import { WorkPanel } from "./features/work-context/panel";
+import { workHeaderAction } from "./features/work-context/header-action";
 import { withPluginProviders } from "./query-runtime";
 import { ActionTooltip } from "./components/ui/action-tooltip";
 import { SettingsCard, SettingsGroup } from "./components/ui/settings";
-
-function WorkContextHeaderAction({
-  isCompactViewport,
-}: PluginThreadHeaderActionProps) {
-  const navigate = useBbNavigate();
-  return (
-    <ActionTooltip label="Open Work">
-      {(tooltipId) => <button
-      type="button"
-      className="ws-header-action"
-      aria-label="Open Work"
-      aria-describedby={tooltipId}
-      onClick={() => {
-        navigate.openThreadPanel({ actionId: "work-context" });
-      }}
-    >
-      {isCompactViewport ? "▣" : "Work"}
-      </button>}
-    </ActionTooltip>
-  );
-}
 
 function OptionalIntegrationsSettings() {
   return (
@@ -124,11 +102,7 @@ export default definePluginApp((app) => {
     component: withPluginProviders(WorkPanel),
     layout: "flush",
   });
-  app.slots.experimental_threadHeaderAction({
-    id: "work-context-header",
-    title: "Work",
-    component: withPluginProviders(WorkContextHeaderAction),
-  });
+  app.slots.experimental_threadAction(workHeaderAction);
   app.composer.customize({
     id: "task-first",
     scopes: ["thread"],

@@ -391,24 +391,6 @@
   outline: 2px solid var(--ring);
   outline-offset: -2px;
 }
-.ws-header-action {
-  height: 1.75rem;
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 3px);
-  padding: 0 0.45rem;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font: var(--ws-text-subtext);
-  line-height: inherit;
-}
-.ws-header-action:hover {
-  background: var(--accent);
-}
-.ws-header-action:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 1px;
-}
 .ws-card-meta {
   display: flex;
   flex-wrap: wrap;

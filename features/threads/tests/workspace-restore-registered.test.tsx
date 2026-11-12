@@ -34,6 +34,7 @@ async function registeredList({
 }: { get?: ReturnType<typeof vi.fn>; restore?: ReturnType<typeof vi.fn>; archived?: boolean; nativeDisabled?: boolean } = {}) {
   const app = await loadPluginApp(() => import("../../../app"));
   const archivedRow = {
+    parentNotifications: "stuck" as const,
     id: threadId, projectId: "project", parentThreadId: null, title: "Restore me",
     titleFallback: null, providerId: "codex", environmentBranchName: "feature/restore",
     environmentName: "Old worktree", environmentWorkspaceDisplayKind: "managed-worktree",

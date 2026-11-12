@@ -41,12 +41,12 @@ function deferred<T>() {
 async function mount(storagePaths = vi.fn().mockResolvedValue(listing()), threadId = "thr_a") {
   threadInteractionStore.getState().setWorkTab(threadId, "work");
   const app = await loadPluginApp(() => import("../../../app"));
-  const slot = renderSlot(app.threadPanelActions[0]!, { threadId, params: null }, {
+  const slot = renderSlot(app.threadPanelActions[0]!, { threadId, params: null, environment: null }, {
     pluginId: "work-sidebar",
     rpc: fixture,
     sdk: { threads: { storagePaths } },
   });
-  const switchThread = (next: string) => slot.lifecycle.rerender(createElement(app.threadPanelActions[0]!.component, { threadId: next, params: null }));
+  const switchThread = (next: string) => slot.lifecycle.rerender(createElement(app.threadPanelActions[0]!.component, { threadId: next, params: null, environment: null }));
   const toggle = () => fireEvent.click(slot.getByRole("button", { name: "Thread storage" }));
   return { slot, storagePaths, switchThread, toggle };
 }

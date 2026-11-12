@@ -30,7 +30,6 @@ function thread(
       backgroundAgents: 0,
       backgroundCommands: 0,
       planMode: 0,
-      goals: 0,
     },
     indicator: "none",
     indicatorLabel: null,
@@ -76,18 +75,18 @@ describe("Agents projection model", () => {
   });
 
   it("maps goal, background, workflow, plan, and runtime host signals to working", () => {
-    expect(agentRuntimePresentation(thread("thr_goal", "thr_root", { indicator: "goal" }))).toEqual({ label: "Working", tone: "working" });
+    expect(agentRuntimePresentation(thread("thr_goal", "thr_root", { indicator: "runtime" }))).toEqual({ label: "Working", tone: "working" });
     expect(agentRuntimePresentation(thread("thr_background", "thr_root", { indicator: "background-agent" }))).toEqual({ label: "Working", tone: "working" });
     expect(agentRuntimePresentation(thread("thr_background_command", "thr_root", { indicator: "background-command" }))).toEqual({ label: "Working", tone: "working" });
     expect(agentRuntimePresentation(thread("thr_workflow", "thr_root", { indicator: "workflow" }))).toEqual({ label: "Working", tone: "working" });
     expect(agentRuntimePresentation(thread("thr_plan", "thr_root", { indicator: "plan-mode" }))).toEqual({ label: "Working", tone: "working" });
     expect(agentRuntimePresentation(thread("thr_runtime", "thr_root", { indicator: "runtime" }))).toEqual({ label: "Working", tone: "working" });
-    expect(agentRuntimePresentation(thread("thr_counted", "thr_root", { activity: { workflows: 0, backgroundAgents: 0, backgroundCommands: 0, planMode: 0, goals: 1 } }))).toEqual({ label: "Working", tone: "working" });
+    expect(agentRuntimePresentation(thread("thr_counted", "thr_root", { activity: { workflows: 0, backgroundAgents: 1, backgroundCommands: 0, planMode: 0 } }))).toEqual({ label: "Working", tone: "working" });
   });
 
   it("gives error and waiting signals precedence over active counts", () => {
-    expect(agentRuntimePresentation(thread("thr_error", "thr_root", { indicator: "unread-error", hasPendingInteraction: true, activity: { workflows: 1, backgroundAgents: 1, backgroundCommands: 0, planMode: 0, goals: 0 } }))).toEqual({ label: "Blocked", tone: "blocked" });
-    expect(agentRuntimePresentation(thread("thr_waiting", "thr_root", { indicator: "waiting-for-input", activity: { workflows: 1, backgroundAgents: 1, backgroundCommands: 0, planMode: 0, goals: 0 } }))).toEqual({ label: "Waiting", tone: "waiting" });
+    expect(agentRuntimePresentation(thread("thr_error", "thr_root", { indicator: "unread-error", hasPendingInteraction: true, activity: { workflows: 1, backgroundAgents: 1, backgroundCommands: 0, planMode: 0 } }))).toEqual({ label: "Blocked", tone: "blocked" });
+    expect(agentRuntimePresentation(thread("thr_waiting", "thr_root", { indicator: "waiting-for-input", activity: { workflows: 1, backgroundAgents: 1, backgroundCommands: 0, planMode: 0 } }))).toEqual({ label: "Waiting", tone: "waiting" });
     expect(agentRuntimePresentation(thread("thr_complete", "thr_root", { indicator: "unread-success" }))).toEqual({ label: "Complete", tone: "complete" });
   });
 

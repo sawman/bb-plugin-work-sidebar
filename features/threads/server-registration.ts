@@ -6,6 +6,7 @@ import { createSdkThreadHierarchyService, type WorkBindingReader } from "./hiera
 import { registerThreadSettings } from "./settings-registration.js";
 import { createQueuedMessageRegistration } from "./queued-messages-server.js";
 import { createBranchDivergenceReader } from "./branch-divergence-server.js";
+import { createNativeGitReader } from "../../shared/native-git-server.js";
 type ThreadHandlers = Pick<
   PluginRpcHandlers<typeof rpcContract>,
   "sidebarBranchDivergence" | "sidebarQueuedMessages" | "getSidebarOrder" | "saveSiblingOrder"
@@ -20,7 +21,7 @@ export function createThreadRegistration(bb: BbPluginApi, work: WorkBindingReade
   const preferences = createThreadPreferencesService({ get: (key) => bb.storage.kv.get<unknown>(key), set: (key, value) => bb.storage.kv.set(key, value), publish: (channel, payload) => bb.realtime.publish(channel, payload) });
   const hierarchy = createSdkThreadHierarchyService(bb, work, preferences);
   const queuedMessages = createQueuedMessageRegistration(bb);
-  const branchDivergence = createBranchDivergenceReader(bb.sdk.environments);
+  const branchDivergence = createBranchDivergenceReader(createNativeGitReader(bb));
   return {
     async sidebarBranchDivergence({ targets }) { return { divergences: await branchDivergence(targets) }; },
     sidebarQueuedMessages: queuedMessages.sidebarQueuedMessages,

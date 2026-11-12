@@ -1,5 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { experimental_useRpcKeyedQuery, useRpc } from "@get-bb/plugin-sdk/app";
+import { useNativeRefreshRegistration } from "./native-refresh";
+export { useNativePullRequestRefresh } from "./native-refresh";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { GITHUB_PR_STATUS_PLUGIN_ID, nativeStatusContract, environmentPullRequestSchema, nativePullRequestAttention, type PullRequest } from "./native-status-schemas";
 import { normalizePullRequestSignal } from "./presentation";
@@ -30,6 +32,7 @@ export function useNativeThreadPullRequest(threadId: string, environmentId: stri
     pluginId: GITHUB_PR_STATUS_PLUGIN_ID, contract: nativeStatusContract,
     method: "pullRequests", keys: environmentId ? [environmentId] : [], enabled: Boolean(environmentId),
   });
+  useNativeRefreshRegistration(environmentId, query.refetch);
   const rawRow = environmentId ? query.data?.[environmentId] : undefined;
   // The host keyed store transports JSON; it does not validate each output row.
   const parsed = useMemo(() => rawRow === undefined ? null : environmentPullRequestSchema.safeParse(rawRow), [rawRow]);
@@ -54,14 +57,6 @@ export function useNativeThreadPullRequest(threadId: string, environmentId: stri
     pullRequest: row?.outcome === "available" ? projectNativePullRequest(row.pullRequest) : null,
     error,
   };
-}
-
-/** Manual refresh rechecks only keys currently subscribed through BB's keyed owner. */
-export function useNativePullRequestRefresh() {
-  return experimental_useRpcKeyedQuery({
-    pluginId: GITHUB_PR_STATUS_PLUGIN_ID, contract: nativeStatusContract,
-    method: "pullRequests", keys: [], enabled: false,
-  }).refetch;
 }
 
 /** Scoped Stack/reviewer enrichment supplements the host row, never an eager roster. */

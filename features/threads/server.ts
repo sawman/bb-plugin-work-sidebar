@@ -1,3 +1,4 @@
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import {
   normalizeActiveGroupPosition,
   normalizeThreadGroupDisclosures,
@@ -61,6 +62,7 @@ type ArchivedThreadRow = {
   title: string | null;
   titleFallback: string | null;
   parentThreadId: string | null;
+  parentNotifications: Awaited<ReturnType<BbPluginApi["sdk"]["threads"]["get"]>>["parentNotifications"];
   providerId: string;
   environmentBranchName: string | null;
   environmentName: string | null;
@@ -92,6 +94,7 @@ export type ArchivedThreadProjection = {
   title: string | null;
   titleFallback: string | null;
   parentThreadId: string | null;
+  parentNotifications: ArchivedThreadRow["parentNotifications"];
   providerId: string;
   environmentBranchName: string | null;
   environmentName: string | null;
@@ -114,6 +117,7 @@ function projectArchivedThread(
     title: row.title,
     titleFallback: row.titleFallback,
     parentThreadId: row.parentThreadId,
+    parentNotifications: row.parentNotifications,
     providerId: row.providerId,
     environmentBranchName: row.environmentBranchName,
     environmentName: row.environmentName,

@@ -305,7 +305,6 @@ describe("R19D registered slot accessibility", () => {
             backgroundAgents: 0,
             backgroundCommands: 0,
             planMode: 0,
-            goals: 0,
           },
           indicator: "none",
           indicatorLabel: null,
@@ -403,7 +402,6 @@ describe("R19D registered slot accessibility", () => {
             backgroundAgents: 1,
             backgroundCommands: 0,
             planMode: 0,
-            goals: 0,
           },
           indicator: "runtime",
           indicatorLabel: "Agent is working",
@@ -433,7 +431,6 @@ describe("R19D registered slot accessibility", () => {
             backgroundAgents: 1,
             backgroundCommands: 0,
             planMode: 0,
-            goals: 0,
           },
           indicator: "runtime",
           indicatorLabel: "Agent is working",
@@ -457,7 +454,7 @@ describe("R19D registered slot accessibility", () => {
     const app = await loadPluginApp(() => import("../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_accessible", params: null },
+      { threadId: "thr_accessible", params: null, environment: null },
       { rpc: fixture() },
     );
     await waitFor(() => expect(slot.getByRole("tabpanel")).toBeTruthy());

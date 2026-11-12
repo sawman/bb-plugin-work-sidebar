@@ -100,7 +100,7 @@ describe("registered provider Background card", () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_jobs", params: null },
+      { threadId: "thr_jobs", params: null, environment: null },
       { rpc: fixture(getWorkBackgroundJobs) },
     );
 
@@ -124,7 +124,7 @@ describe("registered provider Background card", () => {
     slot.lifecycle.rerender(
       createElement(app.threadPanelActions[0]!.component, {
         threadId: "thr_other",
-        params: null,
+        params: null, environment: null,
       }),
     );
     await waitFor(() =>
@@ -144,7 +144,7 @@ describe("registered provider Background card", () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_jobs", params: null },
+      { threadId: "thr_jobs", params: null, environment: null },
       { rpc: fixture(getWorkBackgroundJobs) },
     );
 
@@ -163,7 +163,7 @@ describe("registered provider Background card", () => {
     const app = await loadPluginApp(() => import("../../../app"));
     const slot = renderSlot(
       app.threadPanelActions[0]!,
-      { threadId: "thr_jobs", params: null },
+      { threadId: "thr_jobs", params: null, environment: null },
       { rpc: fixture(getWorkBackgroundJobs) },
     );
 

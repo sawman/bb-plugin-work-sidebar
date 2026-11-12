@@ -107,61 +107,68 @@ describe("R13 Changes server adapter", () => {
 });
 
 describe("R14 working-tree file diff reader", () => {
-  it("classifies no environment, patches, binary files, absent patches, SDK unavailability, and thrown SDK errors", async () => {
+  const files = (path = "src/file.ts", binary = false) => ({
+    outcome: "available" as const,
+    files: [{ path, binary, revision: "revision_one" }],
+    initialPatches: [] as Array<{ path: string; patch: string; truncated: boolean }>,
+    truncated: false,
+  });
+
+  it("classifies no environment, patches, binary files, absent files, native unavailability and thrown errors", async () => {
     const getThread = vi.fn<WorkingTreeFileDiffReaderDependencies["getThread"]>(async () => ({ environmentId: "env_one" }));
     const diffPatch = vi.fn<WorkingTreeFileDiffReaderDependencies["diffPatch"]>(async () => ({
-      outcome: "available" as const,
-      patches: [{ path: "src/file.ts", patch: "@@ -1 +1 @@\n-old\n+new", truncated: false }],
+      outcome: "available", patch: { path: "src/file.ts", patch: "@@ -1 +1 @@\n-old\n+new", truncated: false },
     }));
-    const diffFiles = vi.fn<WorkingTreeFileDiffReaderDependencies["diffFiles"]>(async () => ({
-      outcome: "available" as const,
-      files: [],
-      initialPatches: [],
-      mergeBaseRef: null,
-      shortstat: "",
-      truncated: false,
-    }));
+    const diffFiles = vi.fn<WorkingTreeFileDiffReaderDependencies["diffFiles"]>(async () => files());
     const reader = createWorkingTreeFileDiffReader({ getThread, diffPatch, diffFiles });
-
     await expect(reader("thr_one", "src/file.ts")).resolves.toEqual({
-      kind: "patch",
-      path: "src/file.ts",
-      patch: "@@ -1 +1 @@\n-old\n+new",
-      message: null,
+      kind: "patch", path: "src/file.ts", patch: "@@ -1 +1 @@\n-old\n+new", message: null,
     });
-    expect(getThread).toHaveBeenCalledWith("thr_one");
-    expect(diffPatch).toHaveBeenCalledWith({ environmentId: "env_one", target: { type: "uncommitted" }, paths: ["src/file.ts"] });
-    expect(diffFiles).toHaveBeenCalledWith({ environmentId: "env_one", target: "uncommitted" });
+    expect(diffPatch).toHaveBeenCalledExactlyOnceWith({ environmentId: "env_one", path: "src/file.ts", revision: "revision_one" });
+    expect(diffFiles).toHaveBeenCalledExactlyOnceWith({ environmentId: "env_one", target: "uncommitted" });
 
     getThread.mockResolvedValueOnce({ environmentId: null });
     await expect(reader("thr_none", "none.ts")).resolves.toMatchObject({ kind: "unavailable", path: "none.ts", message: "This thread has no workspace." });
+    expect(diffFiles).toHaveBeenCalledOnce();
 
-    diffFiles.mockResolvedValueOnce({ outcome: "available", files: [{ path: "image.png", binary: true }] });
+    diffFiles.mockResolvedValueOnce(files("image.png", true));
     await expect(reader("thr_binary", "image.png")).resolves.toMatchObject({ kind: "binary", path: "image.png" });
+    expect(diffPatch).toHaveBeenCalledOnce();
 
-    diffPatch.mockResolvedValueOnce({ outcome: "available", patches: [] });
     await expect(reader("thr_absent", "gone.ts")).resolves.toMatchObject({ kind: "absent", path: "gone.ts" });
+    expect(diffPatch).toHaveBeenCalledOnce();
 
     diffPatch.mockResolvedValueOnce({ outcome: "unavailable", failure: { message: "SDK unavailable" } });
-    await expect(reader("thr_sdk", "offline.ts")).resolves.toMatchObject({ kind: "unavailable", path: "offline.ts", message: "SDK unavailable" });
-
+    await expect(reader("thr_sdk", "src/file.ts")).resolves.toMatchObject({ kind: "unavailable", message: "SDK unavailable" });
     diffPatch.mockRejectedValueOnce(new Error("SDK threw"));
-    await expect(reader("thr_throw", "throw.ts")).resolves.toMatchObject({ kind: "unavailable", path: "throw.ts", message: "SDK threw" });
+    await expect(reader("thr_throw", "src/file.ts")).resolves.toMatchObject({ kind: "unavailable", message: "SDK threw" });
+    diffFiles.mockResolvedValueOnce({ outcome: "not_applicable", message: "No Git repository" });
+    await expect(reader("thr_nongit", "src/file.ts")).resolves.toMatchObject({ kind: "unavailable", message: "No Git repository" });
+    diffFiles.mockRejectedValueOnce(new Error("Listing failed"));
+    await expect(reader("thr_failed", "src/file.ts")).resolves.toMatchObject({ kind: "unavailable", message: "Listing failed" });
+    expect(getThread.mock.calls).toEqual([["thr_one"], ["thr_none"], ["thr_binary"], ["thr_absent"], ["thr_sdk"], ["thr_throw"], ["thr_nongit"], ["thr_failed"]]);
+    expect(diffFiles).toHaveBeenCalledTimes(7);
+    expect(diffPatch).toHaveBeenCalledTimes(3);
+  });
 
-    expect(getThread.mock.calls).toEqual([["thr_one"], ["thr_none"], ["thr_binary"], ["thr_absent"], ["thr_sdk"], ["thr_throw"]]);
-    expect(diffPatch.mock.calls).toEqual([
-      [{ environmentId: "env_one", target: { type: "uncommitted" }, paths: ["src/file.ts"] }],
-      [{ environmentId: "env_one", target: { type: "uncommitted" }, paths: ["image.png"] }],
-      [{ environmentId: "env_one", target: { type: "uncommitted" }, paths: ["gone.ts"] }],
-      [{ environmentId: "env_one", target: { type: "uncommitted" }, paths: ["offline.ts"] }],
-      [{ environmentId: "env_one", target: { type: "uncommitted" }, paths: ["throw.ts"] }],
-    ]);
-    expect(diffFiles.mock.calls).toEqual([
-      [{ environmentId: "env_one", target: "uncommitted" }],
-      [{ environmentId: "env_one", target: "uncommitted" }],
-      [{ environmentId: "env_one", target: "uncommitted" }],
-      [{ environmentId: "env_one", target: "uncommitted" }],
-      [{ environmentId: "env_one", target: "uncommitted" }],
-    ]);
+  it.each([true, false])("rejects incomplete %s initial/native patches", async (initial) => {
+    const entry = { path: "src/file.ts", patch: "partial", truncated: true };
+    const reader = createWorkingTreeFileDiffReader({
+      getThread: async () => ({ environmentId: "env_one" }),
+      diffFiles: async () => ({ ...files(), initialPatches: initial ? [entry] : [] }),
+      diffPatch: async () => ({ outcome: "available", patch: entry }),
+    });
+    await expect(reader("thr_one", "src/file.ts")).resolves.toMatchObject({ kind: "unavailable", patch: null, message: expect.stringMatching(/incomplete/i) });
+  });
+
+  it("reuses native initial patches and never treats an incomplete listing as confirmed absence", async () => {
+    const diffPatch = vi.fn<WorkingTreeFileDiffReaderDependencies["diffPatch"]>();
+    const diffFiles = vi.fn<WorkingTreeFileDiffReaderDependencies["diffFiles"]>()
+      .mockResolvedValueOnce({ ...files(), initialPatches: [{ path: "src/file.ts", patch: "initial", truncated: false }] })
+      .mockResolvedValueOnce({ ...files(), truncated: true });
+    const reader = createWorkingTreeFileDiffReader({ getThread: async () => ({ environmentId: "env_one" }), diffFiles, diffPatch });
+    await expect(reader("thr_one", "src/file.ts")).resolves.toMatchObject({ kind: "patch", patch: "initial" });
+    await expect(reader("thr_one", "not-listed.ts")).resolves.toMatchObject({ kind: "unavailable", patch: null });
+    expect(diffPatch).not.toHaveBeenCalled();
   });
 });

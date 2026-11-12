@@ -212,6 +212,7 @@ describe("R9 archived thread service", () => {
   it("passes the exact SDK list options and projects only live archived threads", async () => {
     const list = vi.fn(async () => [
       {
+        parentNotifications: "stuck" as const,
         id: "thr_archived",
         projectId: "project",
         title: "Archived",
@@ -228,6 +229,7 @@ describe("R9 archived thread service", () => {
         deletedAt: null,
       },
       {
+        parentNotifications: "stuck" as const,
         id: "thr_active",
         projectId: "project",
         title: "Active",
@@ -244,6 +246,7 @@ describe("R9 archived thread service", () => {
         deletedAt: null,
       },
       {
+        parentNotifications: "stuck" as const,
         id: "thr_deleted",
         projectId: "project",
         title: "Deleted",
@@ -265,6 +268,7 @@ describe("R9 archived thread service", () => {
 
     await expect(service.list()).resolves.toEqual([
       {
+        parentNotifications: "stuck" as const,
         id: "thr_archived",
         projectId: "project",
         title: "Archived",

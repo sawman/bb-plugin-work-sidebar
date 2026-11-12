@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { configureAxe } from "vitest-axe";
 import type { RenderSlotOptions } from "@get-bb/plugin-sdk/testing/app";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
+import { sidebarThreadFixture } from "../../../tests/utils/sidebar-thread";
 import type { PluginSidebarThread } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../../../contracts";
 import { getPluginQueryClient } from "../../../query-runtime";
@@ -53,9 +54,11 @@ const tasks = (items = [task]): TasksResult => ({
 const sidebarProject = { id: "project_1", name: "Work", isPersonal: false, href: "/projects/project_1", settingsHref: "/projects/project_1/settings" };
 function sidebarThread(id: string, title: string): PluginSidebarThread {
   return {
+    ...sidebarThreadFixture(),
     id,
     projectId: sidebarProject.id,
     title,
+    displayTitle: title,
     titleFallback: null,
     parentThreadId: null,
     sectionId: null,
@@ -68,7 +71,6 @@ function sidebarThread(id: string, title: string): PluginSidebarThread {
       backgroundAgents: 0,
       backgroundCommands: 0,
       planMode: 0,
-      goals: 0,
     },
     indicator: "none",
     indicatorLabel: null,
@@ -81,7 +83,7 @@ function sidebarThread(id: string, title: string): PluginSidebarThread {
     updatedAt: 0,
     lastReadAt: null,
     latestAttentionAt: 0,
-  } as PluginSidebarThread;
+  };
 }
 const sidebarThreads = [
   sidebarThread("thr_test", "Fixture thread"),
@@ -298,7 +300,7 @@ describe("Tasks registered controls", () => {
 
     const captured = await app();
     const right = renderSlot(captured.threadPanelActions[0]!,
-      { threadId: "thr_test", params: null },
+      { threadId: "thr_test", params: null, environment: null },
       { rpc: rpcFixtures((input) => tasks(input ? [done, canceled] : [agent, human])) },
     );
     await right.findByRole("button", { name: "Completed: 2 tasks" });
@@ -362,7 +364,7 @@ describe("Tasks registered controls", () => {
     const captured = await app();
     const rendered = renderSlot(
       captured.threadPanelActions[0]!,
-      { threadId: "thr_test", params: null },
+      { threadId: "thr_test", params: null, environment: null },
       { rpc: rpcFixtures(() => tasks([task, taskTwo])) },
     );
     const picker = await openWorkItemPicker(rendered);
@@ -385,7 +387,7 @@ describe("Tasks registered controls", () => {
     const captured = await app();
     const rendered = renderSlot(
       captured.threadPanelActions[0]!,
-      { threadId: "thr_test", params: null },
+      { threadId: "thr_test", params: null, environment: null },
       { rpc: rpcFixtures(() => tasks([task, taskTwo])) },
     );
     const combo = await openWorkItemPicker(rendered);
@@ -457,7 +459,7 @@ describe("Tasks registered controls", () => {
     const captured = await app();
     const right = renderSlot(
       captured.threadPanelActions[0]!,
-      { threadId: "thr_test", params: null },
+      { threadId: "thr_test", params: null, environment: null },
       { rpc: rpcFixtures(() => tasks([task, taskTwo])) },
     );
     const taskPicker = await openWorkItemPicker(right);
@@ -1120,7 +1122,7 @@ describe("Tasks registered controls", () => {
     const captured = await app();
     const rendered = renderSlot(
       captured.threadPanelActions[0]!,
-      { threadId: "thr_test", params: null },
+      { threadId: "thr_test", params: null, environment: null },
       { rpc: rpcFixtures(() => tasks([task, taskTwo]), call) },
     );
     const combo = await openWorkItemPicker(rendered, "queue");
@@ -1145,7 +1147,7 @@ describe("Tasks registered controls", () => {
     const rightCall = vi.fn(() => Promise.resolve({}));
     const right = renderSlot(
       captured.threadPanelActions[0]!,
-      { threadId: "thr_test", params: null },
+      { threadId: "thr_test", params: null, environment: null },
       {
         rpc: rpcFixtures(
           () => tasks([{ ...task, linkedThreadIds: ["thr_test"] }]),

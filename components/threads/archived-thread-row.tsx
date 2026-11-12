@@ -1,4 +1,5 @@
 import { useThreadControls } from "@/shared/use-thread-controls";
+import type { PluginThreadActionTarget } from "@get-bb/plugin-sdk/app";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -18,6 +19,7 @@ export type ArchivedThread = {
   title: string | null;
   titleFallback: string | null;
   parentThreadId: string | null;
+  parentNotifications: PluginThreadActionTarget["parentNotifications"];
   providerId: string;
   environmentBranchName: string | null;
   environmentName: string | null;

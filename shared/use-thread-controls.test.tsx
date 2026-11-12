@@ -11,7 +11,7 @@ beforeEach(() => { vi.clearAllMocks(); });
 
 function Controls() {
   const controls = useThreadControls(sidebarThreadFixture({
-    id: "thr_target", projectId: "project", parentThreadId: "thr_parent",
+    id: "thr_target", projectId: "project", parentThreadId: "thr_parent", parentNotifications: "stuck",
     archivedAt: 7, pinnedAt: 3, sectionId: "section", isUnread: true,
     environment: { id: null, path: null, name: null, branchName: null,
       isWorktree: null, providerId: null, workspaceDisplayKind: null },
@@ -48,7 +48,7 @@ describe("BB 0.46 thread control contracts", () => {
     const requestDelete = vi.fn(async () => {});
     const resolveActions = vi.fn((target) => {
       expect(target).toMatchObject({ id: "thr_target", parentThreadId: "thr_parent",
-        archivedAt: 7, pinnedAt: 3, sectionId: "section", isUnread: true, environment: null });
+        archivedAt: 7, pinnedAt: 3, sectionId: "section", isUnread: true, parentNotifications: "stuck", environment: null });
       return [{ key: "bb--core/archive", pluginId: "bb--core", group: "lifecycle",
         action: { label: "Archive", icon: "Archive" as const, run: archive } },
       { key: "bb--core/delete", pluginId: "bb--core", group: "lifecycle",

@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { renderSlot } from "@get-bb/plugin-sdk/testing/app";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { useNativeThreadPullRequest } from "../native-status-queries";
+import { useNativeThreadPullRequest, useNativePullRequestRefresh } from "../native-status-queries";
 import { pullRequestKeys, hydratePullRequestFacts, useSharedPullRequestFactDirectory } from "../queries";
 import { factFromPullRequest, type PullRequestFactDirectory } from "../facts";
 import { projectNativePullRequest } from "../native-status-queries";
@@ -31,6 +31,78 @@ function Probe({ threadId, environmentId, label }: { threadId: string; environme
 afterEach(cleanup);
 
 describe("installed SDK keyed PR boundary", () => {
+  it("isolates refresh handles by window client and releases a changed environment key", async () => {
+    const clientA = new QueryClient();
+    const clientB = new QueryClient();
+    const response = async ({ keys }: { keys: string[] }) => Object.fromEntries(keys.map((key) => [key, { outcome: "absent" }]));
+    const readA = vi.fn(response);
+    const readB = vi.fn(response);
+    function WindowContent() {
+      const [key, setKey] = useState("env_old");
+      const refresh = useNativePullRequestRefresh();
+      return <>
+        <button onClick={() => void refresh()}>Refresh window</button>
+        <button onClick={() => setKey("env_new")}>Change environment</button>
+        <Probe label="window" threadId="thr_window" environmentId={key} />
+      </>;
+    }
+    const WindowA = () => <QueryClientProvider client={clientA}><WindowContent /></QueryClientProvider>;
+    const WindowB = () => <QueryClientProvider client={clientB}><WindowContent /></QueryClientProvider>;
+    const slotA = renderSlot({ component: WindowA }, {}, { rpc: { pullRequests: readA } });
+    const slotB = renderSlot({ component: WindowB }, {}, { rpc: { pullRequests: readB } });
+    const viewA = within(slotA.container);
+    const viewB = within(slotB.container);
+    try {
+      await waitFor(() => expect(viewA.getByLabelText("window status").textContent).toBe("absent"));
+      await waitFor(() => expect(viewB.getByLabelText("window status").textContent).toBe("absent"));
+      fireEvent.click(viewA.getByText("Refresh window"));
+      await waitFor(() => expect(readA).toHaveBeenCalledTimes(2));
+      expect(readB).toHaveBeenCalledOnce();
+      fireEvent.click(viewA.getByText("Change environment"));
+      await waitFor(() => expect(readA).toHaveBeenCalledTimes(3));
+      expect(readA).toHaveBeenLastCalledWith({ keys: ["env_new"] });
+      fireEvent.click(viewA.getByText("Refresh window"));
+      await waitFor(() => expect(readA).toHaveBeenCalledTimes(4));
+      expect(readA).toHaveBeenLastCalledWith({ keys: ["env_new"] });
+      expect(readB).toHaveBeenCalledOnce();
+      fireEvent.click(viewB.getByText("Refresh window"));
+      await waitFor(() => expect(readB).toHaveBeenCalledTimes(2));
+      expect(readB).toHaveBeenLastCalledWith({ keys: ["env_old"] });
+    } finally { slotA.lifecycle.unmount(); slotB.lifecycle.unmount(); clientA.clear(); clientB.clear(); }
+  });
+  it("refreshes only mounted native keys once across both surfaces and releases removed consumers", async () => {
+    const client = new QueryClient();
+    const read = vi.fn(async ({ keys }: { keys: string[] }) => Object.fromEntries(keys.map((key) => [key, { outcome: "absent" }])));
+    function Toolbar() {
+      const refresh = useNativePullRequestRefresh();
+      return <button onClick={() => void refresh()}>Refresh native rows</button>;
+    }
+    function Consumers() {
+      const [visible, setVisible] = useState(true);
+      return <>
+        <Toolbar />
+        <button onClick={() => setVisible(false)}>Hide native rows</button>
+        {visible ? <>
+          <Probe label="left" threadId="thr_a" environmentId="env_a" />
+          <Probe label="right" threadId="thr_a" environmentId="env_a" />
+          <Probe label="other" threadId="thr_b" environmentId="env_b" />
+        </> : null}
+      </>;
+    }
+    const Content = () => <QueryClientProvider client={client}><Consumers /></QueryClientProvider>;
+    const slot = renderSlot({ component: Content }, {}, { rpc: { pullRequests: read } });
+    try {
+      await waitFor(() => expect(slot.getByLabelText("other status").textContent).toBe("absent"));
+      expect(read).toHaveBeenCalledExactlyOnceWith({ keys: ["env_a", "env_b"] });
+      fireEvent.click(slot.getByText("Refresh native rows"));
+      await waitFor(() => expect(read).toHaveBeenCalledTimes(2));
+      expect(read).toHaveBeenLastCalledWith({ keys: ["env_a", "env_b"] });
+      fireEvent.click(slot.getByText("Hide native rows"));
+      fireEvent.click(slot.getByText("Refresh native rows"));
+      await act(async () => { await Promise.resolve(); });
+      expect(read).toHaveBeenCalledTimes(2);
+    } finally { slot.lifecycle.unmount(); client.clear(); }
+  });
   it("retains native queue membership independently of derived host attention and resolves blockers centrally", () => {
     const queued = projectNativePullRequest({ ...nativePr(), inMergeQueue: true, attention: "checks_failed",
       checks: { state: "failing", totalCount: 1, passedCount: 0, failedCount: 1, pendingCount: 0 } });

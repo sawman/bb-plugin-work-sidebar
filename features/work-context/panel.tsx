@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStore } from "zustand";
 import {
+  type ExperimentalThreadActionTabProps,
   useRealtime,
   useRpc,
   useBbContext,
@@ -60,7 +61,7 @@ function queueRootEvent(scope: WorkPanelScope, rootThreadId: string) {
   scope.queuedRootThreadIds.push(rootThreadId);
 }
 
-export function WorkPanel({ threadId }: { threadId: string; params: import("@get-bb/plugin-sdk/app").JsonValue | null }) {
+export function WorkPanel({ threadId }: ExperimentalThreadActionTabProps) {
   const queryClient = useQueryClient();
   const changesRpc = useRpc<typeof rpcContract>();
   const { projectId } = useBbContext();

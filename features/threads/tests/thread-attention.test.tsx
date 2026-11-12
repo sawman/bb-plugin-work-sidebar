@@ -48,7 +48,6 @@ function thread(
       backgroundAgents: 0,
       backgroundCommands: 0,
       planMode: 0,
-      goals: 0,
     },
     indicator: "none",
     indicatorLabel: null,
@@ -251,14 +250,13 @@ describe("thread attention presentation", () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     const goalThread = thread({
-      indicator: "none",
+      indicator: "runtime",
       indicatorLabel: "Goal active",
       activity: {
         workflows: 0,
         backgroundAgents: 0,
         backgroundCommands: 0,
         planMode: 0,
-        goals: 1,
       },
       createdAt: NOW - 10 * 60_000,
       updatedAt: NOW - 10 * 60_000,
@@ -325,7 +323,6 @@ describe("thread attention presentation", () => {
         backgroundAgents: 1,
         backgroundCommands: 0,
         planMode: 0,
-        goals: 0,
       },
     });
     const runtimeState = threadProviderRuntimeState(errored, false, 2);
@@ -347,7 +344,6 @@ describe("thread attention presentation", () => {
         backgroundAgents: 1,
         backgroundCommands: 0,
         planMode: 0,
-        goals: 0,
       },
     });
     expect(threadProviderRuntimeState(pendingWork, false, 0)).toBe("working");

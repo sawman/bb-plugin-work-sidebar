@@ -13,6 +13,9 @@ export function useGroupDisclosurePreference(
 ) {
   return useCallback(
     (id: string, open: boolean) => {
+      // Native details also fires after React applies its controlled open prop.
+      const defaultOpen = id !== "archive" && id !== "recycle-bin";
+      if ((preferences.disclosures?.[id] ?? defaultOpen) === open) return;
       void saveGroups
         .mutateAsync({
           ...preferences,

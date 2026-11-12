@@ -125,6 +125,9 @@ export function useAgentDetails(threadIds: readonly string[]) {
           rpc.call("getAgentDetails", { threadIds: batch }),
         ),
       );
+      const returned = new Set(results.flatMap((result) => result.agents.map((agent) => agent.threadId)));
+      if (missing.some((threadId) => !returned.has(threadId)))
+        throw new Error("Agent metadata omitted a requested thread.");
       const facts = { ...(current?.facts ?? {}) };
       for (const result of results)
         for (const agent of result.agents)
@@ -139,6 +142,11 @@ export function useAgentDetails(threadIds: readonly string[]) {
     boundedPanelRoster(queryClient, roster),
   );
   const missingKey = missing.join("\u0000");
+  // Query owns this revision even when structural sharing retains the same
+  // empty data object after a retired roster settles. Errors never advance it.
+  const settledSuccessRevision = query.isSuccess && !query.isFetching
+    ? queryClient.getQueryState(queryKeys.agents.directory())?.dataUpdateCount ?? 0
+    : null;
 
   useEffect(() => {
     updateActiveRoster(queryClient, rosterOwner.current, roster);
@@ -155,11 +163,12 @@ export function useAgentDetails(threadIds: readonly string[]) {
         boundedPanelRoster(queryClient, roster),
       ).length > 0
     )
-      void query.refetch();
+      void query.refetch({ cancelRefetch: false });
   }, [queryClient, query.refetch, rosterKey]);
   useEffect(() => {
-    if (missing.length > 0) void query.refetch();
-  }, [missingKey, query.refetch]);
+    if (settledSuccessRevision !== null && missing.length > 0)
+      void query.refetch({ cancelRefetch: false });
+  }, [missingKey, settledSuccessRevision, query.refetch]);
 
   return query;
 }
