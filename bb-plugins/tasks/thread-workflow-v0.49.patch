@@ -1,0 +1,198 @@
+diff --git a/plugins/tasks/api/index.ts b/plugins/tasks/api/index.ts
+index 208d902..889a58a 100644
+--- a/plugins/tasks/api/index.ts
++++ b/plugins/tasks/api/index.ts
+@@ -872,6 +872,10 @@ export function registerHandlers(
+         ),
+       };
+     },
++    listTasksForThread(input) {
++      const result = store.tasks.listTasksForThread(input);
++      return { ...result, tasks: apiTasks(store, result.tasks) };
++    },
+     boardMove(input) {
+       const current = store.tasks.getTask(input.taskId);
+       if (!current) throw new Error(`Task not found: ${input.taskId}`);
+diff --git a/plugins/tasks/cli/index.ts b/plugins/tasks/cli/index.ts
+index b2faa50..2b0fe6c 100644
+--- a/plugins/tasks/cli/index.ts
++++ b/plugins/tasks/cli/index.ts
+@@ -2599,7 +2599,7 @@ export function registerTasksCli(
+             },
+             json: JSON_OPTION,
+           },
+-          run(input) {
++          run(input, ctx) {
+             return guard(async () => {
+               const task = await resolveTask(
+                 domain,
+@@ -2615,6 +2615,9 @@ export function registerTasksCli(
+                     taskId: task.id,
+                     presetId: preset.id,
+                     extraInstructions: input.options.instructions,
++                    ...(ctx.threadId === undefined
++                      ? {}
++                      : { parentThreadId: ctx.threadId }),
+                   }),
+                 ),
+               );
+diff --git a/plugins/tasks/db/store.ts b/plugins/tasks/db/store.ts
+index dabafd2..06466ad 100644
+--- a/plugins/tasks/db/store.ts
++++ b/plugins/tasks/db/store.ts
+@@ -29,6 +29,8 @@ import type {
+   Folder,
+   Label,
+   ListTasksFilters,
++  ListTasksForThreadFilters,
++  ListTasksForThreadResult,
+   ListTasksPage,
+   MoveTaskToProjectResult,
+   Preset,
+@@ -1074,6 +1076,57 @@ export function createTasksStore(db: PluginDatabase) {
+     return tasks;
+   }
+ 
++  function listTasksForThread(
++    filters: ListTasksForThreadFilters,
++  ): ListTasksForThreadResult {
++    const limit = filters.limit ?? TASKS_PAGE_DEFAULT_LIMIT;
++    if (!Number.isInteger(limit) || limit < 1 || limit > TASKS_PAGE_MAX_LIMIT) {
++      throw new Error(
++        `Thread task limit must be an integer from 1 to ${TASKS_PAGE_MAX_LIMIT}`,
++      );
++    }
++    const parameters: Record<string, SqlParameter> = {
++      threadId: filters.threadId,
++      limit,
++    };
++    const clauses = ["tt.thread_id = @threadId"];
++    if (filters.statuses !== undefined) {
++      if (filters.statuses.length === 0) return { tasks: [], taskThreads: [] };
++      const names = filters.statuses.map((status, index) => {
++        const name = `status${index}`;
++        parameters[name] = status;
++        return `@${name}`;
++      });
++      clauses.push(`t.status IN (${names.join(", ")})`);
++    }
++    if (filters.includeCompleted !== true) {
++      clauses.push("t.status NOT IN ('done', 'canceled')");
++    }
++    const where = clauses.join(" AND ");
++    const orderBy = "t.updated_at DESC, t.id DESC";
++    const tasks = db
++      .prepare<Record<string, SqlParameter>, TaskRow>(
++        `${taskSelect}
++          JOIN task_threads tt ON tt.task_id = t.id
++          WHERE ${where}
++          ORDER BY ${orderBy}
++          LIMIT @limit`,
++      )
++      .all(parameters)
++      .map(taskFromRow);
++    const taskThreads = db
++      .prepare<Record<string, SqlParameter>, TaskThreadRow>(
++        `SELECT tt.* FROM task_threads tt
++          JOIN tasks t ON t.id = tt.task_id
++          WHERE ${where}
++          ORDER BY ${orderBy}
++          LIMIT @limit`,
++      )
++      .all(parameters)
++      .map(taskThreadFromRow);
++    return { tasks, taskThreads };
++  }
++
+   function listSubtasks(parentTaskId: string): Task[] {
+     requireTask(parentTaskId);
+     return db
+@@ -1957,6 +2010,7 @@ export function createTasksStore(db: PluginDatabase) {
+     getTaskByKey,
+     listTasksPage,
+     listTasks,
++    listTasksForThread,
+     listSubtasks,
+     updateTask,
+     moveTaskToProject,
+diff --git a/plugins/tasks/db/types.ts b/plugins/tasks/db/types.ts
+index 3d14617..88b79c4 100644
+--- a/plugins/tasks/db/types.ts
++++ b/plugins/tasks/db/types.ts
+@@ -194,6 +194,18 @@ export interface ListTasksPage {
+   nextCursor: string | null;
+ }
+ 
++export interface ListTasksForThreadFilters {
++  threadId: string;
++  statuses?: readonly TaskStatus[];
++  includeCompleted?: boolean;
++  limit?: number;
++}
++
++export interface ListTasksForThreadResult {
++  tasks: Task[];
++  taskThreads: TaskThread[];
++}
++
+ export interface UpdateTaskPositionInput {
+   status: TaskStatus;
+   beforeTaskId?: string | null;
+diff --git a/plugins/tasks/delegate/contract.ts b/plugins/tasks/delegate/contract.ts
+index 2451bb3..720366b 100644
+--- a/plugins/tasks/delegate/contract.ts
++++ b/plugins/tasks/delegate/contract.ts
+@@ -11,6 +11,7 @@ export const delegationRpcContract = defineRpcContract({
+         taskId: idSchema,
+         presetId: idSchema,
+         extraInstructions: z.string().optional(),
++        parentThreadId: threadIdSchema.optional(),
+       })
+       .strict(),
+     output: z.object({ threadId: threadIdSchema }).strict(),
+diff --git a/plugins/tasks/delegate/index.ts b/plugins/tasks/delegate/index.ts
+index 716a089..3e5129f 100644
+--- a/plugins/tasks/delegate/index.ts
++++ b/plugins/tasks/delegate/index.ts
+@@ -332,6 +332,9 @@ export function handlers(
+             ? {}
+             : { serviceTier: execution.serviceTier }),
+           permissionMode: execution.permissionMode,
++          ...(input.parentThreadId === undefined
++            ? {}
++            : { parentThreadId: input.parentThreadId }),
+           title,
+           prompt,
+         })
+diff --git a/plugins/tasks/shared/contract.ts b/plugins/tasks/shared/contract.ts
+index 6060498..307c878 100644
+--- a/plugins/tasks/shared/contract.ts
++++ b/plugins/tasks/shared/contract.ts
+@@ -553,6 +553,27 @@ export const tasksRpcContract = defineRpcContract({
+     input: taskFilterSchema,
+     output: z.object({ tasks: z.array(taskSchema) }).strict(),
+   },
++  listTasksForThread: {
++    input: z
++      .object({
++        threadId: z.string().startsWith("thr_"),
++        statuses: z.array(taskStatusSchema).optional(),
++        includeCompleted: z.boolean().default(false),
++        limit: z
++          .number()
++          .int()
++          .min(1)
++          .max(TASKS_PAGE_MAX_LIMIT)
++          .default(TASKS_PAGE_DEFAULT_LIMIT),
++      })
++      .strict(),
++    output: z
++      .object({
++        tasks: z.array(taskSchema),
++        taskThreads: z.array(taskThreadSchema),
++      })
++      .strict(),
++  },
+   boardMove: {
+     input: z
+       .object({

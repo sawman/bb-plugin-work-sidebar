@@ -363,6 +363,34 @@
           "sourcePatch": "bb-plugins/automations/personal-projects.patch"
         }
       ]
+    },
+    "0.49.0": {
+      "sourceRef": "desktop-v0.49.0",
+      "sourceCommit": "7b26cae79ec978fafd0a5db0e8517e94f12eb8f4",
+      "patches": [
+        {
+          "id": "ask-user-question-acp-continuation",
+          "pluginId": "ask-user-question",
+          "pluginPath": "plugins/ask-user-question",
+          "sourcePatch": "bb-plugins/ask-user-question/acp-continuation-v0.49.patch",
+          "turboFilter": "bb-plugin-ask-user-question"
+        },
+        {
+          "id": "tasks-thread-workflow",
+          "pluginId": "tasks",
+          "pluginPath": "plugins/tasks",
+          "sourcePatch": "bb-plugins/tasks/thread-workflow-v0.49.patch",
+          "turboFilter": "bb-plugin-tasks",
+          "behaviorGate": "tasks-thread-workflow-v1"
+        }
+      ],
+      "retiredPatches": [
+        {
+          "id": "automations-personal-projects",
+          "reason": "Native projects.get accepts personal projects and Automations explicitly accepts kind personal in exact 0.49.0; preserve retirement and pristine artifacts.",
+          "sourcePatch": "bb-plugins/automations/personal-projects.patch"
+        }
+      ]
     }
   }
 }
