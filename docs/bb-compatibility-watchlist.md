@@ -9,7 +9,41 @@ removing any item below. Re-run the linked searches against the current open
 issues and pull requests, then confirm the shipped API through a typed plugin
 test—not just a changelog entry.
 
-Last checked: 2026-10-26 against BB 0.47.1 / SDK 0.6.79.
+Last checked: 2026-11-12 against BB 0.49.0 / SDK 0.6.132.
+
+## BB 0.49.0 audit
+
+Audited immutable `desktop-v0.49.0` at
+`7b26cae79ec978fafd0a5db0e8517e94f12eb8f4`, source SDK 0.6.132 and installed
+artifact metadata 0.6.132. All five remaining gaps are still absent at their
+owning shipped boundaries. Retain Questions ACP queue and Tasks indexed read
+plus caller-parent forwarding. Preserve Sidebar's `listTasksForThread` consumer
+until an equivalent native migration is verified. Automations stays retired and
+pristine; exact service accepts personal projects and live `proj_personal` GET
+succeeds. No automation or user form was created/changed.
+
+Both old patch contexts fail against 0.49 and have explicit versioned rebases;
+Questions preserves the release's ordinary required-answer shared-form adapter.
+[Audit, exact source and validation](compatibility/bb-0.49.0/README.md),
+[deployment-ready gate](compatibility/bb-0.49.0/DEPLOYMENT-READY.md), and
+[rollback](../bb-plugins/rollback/bb-0.49.0/README.md) distinguish worker staging
+from root deployment/live acceptance. No installed writes/reload/restart or UI
+mutation occurred. Sidebar SDK migration evidence belongs to BBPLUG-466.
+
+One bounded primary GraphQL request refreshed #1978 (closed), #2200 and #2836
+(open), exact indexed-RPC issue/PR search (zero results) and ACP/question/queue
+search (three unrelated open hits). Source establishes the missing behavior;
+search absence alone does not. No quota polling, broad query loop or remote
+write. All remote windows used verified sawman and restored verified matthew-se.
+
+Inverse HTTP navigation remains preference-only `openUrl(url)` with no effective
+preference getter or explicit in-app HTTP intent. App-wide URL host still has a
+null browser default, while right-panel host supplies `openBrowser`; no private
+storage workaround or broad host patch is introduced. Native same-provider
+live-parent defaults now include serviceTier as well as model/reasoning, unlike
+the preserved 0.47 audit; provider/fast-tier constraints still apply. This is
+separate from Tasks' missing caller forwarding. Historical acceptance below does
+not certify this release; root owns final 0.49 runtime/visual acceptance.
 
 ## BB 0.47.1 audit
 
@@ -295,7 +329,7 @@ audit intentionally did not create speculative work.
   multi-call queue that keeps unanswered questions visible while each submitted
   answer immediately reaches the agent. The local plugin-only patch supplies
   that queue (maximum 32 questions) and `threads.send({ mode: "auto" })`
-  follow-up. It is cataloged against BB 0.47.1 with an exact source ref,
+  follow-up. It is cataloged against BB 0.49.0 with an exact source ref,
   regression suite, and rollback artifacts in
   [`bb-plugins/ask-user-question/`](../bb-plugins/ask-user-question/). On every
   BB release, run `npm run bb-plugins:sync`: remove this patch only when ACP

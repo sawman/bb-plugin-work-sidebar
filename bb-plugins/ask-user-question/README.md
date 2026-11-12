@@ -28,6 +28,20 @@ coverage for Cursor, OpenCode, and a custom ACP provider, plus dismissal.
 The versioned release criteria and live smoke matrix are in
 [TEST-PLAN.md](TEST-PLAN.md).
 
+## BB 0.49.0 candidate audit (2026-11-12)
+
+Exact `desktop-v0.49.0`, SHA `7b26cae79ec978fafd0a5db0e8517e94f12eb8f4`,
+BB 0.49.0 / SDK 0.6.132. Retain plugin-only ACP queue in
+[acp-continuation-v0.49.patch](acp-continuation-v0.49.patch). Rebase preserves the
+release's required-answer adapter for ordinary shared QuestionForm; queued ACP
+semantics, timeout and submission descriptions remain. Existing 0.47 patch fails
+on 0.49 source and is not copied forward unchecked.
+
+[Current audit and exact gates](../../docs/compatibility/bb-0.49.0/README.md),
+[deployment-ready boundary](../../docs/compatibility/bb-0.49.0/DEPLOYMENT-READY.md),
+and [version-matched rollback](../rollback/bb-0.49.0/README.md).
+Root owns deployment and live acceptance; worker makes no installed writes or reload.
+
 ## BB 0.47.1 compatibility preflight (2026-10-26)
 
 Exact `desktop-v0.47.1`, SHA `5e1acd765039e874643f34c4d35409e58484e408`,
@@ -162,14 +176,19 @@ Exact paths and SHA-256 are recorded in
 
 ## Update procedure
 
-1. Check whether ACP has gained a durable interactive-call continuation. If it
-   has, remove this patch after a live Reply test.
+1. Retire only after native ACP provides an equivalent bounded multi-call queue,
+   per-answer automatic delivery with unanswered questions retained, and verified
+   dismissal/retry/capability behavior. Ordinary detached requestInput alone is
+   insufficient; root must validate native source/contract and live acceptance.
 2. Otherwise run the cataloged sync job from the repository root. It checks the
    installed BB version, clones the matching `desktop-v<version>` tag, verifies
    every patch, runs focused tests/typechecks, and stages the built artifacts.
-3. Review the stage, then run `npm run bb-plugins:sync -- --deploy`. If an
-   emergency rollback is needed, restore the version-matched payload in
-   `rollback/bb-<version>/` after checking its manifest hashes.
-4. Confirm one live ACP question and Reply resumes its agent, then update this
-   document and the compatibility watchlist in
+3. Review the exact release's accepted stage and use its strict artifact verifier
+   and [deployment runbook](../../docs/compatibility/bb-0.49.0/DEPLOYMENT-READY.md).
+   Root must pass the zero-pending/resolving-Questions-form gate before any
+   Questions writes and again immediately before reload. Never use sync's
+   unchecked `--deploy` copy path. Rollback uses only that release's full-set
+   pristine payload and manifest, under the same disposal gate.
+4. Root confirms live ACP per-answer delivery and retained unanswered questions,
+   then updates this document and the compatibility watchlist in
    [`docs/bb-compatibility-watchlist.md`](../../docs/bb-compatibility-watchlist.md).

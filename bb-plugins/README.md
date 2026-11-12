@@ -1,20 +1,26 @@
 # Local BB plugin patches
 
-BB 0.47.1 / SDK 0.6.79 Questions and Tasks are deployed. Automations
-remains retired and pristine. The [deployment record](../docs/compatibility/bb-0.47.1/DEPLOYMENT.md)
-contains root's full-set backup/readback, final 929-test combined run, live ACP
-delivery and bounded Sidebar acceptance. Pointer/keyboard and other explicit
-live limits remain; historical 430 was superseded by 446, not retrospectively passed.
+BB 0.49.0 / SDK 0.6.132 is installed with pristine Questions, Tasks and
+Automations, byte-matched to the cached release ZIP. Questions ACP queue and
+Tasks indexed thread read/parent forwarding remain required. Their old patches
+fail against 0.49 source and now have explicit versioned candidates; Automations
+remains retired. Worker audit is staging-only: root owns deployment and final
+acceptance. No installed writes/reload/restart or UI changes occurred.
 
-Source/preflight history is in the [worker audit](../docs/compatibility/bb-0.47.1/README.md),
-with the existing [accepted artifact manifest](../docs/compatibility/bb-0.47.1/artifact-manifest.json)
-and [pristine rollback](rollback/bb-0.47.1/README.md).
-The [mandatory verifier](verify-artifacts.py) checks exact directories and all
-bytes. Its deployment mode requires a pristine installation and intentionally
-rejects the currently patched installation; use `--verify-installed` for current
-readback. Questions writes/reload require the audit's zero-form disposal gate.
-Historical sync silently skips missing artifacts; do not use its unchecked
-`--deploy` copy path.
+The [0.49 audit](../docs/compatibility/bb-0.49.0/README.md) records exact immutable
+source, honest failures, behavior/artifact gates and provenance limits. Use its
+[deployment-ready recipe](../docs/compatibility/bb-0.49.0/DEPLOYMENT-READY.md),
+[accepted stage manifest](../docs/compatibility/bb-0.49.0/artifact-manifest.json)
+and [pristine rollback](rollback/bb-0.49.0/README.md). The
+[mandatory verifier](verify-artifacts.py) checks exact directories and every byte.
+Questions writes/reload require the exact zero-pending/resolving-form disposal
+gate; an artifact verifier does not inspect live forms. Historical sync silently
+skips missing files; never use its unchecked `--deploy` copy path.
+
+Historical 0.47.1 deployment remains in its
+[deployment record](../docs/compatibility/bb-0.47.1/DEPLOYMENT.md), including live
+ACP delivery and explicit UI limits; it is not current 0.49 acceptance. Historical
+430 was superseded by 446, not retrospectively passed.
 
 This directory is the versioned catalog for patches applied to BB's bundled
 plugins. It is not a second plugin registry and it is not the work queue—BB
@@ -32,7 +38,8 @@ matching BB version. Tracked rollback coverage is explicit: historical 0.41
 payloads for Questions/Automations and [0.45 packages for all three plugins](rollback/bb-0.45.0/README.md).
 Matching archives also cover [0.46.0](rollback/bb-0.46.0/README.md),
 [0.46.1](rollback/bb-0.46.1/README.md) and
-[0.47.1](rollback/bb-0.47.1/README.md). Other historical deployments have local
+[0.47.1](rollback/bb-0.47.1/README.md) and
+[0.49.0](rollback/bb-0.49.0/README.md). Other historical deployments have local
 backups only; never use a different BB version's rollback payload.
 
 Historical BB 0.46.1 deployment on 2026-10-20 is preserved in
@@ -45,9 +52,9 @@ preflight; its HEAD must match the catalog's immutable source commit.
 
 | Built-in plugin | Patch | Status |
 | --- | --- | --- |
-| `ask-user-question` | [ACP answer continuation](ask-user-question/README.md) | BB 0.47.1 deployed; live ACP delivery passed, rendered-button input unverified |
+| `ask-user-question` | [ACP answer continuation](ask-user-question/README.md) | BB 0.49.0 candidate; source gates/stage evidence in audit, root acceptance pending |
 | `automations` | [Personal-project availability](automations/README.md) | Retired; keep pristine built-in |
-| `tasks` | [Thread workflow](tasks/README.md) | BB 0.47.1 deployed; scoped indexed read verified |
+| `tasks` | [Thread workflow](tasks/README.md) | BB 0.49.0 candidate; indexed RPC/parenting retained, root acceptance pending |
 
 Deployment on 2026-10-09 reran the exact-source preflight (43 Questions, 136
 Automations, 412 Tasks tests, plus typechecks/builds). All installed artifacts

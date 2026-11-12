@@ -48,10 +48,10 @@ absent-caller omission, and spawn-error propagation without task advancement.
 Only the host SDK boundary is fake; the Tasks implementations and DB are real.
 
 All cataloged Tasks releases (0.42.0, 0.42.1, 0.43.1, 0.43.3, 0.43.4, 0.44.0,
-0.45.0, 0.46.0, 0.46.1 and 0.47.1) explicitly select this shared seam profile.
-There is no new dependency or historical bypass. Actual native acceptance in
-this change is **0.47.1 only**; older release suites/builds were not rerun or
-retrospectively certified. Their existing exact-source/patch checks still apply;
+0.45.0, 0.46.0, 0.46.1, 0.47.1 and 0.49.0) explicitly select this shared seam profile.
+There is no new dependency or historical bypass. Original native acceptance was **0.47.1**. The 0.49 audit repeats the same
+24-test profile and both failure mutations against exact **0.49.0**; older
+release suites/builds were not rerun or retrospectively certified. Their existing exact-source/patch checks still apply;
 any incompatible patch, harness or profile blocks that release until reviewed.
 A future catalog entry must explicitly select a reviewed profile.
 
@@ -64,12 +64,16 @@ The untouched patched workspace passes before and after both mutations.
 
 ```sh
 node --test scripts/bb-plugin-patch-sync.test.mjs
-# Private COPY of an existing release-pinned patched build workspace with deps:
+# Private COPY of an existing 0.47.1 patched build workspace with deps:
 printf 'BBPLUG-434 disposable\n' > "$DISPOSABLE_BB_SOURCE/.bb-catalog-disposable"
 BB_PATCH_BEHAVIOR_TEST_SOURCE="$DISPOSABLE_BB_SOURCE" \
   BB_PATCH_BEHAVIOR_TEST_LOG_ROOT="$GATE_LOG_ROOT" \
   node --test scripts/bb-plugin-behavior-gates.native.test.mjs
 ```
+
+The checked-in native mutation runner is pinned to 0.47.1. The 0.49 audit
+retains its version/path-selected 0.49 copy and exact reports as task evidence;
+the production pipeline uses the catalog-selected shared 24-test profile.
 
 Never place the marker in pristine source or a shared/installed workspace.
 The native acceptance runner intentionally mutates and restores only that private
@@ -77,6 +81,19 @@ copy; it does not install dependencies, build app artifacts, stage or deploy.
 The [current audit](../../docs/compatibility/bb-0.47.1/README.md#mandatory-tasks-behavior-gate)
 records validation and limits. The accepted artifact manifest and rollback
 payload remain unchanged by this test-only catalog/pipeline change.
+
+## BB 0.49.0 candidate audit (2026-11-12)
+
+Exact `desktop-v0.49.0`, SHA `7b26cae79ec978fafd0a5db0e8517e94f12eb8f4`,
+BB 0.49.0 / SDK 0.6.132. Retain indexed RPC and caller-parent forwarding in
+[thread-workflow-v0.49.patch](thread-workflow-v0.49.patch). API/contract insertion
+contexts changed; Sidebar's completed-task preview contract is preserved. The
+mandatory 24-test native profile remains required before any staging.
+
+[Current audit and exact gates](../../docs/compatibility/bb-0.49.0/README.md),
+[deployment-ready boundary](../../docs/compatibility/bb-0.49.0/DEPLOYMENT-READY.md),
+and [version-matched rollback](../rollback/bb-0.49.0/README.md).
+Root owns deployment and live acceptance; worker makes no installed writes or reload.
 
 ## BB 0.47.1 compatibility preflight (2026-10-26)
 

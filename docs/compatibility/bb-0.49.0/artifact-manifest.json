@@ -1,0 +1,102 @@
+{
+  "bbVersion": "0.49.0",
+  "sdkVersion": "0.6.132",
+  "sourceCommit": "7b26cae79ec978fafd0a5db0e8517e94f12eb8f4",
+  "candidateCommit": "c84a819f2b1293c3f4420c19068762d80c138eba",
+  "stageRoot": "/Users/matthewsaw/.bb/patch-staging/bb-0.49.0-2026-11-12T03-48-30-653Z",
+  "buildSourceRoot": "/var/folders/2p/_p95gdmd3rv2qzzhs0h2y2th0000gn/T/bb-plugin-sync-0.49.0-x70Mtb/bb",
+  "appRoot": "/Applications/bb.app/Contents/Resources/app.asar.unpacked/node_modules/bb-app",
+  "requiredFiles": [
+    "server.js",
+    "server.js.map",
+    "server.meta.json",
+    "app.js",
+    "app.css",
+    "app.meta.json"
+  ],
+  "rollbackManifest": "../../../bb-plugins/rollback/bb-0.49.0/manifest.json",
+  "patches": [
+    {
+      "path": "bb-plugins/ask-user-question/acp-continuation-v0.49.patch",
+      "sha256": "f008c39c481c0843156c51c1dbc9f9debc45999bc76fb3f8ccb6c41018fb672e"
+    },
+    {
+      "path": "bb-plugins/tasks/thread-workflow-v0.49.patch",
+      "sha256": "60c9448480df412ef6f3ea83e472f5eabbb9f5b402a1a016bd5c51321d5665ac"
+    }
+  ],
+  "plugins": [
+    {
+      "pluginId": "ask-user-question",
+      "installedPath": "server/dist/builtin-plugins/ask-user-question/dist",
+      "artifacts": [
+        {
+          "file": "server.js",
+          "size": 220255,
+          "sha256": "ad4a53645533e23bb9028e84c7d460aefc486e576d72d674774c1285659616e6"
+        },
+        {
+          "file": "server.js.map",
+          "size": 337018,
+          "sha256": "92412f75cda73fb8074b51583c71e128fe0a87525ba84e868bddf26c74ebb8b6"
+        },
+        {
+          "file": "server.meta.json",
+          "size": 223,
+          "sha256": "1adb66093a9b7f1f14ee400be29f3e016fe46e44b06f3db731d24324b229c413"
+        },
+        {
+          "file": "app.js",
+          "size": 231570,
+          "sha256": "ac19fd13f4efad761f0a30a26df9ee5ad6507da80604d4a9c03445822b4a7bd0"
+        },
+        {
+          "file": "app.css",
+          "size": 51309,
+          "sha256": "ec8d528c58c4b55114b60e7780d137834c7c71abe55a58db396d3b15e0523b3a"
+        },
+        {
+          "file": "app.meta.json",
+          "size": 431,
+          "sha256": "e2394bf8d2fe8ea4cb8289ccf75105ad07a772895ce81034c52ac4fc51e470c8"
+        }
+      ]
+    },
+    {
+      "pluginId": "tasks",
+      "installedPath": "server/dist/builtin-plugins/tasks/dist",
+      "artifacts": [
+        {
+          "file": "server.js",
+          "size": 347940,
+          "sha256": "e98f15e203755f3f8445fc81dc05ea61feec52734f865b490813f0646317dc37"
+        },
+        {
+          "file": "server.js.map",
+          "size": 477184,
+          "sha256": "b6e734f650a76fe7f679a5c65fc205a268bc1a46b38f156518b4878ff4e07a77"
+        },
+        {
+          "file": "server.meta.json",
+          "size": 211,
+          "sha256": "e866aef92497418e80003d5fbe99ed266ba77d39b20b2954c989bfbf1e2ae27f"
+        },
+        {
+          "file": "app.js",
+          "size": 1056368,
+          "sha256": "e6e4ab9898e83ebc7cd4f4bca54744093c7cd5dfca5ef6c8712f8c5229a34387"
+        },
+        {
+          "file": "app.css",
+          "size": 165303,
+          "sha256": "82226224566ad060dae7c964d3a7d57178c0fcc2d6a026fd5150e8a926473af1"
+        },
+        {
+          "file": "app.meta.json",
+          "size": 512,
+          "sha256": "cb5d128ee5e9ccfe2dc789e3a5edad949b65f1f6bc523ed928152e2ca229f89c"
+        }
+      ]
+    }
+  ]
+}

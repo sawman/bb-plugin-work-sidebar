@@ -7,7 +7,7 @@ the `providerId` incident was caused by a core/plugin artifact skew.
 
 ## Release rule
 
-Do not deploy a new BB version or edit this patch until every automated gate
+Do not accept or deploy a new patch candidate until every automated gate
 below passes against the exact `desktop-v<installed-version>` source commit.
 After deployment, complete the live smoke matrix before considering the patch
 active. Record the BB version, source commit, artifact hashes, commands, and
@@ -15,8 +15,12 @@ results in the versioned rollback manifest or the related BB Task evidence.
 
 ## Automated gates
 
-Run these through `npm run bb-plugins:sync`; it must stop before staging if
-any gate fails.
+`npm run bb-plugins:sync` owns immutable-source, dependency, mandatory Tasks
+behavior, retained-plugin suite/typecheck/build and metadata gates. Since 0.43.3
+Questions is plugin-only: no core artifact is patched or staged. Run the core
+type/interaction/dispatch/tool-route checks below separately against the same
+exact source and record their results before accepting any stage for deployment.
+A successful sync is not evidence those supplementary core checks ran.
 
 | Layer | Required proof |
 | --- | --- |
@@ -25,15 +29,17 @@ any gate fails.
 | Core types | `turbo run typecheck --filter=@bb/server --force` passes after patches apply. |
 | Core interaction behavior | Focused pending-interaction tests prove a blocking interaction gates messages and a non-blocking plugin form remains pending while messages dispatch. |
 | Core dispatch states | Focused thread-dispatch tests send an ACP answer to idle and active/running threads, prove ordinary forms still produce an `interaction` wait, and prove a real provider-capacity wait remains a provider/plugin wait rather than being masked by the question form. |
-| Core tool route | Focused internal tool-call test proves a provider ID reaches the plugin context on current BB; plugin fallback is separately tested with that field absent. |
+| Core tool route | Focused internal tool-call tests verify current host plugin context/dispatch. The plugin supports a provided provider ID and safely reads the thread when absent; both paths are covered separately. |
 | Plugin types | `turbo run typecheck --filter=bb-plugin-ask-user-question --force` passes. |
-| Plugin behavior | Focused plugin tests cover native blocking calls and ACP non-blocking calls, provider lookup fallback, validation, queueing, answer delivery, dismissal, and final-form cleanup. |
-| Built artifact | `bb plugin build .` emits all six plugin artifacts with the expected plugin ID and BB version. The patched core build emits both cataloged core artifacts. |
+| Plugin behavior | Focused plugin tests cover ordinary blocking calls and ACP non-blocking calls, provider lookup fallback, validation, queueing, answer delivery, dismissal, and final-form cleanup. |
+| Built artifact | `bb plugin build .` emits all six plugin artifacts with the expected plugin ID and BB version. Core artifacts are required only when explicitly cataloged for that historical release; the current plan has none. |
 | Artifact boundary | The staged manifest lists exactly the cataloged plugin and core targets, and every staged file exists and has a recorded hash. |
 
-The sync script must apply patches **before** building the core and must install
-dependencies **before** invoking Turbo. It stages only; `--deploy` is a
-separate, reviewed action.
+The sync script must apply patches before builds and install frozen dependencies
+before Turbo. It stages only in current use. Never use its historical unchecked
+`--deploy` path. The strict artifact verifier and exact release's
+[deployment runbook](../../docs/compatibility/bb-0.49.0/DEPLOYMENT-READY.md)
+are mandatory. Core guard failures block acceptance even if artifacts were staged.
 
 ## Required behavioral corpus
 
@@ -43,10 +49,10 @@ These tests belong in the pinned BB source patch, not only in this repository.
 
 | Case | Expected result |
 | --- | --- |
-| Native provider with a user-question capability | One host form; tool waits; answer returns the normal combined answer object. |
+| Native provider with a user-question capability | Plugin tool is hidden; the provider retains its native question behavior. Non-ACP providers without native questions use the ordinary shared form and combined result. |
 | `acp-cursor`, `acp-opencode`, and another arbitrary `acp-*` provider | Tool returns promptly with the pending acknowledgement; form remains visible; no timeout. |
 | ACP context includes `providerId` | ACP mode is selected without an extra thread read. |
-| Older host context omits `providerId` | Plugin reads the thread provider safely; it never calls `startsWith` on `undefined`. |
+| Host context omits `providerId` (current supported SDK path) | Plugin reads the thread provider safely; it never calls `startsWith` on `undefined`. |
 | Provider lookup fails | No crash; safe blocking behavior is used and an informational log is emitted. |
 | Non-ACP provider | Existing blocking behavior is unchanged. |
 
@@ -94,7 +100,7 @@ contents. A failure must print the seed/case tuple for exact reproduction.
 | Answer arrives while agent is idle | `threads.send({ mode: "auto" })` starts/steers the agent without manual Resume. |
 | Answer arrives while agent is actively working | The answer is delivered as a follow-up without cancelling unrelated work. |
 | Answer arrives while a normal blocking interaction exists | The normal interaction retains its existing dispatch semantics; no bypass is introduced. |
-| Plugin reload / server restart with queued questions | Queue persistence and post-restart answer delivery behave according to the stored interaction state; no duplicate messages. |
+| Plugin reload / server restart with queued questions | Not a persistence guarantee: ACP queue is in memory and disposal interrupts pending/resolving plugin forms. Defer Questions writes/reload until the native zero-form gate passes; do not manufacture zero or run a destructive live probe. |
 | Abort signal from original ACP tool call | The non-blocking request is retained and can still be answered after the tool call has returned. |
 | Original tool-call timeout | The same as abort: a later inbox answer is accepted and sent exactly once; the original timeout must never cancel the display-only form. |
 | Queue delivery while provider is unavailable | The question is retained after `threads.send` rejects; one explicit retry sends it once when delivery recovers. |
@@ -103,11 +109,13 @@ contents. A failure must print the seed/case tuple for exact reproduction.
 
 ## Deployment and rollback smoke matrix
 
-Run this against the installed artifacts after `npm run bb-plugins:sync -- --deploy`
-and a BB restart. Do not claim success from a source build alone.
+Root runs this only after the exact release's strict artifact verification,
+zero-form disposal gate, reviewed deployment and plugin reload. Plugin-only
+patches need no BB restart. Source builds do not certify live acceptance.
 
-1. Confirm the installed built-in plugin and core `start-server` contain the
-   expected patch markers and their hashes match the staged manifest.
+1. Confirm the complete installed plugin sets match the accepted artifact and
+   pristine manifests. Check core artifacts only for a historical release whose
+   catalog explicitly includes them; current Questions/Tasks are plugin-only.
 2. Spawn a disposable `acp-cursor` child thread in a managed worktree.
 3. Have it ask one question, submit an answer through the **rendered UI Send
    button**, and confirm the agent prints/acts on the answer without Resume.
@@ -126,15 +134,19 @@ useful evidence, but does not replace the next available rendered-button test.
 
 ## Rollback
 
-Before deployment, the sync command backs up every cataloged plugin and core
-artifact. On any failed smoke step:
+Before root deployment, the strict verifier checks and backs up all three
+complete plugin sets. On a failed smoke step:
 
-1. Restore the version-matched backup files, including `start-server.js` and
-   its map when core artifacts were deployed.
-2. Restart BB.
-3. Confirm the old artifact hashes and run one native question smoke.
-4. Leave the incident and rollback evidence on the related BB Task; do not
-   retry a deployment until the failed case has a regression test.
+1. Preserve any user forms and pass the Questions zero-form disposal gate before
+   Questions restoration writes and again before its reload. Never clear forms
+   or assume byte rollback restores an in-memory queue.
+2. Restore only the exact release's verified full-set backup or pristine rollback
+   archives; verify every hash and exact directory membership. Current plugin-only
+   patches require plugin reload, not a BB restart. Historical core restore/restart
+   applies only where that release explicitly cataloged core artifacts.
+3. Record rollback/readback and the remaining live acceptance gap in the owning
+   BB Task. Root owns any further smoke; no new live form is required for this
+   worker's source audit. Do not retry until the failure has a regression test.
 
 ## BB 0.46.0 automated execution coverage
 

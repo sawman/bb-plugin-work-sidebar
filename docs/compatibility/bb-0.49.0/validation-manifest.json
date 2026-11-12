@@ -1,0 +1,394 @@
+{
+  "checkedAt": "2026-11-12T03:59:58.230753+00:00",
+  "bbVersion": "0.49.0",
+  "sdkVersion": "0.6.132",
+  "workerBase": "3ce2f2e226f1c5421780ddc91acd5a6f37fb74b6",
+  "candidateCommit": "c84a819f2b1293c3f4420c19068762d80c138eba",
+  "sourceCommit": "7b26cae79ec978fafd0a5db0e8517e94f12eb8f4",
+  "deployment": "not performed; root owns review, zero-form gate, deployment and live acceptance",
+  "archive": {
+    "path": "/Users/matthewsaw/.bb/thread-storage/thr_vxaxfmk2rh/bb-0.49.0-patch-audit-evidence.tar.gz",
+    "size": 317295,
+    "sha256": "608a0b9644411299534dcfc98d69dff9941a3f70af18f2bb66ec219a0357bc0c"
+  },
+  "rawFiles": [
+    {
+      "file": "preflight-initial.log",
+      "size": 579,
+      "sha256": "d98acd8fc683d12c6ba1f3f5f645ba189ff6a25070b2ef93c919d8201e91bce9"
+    },
+    {
+      "file": "source-retrieval.log",
+      "size": 3132,
+      "sha256": "319e77fbe30a90dc4c0260ffbfcd0ebd1c65abbc737837fd19c3f89ac2e20e8d"
+    },
+    {
+      "file": "source-install.log",
+      "size": 32864,
+      "sha256": "9c482dad7a3daa5caad5b428b8cde8a2589940eaeab2acd21a8762b1e6bb33c8"
+    },
+    {
+      "file": "source-sdk-build.log",
+      "size": 1882,
+      "sha256": "35f5f2491e2d3a43ce8842ef2c5fffc9840f8f4bd10a3358c4c32f9e78c9020f"
+    },
+    {
+      "file": "questions-initial-apply.log",
+      "size": 1997,
+      "sha256": "d71bec58ce93a9d29128f17b5df09b52648eaf973d1ad409f7eaba8306b1d3e5"
+    },
+    {
+      "file": "tasks-initial-apply.log",
+      "size": 1509,
+      "sha256": "b3d3b904a6db384daf32417c4cf767e046218954e4fc80f39d242369b41ccbd1"
+    },
+    {
+      "file": "questions-old-apply.log",
+      "size": 120,
+      "sha256": "8cc04858125341e9198c9459f8335bddd334eb233d9f998ea41d3a5463cf9396"
+    },
+    {
+      "file": "tasks-old-apply.log",
+      "size": 228,
+      "sha256": "ef4911f2a38d8f3c4beb4a1387d54c7e1a3ad50bf379664423838aa403c456ac"
+    },
+    {
+      "file": "old-patch-results.json",
+      "size": 598,
+      "sha256": "e3c201b23cde22e50d9d1eede2c99d7678551c6b475e7fe2804721930d412a81"
+    },
+    {
+      "file": "questions-required-red.log",
+      "size": 1444,
+      "sha256": "2c1c3a50b6ada036826a9ad57ddff5e88d602c016289cc4fc565b5c729c9d435"
+    },
+    {
+      "file": "questions-required-green.log",
+      "size": 281,
+      "sha256": "6829b321bf372ac907ca4e84a794ae6bce184244acefbdede1714ebd4c17c3ef"
+    },
+    {
+      "file": "native-049.test.mjs",
+      "size": 4579,
+      "sha256": "00aea31c80ba2eb2d4d9e06657f00f8de7b6ab91552ab43a06cbe3fb5c320bd2"
+    },
+    {
+      "file": "native-049.log",
+      "size": 2058,
+      "sha256": "16c4ac95663df0b93a49dcad00adb79d776045b90e1bcc3aaa42c1ac75e277f2"
+    },
+    {
+      "file": "sync-fixtures.log",
+      "size": 1124,
+      "sha256": "30f05c6bd657638532384ec94d7e5b2515780c369c0abb05429e9b24ff5481d6"
+    },
+    {
+      "file": "artifact-verifier-tests.log",
+      "size": 495,
+      "sha256": "143648ffad57385ee723c4ca42d8f147922e24c1a7f3fd144f5af40b9bfa2563"
+    },
+    {
+      "file": "preflight-049.log",
+      "size": 44661,
+      "sha256": "8eafc10c74546ed84542a60ec25ca101c83bc95c75c2c1c82204764ce230a21d"
+    },
+    {
+      "file": "core-typecheck.log",
+      "size": 3561,
+      "sha256": "0631cb9d2e518da67b7ba9cf5008a1d99bc521e4fb15969da62cad4c3b456c86"
+    },
+    {
+      "file": "core-behavior.log",
+      "size": 1211,
+      "sha256": "464111e2d4caf60b7e12dff888cdb459b0976ec4c238fdf38450749360855e21"
+    },
+    {
+      "file": "automations-tests.log",
+      "size": 302,
+      "sha256": "c6066a3bb9f272b129a0457213b52521ca4fd49a6f262a7980671fd841f97120"
+    },
+    {
+      "file": "automations-typecheck.log",
+      "size": 6148,
+      "sha256": "dd2a7d0739fd435692eb7c5956fb589b9919a47bf5b8fcb0cf3a5862a2c0491c"
+    },
+    {
+      "file": "automations-dependency-build.log",
+      "size": 2611,
+      "sha256": "87e06878e756f16a863728d4b7cfe9dbb82dd9fd0e75082c957ee6587c82020a"
+    },
+    {
+      "file": "automations-target-build.log",
+      "size": 291,
+      "sha256": "542634759f6ea66ec601f32507cf6b7c01dff87cbd3f98b990245033970af01c"
+    },
+    {
+      "file": "automations-results.json",
+      "size": 1599,
+      "sha256": "71c767e4a70f772b61282bc634701531a1dc4b6afeb9a1b9128958b6cb616017"
+    },
+    {
+      "file": "artifact-verify.log",
+      "size": 76,
+      "sha256": "95910895a76c82079b779815a26344689072f82bb945b9142c565c7e0422c713"
+    },
+    {
+      "file": "codesign.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "primary-queries.json",
+      "size": 2700,
+      "sha256": "74ac94e9201491970e6d6c0e6faffe8e2479174e9f38f154c5fc99d8d296b3bc"
+    },
+    {
+      "file": "source-filelist.txt.gz",
+      "size": 292824,
+      "sha256": "aa691c73faa1ed2826b50a34c6c4eb5a3cb1c05c113605e7c4ef5f215327c6db"
+    },
+    {
+      "file": "final-source-checks.log",
+      "size": 1255,
+      "sha256": "18bce76e1c46703518ba25fe47737ac63e841e1bb117a5f7dfe60431696e3757"
+    },
+    {
+      "file": "native-gate-reports/native-patched.json",
+      "size": 8312,
+      "sha256": "f774500466bca80e2d55eec09c551d8eb7b0dba6752673ec8739033478684fcd"
+    },
+    {
+      "file": "native-gate-reports/native-restored.json",
+      "size": 8308,
+      "sha256": "86e1c9a2ee47a705edad67e6d054b39a63064a1a87049fdf05eb034e42789fd7"
+    },
+    {
+      "file": "native-gate-reports/native-without-parent.json",
+      "size": 9791,
+      "sha256": "76a501358ee223566b5d0c9a5490af02856c16666abebdfd7b401d549d4ccada"
+    },
+    {
+      "file": "native-gate-reports/native-without-patch.json",
+      "size": 33156,
+      "sha256": "0c12f1161f884bbf0b77db9a1d42cf26a4e5ba7e4458d3928275030d5f2f064e"
+    },
+    {
+      "file": "documentation-checks.log",
+      "size": 171,
+      "sha256": "666f5ab190b61f2c39455b689ddd52b09b5f1da9991a2bef656fa756dd60fda8"
+    },
+    {
+      "file": "diff-check.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "initialFailures": [
+    {
+      "check": "cataloged initial non-mutating preflight",
+      "result": "failed: no BB 0.49.0 catalog entry",
+      "log": "preflight-initial.log",
+      "exit": null,
+      "exitNote": "Original shell retained npm error output but did not independently persist its numeric exit; do not infer a measured code."
+    },
+    {
+      "check": "old Questions patch apply --check",
+      "exit": 1,
+      "log": "questions-old-apply.log"
+    },
+    {
+      "check": "old Tasks patch apply --check",
+      "exit": 1,
+      "log": "tasks-old-apply.log"
+    },
+    {
+      "check": "ordinary required-answer owning regression RED",
+      "exit": 1,
+      "tests": {
+        "failed": 1,
+        "filtered": 11
+      },
+      "observed": "QuestionForm renders Optional when old raw questions prop drops release required adapter",
+      "log": "questions-required-red.log"
+    }
+  ],
+  "checks": [
+    {
+      "command": "pnpm install --frozen-lockfile",
+      "exit": 0,
+      "log": "source-install.log",
+      "limits": "Optional dtrace-provider Xcode/node-gyp detection fails internally; optional install and pnpm succeed. Missing unbuilt-bin warnings retained."
+    },
+    {
+      "command": "node_modules/.bin/turbo run build --filter=@get-bb/plugin-sdk --force",
+      "exit": 0,
+      "log": "source-sdk-build.log"
+    },
+    {
+      "command": "pnpm --filter bb-plugin-ask-user-question exec vitest run --no-file-parallelism app.test.tsx",
+      "exit": 0,
+      "files": 1,
+      "tests": 12,
+      "log": "questions-required-green.log"
+    },
+    {
+      "command": "BB_PATCH_BEHAVIOR_TEST_SOURCE=<private-patched-0.49> node --test native-049.test.mjs",
+      "exit": 0,
+      "acceptanceChecks": 4,
+      "nativeTests": 24,
+      "mutationFailures": {
+        "withoutPatch": 20,
+        "withoutCallerForwarding": 3
+      },
+      "stagingContinuationEnteredOnFailure": false,
+      "log": "native-049.log"
+    },
+    {
+      "command": "BB_PATCH_SOURCE_ROOT=<exact-local-release> npm run bb-plugins:sync -- --keep-workspace",
+      "exit": 0,
+      "questions": {
+        "files": 5,
+        "tests": 143
+      },
+      "tasksIncludingNativeGate": {
+        "files": 36,
+        "tests": 428
+      },
+      "mandatoryGate": 24,
+      "typechecks": "Questions and Tasks pass, native test included",
+      "builds": "dependency closure + target BB 0.49.0 CLI pass; metadata SDK 0.6.132",
+      "log": "preflight-049.log"
+    },
+    {
+      "command": "node_modules/.bin/turbo run typecheck --filter=@bb/server --force",
+      "exit": 0,
+      "tasks": 6,
+      "log": "core-typecheck.log"
+    },
+    {
+      "command": "pnpm --filter @bb/server exec vitest run --no-file-parallelism test/services/pending-interactions.test.ts test/threads/thread-send-dispatch.test.ts test/threads/thread-execution-defaults.test.ts test/internal/internal-events-tool-calls.test.ts",
+      "exit": 0,
+      "files": 4,
+      "tests": 158,
+      "log": "core-behavior.log"
+    },
+    {
+      "label": "automations-tests",
+      "command": [
+        "pnpm",
+        "--filter",
+        "bb-plugin-automations",
+        "exec",
+        "vitest",
+        "run",
+        "--no-file-parallelism"
+      ],
+      "cwd": "/var/folders/2p/_p95gdmd3rv2qzzhs0h2y2th0000gn/T/bb-plugin-sync-0.49.0-x70Mtb/bb",
+      "exit": 0,
+      "log": "automations-tests.log",
+      "files": 12,
+      "tests": 166
+    },
+    {
+      "label": "automations-typecheck",
+      "command": [
+        "/var/folders/2p/_p95gdmd3rv2qzzhs0h2y2th0000gn/T/bb-plugin-sync-0.49.0-x70Mtb/bb/node_modules/.bin/turbo",
+        "run",
+        "typecheck",
+        "--filter=bb-plugin-automations",
+        "--force"
+      ],
+      "cwd": "/var/folders/2p/_p95gdmd3rv2qzzhs0h2y2th0000gn/T/bb-plugin-sync-0.49.0-x70Mtb/bb",
+      "exit": 0,
+      "log": "automations-typecheck.log"
+    },
+    {
+      "label": "automations-dependency-build",
+      "command": [
+        "/var/folders/2p/_p95gdmd3rv2qzzhs0h2y2th0000gn/T/bb-plugin-sync-0.49.0-x70Mtb/bb/node_modules/.bin/turbo",
+        "run",
+        "build",
+        "--filter=bb-plugin-automations",
+        "--force"
+      ],
+      "cwd": "/var/folders/2p/_p95gdmd3rv2qzzhs0h2y2th0000gn/T/bb-plugin-sync-0.49.0-x70Mtb/bb",
+      "exit": 0,
+      "log": "automations-dependency-build.log"
+    },
+    {
+      "label": "automations-target-build",
+      "command": [
+        "/Applications/bb.app/Contents/Resources/app.asar.unpacked/node_modules/bb-app/host-daemon/dist/bb",
+        "plugin",
+        "build",
+        "."
+      ],
+      "cwd": "/var/folders/2p/_p95gdmd3rv2qzzhs0h2y2th0000gn/T/bb-plugin-sync-0.49.0-x70Mtb/bb/plugins/automations",
+      "exit": 0,
+      "log": "automations-target-build.log"
+    },
+    {
+      "command": "node --test scripts/bb-plugin-patch-sync.test.mjs",
+      "exit": 0,
+      "tests": 15,
+      "log": "sync-fixtures.log"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 bb-plugins/verify-artifacts.test.py",
+      "exit": 0,
+      "tests": 7,
+      "log": "artifact-verifier-tests.log"
+    },
+    {
+      "command": "python3 bb-plugins/verify-artifacts.py docs/compatibility/bb-0.49.0/artifact-manifest.json",
+      "exit": 0,
+      "stagedFiles": 12,
+      "pristineInstalledFiles": 21,
+      "log": "artifact-verify.log"
+    },
+    {
+      "command": "codesign --verify --deep --strict /Applications/bb.app",
+      "exit": 0,
+      "log": "codesign.log"
+    },
+    {
+      "check": "rollback archive and member exact membership/size/hash verification",
+      "exit": 0,
+      "archives": 3,
+      "members": 21
+    },
+    {
+      "check": "frozen candidate patch bytes + clean exact source + retired source unchanged",
+      "exit": 0,
+      "log": "final-source-checks.log"
+    },
+    {
+      "check": "Markdown local paths/fragments, deletion inventory, Python native gate recipe syntax",
+      "exit": 0,
+      "markdownFiles": 9,
+      "localLinksAndFragments": 90,
+      "deletedFiles": 0,
+      "liveInventoryExecuted": false,
+      "log": "documentation-checks.log"
+    },
+    {
+      "command": "git diff --cached --check",
+      "exit": 0,
+      "log": "diff-check.log"
+    }
+  ],
+  "limits": [
+    "No installed writes, builtin reload, BB restart, UI/navigation/draft/theme/zoom mutation, live questions or automations.",
+    "Root has not run current zero-pending/resolving Questions inventory; required before Questions writes and immediately before reload.",
+    "Source/cached ZIP provenance is local parity with updater SHA512 and app signature verification; no independent source-to-binary attestation or signed source-tag certification.",
+    "Full Sidebar SDK/package/build/live gates belong to BBPLUG-466/root, not this worker.",
+    "Vite future native config __dirname warning, Node DEP0205, and missing complete history marketplace-date warning are retained; no suppressions or source workarounds."
+  ],
+  "finalGithubActiveAccount": "matthew-se (locally verified; no remote write)",
+  "evidenceAttachment": {
+    "taskKey": "BBPLUG-467",
+    "id": "01M76YNMWE63NWDB0XZXT8421W",
+    "fileName": "bb-0.49.0-patch-audit-evidence.tar.gz",
+    "sizeBytes": 317295
+  }
+}

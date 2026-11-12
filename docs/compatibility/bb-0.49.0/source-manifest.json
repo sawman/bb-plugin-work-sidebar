@@ -1,0 +1,207 @@
+{
+  "sourceRef": "desktop-v0.49.0",
+  "sourceCommit": "7b26cae79ec978fafd0a5db0e8517e94f12eb8f4",
+  "sourceParent": "bcfdf1ca3c3a6ff60385ab323c5a551f943a0bff",
+  "sourceTree": "703b4d489c39f1c7f83eb464d25f227432b5f31c",
+  "sourceRoot": "/Users/matthewsaw/.bb/patch-sources/desktop-v0.49.0",
+  "pristine": true,
+  "bbVersion": "0.49.0",
+  "sdkVersion": "0.6.132",
+  "canonicalWorkerBase": "3ce2f2e226f1c5421780ddc91acd5a6f37fb74b6",
+  "checkedAt": "2026-11-12T03:40:50.871308+00:00",
+  "retrieval": "Single depth-1 HTTPS Git clone of exact release tag after checking local source cache; sawman verified before operation and matthew-se restored/verified afterward. Subsequent clones/builds use local source only.",
+  "provenanceLimits": [
+    "The cached ZIP SHA512 matches local updater metadata and installed code signature verifies; updater metadata is not an independently fetched/signed release digest.",
+    "Installed bundle version and 21 plugin artifact bytes match cached ZIP; this does not prove reproducible builds from source or a signed source tag.",
+    "Source commit is pinned from fetched exact release tag. No independent source-to-binary attestation was available."
+  ],
+  "sourceFilelist": {
+    "path": "/Users/matthewsaw/.bb/thread-storage/thr_vxaxfmk2rh/source-filelist.txt.gz",
+    "entries": 8632,
+    "rawBytes": 905121,
+    "rawSha256": "8a612636ca896bc768db98122b5bdd57bb8109d45e02d39f1de03f4dca24f07c"
+  },
+  "primaryQueryLog": "/Users/matthewsaw/.bb/thread-storage/thr_vxaxfmk2rh/primary-queries.json",
+  "files": [
+    {
+      "path": "plugins/ask-user-question/src/server.ts",
+      "size": 4446,
+      "sha256": "960920cb3fe0b55584cef4291c3991e62dde6218db0f8b032535a2d7cc91802c",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/plugins/ask-user-question/src/server.ts"
+    },
+    {
+      "path": "plugins/ask-user-question/app.tsx",
+      "size": 1762,
+      "sha256": "96f3a9dce5a2f22110645eb427e7f47c522906f671d169129f721ed384cc4f4b",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/plugins/ask-user-question/app.tsx"
+    },
+    {
+      "path": "plugins/tasks/shared/contract.ts",
+      "size": 23960,
+      "sha256": "30e4114364400621f203342851f2e22f5d0064f0c206075d09bc41e7439b7dfb",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/plugins/tasks/shared/contract.ts"
+    },
+    {
+      "path": "plugins/tasks/api/index.ts",
+      "size": 35426,
+      "sha256": "afad2dfea72e43cce05a2324a7f7eca63dc978405dc8713415d124f2b1014fc2",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/plugins/tasks/api/index.ts"
+    },
+    {
+      "path": "plugins/tasks/db/store.ts",
+      "size": 58337,
+      "sha256": "5691ef02ced8c1b26ebc109086e0290d18ccfd2feb8f5d4d575362e8b629b29c",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/plugins/tasks/db/store.ts"
+    },
+    {
+      "path": "plugins/tasks/cli/index.ts",
+      "size": 98111,
+      "sha256": "bf7e8070bf5284a03b736598c47b67882313f849203a429babfa508ad9f314b9",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/plugins/tasks/cli/index.ts"
+    },
+    {
+      "path": "plugins/tasks/delegate/index.ts",
+      "size": 12814,
+      "sha256": "b2c58deb1a9727965459c605ca770859052bbea218f3a7d735c2a594b954d5ed",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/plugins/tasks/delegate/index.ts"
+    },
+    {
+      "path": "plugins/tasks/delegate/contract.ts",
+      "size": 885,
+      "sha256": "8e4002a6d812d1c0a6929653fe68125dec7704444e5b6c0c5eeb67be71d60da9",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/plugins/tasks/delegate/contract.ts"
+    },
+    {
+      "path": "plugins/automations/src/service.ts",
+      "size": 30858,
+      "sha256": "b163c58e9390f200c5ba02b0cb834d373a14b62440c87e899adaaf3e8bbe3c7f",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/plugins/automations/src/service.ts"
+    },
+    {
+      "path": "plugins/provider-acp/src/declaration.ts",
+      "size": 3553,
+      "sha256": "2593a3c697bf32c3cdc5a860ea55f805f404aae935f87896eb47dfa9a56e4a35",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/plugins/provider-acp/src/declaration.ts"
+    },
+    {
+      "path": "packages/plugin-sdk/package.json",
+      "size": 8336,
+      "sha256": "ccc3420871426d23131f91b099e620de3cb482fbdfc8842a0fbea177c8ac0e0c",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/packages/plugin-sdk/package.json"
+    },
+    {
+      "path": "packages/plugin-sdk/src/app-contract.ts",
+      "size": 253410,
+      "sha256": "b2ee304fe4e84445d8d8bd4439da93309df8d57d5b17b960257a99ed937215c2",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/packages/plugin-sdk/src/app-contract.ts"
+    },
+    {
+      "path": "apps/app/src/App.tsx",
+      "size": 17129,
+      "sha256": "902000ded6ce6a685a4fac99a797156e4ed5ae0186e5a3f20580e705942ef5ad",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/apps/app/src/App.tsx"
+    },
+    {
+      "path": "apps/app/src/lib/url-open-routing.tsx",
+      "size": 3177,
+      "sha256": "6383c4b823f84c0d1c81b0119cac75a95d93f84d132d028b0aafd9ef9813bc6c",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/apps/app/src/lib/url-open-routing.tsx"
+    },
+    {
+      "path": "apps/app/src/components/plugin/PluginPanelRightPanelHost.tsx",
+      "size": 29553,
+      "sha256": "ff0a20e2ffa74f64c56f1b0dd8657b179d28ce39758093a1f856751f0e5796cc",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/apps/app/src/components/plugin/PluginPanelRightPanelHost.tsx"
+    },
+    {
+      "path": "apps/server/src/routes/projects.ts",
+      "size": 30237,
+      "sha256": "cd11e360438d9cf7c5267795da6352f05389fb742f45a205b638abf9d39e90b8",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/apps/server/src/routes/projects.ts"
+    },
+    {
+      "path": "apps/server/src/services/lib/entity-lookup.ts",
+      "size": 8239,
+      "sha256": "53619effaed2cddec142c228cc969dc5892149809cb2bf074275f21c49218dc2",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/apps/server/src/services/lib/entity-lookup.ts"
+    },
+    {
+      "path": "apps/server/src/services/plugins/plugin-runtime.ts",
+      "size": 74523,
+      "sha256": "24ed7e6a002b949888a3ee682ed3c884d42b14f8885de9374f5cbfa97c50d950",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/apps/server/src/services/plugins/plugin-runtime.ts"
+    },
+    {
+      "path": "apps/server/src/services/interactions/pending-interactions.ts",
+      "size": 38763,
+      "sha256": "a9abebb9fe7a367a899520a69491bcfeafc7f9e93d852cf6009e78e2549c0c04",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/apps/server/src/services/interactions/pending-interactions.ts"
+    },
+    {
+      "path": "apps/server/src/routes/threads/interactions.ts",
+      "size": 3164,
+      "sha256": "7b98b5ae71d22be635cdcc2bc38f4ae434170cb4a45f1cba7645105ddcf8b4a4",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/apps/server/src/routes/threads/interactions.ts"
+    },
+    {
+      "path": "packages/db/src/data/pending-interactions.ts",
+      "size": 11445,
+      "sha256": "cd3fff2d36c8cb7f65806529a99bc5df6aaec6ec619fabf95ae12fc0f3bfe0e4",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/packages/db/src/data/pending-interactions.ts"
+    },
+    {
+      "path": "apps/cli/src/commands/thread/list.ts",
+      "size": 5844,
+      "sha256": "c518f97de7a2ac989930302b9f5dc38f0ccf57590a15df7391dab61f0c594989",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/apps/cli/src/commands/thread/list.ts"
+    },
+    {
+      "path": "apps/cli/src/commands/thread/interactions.ts",
+      "size": 26674,
+      "sha256": "a97ddf44749138cbaabeb764662dd6a5cff34bc4c3c4fc9daf5665a99289953c",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/apps/cli/src/commands/thread/interactions.ts"
+    },
+    {
+      "path": "packages/domain/src/pending-interactions.ts",
+      "size": 26535,
+      "sha256": "f5b6c6680c7607f601446f2362f43508d14953e9da9fb23396d23aac39186c30",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/packages/domain/src/pending-interactions.ts"
+    },
+    {
+      "path": "packages/shared-ui/src/components/ui/question-form.tsx",
+      "size": 21210,
+      "sha256": "234d82728947c17c06b0a86a9ee79609ca29e6505a732107a0afeeab0dd5befe",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/packages/shared-ui/src/components/ui/question-form.tsx"
+    },
+    {
+      "path": "apps/server/src/services/threads/thread-default-policy.ts",
+      "size": 16039,
+      "sha256": "058bd0c819db4096a7ee14af8c674b2347a3824d3c32122c14315c3f2986a481",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/apps/server/src/services/threads/thread-default-policy.ts"
+    },
+    {
+      "path": "apps/server/src/services/threads/project-execution-defaults.ts",
+      "size": 5906,
+      "sha256": "ebcbaf5edab9b467cbbbaac8dd826521054c2391f6942b6965b2f0e58a1b0e51",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/apps/server/src/services/threads/project-execution-defaults.ts"
+    },
+    {
+      "path": "apps/server/src/services/threads/thread-execution-plan.ts",
+      "size": 11703,
+      "sha256": "4e17a59ccf43b174357d2ca7bd7065616b55293ac58806cbdfbeaf4449683bfe",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/apps/server/src/services/threads/thread-execution-plan.ts"
+    },
+    {
+      "path": "apps/server/test/threads/thread-execution-defaults.test.ts",
+      "size": 16017,
+      "sha256": "d5b1cc9534d9949bbb75edabf6fd9b5e03a1a040bb2e7c732fac1fbd698a2917",
+      "url": "https://github.com/get-bb/bb/blob/7b26cae79ec978fafd0a5db0e8517e94f12eb8f4/apps/server/test/threads/thread-execution-defaults.test.ts"
+    }
+  ],
+  "evidenceAttachment": {
+    "taskKey": "BBPLUG-467",
+    "id": "01M76YNMWE63NWDB0XZXT8421W",
+    "fileName": "bb-0.49.0-patch-audit-evidence.tar.gz",
+    "sizeBytes": 317295
+  }
+}

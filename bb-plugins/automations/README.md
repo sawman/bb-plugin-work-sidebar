@@ -13,6 +13,18 @@ list for the same active ID. It preserves the original direct-lookup error for
 missing, deleted, or unreadable projects. The source patch is
 [personal-projects.patch](personal-projects.patch).
 
+## BB 0.49.0 candidate audit (2026-11-12)
+
+Exact `desktop-v0.49.0`, SHA `7b26cae79ec978fafd0a5db0e8517e94f12eb8f4`,
+BB 0.49.0 / SDK 0.6.132. Keep pristine and retired. Exact native service explicitly
+accepts personal projects; read-only live `proj_personal` succeeds. No automation
+was created or changed.
+
+[Current audit and exact gates](../../docs/compatibility/bb-0.49.0/README.md),
+[deployment-ready boundary](../../docs/compatibility/bb-0.49.0/DEPLOYMENT-READY.md),
+and [version-matched rollback](../rollback/bb-0.49.0/README.md).
+Root owns deployment and live acceptance; worker makes no installed writes or reload.
+
 ## BB 0.47.1 compatibility preflight (2026-10-26)
 
 Exact `desktop-v0.47.1`, SHA `5e1acd765039e874643f34c4d35409e58484e408`,
@@ -115,16 +127,13 @@ no automation was created to test this read-only compatibility decision.
 
 ## Update procedure
 
-Use the cataloged sync job from the repository root:
+Automations is retired from the current patch plan. Keep its built-in artifacts
+pristine; do not deploy the historical personal-project patch. On each release,
+verify native personal-project availability, run the pristine plugin's focused
+suite/typecheck/build, and verify the installed set against that exact release.
 
-```sh
-npm run bb-plugins:sync
-# inspect the staged artifacts, then:
-npm run bb-plugins:sync -- --deploy
-```
-
-It clones the exact `desktop-v<installed-version>` source tag, verifies every
-patch against its immutable commit, runs focused tests/typecheck, builds each
-built-in plugin, and stages artifacts before deployment. A new BB version with
-no catalog entry fails closed; rebase the patch and update
-[`registry.json`](../registry.json) first.
+Run `npm run bb-plugins:sync` for retained Questions/Tasks source gates. A missing
+catalog entry fails closed. Root deployment uses only the exact release's strict
+[artifact verifier and runbook](../../docs/compatibility/bb-0.49.0/DEPLOYMENT-READY.md),
+which preserve Automations' complete pristine set. Never use sync's unchecked
+`--deploy` copy path or restore another release's rollback payload.
